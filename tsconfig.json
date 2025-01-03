@@ -1,0 +1,41 @@
+{
+    "compilerOptions": {
+        "noUncheckedIndexedAccess": true,
+        "moduleDetection": "auto",
+        "allowJs": true,
+        "checkJs": true,
+        "module": "ESNext",
+        "target": "ESNext",
+        "lib": [
+            "es2020",
+            "es2015",
+            "es2019",
+            "dom",
+            "scripthost",
+            "dom.iterable",
+            "ES5",
+            "ES6",
+            "esnext"
+        ],
+        "outDir": "./public/",
+        "sourceRoot": "./test/",
+        "sourceMap": true,
+        "rootDir": ".",
+        "paths": {
+            "@/*": ["./public/*"]
+        },
+        "typeRoots": ["/node_modules/", "./src/dashboard/**/*"],
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "skipLibCheck": true
+    },
+    "vueCompilerOptions": {
+        "target": 3.5
+    },
+    "exclude": ["./public/**/*"],
+    "typeAcquisition": {
+        "enable": true,
+        "include": ["vue", "pinia", "code-tag", "sweetalert2", "SweetAlertIcon"]
+    }
+}
