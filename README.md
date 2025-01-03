@@ -29,13 +29,13 @@ npm install
 Para iniciar el proceso de compilación y observación de archivos, ejecuta:
 
 ```sh
-node index.js
+node dist/index.js
 ```
 
 Puedes agregar los parámetros `--all` y `--prod` según sea necesario:
 
 ```sh
-node index.js --all --prod
+node dist/index.js --all --prod
 ```
 
 ## Funcionalidades
