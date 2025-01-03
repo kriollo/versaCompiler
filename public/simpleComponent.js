@@ -1,5 +1,7 @@
 import { app } from '/public/dashboard/js/vue-instancia.js';
 import { ref } from 'vue';
+import { add } from '/public/sampleFile.js';
+const result = add(1, 2);
 const message = ref('Hello, World!');
 import { createElementVNode as _createElementVNode, toDisplayString as _toDisplayString, Fragment as _Fragment, openBlock as _openBlock, createElementBlock as _createElementBlock } from "vue";
 function render(_ctx, _cache, $props, $setup, $data, $options) {

@@ -2,6 +2,9 @@
     import { ref } from 'vue';
     import type { Ref } from 'vue';
 
+    import { add } from '@/sampleFile';
+
+    const result = add(1, 2);
     const message: Ref<string> = ref('Hello, World!');
 </script>
 <template>
