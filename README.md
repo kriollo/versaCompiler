@@ -16,11 +16,11 @@ npm install
 
 ### Comandos globales
 
-- `node --run compile`: Modo de escucha para compilar el archivo que ha sido guardado en la carpeta definida como `src`.
+- `node --run compile`: Modo de observación para compilar el archivo que ha sido guardado en la carpeta definida como `src`.
 - `node --run compile-prod`: Compila todos los archivos ubicados en la carpeta definida como `src`
 
 ### Parámetros
-
+- Sin Parametros se activa el modo observación que detecta si algun archivo en la carpeta destinada como `src` fue modificado
 - `--all`: Compila todos los archivos.
 - `--prod`: Realiza la compilación en modo producción, eliminando comentarios y minificando el código.
 
@@ -53,6 +53,12 @@ Si se ejecuta con el parámetro `--prod`, el código se minifica utilizando `ter
 ### Observación de Archivos
 
 El compilador observa los cambios en los archivos `.js`, `.ts` y `.vue` en el directorio `src` y recompila automáticamente los archivos modificados.
+
+## Dependencias
+
+- **VueJS**: API (vue/compiler-sfc) para pasar de archivo .vue a javascript
+- **TypeScript**: API (transpileModule) para pasar de typescript a javascript
+- **Terser**: API (minify) para limpiar, ordenar y comprimir el codigo
 
 ## Contribución
 
