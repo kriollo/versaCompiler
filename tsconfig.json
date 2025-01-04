@@ -18,13 +18,13 @@
             "esnext"
         ],
         "outDir": "./public/",
-        "sourceRoot": "./test/",
+        "sourceRoot": "./samples/",
         "sourceMap": true,
         "rootDir": ".",
         "paths": {
             "@/*": ["./public/*"]
         },
-        "typeRoots": ["/node_modules/", "./src/dashboard/**/*"],
+        "typeRoots": ["./src/dashboard/**/*"],
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "node",
@@ -36,6 +36,6 @@
     "exclude": ["./public/**/*"],
     "typeAcquisition": {
         "enable": true,
-        "include": ["vue", "pinia", "code-tag", "sweetalert2", "SweetAlertIcon"]
+        "include": ["vue"]
     }
 }

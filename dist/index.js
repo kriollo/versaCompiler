@@ -18,8 +18,8 @@ import * as vCompiler from 'vue/compiler-sfc';
 const log = console.log.bind(console);
 const error = console.error.bind(console);
 
-let PATH_SOURCE = './src';
-let PATH_DIST = './public';
+let PATH_SOURCE = '';
+let PATH_DIST = '';
 const PATH_CONFIG_FILE = './tsconfig.json';
 
 let watchJS = `${PATH_SOURCE}/**/*.js`;
@@ -115,7 +115,7 @@ const deleteFile = async ruta => {
  * Removes the "html" tag from a template string.
  *
  * @param {string} data - The template string to remove the "html" tag from.
- * @returns {string} - The modified template string without the "html" tag.
+ * @returns {Promise<string>} - The modified template string without the "html" tag.
  */
 const removehtmlOfTemplateString = async data => {
     const htmlRegExp = /html\s*`/g;
@@ -129,6 +129,18 @@ const removehtmlOfTemplateString = async data => {
     return data;
 };
 
+/**
+ * Replaces path aliases in the provided data string with their corresponding values.
+ *
+ * @param {string} data - The input string containing the code with path aliases.
+ * @returns {Promise<string>} - A promise that resolves to the modified string with path aliases replaced.
+ *
+ * @example
+ * const data = "import something from '@alias/someModule';";
+ * replaceAlias(data).then(result => {
+ *     console.log(result); // Output will have '@alias' replaced with the actual path.
+ * });
+ */
 const replaceAlias = async data => {
     // Función para escapar los caracteres especiales en una expresión regular
     const escapeRegExp = string =>
@@ -175,9 +187,14 @@ const replaceAlias = async data => {
     return data;
 };
 
+/**
+ * Asynchronously removes the import statement for 'code-tag' from the given data string.
+ *
+ * @param {string} data - The input string containing JavaScript code.
+ * @returns {Promise<string>} A promise that resolves to the modified string with the 'code-tag' import removed.
+ */
 const removeCodeTagImport = async data => {
     // remove import if exist code-tag
-
     const codeTagRegExp = /import\s+{.*}\s+from\s+['"].*code-tag.*['"];/g;
     data = data.replace(codeTagRegExp, '');
     return data;
@@ -233,6 +250,7 @@ const estandarizaData = async data => {
 };
 
 const compileCustomBlock = async (block, source) => {};
+
 const preCompileTS = async data => {
     try {
         // Leer tsconfig.json
@@ -300,10 +318,10 @@ const preCompileTS = async data => {
             );
         }
 
-        return result.outputText;
+        return { error: null, data: result.outputText };
     } catch (error) {
         console.error(error.message); // Consider a more generic error logging mechanism
-        return { error: error.message };
+        return { error: error.message, data: null };
     }
 };
 
@@ -514,16 +532,17 @@ const compileJS = async (source, destination) => {
 
         if (extension === 'ts' || resultVue?.lang === 'ts') {
             await log(chalk.blue(`🔄️ :Pre Compilando TS`));
-            data = await preCompileTS(data);
-            if (data.error) {
+            const Resultdata = await preCompileTS(data);
+            if (Resultdata.error !== null) {
                 await error(
                     chalk.red(
-                        `🚩 :Error durante la compilación TS: ${data.error}\n`,
+                        `🚩 :Error durante la compilación TS: ${Resultdata.error}\n`,
                     ),
                 );
                 return;
             }
             destination = destination.replace('.ts', '.js');
+            data = Resultdata.data;
         }
 
         data = await estandarizaData(data);
@@ -553,7 +572,6 @@ const compileJS = async (source, destination) => {
                         join_vars: true, // Unir declaraciones de variables
                         reduce_vars: true, // Reducir variables
                         collapse_vars: true, // Colapsar variables
-                        warnings: false, // Ocultar warnings (usar con precaución)
                     },
                     mangle: {
                         toplevel: true, // Minificar nombres de variables globales
@@ -621,10 +639,11 @@ const compile = async path => {
     }
 };
 
-const compileAll = async watchDir => {
+const compileAll = async () => {
     try {
         pathAlias = await getPathAlias();
-        for await (const file of glob(watchDir)) {
+
+        for await (const file of glob([watchJS, watchVue, watchTS])) {
             await compile(file.startsWith('./') ? file : `./${file}`);
         }
     } catch (errora) {
@@ -663,5 +682,5 @@ const init = async () => {
 
 if (isAll) {
     console.log(chalk.green('🔄️ :Compilando todos los archivos...'));
-    compileAll([watchJS, watchVue, watchTS]);
+    compileAll();
 } else init();

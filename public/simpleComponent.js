@@ -1,20 +1,2 @@
-import { app } from '/public/dashboard/js/vue-instancia.js';
-import { ref } from 'vue';
-import { add } from '/public/sampleFile.js';
-const result = add(1, 2);
-const message = ref('Hello, World!');
-import { createElementVNode as _createElementVNode, toDisplayString as _toDisplayString, Fragment as _Fragment, openBlock as _openBlock, createElementBlock as _createElementBlock } from "vue";
-function render(_ctx, _cache, $props, $setup, $data, $options) {
-    return (_openBlock(), _createElementBlock(_Fragment, null, [
-        _cache[0] || (_cache[0] = _createElementVNode("div", null, [
-            _createElementVNode("h1", null, "Simple Component")
-        ], -1 /* HOISTED */)),
-        _createElementVNode("div", null, [
-            _createElementVNode("p", null, _toDisplayString(_ctx.message), 1 /* TEXT */)
-        ])
-    ], 64 /* STABLE_FRAGMENT */));
-}
-simpleComponent_component.render = render;
-simpleComponent_component.__file = 'simpleComponent';
-export const simpleComponent = app.component('simpleComponent', simpleComponent_component);
-//# sourceMappingURL=module.js.map
+/* WYS Soluciones Informatica - VersaWYS */
+import{app as e}from"/public/dashboard/js/vue-instancia.js";import{ref as o}from"vue";import{add as n}from"/public/sampleFile.js";n(1,2),o("Hello, World!");import{createElementVNode as m,toDisplayString as l,Fragment as p,openBlock as t,createElementBlock as i}from"vue";simpleComponent_component.render=function(e,o,n,s,r,a){return t(),i(p,null,[o[0]||(o[0]=m("div",null,[m("h1",null,"Simple Component")],-1)),m("div",null,[m("p",null,l(e.message),1)])],64)},simpleComponent_component.__file="simpleComponent";export const simpleComponent=e.component("simpleComponent",simpleComponent_component);
