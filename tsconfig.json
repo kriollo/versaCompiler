@@ -6,34 +6,28 @@
         "checkJs": true,
         "module": "ESNext",
         "target": "ESNext",
-        "lib": [
-            "es2020",
-            "es2015",
-            "es2019",
-            "dom",
-            "scripthost",
-            "dom.iterable",
-            "ES5",
-            "ES6",
-            "esnext"
-        ],
+        "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
-        "sourceRoot": "./samples/",
+        "sourceRoot": "./src/",
         "sourceMap": true,
         "rootDir": ".",
+        "baseUrl": ".",
         "paths": {
-            "@/*": ["./public/*"]
+            "@/*": ["src/*"],
+            "P@/*": ["public/*"]
         },
-        "typeRoots": ["./src/dashboard/**/*"],
+        "typeRoots": ["./node_modules/@types", "./src/types"],
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "node",
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
     },
     "vueCompilerOptions": {
         "target": 3.5
     },
     "exclude": ["./public/**/*"],
+    "include": ["src/**/*"],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue"]

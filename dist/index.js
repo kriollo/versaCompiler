@@ -148,6 +148,7 @@ const replaceAlias = async data => {
 
     for (const key in pathAlias) {
         const values = pathAlias[key];
+
         // Escapa el alias para usarlo en una expresión regular
         const escapedKey = escapeRegExp(key.replace('/*', ''));
 
@@ -160,7 +161,11 @@ const replaceAlias = async data => {
         ];
 
         for (const value of values) {
-            const replacement = value.replace('/*', '').replace('./', '/');
+            let replacement = value.replace('/*', '').replace('./', '/');
+
+            replacement = replacement
+                .replace(replacement, PATH_DIST)
+                .replace('./', '/');
 
             // Aplica todos los reemplazos
             for (const pattern of aliasPatterns) {
@@ -187,6 +192,28 @@ const replaceAlias = async data => {
     return data;
 };
 
+const replaceAliasImportsAsync = async data => {
+    //debemos buscar en data si hay algun import con esta sintaxis import('P@/appLoader.js')
+    //y reemplazarlo por import('/public/appLoader.js')
+    const importRegExp = /import\(['"](.*)['"]\)/g;
+    const importList = data.match(importRegExp);
+
+    if (importList) {
+        for (const item of importList) {
+            const importRegExp2 = /import\(['"](.*)['"]\)/;
+            const result = item.match(importRegExp2);
+            if (result) {
+                const ruta = result[1];
+                const newRuta = ruta.replace('@', PATH_DIST);
+                const newImport = item.replace(ruta, newRuta);
+                data = data.replace(item, newImport);
+            }
+        }
+    }
+
+    return data;
+};
+
 /**
  * Asynchronously removes the import statement for 'code-tag' from the given data string.
  *
@@ -203,7 +230,6 @@ const removeCodeTagImport = async data => {
 const addImportEndJs = async data => {
     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
     const importList = data.match(importRegExp);
-
     if (importList) {
         for (const item of importList) {
             const importRegExp2 = /from\s+['"](.*)['"];/;
@@ -211,7 +237,22 @@ const addImportEndJs = async data => {
             if (result) {
                 const ruta = result[1];
 
-                if (!ruta.endsWith('.js')) {
+                if (ruta.endsWith('.vue')) {
+                    const importRegExp3 = /from\s+['"](.+\/(\w+))\.vue['"];/;
+                    const resultVue = item.match(importRegExp3);
+
+                    if (resultVue) {
+                        const fullPath = resultVue[1].replace('.vue', '');
+                        const fileName = resultVue[2];
+
+                        const newImport = item.replace(
+                            /import\s+(\w+)\s+from\s+['"](.+\/(\w+))\.vue['"];/,
+                            `import {${fileName}} from '${fullPath}.js';`,
+                        );
+
+                        data = data.replace(item, newImport);
+                    }
+                } else if (!ruta.endsWith('.js')) {
                     if (
                         ruta.endsWith('.mjs') ||
                         ruta.endsWith('.css') ||
@@ -225,6 +266,7 @@ const addImportEndJs = async data => {
             }
         }
     }
+
     return data;
 };
 
@@ -244,6 +286,7 @@ const estandarizaData = async data => {
     data = await removehtmlOfTemplateString(data);
     data = await removeCodeTagImport(data);
     data = await replaceAlias(data);
+    data = await replaceAliasImportsAsync(data);
     data = await addImportEndJs(data);
 
     return data;
@@ -439,25 +482,28 @@ const preCompileVue = async (data, source) => {
             ${compiledTemplate.code}
         `;
         //añardir instancia de app
-        const appImport = `import { app } from '@/dashboard/js/vue-instancia';`;
+        const appImport = `import { app } from '@/vue-instancia';`;
         output = `${appImport}${output}`;
 
-        const componentName = `${fileName}_component`;
-        const exportComponent = `
-            ${componentName}.render = render;
-            ${componentName}.__file = '${fileName}';
-            ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
-            ${customBlocks}
-            export const ${fileName} = app.component('${fileName}', ${componentName});
-        `;
+        let exportComponent = '';
+        let componentName = '';
+
+        componentName = `${fileName}_component`;
+        exportComponent = `
+                ${componentName}.render = render;
+                ${componentName}.__file = '${fileName}';
+                ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
+                ${customBlocks}
+                export const ${fileName} = app.component('${fileName}', ${componentName});
+            `;
 
         // quitamos export default y añadimos el nombre del archivo
         if (output.includes('export default {')) {
             output = output.replace(
                 'export default {',
                 `const ${componentName} = {
-                __name: '${fileName}',
-            `,
+                        __name: '${fileName}',
+                    `,
             );
         } else {
             output = output.replace(
