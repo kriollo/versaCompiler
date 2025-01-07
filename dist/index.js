@@ -218,7 +218,6 @@ const replaceAliasImportsAsync = async data => {
                     .replace(ruta, newRuta)
                     .replace('.vue', '.js')
                     .replace('.ts', '.js');
-                console.log(newImport);
                 data = data.replace(item, newImport);
             }
         }
