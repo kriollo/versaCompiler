@@ -13,8 +13,8 @@ app.config.compilerOptions.comments = true;
 app.config.performance = true;
 app.config.compilerOptions.whitespace = 'condense';
 
-import('P@/components/appLoader.vue')
-    .then(({ appLoader }) => {})
+import('@/components/appLoader.vue')
+    .then(() => {})
     .catch(error => {
         console.error('Error al cargar el módulo:', error);
     })

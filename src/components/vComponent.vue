@@ -1,16 +1,6 @@
-<template>
-    <div>
-        <h1>{{ message }}</h1>
-    </div>
-
-    <div>
-        <label for="">Result Suma: {{ add(5, 3) }}</label>
-    </div>
-</template>
-
 <script setup lang="ts">
-    import { add } from '@/sampleFile';
-    import { toRefs } from 'vue';
+    import { add, multiply, subtract } from '@/sampleFile';
+    import { ref, toRefs } from 'vue';
 
     type Props = {
         message: string;
@@ -18,12 +8,101 @@
     const props = defineProps<Props>();
 
     const { message } = toRefs(props);
+
+    const num1 = ref(0);
+    const num2 = ref(0);
+    const result = ref<number | null>(null);
+
+    const addNumber = () => {
+        result.value = add(num1.value, num2.value);
+    };
+    const subtractNumber = () => {
+        result.value = subtract(num1.value, num2.value);
+    };
+    const multiplyNumber = () => {
+        result.value = multiply(num1.value, num2.value);
+    };
 </script>
+<template>
+    <div>
+        <h1>{{ message }}</h1>
+    </div>
+
+    <div class="container">
+        <div class="numOperations">
+            <div>
+                <label for="num1">Number 1:</label>
+                <input id="num1" type="number" v-model="num1" />
+            </div>
+            <div>
+                <label for="num2">Number 2:</label>
+                <input id="num2" type="number" v-model="num2" />
+            </div>
+        </div>
+        <div class="btnOperations">
+            <button @click="addNumber">Sumar</button>
+            <button @click="subtractNumber">Restar</button>
+            <button @click="multiplyNumber">Multiplicar</button>
+        </div>
+        <div v-if="result !== null" class="result">
+            <h2>Resultado: {{ result }}</h2>
+        </div>
+    </div>
+</template>
 
 <style lang="css" scoped>
     h1 {
         color: red;
         font-size: 24px;
         text-align: center;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .numOperations {
+        display: flex;
+        justify-content: space-evenly;
+        margin: 20px 0;
+        width: 100%;
+    }
+
+    .btnOperations {
+        display: flex;
+        justify-content: space-evenly;
+        margin: 20px 0;
+        width: 100%;
+    }
+
+    .btnOperations button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+        background-color: #007bff;
+        color: white;
+        transition: background-color 0.3s;
+    }
+
+    .btnOperations button:hover {
+        background-color: #0056b3;
+    }
+
+    .result {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .result h2 {
+        color: green;
+        font-size: 20px;
     }
 </style>
