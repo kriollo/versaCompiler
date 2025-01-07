@@ -40,6 +40,10 @@ if (process.argv.length > 1) {
     console.log(chalk.green(`isProd: ${isProd}`));
 }
 
+/**
+ * Obtiene los alias de ruta desde el archivo tsconfig.json.
+ * @returns {Promise<Object>} - Un objeto con los alias de ruta.
+ */
 const getPathAlias = async () => {
     const data = await readFile(PATH_CONFIG_FILE, { encoding: 'utf-8' });
     if (!data) {
@@ -73,9 +77,18 @@ const getPathAlias = async () => {
     return pathAlias;
 };
 
+/**
+ * Mapea una ruta de origen a una ruta de destino en el directorio de distribución.
+ * @param {string} ruta - La ruta de origen.
+ * @returns {Promise<string>} - La ruta mapeada en el directorio de distribución.
+ */
 const mapRuta = async ruta =>
     path.join(PATH_DIST, path.relative(PATH_SOURCE, ruta));
 
+/**
+ * Elimina un archivo o directorio en la ruta especificada.
+ * @param {string} ruta - La ruta del archivo o directorio a eliminar.
+ */
 const deleteFile = async ruta => {
     const newPath = (
         await mapRuta(
@@ -112,10 +125,9 @@ const deleteFile = async ruta => {
 };
 
 /**
- * Removes the "html" tag from a template string.
- *
- * @param {string} data - The template string to remove the "html" tag from.
- * @returns {Promise<string>} - The modified template string without the "html" tag.
+ * Elimina la etiqueta "html" de una cadena de plantilla.
+ * @param {string} data - La cadena de plantilla de la cual eliminar la etiqueta "html".
+ * @returns {Promise<string>} - La cadena de plantilla modificada sin la etiqueta "html".
  */
 const removehtmlOfTemplateString = async data => {
     const htmlRegExp = /html\s*`/g;
@@ -130,16 +142,9 @@ const removehtmlOfTemplateString = async data => {
 };
 
 /**
- * Replaces path aliases in the provided data string with their corresponding values.
- *
- * @param {string} data - The input string containing the code with path aliases.
- * @returns {Promise<string>} - A promise that resolves to the modified string with path aliases replaced.
- *
- * @example
- * const data = "import something from '@alias/someModule';";
- * replaceAlias(data).then(result => {
- *     console.log(result); // Output will have '@alias' replaced with the actual path.
- * });
+ * Reemplaza los alias de ruta en la cadena de datos proporcionada con sus valores correspondientes.
+ * @param {string} data - La cadena de entrada que contiene el código con alias de ruta.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada con los alias de ruta reemplazados.
  */
 const replaceAlias = async data => {
     // Función para escapar los caracteres especiales en una expresión regular
@@ -192,9 +197,12 @@ const replaceAlias = async data => {
     return data;
 };
 
+/**
+ * Reemplaza los alias de importación en la cadena de datos proporcionada con sus valores correspondientes.
+ * @param {string} data - La cadena de entrada que contiene el código con alias de importación.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada con los alias de importación reemplazados.
+ */
 const replaceAliasImportsAsync = async data => {
-    //debemos buscar en data si hay algun import con esta sintaxis import('P@/appLoader.js')
-    //y reemplazarlo por import('/public/appLoader.js')
     const importRegExp = /import\(['"](.*)['"]\)/g;
     const importList = data.match(importRegExp);
 
@@ -202,23 +210,26 @@ const replaceAliasImportsAsync = async data => {
         for (const item of importList) {
             const importRegExp2 = /import\(['"](.*)['"]\)/;
             const result = item.match(importRegExp2);
+
             if (result) {
                 const ruta = result[1];
                 const newRuta = ruta.replace('@', PATH_DIST);
-                const newImport = item.replace(ruta, newRuta);
+                const newImport = item
+                    .replace(ruta, newRuta)
+                    .replace('.vue', '.js')
+                    .replace('.ts', '.js');
+                console.log(newImport);
                 data = data.replace(item, newImport);
             }
         }
     }
-
     return data;
 };
 
 /**
- * Asynchronously removes the import statement for 'code-tag' from the given data string.
- *
- * @param {string} data - The input string containing JavaScript code.
- * @returns {Promise<string>} A promise that resolves to the modified string with the 'code-tag' import removed.
+ * Elimina la declaración de importación para 'code-tag' de la cadena de datos proporcionada.
+ * @param {string} data - La cadena de entrada que contiene el código JavaScript.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada sin la importación de 'code-tag'.
  */
 const removeCodeTagImport = async data => {
     // remove import if exist code-tag
@@ -227,6 +238,11 @@ const removeCodeTagImport = async data => {
     return data;
 };
 
+/**
+ * Agrega la extensión .js a las importaciones en la cadena de datos proporcionada.
+ * @param {string} data - La cadena de entrada que contiene el código JavaScript.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada con las importaciones actualizadas.
+ */
 const addImportEndJs = async data => {
     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
     const importList = data.match(importRegExp);
@@ -266,10 +282,14 @@ const addImportEndJs = async data => {
             }
         }
     }
-
     return data;
 };
 
+/**
+ * Elimina los comentarios con la etiqueta @preserve de la cadena de datos proporcionada.
+ * @param {string} data - La cadena de entrada que contiene el código JavaScript.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada sin los comentarios @preserve.
+ */
 const removePreserverComent = async data => {
     const preserverRegExp =
         /\/\*[\s\S]*?@preserve[\s\S]*?\*\/|\/\/.*?@preserve.*?(?=\n|$)/g;
@@ -279,6 +299,11 @@ const removePreserverComent = async data => {
     return data;
 };
 
+/**
+ * Estandariza la cadena de datos proporcionada aplicando varias transformaciones.
+ * @param {string} data - La cadena de entrada que contiene el código JavaScript.
+ * @returns {Promise<string>} - Una promesa que se resuelve con la cadena estandarizada.
+ */
 const estandarizaData = async data => {
     if (isProd) {
         data = await removePreserverComent(data);
@@ -292,8 +317,18 @@ const estandarizaData = async data => {
     return data;
 };
 
+/**
+ * Compila un bloque personalizado.
+ * @param {Object} block - El bloque personalizado a compilar.
+ * @param {string} source - La fuente del bloque.
+ */
 const compileCustomBlock = async (block, source) => {};
 
+/**
+ * Precompila el código TypeScript proporcionado.
+ * @param {string} data - El código TypeScript a precompilar.
+ * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
+ */
 const preCompileTS = async data => {
     try {
         // Leer tsconfig.json
@@ -368,6 +403,12 @@ const preCompileTS = async data => {
     }
 };
 
+/**
+ * Precompila un componente Vue.
+ * @param {string} data - El código del componente Vue.
+ * @param {string} source - La fuente del componente Vue.
+ * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
+ */
 const preCompileVue = async (data, source) => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
@@ -485,11 +526,8 @@ const preCompileVue = async (data, source) => {
         const appImport = `import { app } from '@/vue-instancia';`;
         output = `${appImport}${output}`;
 
-        let exportComponent = '';
-        let componentName = '';
-
-        componentName = `${fileName}_component`;
-        exportComponent = `
+        const componentName = `${fileName}_component`;
+        const exportComponent = `
                 ${componentName}.render = render;
                 ${componentName}.__file = '${fileName}';
                 ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
@@ -546,6 +584,55 @@ const preCompileVue = async (data, source) => {
     }
 };
 
+/**
+ * Minifica el codigo JavaScript usando opciones especificas.
+ *
+ * @param {string} data - The JavaScript code to be minified.
+ * @param {string} filename - The name of the file containing the JavaScript code.
+ * @returns {Promise<Object>} The result of the minification process.
+ */
+const minifyJS = async (data, filename) => {
+    const result = await minify(
+        { [filename]: data },
+        {
+            compress: {
+                passes: 3,
+                unsafe: true,
+                unsafe_comps: true,
+                unsafe_Function: true,
+                unsafe_math: true,
+                unsafe_proto: true,
+                drop_debugger: true, // Eliminar debugger;
+                pure_getters: true, // Permitir optimizar getters puros
+                sequences: true, // Unir sentencias secuenciales
+                booleans: true, // Simplificar expresiones booleanas
+                conditionals: true, // Simplificar condicionales
+                dead_code: true, // Eliminar código muerto
+                if_return: true, // Optimizar if/return
+                join_vars: true, // Unir declaraciones de variables
+                reduce_vars: true, // Reducir variables
+                collapse_vars: true, // Colapsar variables
+            },
+            mangle: {
+                toplevel: true, // Minificar nombres de variables globales
+            },
+            ecma: 5,
+            module: true, // Indicar que es un módulo ES
+            toplevel: true, // Aplicar optimizaciones a nivel superior
+            format: {
+                preamble: '/* WYS Soluciones Informatica - VersaWYS */',
+                comments: isProd ? false : 'all', // Eliminar comentarios
+            },
+        },
+    );
+    return result;
+};
+
+/**
+ * Compila un archivo JavaScript.
+ * @param {string} source - La ruta del archivo fuente.
+ * @param {string} destination - La ruta del archivo de destino.
+ */
 const compileJS = async (source, destination) => {
     try {
         const startTime = Date.now(); // optener la hora actual
@@ -568,7 +655,7 @@ const compileJS = async (source, destination) => {
             if (resultVue.error !== null) {
                 await error(
                     chalk.red(
-                        `🚩 :Error durante la compilación Vue :${resultVue?.error}\n`,
+                        `🚩 :Error durante la compilación Vue :${resultVue.error}\n`,
                     ),
                 );
                 return;
@@ -598,39 +685,7 @@ const compileJS = async (source, destination) => {
         let result = null;
         if (isProd) {
             await log(chalk.blue(`🤖 :minifying`));
-            result = await minify(
-                { [filename]: data },
-                {
-                    compress: {
-                        passes: 3,
-                        unsafe: true, // Asegúrate de probar exhaustivamente
-                        unsafe_comps: true, // Asegúrate de probar exhaustivamente
-                        unsafe_Function: true, // Asegúrate de probar exhaustivamente
-                        unsafe_math: true, // Asegúrate de probar exhaustivamente
-                        unsafe_proto: true, // Asegúrate de probar exhaustivamente
-                        drop_debugger: true, // Eliminar debugger;
-                        pure_getters: true, // Permitir optimizar getters puros
-                        sequences: true, // Unir sentencias secuenciales
-                        booleans: true, // Simplificar expresiones booleanas
-                        conditionals: true, // Simplificar condicionales
-                        dead_code: true, // Eliminar código muerto
-                        if_return: true, // Optimizar if/return
-                        join_vars: true, // Unir declaraciones de variables
-                        reduce_vars: true, // Reducir variables
-                        collapse_vars: true, // Colapsar variables
-                    },
-                    mangle: {
-                        toplevel: true, // Minificar nombres de variables globales
-                    },
-                    ecma: 5,
-                    module: true, // Indicar que es un módulo ES
-                    toplevel: true, // Aplicar optimizaciones a nivel superior
-                    format: {
-                        preamble: '/* WYS Soluciones Informatica - VersaWYS */',
-                        comments: isProd ? false : 'all', // Eliminar comentarios
-                    },
-                },
-            );
+            result = await minifyJS(data, filename);
         } else {
             result = { code: data };
         }
@@ -659,12 +714,17 @@ const compileJS = async (source, destination) => {
             );
         }
     } catch (errora) {
-        error(
+        await error(
             chalk.red(`🚩 :Error durante la compilación JS: ${errora}\n`),
             errora,
         );
     }
 };
+
+/**
+ * Compila un archivo dado su ruta.
+ * @param {string} path - La ruta del archivo a compilar.
+ */
 const compile = async path => {
     if (path.includes('.d.ts')) {
         return;
@@ -685,6 +745,9 @@ const compile = async path => {
     }
 };
 
+/**
+ * Compila todos los archivos en los directorios de origen.
+ */
 const compileAll = async () => {
     try {
         pathAlias = await getPathAlias();
@@ -697,6 +760,9 @@ const compileAll = async () => {
     }
 };
 
+/**
+ * Inicializa el proceso de compilación y observación de archivos.
+ */
 const init = async () => {
     try {
         pathAlias = await getPathAlias();
