@@ -1,6 +1,6 @@
 {
   "name": "versacompiler",
-  "version": "1.0.6",
+  "version": "2.0.0",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -21,13 +21,16 @@
   "license": "MIT",
   "dependencies": {
     "chalk": "5.4.1",
-    "gulp": "5.0.0",
-    "terser": "5.37.0",
-    "vue": "3.5.13"
+    "terser": "5.38.1",
+    "vue": "3.5.13",
+    "chokidar": "^4.0.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "@types/node": "^22.10.5",
-    "prettier": "3.4.2"
+    "typescript": "^5.7.3",
+    "@types/node": "^22.13.1",
+    "prettier": "3.4.2",
+    "acorn": "^8.14.0",
+    "browser-sync": "^3.0.3",
+    "get-port": "^7.1.0"
   }
 }

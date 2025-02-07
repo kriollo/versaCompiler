@@ -1,5 +1,9 @@
+import * as Parser from 'acorn';
+import browserSync from 'browser-sync';
 import chalk from 'chalk';
-import { watch } from 'gulp';
+import { exec } from 'child_process';
+import chokidar from 'chokidar';
+import getPort from 'get-port';
 import {
     glob,
     mkdir,
@@ -18,15 +22,23 @@ import * as vCompiler from 'vue/compiler-sfc';
 const log = console.log.bind(console);
 const error = console.error.bind(console);
 
+let bs = null;
+
 let PATH_SOURCE = '';
 let PATH_DIST = '';
 const PATH_CONFIG_FILE = './tsconfig.json';
+const PATH_SOURCE_DEFAULT = './src'; // Valor por defecto para PATH_SOURCE
+const PATH_DIST_DEFAULT = './dist'; // Valor por defecto para PATH_DIST
 
 let watchJS = `${PATH_SOURCE}/**/*.js`;
 let watchVue = `${PATH_SOURCE}/**/*.vue`;
 let watchTS = `${PATH_SOURCE}/**/*.ts`;
+const excludeFile = `!${PATH_SOURCE}/**/*.ts`;
 
 let pathAlias = null;
+
+let tailwindcss = null;
+let proxyUrl = '';
 
 // obtener parametro de entrada
 let isAll = false;
@@ -40,41 +52,73 @@ if (process.argv.length > 1) {
     console.log(chalk.green(`isProd: ${isProd}`));
 }
 
+let totalFiles = 0;
+let vueFiles = 0;
+let tsFiles = 0;
+let acornFiles = 0;
+let successfulFiles = 0;
+let errorFiles = 0;
+const errorList = [];
+
+/**
+ * Converts a 24-hour time string to a 12-hour time string with AM/PM.
+ *
+ * @param {number} timing - The value of the timing en miliseconds.
+ * @returns {string} the timing in ms, seconds, minutes or hours.
+ */
+export const showTimingForHumans = timing => {
+    if (timing < 1000) {
+        return `${timing} ms`;
+    } else if (timing < 60000) {
+        return `${timing / 1000} s`;
+    } else if (timing < 3600000) {
+        return `${timing / 60000} min`;
+    } else {
+        return `${timing / 3600000} h`;
+    }
+};
+
 /**
  * Obtiene los alias de ruta desde el archivo tsconfig.json.
  * @returns {Promise<Object>} - Un objeto con los alias de ruta.
  */
 const getPathAlias = async () => {
-    const data = await readFile(PATH_CONFIG_FILE, { encoding: 'utf-8' });
-    if (!data) {
-        error(chalk.red('🚩 :Error al leer el archivo tsconfig.json'));
-        return;
-    }
+    try {
+        const data = await readFile(PATH_CONFIG_FILE, { encoding: 'utf-8' });
+        if (!data) {
+            error(chalk.red('🚩 :Error al leer el archivo tsconfig.json'));
+            return;
+        }
 
-    const tsConfig = JSON.parse(data);
-    pathAlias = tsConfig.compilerOptions.paths;
-    log(chalk.green(`pathAlias: ${JSON.stringify(pathAlias)}`));
+        const tsConfig = JSON.parse(data);
+        pathAlias = tsConfig.compilerOptions.paths || {};
+        log(chalk.green(`pathAlias: ${JSON.stringify(pathAlias)}`));
 
-    const sourceRoot = tsConfig.compilerOptions.sourceRoot;
-    if (sourceRoot) {
+        tailwindcss = tsConfig.tailwindcss || false;
+
+        const sourceRoot =
+            tsConfig.compilerOptions.sourceRoot || PATH_SOURCE_DEFAULT;
         PATH_SOURCE = sourceRoot.endsWith('/')
             ? sourceRoot.slice(0, -1)
             : sourceRoot;
-    }
 
-    const outDir = tsConfig.compilerOptions.outDir;
-    if (outDir) {
+        const outDir = tsConfig.compilerOptions.outDir || PATH_DIST_DEFAULT;
         PATH_DIST = outDir.endsWith('/') ? outDir.slice(0, -1) : outDir;
+
+        console.log(chalk.green(`PATH_SOURCE: ${PATH_SOURCE}`));
+        console.log(chalk.green(`PATH_DIST: ${PATH_DIST}\n`));
+
+        watchJS = `${PATH_SOURCE}/**/*.js`;
+        watchVue = `${PATH_SOURCE}/**/*.vue`;
+        watchTS = `${PATH_SOURCE}/**/*.ts`;
+
+        return pathAlias;
+    } catch (error) {
+        console.error(chalk.red(`Error en getPathAlias: ${error.message}`));
+        // Puedes decidir si quieres lanzar el error o retornar un valor por defecto
+        // throw error;
+        return {}; // Retornar objeto vacío para evitar errores posteriores
     }
-
-    console.log(chalk.green(`PATH_SOURCE: ${PATH_SOURCE}`));
-    console.log(chalk.green(`PATH_DIST: ${PATH_DIST}\n`));
-
-    watchJS = `${PATH_SOURCE}/**/*.js`;
-    watchVue = `${PATH_SOURCE}/**/*.vue`;
-    watchTS = `${PATH_SOURCE}/**/*.ts`;
-
-    return pathAlias;
 };
 
 /**
@@ -92,8 +136,9 @@ const mapRuta = async ruta =>
 const deleteFile = async ruta => {
     const newPath = (
         await mapRuta(
-            ruta
-                .replace('\\', '/')
+            path
+                .normalize(ruta)
+                .replace(/\\/g, '/')
                 .replace('.vue', '.js')
                 .replace('.ts', '.js'),
         )
@@ -113,6 +158,12 @@ const deleteFile = async ruta => {
         if (files.length === 0) {
             await rmdir(dir);
         }
+
+        return {
+            extension: path.extname(newPath).replace('.', ''),
+            normalizedPath: path.normalize(newPath),
+            fileName: path.basename(newPath).replace('.js', ''),
+        };
 
         log(chalk.gray(`✅ :Eliminación exitosa: ${newPath} \n`));
     } catch (errora) {
@@ -134,7 +185,7 @@ const removehtmlOfTemplateString = async data => {
 
     data = data.replace(htmlRegExp, '`');
 
-    //remove ", get html() { return html }"
+    //remove ""
     const htmlGetterRegExp = /,\s*get\s+html\(\)\s*{\s*return\s*html\s*}/g;
     data = data.replace(htmlGetterRegExp, '');
 
@@ -147,51 +198,42 @@ const removehtmlOfTemplateString = async data => {
  * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada con los alias de ruta reemplazados.
  */
 const replaceAlias = async data => {
-    // Función para escapar los caracteres especiales en una expresión regular
     const escapeRegExp = string =>
         string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     for (const key in pathAlias) {
         const values = pathAlias[key];
-
-        // Escapa el alias para usarlo en una expresión regular
         const escapedKey = escapeRegExp(key.replace('/*', ''));
 
-        // Genera las posibles variaciones del alias en formato de expresión regular
-        const aliasPatterns = [
-            new RegExp(`import\\(\\s*['"]${escapedKey}`, 'g'),
-            new RegExp(`from\\s*['"]${escapedKey}`, 'g'),
-            new RegExp(`['"]${escapedKey}`, 'g'),
-            new RegExp(`import\\(\`\\${escapedKey}`, 'g'), // Maneja el caso de backticks
-        ];
+        // Combinar patrones en una sola expresión regular (más eficiente)
+        const aliasPattern = new RegExp(
+            `import\\(\\s*['"]${escapedKey}|from\\s*['"]${escapedKey}|['"]${escapedKey}|import\\(\`\\${escapedKey}`,
+            'g',
+        );
 
         for (const value of values) {
             let replacement = value.replace('/*', '').replace('./', '/');
-
             replacement = replacement
                 .replace(replacement, PATH_DIST)
                 .replace('./', '/');
 
-            // Aplica todos los reemplazos
-            for (const pattern of aliasPatterns) {
-                data = data.replace(pattern, match => {
-                    // Ajuste específico según el patrón encontrado
-                    if (match.startsWith('import(`')) {
-                        return `import(\`${replacement}`;
-                    } else if (match.startsWith('import(')) {
-                        return `import('${replacement}`;
-                    } else if (match.startsWith('from ')) {
-                        return `from '${replacement}`;
-                    } else {
-                        return `'${replacement}`;
-                    }
-                });
-            }
+            data = data.replace(aliasPattern, match => {
+                if (match.startsWith('import(`')) {
+                    return `import(\`${replacement}`;
+                } else if (match.startsWith('import(')) {
+                    return `import('${replacement}`;
+                } else if (match.startsWith('from ')) {
+                    return `from '${replacement}`;
+                } else {
+                    return `'${replacement}`;
+                }
+            });
         }
 
-        // Reemplaza los patrones específicos './' por '/'
-        data = data.replace(/import ['"]\.\//g, "import '/");
-        data = data.replace(/from ['"]\.\//g, "from '/");
+        // Reemplazar './' con '/' (simplificado)
+        data = data
+            .replace(/import ['"]\.\//g, "import '/")
+            .replace(/from ['"]\.\//g, "from '/");
     }
 
     return data;
@@ -244,44 +286,28 @@ const removeCodeTagImport = async data => {
  */
 const addImportEndJs = async data => {
     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
-    const importList = data.match(importRegExp);
-    if (importList) {
-        for (const item of importList) {
-            const importRegExp2 = /from\s+['"](.*)['"];/;
-            const result = item.match(importRegExp2);
-            if (result) {
-                const ruta = result[1];
 
-                if (ruta.endsWith('.vue')) {
-                    const importRegExp3 = /from\s+['"](.+\/(\w+))\.vue['"];/;
-                    const resultVue = item.match(importRegExp3);
+    return data.replace(importRegExp, match => {
+        const ruta = match.match(/from\s+['"](.*)['"];/)[1];
 
-                    if (resultVue) {
-                        const fullPath = resultVue[1].replace('.vue', '');
-                        const fileName = resultVue[2];
-
-                        const newImport = item.replace(
-                            /import\s+(\w+)\s+from\s+['"](.+\/(\w+))\.vue['"];/,
-                            `import {${fileName}} from '${fullPath}.js';`,
-                        );
-
-                        data = data.replace(item, newImport);
-                    }
-                } else if (!ruta.endsWith('.js')) {
-                    if (
-                        ruta.endsWith('.mjs') ||
-                        ruta.endsWith('.css') ||
-                        !ruta.includes('/')
-                    )
-                        continue;
-                    const newRuta = `${ruta}.js`;
-                    const newImport = item.replace(ruta, newRuta);
-                    data = data.replace(item, newImport);
-                }
+        if (ruta.endsWith('.vue')) {
+            const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
+            if (resultVue) {
+                const fullPath = resultVue[1].replace('.vue', '');
+                const fileName = resultVue[2];
+                return `import ${fileName} from '${fullPath}.js';`;
             }
+        } else if (
+            !ruta.endsWith('.js') &&
+            !ruta.endsWith('.mjs') &&
+            !ruta.endsWith('.css') &&
+            ruta.includes('/')
+        ) {
+            return match.replace(ruta, `${ruta}.js`);
         }
-    }
-    return data;
+
+        return match; // Devolver el match original si no se cumple ninguna condición
+    });
 };
 
 /**
@@ -326,9 +352,11 @@ const compileCustomBlock = async (block, source) => {};
 /**
  * Precompila el código TypeScript proporcionado.
  * @param {string} data - El código TypeScript a precompilar.
+ * @param {string} fileName - El nombre del archivo que contiene el código TypeScript.
+ *
  * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
  */
-const preCompileTS = async data => {
+const preCompileTS = async (data, fileName) => {
     try {
         // Leer tsconfig.json
         const tsConfigContent = await readFile(PATH_CONFIG_FILE, 'utf-8');
@@ -341,7 +369,7 @@ const preCompileTS = async data => {
         const tsConfig = JSON.parse(tsConfigContent);
 
         // Obtener las opciones del compilador
-        const { compilerOptions, ...restOfConfig } = tsConfig;
+        const { compilerOptions } = tsConfig;
 
         if (!compilerOptions) {
             throw new Error(
@@ -355,6 +383,14 @@ const preCompileTS = async data => {
             readDirectory: ts.sys.readDirectory,
             fileExists: ts.sys.fileExists,
             readFile: ts.sys.readFile,
+            onUnRecoverableConfigFileDiagnostic: diagnostic => {
+                throw new Error(
+                    ts.flattenDiagnosticMessageText(
+                        diagnostic.messageText,
+                        '\n',
+                    ),
+                );
+            },
         };
 
         // Parsear la configuración para que TS la entienda
@@ -376,6 +412,7 @@ const preCompileTS = async data => {
         const result = ts.transpileModule(data, {
             compilerOptions: parsedConfig.options,
             reportDiagnostics: true,
+            fileName,
         });
         if (result.diagnostics && result.diagnostics.length > 0) {
             const errors = result.diagnostics.map(diagnostic => {
@@ -384,22 +421,42 @@ const preCompileTS = async data => {
                         diagnostic.file.getLineAndCharacterOfPosition(
                             diagnostic.start,
                         );
-                    return `Error: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')} - ${diagnostic.file.fileName} (${line + 1},${character + 1})`;
+                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')} - ${diagnostic.file.fileName} (${line + 1},${character + 1})`;
                 } else {
-                    return `Error: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
+                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
                 }
             });
 
-            throw new Error(
-                `Error en la compilación de TypeScript:\n${errors.join('\n')}`,
-            );
+            throw new Error(`${errors.join('\n')}`);
         }
 
         return { error: null, data: result.outputText };
     } catch (error) {
-        console.error(error.message); // Consider a more generic error logging mechanism
-        return { error: error.message, data: null };
+        return { error, data: null };
     }
+};
+
+const getComponentsVue = async data => {
+    let components = [];
+
+    const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
+
+    const a = data.replace(importRegExp, match => {
+        const ruta = match.match(/from\s+['"](.*)['"];/)[1];
+
+        if (ruta.endsWith('.vue')) {
+            const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
+            if (resultVue) {
+                const fullPath = resultVue[1].replace('.vue', '');
+                const fileName = resultVue[2];
+                components.push(fileName);
+                return `import ${fileName} from '${fullPath}.js';`;
+            }
+        }
+        return match; // Devolver el match original si no se cumple ninguna condición
+    });
+
+    return components;
 };
 
 /**
@@ -455,6 +512,10 @@ const preCompileVue = async (data, source) => {
                 runtimeComponents: true,
                 runtimeCompiledRender: true,
                 whitespace: 'condense',
+                ssrCssExternal: true,
+                ssr: false,
+                nodeTransforms: [],
+                directiveTransforms: {},
             },
         };
 
@@ -483,8 +544,17 @@ const preCompileVue = async (data, source) => {
 
         // Compile template y obtener el contenido del template
         const compiledTemplate = descriptor.template?.content // Usar optional chaining
-            ? vCompiler.compileTemplate(templateOptions)
+            ? vCompiler.compileTemplate({
+                  ...templateOptions,
+              })
             : { code: '' }; // Manejar caso sin template
+        if (!descriptor.template?.content) {
+            console.warn(
+                chalk.yellow(
+                    `Advertencia: El componente Vue ${source} no tiene una sección de plantilla.`,
+                ),
+            );
+        }
 
         let customBlocks = '';
         if (descriptor.customBlocks.length > 0) {
@@ -522,16 +592,16 @@ const preCompileVue = async (data, source) => {
             ${compiledTemplate.code}
         `;
         //añardir instancia de app
-        const appImport = `import { app } from '@/vue-instancia';`;
-        output = `${appImport}${output}`;
+        const appImport = `import { app } from '@/dashboard/js/vue-instancia.js';`;
+        // output = `${appImport}${output}`;
 
         const componentName = `${fileName}_component`;
+        const components = await getComponentsVue(data);
         const exportComponent = `
-                ${componentName}.render = render;
-                ${componentName}.__file = '${fileName}';
-                ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
-                ${customBlocks}
-                export const ${fileName} = app.component('${fileName}', ${componentName});
+                __file: '${source}',
+                __name: '${fileName}',
+                name: '${fileName}',
+                components: { ${components.join(', ')} },
             `;
 
         // quitamos export default y añadimos el nombre del archivo
@@ -539,14 +609,14 @@ const preCompileVue = async (data, source) => {
             output = output.replace(
                 'export default {',
                 `const ${componentName} = {
-                        __name: '${fileName}',
-                    `,
+                \n${exportComponent}
+                `,
             );
         } else {
             output = output.replace(
                 'export default /*@__PURE__*/_defineComponent({',
                 `const ${componentName} = /*@__PURE__*/_defineComponent({
-                    __name: '${fileName}',
+                \n${exportComponent}
                 `,
             );
         }
@@ -556,22 +626,31 @@ const preCompileVue = async (data, source) => {
             output = output.replaceAll(/_ctx\.(?!\$)/g, '$setup.');
             output = output.replace(
                 'export function render(_ctx, _cache) {',
-                'function render(_ctx, _cache, $props, $setup, $data, $options) {',
+                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
             );
         } else {
             output = output.replace(
                 'export function render(_ctx, _cache) {',
-                'function render(_ctx, _cache, $props, $setup, $data, $options) {',
+                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
             );
         }
 
-        output = `${output}\n${exportComponent}`;
+        const finishComponent = `
+            ${componentName}.render = render;
+            ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
+            ${customBlocks}
+
+            export default ${componentName};
+        `;
+
+        output = `${output}\n${finishComponent}`;
 
         // await writeFile(
         //     `./public/dashboard/js/${fileName}-temp.js`,
         //     output,
         //     'utf-8',
         // );
+        // await unlink(`./public/dashboard/js/${fileName}-temp.js`);
 
         return {
             lang: compiledScript.lang,
@@ -591,53 +670,88 @@ const preCompileVue = async (data, source) => {
  * @returns {Promise<Object>} The result of the minification process.
  */
 const minifyJS = async (data, filename) => {
-    const result = await minify(
-        { [filename]: data },
-        {
-            compress: {
-                passes: 3,
-                unsafe: true,
-                unsafe_comps: true,
-                unsafe_Function: true,
-                unsafe_math: true,
-                unsafe_proto: true,
-                drop_debugger: true, // Eliminar debugger;
-                pure_getters: true, // Permitir optimizar getters puros
-                sequences: true, // Unir sentencias secuenciales
-                booleans: true, // Simplificar expresiones booleanas
-                conditionals: true, // Simplificar condicionales
-                dead_code: true, // Eliminar código muerto
-                if_return: true, // Optimizar if/return
-                join_vars: true, // Unir declaraciones de variables
-                reduce_vars: true, // Reducir variables
-                collapse_vars: true, // Colapsar variables
+    try {
+        const result = await minify(
+            { [filename]: data },
+            {
+                compress: {
+                    passes: 3,
+                    unsafe: true,
+                    unsafe_comps: true,
+                    unsafe_Function: true,
+                    unsafe_math: true,
+                    unsafe_proto: true,
+                    drop_debugger: true, // Eliminar debugger;
+                    pure_getters: true, // Permitir optimizar getters puros
+                    sequences: true, // Unir sentencias secuenciales
+                    booleans: true, // Simplificar expresiones booleanas
+                    conditionals: true, // Simplificar condicionales
+                    dead_code: true, // Eliminar código muerto
+                    if_return: true, // Optimizar if/return
+                    join_vars: true, // Unir declaraciones de variables
+                    reduce_vars: true, // Reducir variables
+                    collapse_vars: true, // Colapsar variables
+                },
+                mangle: {
+                    toplevel: true, // Minificar nombres de variables globales
+                },
+                ecma: 5,
+                module: true, // Indicar que es un módulo ES
+                toplevel: true, // Aplicar optimizaciones a nivel superior
+                format: {
+                    preamble: '/* WYS Soluciones Informatica - VersaWYS */',
+                    comments: isProd ? false : 'all', // Eliminar comentarios
+                },
             },
-            mangle: {
-                toplevel: true, // Minificar nombres de variables globales
-            },
-            ecma: 5,
-            module: true, // Indicar que es un módulo ES
-            toplevel: true, // Aplicar optimizaciones a nivel superior
-            format: {
-                preamble: '/* WYS Soluciones Informatica - VersaWYS */',
-                comments: isProd ? false : 'all', // Eliminar comentarios
-            },
-        },
-    );
-    return result;
+        );
+        return { code: result.code };
+    } catch (error) {
+        return { error, code: '' };
+    }
+};
+
+/**
+ * Parses the given JavaScript code using Acorn and returns the Abstract Syntax Tree (AST).
+ *
+ * @param {string} data - The JavaScript code to be parsed.
+ * @returns {Promise<Object|null>} The parsed AST object if successful, or null if an error occurs.
+ * @throws {Error} If there is an error during parsing, it logs the error details and stack trace.
+ */
+const checkSintaxysAcorn = async data => {
+    try {
+        const ast = Parser.parse(data, {
+            ecmaVersion: 2020,
+            sourceType: 'module',
+            locations: true,
+            ranges: true,
+        });
+
+        return { ast, error: null };
+    } catch (error) {
+        console.log(
+            chalk.red(
+                `🚩 :Error durante la compilación JS:${error.loc.line}:${error.loc.column}: ${error.message}\n`,
+            ),
+        );
+        console.error(error.stack); // Imprime la pila de llamadas para depuración
+        return { ast: null, error };
+    }
 };
 
 /**
  * Compila un archivo JavaScript.
  * @param {string} source - La ruta del archivo fuente.
  * @param {string} destination - La ruta del archivo de destino.
+ *
+ * @returns {Promise<void>} - Una promesa que se resuelve después de la compilación.
  */
 const compileJS = async (source, destination) => {
     try {
+        totalFiles++;
         const startTime = Date.now(); // optener la hora actual
 
         const filename = path.basename(source);
-        await log(chalk.blue(`🪄  :start transformation`));
+        await log(chalk.blue(`🪄  :start compilation`));
 
         let data = await readFile(source, 'utf-8');
         if (!data) {
@@ -648,10 +762,17 @@ const compileJS = async (source, destination) => {
         const extension = source.split('.').pop();
         let resultVue = null;
         if (extension === 'vue') {
+            vueFiles++;
             await log(chalk.green(`💚 :Pre Compile VUE`));
             resultVue = await preCompileVue(data, source);
             data = resultVue.data;
             if (resultVue.error !== null) {
+                errorFiles++;
+                errorList.push({
+                    file: source,
+                    error: resultVue.error.message,
+                    proceso: 'Compilación Vue',
+                });
                 await error(
                     chalk.red(
                         `🚩 :Error durante la compilación Vue :${resultVue.error}\n`,
@@ -663,9 +784,16 @@ const compileJS = async (source, destination) => {
         }
 
         if (extension === 'ts' || resultVue?.lang === 'ts') {
+            tsFiles++;
             await log(chalk.blue(`🔄️ :Pre Compilando TS`));
-            const Resultdata = await preCompileTS(data);
+            const Resultdata = await preCompileTS(data, filename);
             if (Resultdata.error !== null) {
+                errorFiles++;
+                errorList.push({
+                    file: source,
+                    error: Resultdata.error.message,
+                    proceso: 'Compilación TS',
+                });
                 await error(
                     chalk.red(
                         `🚩 :Error durante la compilación TS: ${Resultdata.error}\n`,
@@ -680,6 +808,19 @@ const compileJS = async (source, destination) => {
         data = await estandarizaData(data);
 
         // await writeFile(`${destination}-temp.js`, data, 'utf-8');
+
+        await log(chalk.green(`🔍 :Validando Sintaxis`));
+        const resultAcorn = await checkSintaxysAcorn(data);
+        if (resultAcorn.error !== null) {
+            errorFiles++;
+            errorList.push({
+                file: source,
+                error: resultAcorn.error.message,
+                proceso: 'Validación Sintaxis',
+            });
+            return;
+        }
+        acornFiles++;
 
         let result = null;
         if (isProd) {
@@ -699,7 +840,7 @@ const compileJS = async (source, destination) => {
             await unlink(destination);
         } else {
             if (!isProd) {
-                result.code = result.code.replaceAll('*/;export', '*/\nexport');
+                result.code = result.code.replaceAll('*/export', '*/\nexport');
                 result.code = result.code.replaceAll('*/export', '*/\nexport');
             }
             const destinationDir = path.dirname(destination);
@@ -707,12 +848,19 @@ const compileJS = async (source, destination) => {
             await writeFile(destination, result.code, 'utf-8');
 
             const endTime = Date.now();
-            const elapsedTime = endTime - startTime;
+            const elapsedTime = showTimingForHumans(endTime - startTime);
             await log(
-                chalk.gray(`✅ :Compilación exitosa (${elapsedTime} ms) \n`),
+                chalk.gray(`✅ :Compilación exitosa (${elapsedTime}) \n`),
             );
+            successfulFiles++;
         }
     } catch (errora) {
+        errorFiles++;
+        errorList.push({
+            file: source,
+            error: errora.message,
+            proceso: 'Compilación JS',
+        });
         await error(
             chalk.red(`🚩 :Error durante la compilación JS: ${errora}\n`),
             errora,
@@ -720,28 +868,60 @@ const compileJS = async (source, destination) => {
     }
 };
 
+async function generateTailwindCSS(filePath = null) {
+    if (!tailwindcss) {
+        return;
+    }
+    return new Promise((resolve, reject) => {
+        console.log('Compilando TailwindCSS...');
+        exec(
+            `npx tailwindcss -i ${tailwindcss.inputCSS} -o ${tailwindcss.outputCSS}`,
+            (err, stdout, stderr) => {
+                if (err) {
+                    console.error('Error al compilar Tailwind:', stderr);
+                    return reject(err);
+                }
+                console.log('Tailwind actualizado:', stdout);
+                resolve();
+            },
+        );
+    });
+}
+
 /**
  * Compila un archivo dado su ruta.
  * @param {string} path - La ruta del archivo a compilar.
  */
-const compile = async path => {
-    if (path.includes('.d.ts')) {
+const compile = async filePath => {
+    if (!filePath || typeof filePath !== 'string') {
+        console.error(chalk.red('⚠️ :Ruta inválida:', filePath));
         return;
     }
-    console.log(chalk.green(`🔜 :Source ${path}`));
-
-    const outputPath = path.replace(PATH_SOURCE, PATH_DIST);
+    if (filePath.includes('.d.ts')) {
+        return;
+    }
+    const normalizedPath = path.normalize(filePath).replace(/\\/g, '/'); // Normalizar la ruta para que use barras inclinadas hacia adelante
+    const filePathForReplate = `./${normalizedPath}`;
+    const outputPath = filePathForReplate.replace(PATH_SOURCE, PATH_DIST);
     const outFileJs = outputPath.replace('.ts', '.js').replace('.vue', '.js');
 
+    console.log(chalk.green(`🔜 :Source ${filePathForReplate}`));
     console.log(chalk.green(`🔚 :destination ${outFileJs}`));
 
-    const extension = path.split('.').pop();
+    const extension = normalizedPath.split('.').pop();
+    //sólo el filename sin extesion
+    const fileName = path
+        .basename(normalizedPath)
+        .replace('.vue', '')
+        .replace('.ts', '')
+        .replace('.js', '');
 
     if (outputPath) {
-        await compileJS(path, outputPath);
+        await compileJS(normalizedPath, outputPath);
     } else {
         await log(chalk.yellow(`⚠️ :Tipo no reconocido: ${extension}`));
     }
+    return { extension, normalizedPath: path.normalize(outFileJs), fileName };
 };
 
 /**
@@ -750,36 +930,183 @@ const compile = async path => {
 const compileAll = async () => {
     try {
         pathAlias = await getPathAlias();
+        const beginTime = Date.now();
 
-        for await (const file of glob([watchJS, watchVue, watchTS])) {
+        for await (const file of glob([
+            watchJS,
+            watchVue,
+            watchTS,
+            excludeFile,
+        ])) {
             await compile(file.startsWith('./') ? file : `./${file}`);
+        }
+
+        const endTime = Date.now();
+
+        console.log(chalk.green('🔄️ :Resumen de compilación:'));
+        console.log(chalk.green(`isAll: ${isAll}`));
+        console.log(chalk.green(`isProd: ${isProd}`));
+
+        console.log(
+            chalk.green(
+                `Tiempo total: ${showTimingForHumans(endTime - beginTime)}`,
+            ),
+        );
+        console.table([
+            {
+                Tipo: 'Archivos Vue',
+                Exitosos: vueFiles,
+                'Con Error': errorList.filter(e => e.file.endsWith('.vue'))
+                    .length,
+            },
+            {
+                Tipo: 'Archivos TypeScript',
+                Exitosos: tsFiles,
+                'Con Error': errorList.filter(e => e.file.endsWith('.ts'))
+                    .length,
+            },
+            {
+                Tipo: 'Validación Sintaxis',
+                Exitosos: acornFiles,
+                'Con Error': errorList.filter(e => e.error.includes('Acorn'))
+                    .length,
+            },
+            {
+                Tipo: '-------------------',
+                Exitosos: '-------------------',
+                'Con Error': '-------------------',
+            },
+            {
+                Tipo: 'Total',
+                Exitosos: successfulFiles,
+                'Con Error': errorFiles,
+            },
+        ]);
+
+        if (errorFiles > 0) {
+            console.log(chalk.red('🔄️ :Lista de archivos con errores:'));
+            console.table(
+                errorList.map(({ file, error, proceso }) => ({
+                    Archivo: file,
+                    Error: error,
+                    Proceso: proceso,
+                })),
+            );
         }
     } catch (errora) {
         error(chalk.red('🚩 :Error durante la compilación inicial:'), errora);
     }
 };
 
+const emitirCambios = async (bs, extension, normalizedPath, fileName, type) => {
+    bs.sockets.emit('vue:update', {
+        component: fileName,
+        timestamp: Date.now(),
+        relativePath: normalizedPath,
+        extension,
+        type,
+    });
+    console.log(`📡 : Emitiendo evento 'vue:update' para ${fileName} \n`);
+};
+
 /**
  * Inicializa el proceso de compilación y observación de archivos.
  */
-const init = async () => {
+const initChokidar = async () => {
     try {
         pathAlias = await getPathAlias();
         log(
             chalk.green(
-                `👀 :Watching ${[watchJS, watchVue, watchTS].join(', ')}\n`,
+                `👀 :Observando ${[watchJS, watchVue, watchTS].join(', ')}\n`,
             ),
         );
-        watch([watchJS, watchVue, watchTS])
-            .on('add', path =>
-                compile(path.startsWith('./') ? path : `./${path}`),
-            )
-            .on('change', path =>
-                compile(path.startsWith('./') ? path : `./${path}`),
-            )
-            .on('unlink', path =>
-                deleteFile(path.startsWith('./') ? path : `./${path}`),
+
+        // Inicializar chokidar
+        const watcher = chokidar.watch(PATH_SOURCE, {
+            persistent: true,
+            ignoreInitial: true,
+            recursive: true,
+            ignored: /\.(?!js$|vue$|ts$).+$/,
+        });
+
+        console.log(watcher.getWatched());
+
+        // Evento cuando se añade un archivo
+        watcher.on('add', async filePath => {
+            await generateTailwindCSS(filePath);
+            const { extension, normalizedPath, fileName } = await compile(
+                path.normalize(filePath).replace(/\\/g, '/'),
             );
+            emitirCambios(bs, extension, normalizedPath, fileName, 'add');
+        });
+
+        // Evento cuando se modifica un archivo
+        watcher.on('change', async filePath => {
+            // await generateTailwindCSS(filePath);
+            const { extension, normalizedPath, fileName } = await compile(
+                path.normalize(filePath).replace(/\\/g, '/'),
+            );
+            emitirCambios(bs, extension, normalizedPath, fileName, 'change');
+        });
+
+        // Evento cuando se elimina un archivo
+        watcher.on('unlink', async filePath => {
+            await generateTailwindCSS();
+            const { extension, normalizedPath, fileName } = deleteFile(
+                path.normalize(filePath).replace(/\\/g, '/'),
+            );
+            emitirCambios(bs, extension, normalizedPath, fileName, 'delete');
+        });
+
+        // Manejar la señal de interrupción (Ctrl+C)
+        process.on('SIGINT', async () => {
+            console.log(chalk.yellow('🛑 :Proceso interrumpido.'));
+
+            //detener el servidor de desarrollo
+            bs.exit();
+
+            await watcher.close();
+            log(chalk.yellow('👋 :Watcher cerrado.'));
+
+            process.exit(0);
+        });
+
+        bs = browserSync.create();
+        const port = await getPort({ port: 3000 });
+        const uiPort = await getPort({ port: 4000 });
+
+        bs.init({
+            server: './',
+            files: ['./public/**/*.css'], // Observa cambios en archivos CSS
+            injectChanges: true, // Inyecta CSS sin recargar la página
+            open: false, // No abre automáticamente el navegador
+            port, // Puerto aleatorio para BrowserSync
+            ui: {
+                port: uiPort, // Puerto aleatorio para la interfaz de usuario
+            },
+            socket: {
+                domain: `localhost:${port}`, // Mismo puerto que arriba
+                path: '/browser-sync/socket.io', // Ruta correcta para socket.io
+            },
+            snippetOptions: {
+                rule: {
+                    match: /<\/body>/i,
+                    fn: (snippet, match) => `${snippet}${match}`,
+                },
+            },
+            logLevel: 'debug',
+            logPrefix: 'BS',
+            logConnections: true,
+            logFileChanges: true,
+            watchEvents: ['change', 'add', 'unlink', 'addDir', 'unlinkDir'],
+            reloadDelay: 500,
+            reloadDebounce: 500,
+            notify: true,
+            watchOptions: {
+                ignoreInitial: true,
+                ignored: ['node_modules', '.git'],
+            },
+        });
     } catch (error) {
         console.error(
             chalk.red('🚩 :Error al iniciar:'),
@@ -794,4 +1121,4 @@ const init = async () => {
 if (isAll) {
     console.log(chalk.green('🔄️ :Compilando todos los archivos...'));
     compileAll();
-} else init();
+} else initChokidar();

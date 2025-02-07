@@ -28,6 +28,8 @@
         <h1>{{ message }}</h1>
     </div>
 
+    <h1>Operaciones Matemáticas</h1>
+
     <div class="container">
         <div class="numOperations">
             <div>

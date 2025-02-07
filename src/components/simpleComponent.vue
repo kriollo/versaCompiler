@@ -10,6 +10,7 @@
 </script>
 <template>
     <div class="container">
+        <h1>Simple Component</h1>
         <div class="inputContainer">
             <input type="text" v-model="message" />
         </div>
