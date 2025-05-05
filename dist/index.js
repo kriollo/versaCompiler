@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { exec } from 'child_process';
 import chokidar from 'chokidar';
 import getPort from 'get-port';
-import { spawnSync } from 'node:child_process';
+
 import {
     glob,
     mkdir,
@@ -17,9 +17,12 @@ import {
 import path from 'node:path';
 
 import { checkSintaxysAcorn } from './services/acorn.js';
+import { linter } from './services/linter.js';
 import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
+
+import { mapRuta, showTimingForHumans } from './utils/utils.js';
 
 const log = console.log.bind(console);
 const error = console.error.bind(console);
@@ -59,24 +62,6 @@ let acornFiles = 0;
 let successfulFiles = 0;
 let errorFiles = 0;
 const errorList = [];
-
-/**
- * Converts a 24-hour time string to a 12-hour time string with AM/PM.
- *
- * @param {number} timing - The value of the timing en miliseconds.
- * @returns {string} the timing in ms, seconds, minutes or hours.
- */
-export const showTimingForHumans = timing => {
-    if (timing < 1000) {
-        return `${timing} ms`;
-    } else if (timing < 60000) {
-        return `${timing / 1000} s`;
-    } else if (timing < 3600000) {
-        return `${timing / 60000} min`;
-    } else {
-        return `${timing / 3600000} h`;
-    }
-};
 
 /**
  * Obtiene los alias de ruta desde el archivo tsconfig.json.
@@ -122,14 +107,6 @@ const getPathAlias = async () => {
 };
 
 /**
- * Mapea una ruta de origen a una ruta de destino en el directorio de distribución.
- * @param {string} ruta - La ruta de origen.
- * @returns {Promise<string>} - La ruta mapeada en el directorio de distribución.
- */
-const mapRuta = async ruta =>
-    path.join(PATH_DIST, path.relative(PATH_SOURCE, ruta));
-
-/**
  * Elimina un archivo o directorio en la ruta especificada.
  * @param {string} ruta - La ruta del archivo o directorio a eliminar.
  */
@@ -141,6 +118,7 @@ const deleteFile = async ruta => {
                 .replace(/\\/g, '/')
                 .replace('.vue', '.js')
                 .replace('.ts', '.js'),
+            PATH_DIST,
         )
     ).toString();
     try {
@@ -531,56 +509,6 @@ const compile = async filePath => {
     return { extension, normalizedPath: path.normalize(outFileJs), fileName };
 };
 
-const linter = async filePath => {
-    // 1. Calcula la ruta del binario
-    const oxlintExe = 'npx oxlint';
-    const args = filePath ? [filePath] : [];
-    // const args = filePath ? [`${filePath}`] : [];
-    const processOXC = spawnSync(
-        oxlintExe,
-        args, // Ejecuta en lote (ej: ['src/**/*.js', 'lib/*.ts'])
-        {
-            stdio: 'pipe',
-            encoding: 'utf-8', // Evita .toString()
-            shell: true, // ¡Más rápido sin shell!
-        },
-    );
-    if (processOXC.error) {
-        console.error(
-            chalk.red('🚨 Error ejecutando oxlint:', processOXC.error),
-        );
-        return false;
-    }
-
-    const output = processOXC.stdout.trim();
-    if (!output) {
-        console.log(chalk.green('✅ No se encontraron errores de linting.'));
-        return true;
-    }
-
-    // Regex optimizado (unificado)
-    const LINT_REGEX =
-        /([×x!]|warning)\s+([^:]+):\s+([^\n]+)\n\s+[,╭][-─]\[([^\]]+)\][\s\S]+?help:\s+([^\n]+)/gi;
-    const matches = output.matchAll(LINT_REGEX);
-    errorFiles = 0; // Reiniciar el contador de archivos con errores
-    errorList.splice(0, errorList.length); // Limpiar la lista de errores
-    for (const match of matches) {
-        const [_, severitySymbol, ruleId, message, filePath, help] = match;
-        const normalizedPath = filePath.trim().replace(/\\/g, '/');
-
-        errorFiles++;
-        errorList.push({
-            file: normalizedPath,
-            error: `${ruleId}: ${message.trim()}`,
-            proceso: 'Linting',
-            help: help.trim(),
-            severity: severitySymbol === '!' ? 'warning' : 'error',
-        });
-    }
-
-    return errorList.length === 0;
-};
-
 /**
  * Compila todos los archivos en los directorios de origen.
  */
@@ -590,7 +518,11 @@ const compileAll = async () => {
         const beginTime = Date.now();
 
         console.log(chalk.blue('🔍 :Validando Linting'));
-        await linter();
+        const resultLinter = await linter();
+        if (resultLinter.error) {
+            errorFiles = resultLinter.errorFiles;
+            errorList.push(...resultLinter.errorList);
+        }
 
         for await (const file of glob([
             watchJS,
@@ -712,7 +644,7 @@ const initChokidar = async () => {
         // Evento cuando se elimina un archivo
         watcher.on('unlink', async filePath => {
             await generateTailwindCSS();
-            const { extension, normalizedPath, fileName } = deleteFile(
+            const { extension, normalizedPath, fileName } = await deleteFile(
                 path.normalize(filePath).replace(/\\/g, '/'),
             );
             emitirCambios(bs, extension, normalizedPath, fileName, 'delete');

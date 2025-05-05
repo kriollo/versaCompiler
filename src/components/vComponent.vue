@@ -20,7 +20,7 @@
         result.value = subtract(num1.value, num2.value);
     };
     const multiplyNumber = () => {
-        result.value = multiply(num1.value, num2.value);
+        result.value = multiply(num1.value, num2.value)
     };
 </script>
 <template>
