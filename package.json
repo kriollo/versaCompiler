@@ -1,36 +1,38 @@
 {
-  "name": "versacompiler",
-  "version": "2.0.0",
-  "main": "dist/index.js",
-  "type": "module",
-  "scripts": {
-    "dev": "node --watch dist/index.js",
-    "compile": "node dist/index.js",
-    "compile-dev": "node dist/index.js --all",
-    "compile-prod": "node dist/index.js --all --prod"
-  },
-  "keywords": [
-    "vue",
-    "compiler",
-    "minifier",
-    "vue3",
-    "versacompiler",
-    "typescript"
-  ],
-  "author": "Jorge Jara H (kriollone@gmail.com)",
-  "license": "MIT",
-  "dependencies": {
-    "chalk": "5.4.1",
-    "terser": "5.38.1",
-    "vue": "3.5.13",
-    "chokidar": "^4.0.3"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.3",
-    "@types/node": "^22.13.1",
-    "prettier": "3.4.2",
-    "acorn": "^8.14.0",
-    "browser-sync": "^3.0.3",
-    "get-port": "^7.1.0"
-  }
+    "name": "versacompiler",
+    "version": "2.0.0",
+    "main": "dist/index.js",
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch dist/index.js",
+        "compile": "node dist/index.js",
+        "compile-dev": "node dist/index.js --all",
+        "compile-prod": "node dist/index.js --all --prod"
+    },
+    "keywords": [
+        "vue",
+        "compiler",
+        "minifier",
+        "vue3",
+        "versacompiler",
+        "typescript"
+    ],
+    "author": "Jorge Jara H (kriollone@gmail.com)",
+    "license": "MIT",
+    "dependencies": {
+        "chalk": "5.4.1",
+        "chokidar": "^4.0.3",
+        "oxc-minify": "^0.67.0",
+        "vue": "3.5.13"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.3",
+        "acorn": "^8.14.1",
+        "browser-sync": "^3.0.4",
+        "code-tag": "^1.2.0",
+        "get-port": "^7.1.0",
+        "oxlint": "^0.16.9",
+        "prettier": "3.5.3",
+        "typescript": "^5.8.3"
+    }
 }

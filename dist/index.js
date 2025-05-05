@@ -1,9 +1,9 @@
-import * as Parser from 'acorn';
 import browserSync from 'browser-sync';
 import chalk from 'chalk';
 import { exec } from 'child_process';
 import chokidar from 'chokidar';
 import getPort from 'get-port';
+import { spawnSync } from 'node:child_process';
 import {
     glob,
     mkdir,
@@ -15,9 +15,11 @@ import {
     writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
-import { minify } from 'terser';
-import * as ts from 'typescript';
-import * as vCompiler from 'vue/compiler-sfc';
+
+import { checkSintaxysAcorn } from './services/acorn.js';
+import { minifyJS } from './services/minify.js';
+import { preCompileTS } from './services/typescript.js';
+import { preCompileVue } from './services/vuejs.js';
 
 const log = console.log.bind(console);
 const error = console.error.bind(console);
@@ -38,7 +40,6 @@ const excludeFile = `!${PATH_SOURCE}/**/*.ts`;
 let pathAlias = null;
 
 let tailwindcss = null;
-let proxyUrl = '';
 
 // obtener parametro de entrada
 let isAll = false;
@@ -52,7 +53,6 @@ if (process.argv.length > 1) {
     console.log(chalk.green(`isProd: ${isProd}`));
 }
 
-let totalFiles = 0;
 let vueFiles = 0;
 let tsFiles = 0;
 let acornFiles = 0;
@@ -343,402 +343,6 @@ const estandarizaData = async data => {
 };
 
 /**
- * Compila un bloque personalizado.
- * @param {Object} block - El bloque personalizado a compilar.
- * @param {string} source - La fuente del bloque.
- */
-const compileCustomBlock = async (block, source) => {};
-
-/**
- * Precompila el código TypeScript proporcionado.
- * @param {string} data - El código TypeScript a precompilar.
- * @param {string} fileName - El nombre del archivo que contiene el código TypeScript.
- *
- * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
- */
-const preCompileTS = async (data, fileName) => {
-    try {
-        // Leer tsconfig.json
-        const tsConfigContent = await readFile(PATH_CONFIG_FILE, 'utf-8');
-        if (!tsConfigContent) {
-            throw new Error(
-                `No se pudo leer el archivo tsconfig.json en: ${PATH_CONFIG_FILE}`,
-            );
-        }
-
-        const tsConfig = JSON.parse(tsConfigContent);
-
-        // Obtener las opciones del compilador
-        const { compilerOptions } = tsConfig;
-
-        if (!compilerOptions) {
-            throw new Error(
-                'No se encontraron compilerOptions en tsconfig.json',
-            );
-        }
-
-        // Crear host de configuración de parseo
-        const parseConfigHost = {
-            useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
-            readDirectory: ts.sys.readDirectory,
-            fileExists: ts.sys.fileExists,
-            readFile: ts.sys.readFile,
-            onUnRecoverableConfigFileDiagnostic: diagnostic => {
-                throw new Error(
-                    ts.flattenDiagnosticMessageText(
-                        diagnostic.messageText,
-                        '\n',
-                    ),
-                );
-            },
-        };
-
-        // Parsear la configuración para que TS la entienda
-        const parsedConfig = ts.parseJsonConfigFileContent(
-            tsConfig,
-            parseConfigHost,
-            path.dirname(PATH_CONFIG_FILE),
-        );
-        if (parsedConfig.errors.length) {
-            const errors = parsedConfig.errors.map(diagnostic =>
-                ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-            );
-            throw new Error(
-                `Error al parsear tsconfig.json:\n${errors.join('\n')}`,
-            );
-        }
-
-        // Transpilar el código
-        const result = ts.transpileModule(data, {
-            compilerOptions: parsedConfig.options,
-            reportDiagnostics: true,
-            fileName,
-        });
-        if (result.diagnostics && result.diagnostics.length > 0) {
-            const errors = result.diagnostics.map(diagnostic => {
-                if (diagnostic.file) {
-                    const { line, character } =
-                        diagnostic.file.getLineAndCharacterOfPosition(
-                            diagnostic.start,
-                        );
-                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')} - ${diagnostic.file.fileName} (${line + 1},${character + 1})`;
-                } else {
-                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
-                }
-            });
-
-            throw new Error(`${errors.join('\n')}`);
-        }
-
-        return { error: null, data: result.outputText };
-    } catch (error) {
-        return { error, data: null };
-    }
-};
-
-const getComponentsVue = async data => {
-    let components = [];
-
-    const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
-
-    const a = data.replace(importRegExp, match => {
-        const ruta = match.match(/from\s+['"](.*)['"];/)[1];
-
-        if (ruta.endsWith('.vue')) {
-            const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
-            if (resultVue) {
-                const fullPath = resultVue[1].replace('.vue', '');
-                const fileName = resultVue[2];
-                components.push(fileName);
-                return `import ${fileName} from '${fullPath}.js';`;
-            }
-        }
-        return match; // Devolver el match original si no se cumple ninguna condición
-    });
-
-    return components;
-};
-
-/**
- * Precompila un componente Vue.
- * @param {string} data - El código del componente Vue.
- * @param {string} source - La fuente del componente Vue.
- * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
- */
-const preCompileVue = async (data, source) => {
-    try {
-        const fileName = path.basename(source).replace('.vue', '');
-        const { descriptor, errors } = vCompiler.parse(data, {
-            filename: fileName,
-            sourceMap: false,
-            sourceRoot: path.dirname(source),
-        });
-
-        if (errors.length) {
-            throw new Error(
-                `Error al analizar el componente Vue ${source}:\n${errors.map(e => e.message).join('\n')}`,
-            );
-        }
-
-        const id = Math.random().toString(36).slice(2, 12);
-        const scopeId = descriptor.styles.some(s => s.scoped)
-            ? `data-v-${id}`
-            : null;
-        const templateOptions = {
-            sourceMap: false,
-            filename: `${fileName}.vue`,
-            id,
-            scoped: !!scopeId,
-            slotted: descriptor.slotted,
-            source: descriptor.template?.content,
-            comments: isProd ? false : 'all',
-            isProd,
-            compilerOptions: {
-                scopeId,
-                mode: 'module',
-                isProd,
-                inlineTemplate: true,
-                prefixIdentifiers: true,
-                hoistStatic: true,
-                cacheHandlers: true,
-                runtimeGlobalName: 'Vue',
-                runtimeModuleName: 'vue',
-                optimizeBindings: true,
-                runtimeContextBuiltins: true,
-                runtimeDirectives: true,
-                runtimeVNode: true,
-                runtimeProps: true,
-                runtimeSlots: true,
-                runtimeComponents: true,
-                runtimeCompiledRender: true,
-                whitespace: 'condense',
-                ssrCssExternal: true,
-                ssr: false,
-                nodeTransforms: [],
-                directiveTransforms: {},
-            },
-        };
-
-        // Compile script
-        let compiledScript;
-        if (descriptor.script || descriptor.scriptSetup) {
-            const scriptDescriptor =
-                descriptor.script || descriptor.scriptSetup;
-
-            compiledScript = {
-                content: descriptor.script
-                    ? scriptDescriptor.content
-                    : vCompiler.compileScript(descriptor, {
-                          id,
-                          templateOptions,
-                      }).content,
-                lang:
-                    scriptDescriptor.lang === 'ts' ||
-                    scriptDescriptor.lang === 'typescript'
-                        ? 'ts'
-                        : 'js',
-            };
-        } else {
-            compiledScript = { content: `export default {}`, lang: 'js' };
-        }
-
-        // Compile template y obtener el contenido del template
-        const compiledTemplate = descriptor.template?.content // Usar optional chaining
-            ? vCompiler.compileTemplate({
-                  ...templateOptions,
-              })
-            : { code: '' }; // Manejar caso sin template
-        if (!descriptor.template?.content) {
-            console.warn(
-                chalk.yellow(
-                    `Advertencia: El componente Vue ${source} no tiene una sección de plantilla.`,
-                ),
-            );
-        }
-
-        let customBlocks = '';
-        if (descriptor.customBlocks.length > 0) {
-            // eliminar el ultimo caracter que es un punto y coma
-            customBlocks =
-                descriptor?.customBlocks[0].content.slice(0, -1) ?? '';
-        }
-
-        // Compile styles Y obtener el contenido de los estilos
-        const compiledStyles = descriptor.styles.map(style =>
-            vCompiler.compileStyle({
-                id,
-                source: style.content,
-                scoped: style.scoped,
-                preprocessLang: style.lang,
-                isProd,
-                trim: true,
-                filename: `${fileName}.vue`,
-            }),
-        );
-
-        const insertStyles = compiledStyles.length
-            ? `(function(){
-                    let styleTag = document.createElement('style');
-                    styleTag.setAttribute('data-v-${id}', '');
-                    styleTag.innerHTML = \`${compiledStyles.map(s => s.code).join('\n')}\`;
-                    document.head.appendChild(styleTag);
-                })();`
-            : '';
-
-        // Combine all parts into a single module
-        let output = `
-            ${insertStyles}
-            ${compiledScript.content}
-            ${compiledTemplate.code}
-        `;
-        //añardir instancia de app
-        const appImport = `import { app } from '@/dashboard/js/vue-instancia.js';`;
-        // output = `${appImport}${output}`;
-
-        const componentName = `${fileName}_component`;
-        const components = await getComponentsVue(data);
-        const exportComponent = `
-                __file: '${source}',
-                __name: '${fileName}',
-                name: '${fileName}',
-                components: { ${components.join(', ')} },
-            `;
-
-        // quitamos export default y añadimos el nombre del archivo
-        if (output.includes('export default {')) {
-            output = output.replace(
-                'export default {',
-                `const ${componentName} = {
-                \n${exportComponent}
-                `,
-            );
-        } else {
-            output = output.replace(
-                'export default /*@__PURE__*/_defineComponent({',
-                `const ${componentName} = /*@__PURE__*/_defineComponent({
-                \n${exportComponent}
-                `,
-            );
-        }
-
-        // reemplazamos cuando usamos script setup
-        if (descriptor.scriptSetup) {
-            output = output.replaceAll(/_ctx\.(?!\$)/g, '$setup.');
-            output = output.replace(
-                'export function render(_ctx, _cache) {',
-                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
-            );
-        } else {
-            output = output.replace(
-                'export function render(_ctx, _cache) {',
-                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
-            );
-        }
-
-        const finishComponent = `
-            ${componentName}.render = render;
-            ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
-            ${customBlocks}
-
-            export default ${componentName};
-        `;
-
-        output = `${output}\n${finishComponent}`;
-
-        // await writeFile(
-        //     `./public/dashboard/js/${fileName}-temp.js`,
-        //     output,
-        //     'utf-8',
-        // );
-        // await unlink(`./public/dashboard/js/${fileName}-temp.js`);
-
-        return {
-            lang: compiledScript.lang,
-            error: null,
-            data: output,
-        };
-    } catch (error) {
-        return { lang: null, error, data: null }; // Devolver error en objeto
-    }
-};
-
-/**
- * Minifica el codigo JavaScript usando opciones especificas.
- *
- * @param {string} data - The JavaScript code to be minified.
- * @param {string} filename - The name of the file containing the JavaScript code.
- * @returns {Promise<Object>} The result of the minification process.
- */
-const minifyJS = async (data, filename) => {
-    try {
-        const result = await minify(
-            { [filename]: data },
-            {
-                compress: {
-                    passes: 3,
-                    unsafe: true,
-                    unsafe_comps: true,
-                    unsafe_Function: true,
-                    unsafe_math: true,
-                    unsafe_proto: true,
-                    drop_debugger: true, // Eliminar debugger;
-                    pure_getters: true, // Permitir optimizar getters puros
-                    sequences: true, // Unir sentencias secuenciales
-                    booleans: true, // Simplificar expresiones booleanas
-                    conditionals: true, // Simplificar condicionales
-                    dead_code: true, // Eliminar código muerto
-                    if_return: true, // Optimizar if/return
-                    join_vars: true, // Unir declaraciones de variables
-                    reduce_vars: true, // Reducir variables
-                    collapse_vars: true, // Colapsar variables
-                },
-                mangle: {
-                    toplevel: true, // Minificar nombres de variables globales
-                },
-                ecma: 5,
-                module: true, // Indicar que es un módulo ES
-                toplevel: true, // Aplicar optimizaciones a nivel superior
-                format: {
-                    preamble: '/* WYS Soluciones Informatica - VersaWYS */',
-                    comments: isProd ? false : 'all', // Eliminar comentarios
-                },
-            },
-        );
-        return { code: result.code };
-    } catch (error) {
-        return { error, code: '' };
-    }
-};
-
-/**
- * Parses the given JavaScript code using Acorn and returns the Abstract Syntax Tree (AST).
- *
- * @param {string} data - The JavaScript code to be parsed.
- * @returns {Promise<Object|null>} The parsed AST object if successful, or null if an error occurs.
- * @throws {Error} If there is an error during parsing, it logs the error details and stack trace.
- */
-const checkSintaxysAcorn = async data => {
-    try {
-        const ast = Parser.parse(data, {
-            ecmaVersion: 2020,
-            sourceType: 'module',
-            locations: true,
-            ranges: true,
-        });
-
-        return { ast, error: null };
-    } catch (error) {
-        console.log(
-            chalk.red(
-                `🚩 :Error durante la compilación JS:${error.loc.line}:${error.loc.column}: ${error.message}\n`,
-            ),
-        );
-        console.error(error.stack); // Imprime la pila de llamadas para depuración
-        return { ast: null, error };
-    }
-};
-
-/**
  * Compila un archivo JavaScript.
  * @param {string} source - La ruta del archivo fuente.
  * @param {string} destination - La ruta del archivo de destino.
@@ -747,7 +351,6 @@ const checkSintaxysAcorn = async data => {
  */
 const compileJS = async (source, destination) => {
     try {
-        totalFiles++;
         const startTime = Date.now(); // optener la hora actual
 
         const filename = path.basename(source);
@@ -764,7 +367,7 @@ const compileJS = async (source, destination) => {
         if (extension === 'vue') {
             vueFiles++;
             await log(chalk.green(`💚 :Pre Compile VUE`));
-            resultVue = await preCompileVue(data, source);
+            resultVue = await preCompileVue(data, source, isProd);
             data = resultVue.data;
             if (resultVue.error !== null) {
                 errorFiles++;
@@ -786,7 +389,11 @@ const compileJS = async (source, destination) => {
         if (extension === 'ts' || resultVue?.lang === 'ts') {
             tsFiles++;
             await log(chalk.blue(`🔄️ :Pre Compilando TS`));
-            const Resultdata = await preCompileTS(data, filename);
+            const Resultdata = await preCompileTS(
+                data,
+                filename,
+                PATH_CONFIG_FILE,
+            );
             if (Resultdata.error !== null) {
                 errorFiles++;
                 errorList.push({
@@ -825,7 +432,7 @@ const compileJS = async (source, destination) => {
         let result = null;
         if (isProd) {
             await log(chalk.blue(`🤖 :minifying`));
-            result = await minifyJS(data, filename);
+            result = await minifyJS(data, filename, isProd);
         } else {
             result = { code: data };
         }
@@ -868,7 +475,7 @@ const compileJS = async (source, destination) => {
     }
 };
 
-async function generateTailwindCSS(filePath = null) {
+async function generateTailwindCSS(_filePath = null) {
     if (!tailwindcss) {
         return;
     }
@@ -924,6 +531,56 @@ const compile = async filePath => {
     return { extension, normalizedPath: path.normalize(outFileJs), fileName };
 };
 
+const linter = async filePath => {
+    // 1. Calcula la ruta del binario
+    const oxlintExe = 'npx oxlint';
+    const args = filePath ? [filePath] : [];
+    // const args = filePath ? [`${filePath}`] : [];
+    const processOXC = spawnSync(
+        oxlintExe,
+        args, // Ejecuta en lote (ej: ['src/**/*.js', 'lib/*.ts'])
+        {
+            stdio: 'pipe',
+            encoding: 'utf-8', // Evita .toString()
+            shell: true, // ¡Más rápido sin shell!
+        },
+    );
+    if (processOXC.error) {
+        console.error(
+            chalk.red('🚨 Error ejecutando oxlint:', processOXC.error),
+        );
+        return false;
+    }
+
+    const output = processOXC.stdout.trim();
+    if (!output) {
+        console.log(chalk.green('✅ No se encontraron errores de linting.'));
+        return true;
+    }
+
+    // Regex optimizado (unificado)
+    const LINT_REGEX =
+        /([×x!]|warning)\s+([^:]+):\s+([^\n]+)\n\s+[,╭][-─]\[([^\]]+)\][\s\S]+?help:\s+([^\n]+)/gi;
+    const matches = output.matchAll(LINT_REGEX);
+    errorFiles = 0; // Reiniciar el contador de archivos con errores
+    errorList.splice(0, errorList.length); // Limpiar la lista de errores
+    for (const match of matches) {
+        const [_, severitySymbol, ruleId, message, filePath, help] = match;
+        const normalizedPath = filePath.trim().replace(/\\/g, '/');
+
+        errorFiles++;
+        errorList.push({
+            file: normalizedPath,
+            error: `${ruleId}: ${message.trim()}`,
+            proceso: 'Linting',
+            help: help.trim(),
+            severity: severitySymbol === '!' ? 'warning' : 'error',
+        });
+    }
+
+    return errorList.length === 0;
+};
+
 /**
  * Compila todos los archivos en los directorios de origen.
  */
@@ -931,6 +588,9 @@ const compileAll = async () => {
     try {
         pathAlias = await getPathAlias();
         const beginTime = Date.now();
+
+        console.log(chalk.blue('🔍 :Validando Linting'));
+        await linter();
 
         for await (const file of glob([
             watchJS,

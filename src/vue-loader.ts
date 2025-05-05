@@ -1,5 +1,5 @@
-import { html } from 'P@/vendor/code-tag/code-tag-esm';
-import { createApp, ref } from 'vue';
+import { html } from 'code-tag';
+import { createApp, provide, ref } from 'vue';
 
 declare global {
     interface Window {
@@ -44,13 +44,12 @@ const sanitizeModulePath = (module: string): string => {
     return module
         .replace(/\.\.\//g, '') // Eliminar ".."
         .replace(/\/+/g, '/') // Normalizar barras
-        .replace(/[^a-zA-Z0-9\/_-]/g, ''); // Eliminar caracteres no permitidos
+        .replace(/[^a-zA-Z0-9/_-]/g, ''); // Eliminar caracteres no permitidos
 };
 
 type ModuleName = string & { __brand: 'ModuleName' };
 function isValidModuleName(module: string): module is ModuleName {
-    const MODULE_NAME_REGEX =
-        /^(?:@\/)?[a-zA-Z0-9][a-zA-Z0-9\/_-]*[a-zA-Z0-9]$/;
+    const MODULE_NAME_REGEX = /^(?:@\/)?[a-zA-Z0-9][a-zA-Z0-9/_-]*[a-zA-Z0-9]$/;
     return MODULE_NAME_REGEX.test(module);
 }
 
@@ -124,6 +123,7 @@ async function init(): Promise<void> {
                 components: { [component]: moduleResponse.default },
                 name: 'App',
                 setup() {
+                    provide('public_provider', public_provider);
                     return { componentKey, componentTree };
                 },
                 template: `<${component} :key="componentKey" />`,
@@ -175,15 +175,6 @@ async function socketReload() {
                     );
                 else reloadJS(`/${relativePath}?t=${timestamp}`);
             });
-
-            //reconectar si se pierde la conexion
-            // socket.on('disconnect', () => {
-            //     console.warn('🔌 : Socket desconectado.');
-            //     setTimeout(() => {
-            //         window.location.reload();
-            //     }, 5000);
-            // });
-
             console.log('🔌 : Socket conectado y escuchando eventos.');
         } else {
             console.warn('BrowserSync no está disponible.');
@@ -198,8 +189,8 @@ async function socketReload() {
 async function reloadComponent(
     componentName: string,
     relativePath: string,
-    extension: string,
-    type: string,
+    _extension: string,
+    _type: string,
 ) {
     try {
         console.log(`♻️  Recargando componente: ${componentName}`);
@@ -255,24 +246,8 @@ function updateNestedComponents(
 
 async function reloadJS(relativePath: string) {
     try {
+        location.reload();
         console.log(`♻️  Recargando JS: ${relativePath}`);
-
-        // 🗑 Eliminar de la caché para forzar la recarga
-        const fullPath = new URL(relativePath, import.meta.url).href;
-        if (import.meta.hot) {
-            import.meta.hot.invalidate(fullPath);
-        }
-
-        // 🚀 3️⃣ Importar el nuevo componente (con timestamp para evitar caché)
-        const module = await import(`${relativePath}`);
-
-        // 🚀 4️⃣ Volver a registrar el componente
-        console.log(`✅ JS "${relativePath}" registrado nuevamente.`);
-
-        // 🚀 5️⃣ Forzar actualización del árbol de Vue
-        componentKey.value++;
-
-        console.log(`✅ JS "${relativePath}" recargado y montado.`);
     } catch (error) {
         console.error(`❌ Error al recargar el JS "${relativePath}":`, error);
     }

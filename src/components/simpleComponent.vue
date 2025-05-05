@@ -5,8 +5,8 @@
     const message = ref('Hello from versaCompiler!');
 
     setTimeout(() => {
-        message.value = 'Hello from versaCompiler after 2 seconds!';
-    }, 2000);
+        message.value = 'Hello from versaCompiler after 3 seconds!';
+    }, 3000);
 </script>
 <template>
     <div class="container">
