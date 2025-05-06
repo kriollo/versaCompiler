@@ -29,6 +29,7 @@ const error = console.error.bind(console);
 
 let bs = null;
 let proxyUrl = '';
+let AssetsOmit = false;
 
 let PATH_SOURCE = '';
 let PATH_DIST = '';
@@ -42,6 +43,7 @@ let watchTS = `${PATH_SOURCE}/**/*.ts`;
 const excludeFile = `!${PATH_SOURCE}/**/*.ts`;
 
 let pathAlias = null;
+let tsConfig = null;
 
 let tailwindcss = null;
 
@@ -76,7 +78,7 @@ const getPathAlias = async () => {
             process.exit(1);
         }
 
-        const tsConfig = JSON.parse(data);
+        tsConfig = JSON.parse(data);
 
         // Verificar si compilerOptions y compilerOptions.paths existen
         if (!tsConfig.compilerOptions || !tsConfig.compilerOptions.paths) {
@@ -103,6 +105,7 @@ const getPathAlias = async () => {
 
         tailwindcss = tsConfig.tailwindcss || false;
         proxyUrl = tsConfig.versaCompile?.proxyConfig?.proxyUrl || '';
+        AssetsOmit = tsConfig.versaCompile?.proxyConfig?.assetsOmit || false;
 
         const sourceRoot =
             tsConfig.compilerOptions.sourceRoot || PATH_SOURCE_DEFAULT;
@@ -552,6 +555,9 @@ const compileAll = async () => {
         pathAlias = await getPathAlias();
         const beginTime = Date.now();
 
+        console.log(chalk.green('🔄️ :Compilando todos los archivos...'));
+        await generateTailwindCSS();
+
         console.log(chalk.blue('🔍 :Validando Linting'));
         const resultLinter = await linter(PATH_SOURCE);
         if (resultLinter.error) {
@@ -669,7 +675,7 @@ const initChokidar = async () => {
 
         // Evento cuando se modifica un archivo
         watcher.on('change', async filePath => {
-            // await generateTailwindCSS(filePath);
+            await generateTailwindCSS(filePath);
             const { extension, normalizedPath, fileName } = await compile(
                 path.normalize(filePath).replace(/\\/g, '/'),
             );
@@ -741,6 +747,62 @@ const initChokidar = async () => {
             watchOptions: {
                 ignoreInitial: true,
                 ignored: ['node_modules', '.git'],
+            },
+            middleware: function (req, res, next) {
+                // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
+                const isAssets = req.url.match(
+                    /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
+                );
+                if (req.method === 'GET') {
+                    // omitir archivos estáticos sólo si AssetsOmit es true
+                    if (isAssets && !AssetsOmit) {
+                        console.log(
+                            chalk.white(
+                                `${new Date().toLocaleString()} :GET: ${req.url}`,
+                            ),
+                        );
+                    } else if (!isAssets) {
+                        console.log(
+                            chalk.cyan(
+                                `${new Date().toLocaleString()} :GET: ${req.url}`,
+                            ),
+                        );
+                    }
+                } else if (req.method === 'POST') {
+                    console.log(
+                        chalk.blue(
+                            `${new Date().toLocaleString()} :POST: ${req.url}`,
+                        ),
+                    );
+                } else if (req.method === 'PUT') {
+                    console.log(
+                        chalk.yellow(
+                            `${new Date().toLocaleString()} :PUT: ${req.url}`,
+                        ),
+                    );
+                } else if (req.method === 'DELETE') {
+                    console.log(
+                        chalk.red(
+                            `${new Date().toLocaleString()} :DELETE: ${req.url}`,
+                        ),
+                    );
+                } else {
+                    console.log(
+                        chalk.gray(
+                            `${new Date().toLocaleString()} :${req.method}: ${req.url}`,
+                        ),
+                    );
+                }
+
+                res.setHeader(
+                    'Cache-Control',
+                    'no-cache, no-store, must-revalidate',
+                );
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
+
+                // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
+                next();
             },
         });
     } catch (error) {

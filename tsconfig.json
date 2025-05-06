@@ -35,7 +35,8 @@
     },
     "versaCompile": {
         "proxyConfig": {
-            "proxyUrl": ""
+            "proxyUrl": "",
+            "assetsOmit": true
         }
     }
 }
