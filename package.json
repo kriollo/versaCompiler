@@ -1,5 +1,5 @@
 {
-    "name": "versacompiler",
+    "name": "@kriollone/versacompiler",
     "version": "1.0.0",
     "description": "Una herramienta para compilar y minificar archivos .vue, .js y .ts para proyectos de Vue 3 con soporte para TypeScript.",
     "main": "dist/index.js",
