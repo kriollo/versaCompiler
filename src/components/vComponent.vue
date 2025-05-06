@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import { add, multiply, subtract } from '@/sampleFile';
     import { ref, toRefs } from 'vue';
+    import type { Ref } from 'vue';
 
     type Props = {
         message: string;
@@ -11,7 +12,7 @@
 
     const num1 = ref(0);
     const num2 = ref(0);
-    const result = ref<number | null>(null);
+    const result: Ref<number | null> = ref(null);
 
     const addNumber = () => {
         result.value = add(num1.value, num2.value);

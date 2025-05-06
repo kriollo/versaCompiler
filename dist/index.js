@@ -28,6 +28,7 @@ const log = console.log.bind(console);
 const error = console.error.bind(console);
 
 let bs = null;
+let proxyUrl = '';
 
 let PATH_SOURCE = '';
 let PATH_DIST = '';
@@ -72,14 +73,36 @@ const getPathAlias = async () => {
         const data = await readFile(PATH_CONFIG_FILE, { encoding: 'utf-8' });
         if (!data) {
             error(chalk.red('🚩 :Error al leer el archivo tsconfig.json'));
-            return;
+            process.exit(1);
         }
 
         const tsConfig = JSON.parse(data);
-        pathAlias = tsConfig.compilerOptions.paths || {};
-        log(chalk.green(`pathAlias: ${JSON.stringify(pathAlias)}`));
+
+        // Verificar si compilerOptions y compilerOptions.paths existen
+        if (!tsConfig.compilerOptions || !tsConfig.compilerOptions.paths) {
+            console.error(
+                chalk.red(
+                    `❌ Error: El archivo '${PATH_CONFIG_FILE}' existe, pero no contiene la sección 'compilerOptions.paths' necesaria para los alias de ruta.`,
+                ),
+            );
+            process.exit(1); // Detener ejecución
+        } else {
+            pathAlias = tsConfig.compilerOptions.paths;
+        }
+
+        // Asegurarse que pathAlias sea un objeto
+        pathAlias = pathAlias || {};
+
+        // Eliminar /* de las rutas de alias
+        for (const key in pathAlias) {
+            const values = pathAlias[key];
+            for (let i = 0; i < values.length; i++) {
+                values[i] = values[i].replace('/*', '');
+            }
+        }
 
         tailwindcss = tsConfig.tailwindcss || false;
+        proxyUrl = tsConfig.versaCompile?.proxyConfig?.proxyUrl || '';
 
         const sourceRoot =
             tsConfig.compilerOptions.sourceRoot || PATH_SOURCE_DEFAULT;
@@ -99,10 +122,22 @@ const getPathAlias = async () => {
 
         return pathAlias;
     } catch (error) {
-        console.error(chalk.red(`Error en getPathAlias: ${error.message}`));
-        // Puedes decidir si quieres lanzar el error o retornar un valor por defecto
-        // throw error;
-        return {}; // Retornar objeto vacío para evitar errores posteriores
+        // Verificar si el error es porque el archivo no existe
+        if (error.code === 'ENOENT') {
+            console.error(
+                chalk.red(
+                    `❌ Error: No se encontró el archivo de configuración '${PATH_CONFIG_FILE}'. Este archivo es necesario y debe contener la sección 'compilerOptions.paths'.`,
+                ),
+            );
+        } else {
+            // Mostrar otros errores de lectura/parseo
+            console.error(
+                chalk.red(
+                    `❌ Error al leer o parsear '${PATH_CONFIG_FILE}': ${error.message}`,
+                ),
+            );
+        }
+        process.exit(1); // Detener ejecución en cualquier caso de error del catch
     }
 };
 
@@ -518,7 +553,7 @@ const compileAll = async () => {
         const beginTime = Date.now();
 
         console.log(chalk.blue('🔍 :Validando Linting'));
-        const resultLinter = await linter();
+        const resultLinter = await linter(PATH_SOURCE);
         if (resultLinter.error) {
             errorFiles = resultLinter.errorFiles;
             errorList.push(...resultLinter.errorList);
@@ -667,8 +702,17 @@ const initChokidar = async () => {
         const port = await getPort({ port: 3000 });
         const uiPort = await getPort({ port: 4000 });
 
-        bs.init({
+        let proxy = {
             server: './',
+        };
+        if (proxyUrl !== '') {
+            proxy = {
+                proxy: proxyUrl,
+            };
+        }
+
+        bs.init({
+            ...proxy,
             files: ['./public/**/*.css'], // Observa cambios en archivos CSS
             injectChanges: true, // Inyecta CSS sin recargar la página
             open: false, // No abre automáticamente el navegador

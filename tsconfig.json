@@ -32,5 +32,10 @@
     "typeAcquisition": {
         "enable": true,
         "include": ["vue"]
+    },
+    "versaCompile": {
+        "proxyConfig": {
+            "proxyUrl": ""
+        }
     }
 }

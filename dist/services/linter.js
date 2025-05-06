@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import chalk from 'chalk';
 export const linter = async filePath => {
     // 1. Calcula la ruta del binario
     const oxlintExe = 'npx oxlint';
@@ -6,7 +7,7 @@ export const linter = async filePath => {
     // const args = filePath ? [`${filePath}`] : [];
     const processOXC = spawnSync(
         oxlintExe,
-        args, // Ejecuta en lote (ej: ['src/**/*.js', 'lib/*.ts'])
+        args, // Ejecuta en lote (ej: ['src/**/*.js', 'lib/*.ts', 'lib/*.vue'])
         {
             stdio: 'pipe',
             encoding: 'utf-8', // Evita .toString()
