@@ -22,5 +22,5 @@ export const showTimingForHumans = timing => {
  * @param {string} ruta - La ruta de origen.
  * @returns {Promise<string>} - La ruta mapeada en el directorio de distribución.
  */
-export const mapRuta = async (ruta, PATH_DIST) =>
+export const mapRuta = async (ruta, PATH_DIST, PATH_SOURCE) =>
     path.join(PATH_DIST, path.relative(PATH_SOURCE, ruta));

@@ -157,6 +157,7 @@ const deleteFile = async ruta => {
                 .replace('.vue', '.js')
                 .replace('.ts', '.js'),
             PATH_DIST,
+            PATH_SOURCE,
         )
     ).toString();
     try {
