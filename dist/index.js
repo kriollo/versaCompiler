@@ -22,7 +22,7 @@ import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
 
-import { mapRuta, showTimingForHumans } from './utils/utils.js';
+import { addImportEndJs, mapRuta, showTimingForHumans } from './utils/utils.js';
 
 const log = console.log.bind(console);
 const error = console.error.bind(console);
@@ -294,37 +294,6 @@ const removeCodeTagImport = async data => {
     const codeTagRegExp = /import\s+{.*}\s+from\s+['"].*code-tag.*['"];/g;
     data = data.replace(codeTagRegExp, '');
     return data;
-};
-
-/**
- * Agrega la extensión .js a las importaciones en la cadena de datos proporcionada.
- * @param {string} data - La cadena de entrada que contiene el código JavaScript.
- * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada con las importaciones actualizadas.
- */
-const addImportEndJs = async data => {
-    const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
-
-    return data.replace(importRegExp, match => {
-        const ruta = match.match(/from\s+['"](.*)['"];/)[1];
-
-        if (ruta.endsWith('.vue')) {
-            const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
-            if (resultVue) {
-                const fullPath = resultVue[1].replace('.vue', '');
-                const fileName = resultVue[2];
-                return `import ${fileName} from '${fullPath}.js';`;
-            }
-        } else if (
-            !ruta.endsWith('.js') &&
-            !ruta.endsWith('.mjs') &&
-            !ruta.endsWith('.css') &&
-            ruta.includes('/')
-        ) {
-            return match.replace(ruta, `${ruta}.js`);
-        }
-
-        return match; // Devolver el match original si no se cumple ninguna condición
-    });
 };
 
 /**

@@ -1,5 +1,5 @@
-import * as vCompiler from 'vue/compiler-sfc';
 import path from 'node:path';
+import * as vCompiler from 'vue/compiler-sfc';
 
 const getComponentsVue = async data => {
     let components = [];
@@ -169,11 +169,15 @@ export const preCompileVue = async (data, source, isProd = false) => {
 
         const componentName = `${fileName}_component`;
         const components = await getComponentsVue(data);
+        let addComponents = '';
+        if (components.length > 0) {
+            addComponents = `components: { ${components.join(', ')} },`;
+        }
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
                 name: '${fileName}',
-                components: { ${components.join(', ')} },
+                ${addComponents}
             `;
 
         // quitamos export default y añadimos el nombre del archivo
