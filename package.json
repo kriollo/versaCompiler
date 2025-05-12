@@ -1,6 +1,6 @@
 {
     "name": "versacompiler",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "description": "Una herramienta para compilar y minificar archivos .vue, .js y .ts para proyectos de Vue 3 con soporte para TypeScript.",
     "main": "dist/index.js",
     "bin": {
@@ -19,7 +19,9 @@
         "dev": "node --watch dist/index.js",
         "compile": "node dist/index.js",
         "compile-dev": "node dist/index.js --all",
-        "compile-prod": "node dist/index.js --all --prod"
+        "compile-prod": "node dist/index.js --all --prod",
+        "vite-dev": "vite",
+        "vite-build": "vite build"
     },
     "keywords": [
         "vue",
@@ -32,19 +34,23 @@
     "author": "Jorge Jara H (kriollone@gmail.com)",
     "license": "MIT",
     "dependencies": {
+        "acorn": "^8.14.1",
+        "browser-sync": "^3.0.4",
         "chalk": "5.4.1",
         "chokidar": "^4.0.3",
-        "oxc-minify": "^0.67.0",
-        "acorn": "^8.14.1",
-        "vue": "3.5.13",
         "get-port": "^7.1.0",
-        "typescript": "^5.8.3",
-        "oxlint": "^0.16.9",
-        "browser-sync": "^3.0.4"
+        "oxc-minify": "^0.68.1",
+        "oxlint": "^0.16.10",
+        "typescript": "^5.8.3"
     },
     "devDependencies": {
+        "@types/node": "^22.15.17",
+        "@vitejs/plugin-vue": "^5.2.4",
+        "code-tag": "^1.2.0",
+        "glob": "^11.0.2",
         "prettier": "3.5.3",
-        "@types/node": "^22.15.3",
-        "code-tag": "^1.2.0"
+        "unplugin-vue-components": "^28.5.0",
+        "vite": "^6.3.5",
+        "vue": "3.5.13"
     }
 }

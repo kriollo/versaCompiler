@@ -161,9 +161,19 @@ const deleteFile = async ruta => {
         )
     ).toString();
     try {
-        log(chalk.yellow(`🗑️ :Eliminando ${newPath}`));
+        log(chalk.yellow(`🗑️ :Intentando eliminar ${newPath}`));
 
-        const stats = await stat(newPath);
+        const stats = await stat(newPath).catch(() => null);
+
+        if (!stats) {
+            log(
+                chalk.yellow(
+                    `⚠️ :El archivo o directorio no existe: ${newPath}`,
+                ),
+            );
+            return { extension: null, normalizedPath: null, fileName: null };
+        }
+
         if (stats.isDirectory()) {
             await rmdir(newPath, { recursive: true });
         } else if (stats.isFile()) {
@@ -186,9 +196,10 @@ const deleteFile = async ruta => {
     } catch (errora) {
         error(
             chalk.red(
-                `🚩 :Error al eliminar el archivo/directorio ${newPath}: ${errora}\n`,
+                `🚩 :Error al eliminar el archivo/directorio ${newPath}: ${errora.message}\n`,
             ),
         );
+        return { extension: null, normalizedPath: null, fileName: null }; // Asegurar que se devuelve un objeto en caso de otros errores
     }
 };
 
@@ -703,7 +714,10 @@ const initChokidar = async () => {
             snippetOptions: {
                 rule: {
                     match: /<\/body>/i,
-                    fn: (snippet, match) => `${snippet}${match}`,
+
+                    fn: (snippet, match) => `${snippet}${match}
+                    <script type="module" src="/dist/services/vueLoader.js"></script>
+                    `,
                 },
             },
             logLevel: 'debug',

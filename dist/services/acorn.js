@@ -1,4 +1,5 @@
 import * as Parser from 'acorn';
+import chalk from 'chalk';
 /**
  * Parses the given JavaScript code using Acorn and returns the Abstract Syntax Tree (AST).
  *
@@ -8,7 +9,7 @@ import * as Parser from 'acorn';
  */
 export const checkSintaxysAcorn = async data => {
     try {
-        const ast = Parser.parse(data, {
+        const ast = await Parser.parse(data, {
             ecmaVersion: 2020,
             sourceType: 'module',
             locations: true,

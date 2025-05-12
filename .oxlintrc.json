@@ -17,7 +17,6 @@
         "suspicious": "allow"
     },
     "globals": {
-        "Vue": "readonly",
         "Swal": "readonly",
         "Vuex": "readonly",
         "$": "readonly",

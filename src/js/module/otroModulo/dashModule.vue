@@ -1,9 +1,19 @@
 <script setup lang="ts">
-    import simpleComponent from '@/components/simpleComponent.vue';
+    import showModal from '@/js/module/otroModulo/showModal.vue';
+    import { ref } from 'vue';
+
+    const showLocalModal = ref(false);
+    const openModal = () => {
+        showLocalModal.value = true;
+    };
+    const closeModal = () => {
+        showLocalModal.value = false;
+    };
 </script>
 <template>
     <div class="appContainer">
-        <simpleComponent />
+        <button @click="openModal" class="btn btn-primary">Open Modal</button>
+        <showModal :showModal="showLocalModal" @accion="closeModal" />
     </div>
 </template>
 <style lang="css">

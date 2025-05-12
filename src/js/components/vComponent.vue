@@ -1,7 +1,6 @@
 <script setup lang="ts">
-    import { add, multiply, subtract } from '@/sampleFile';
-    import { ref, toRefs } from 'vue';
-    import type { Ref } from 'vue';
+    import { add, multiply, subtract } from '@/js/sampleFile';
+    import { ref, toRefs, type Ref } from 'vue';
 
     type Props = {
         message: string;
@@ -21,7 +20,7 @@
         result.value = subtract(num1.value, num2.value);
     };
     const multiplyNumber = () => {
-        result.value = multiply(num1.value, num2.value)
+        result.value = multiply(num1.value, num2.value);
     };
 </script>
 <template>
@@ -43,9 +42,9 @@
             </div>
         </div>
         <div class="btnOperations">
-            <button @click="addNumber">Sumar</button>
-            <button @click="subtractNumber">Restar</button>
-            <button @click="multiplyNumber">Multiplicar</button>
+            <button @click="addNumber">sumar</button>
+            <button @click="subtractNumber">restar</button>
+            <button @click="multiplyNumber">multiplicar</button>
         </div>
         <div v-if="result !== null" class="result">
             <h2>Resultado: {{ result }}</h2>
