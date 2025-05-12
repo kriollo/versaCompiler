@@ -17,18 +17,13 @@
     const closeOtroModal = () => {
         showOtroModal.value = false;
     };
-    const componentKey = ref(Date.now());
 
     const closeModal = () => {
         emit('accion', false);
     };
 </script>
 <template>
-    <modal
-        idModal="modal"
-        :showModal="showModal"
-        size="max-w-2xl"
-        :key="componentKey">
+    <modal idModal="modal" :showModal="showModal" size="max-w-2xl">
         <template #modalTitle>
             <h1 class="text-lg font-bold">Título del Modal</h1>
         </template>

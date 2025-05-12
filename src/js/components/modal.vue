@@ -21,7 +21,6 @@
     });
 
     const emit = defineEmits(['accion']);
-    const componentKey = ref(0);
 
     const showModal = computed(() => props.showModal);
     const idModal = computed(() => props.idModal);

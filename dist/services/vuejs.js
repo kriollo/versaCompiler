@@ -40,6 +40,25 @@ const _compileCustomBlock = async (_block, _source) => {};
 export const preCompileVue = async (data, source, isProd = false) => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
+
+        const ifExistsref = data.includes('ref(');
+
+        // esto es para HMR re re forzado
+        const varContent = `
+            ${ifExistsref ? '' : 'import { ref } from "vue";'};
+            const versaComponentKey = ref(0);
+        `;
+        data = data.replace(/(<script.*?>)/, `$1${varContent}`);
+
+        data = data.replace(
+            /(<template>[\s\S]*?)(<\w+)([^>]*)(>)/,
+            (match, p1, p2, p3, p4) => {
+                if (p3.includes(':key=')) return match; // Ya tiene key, no modificar
+                return `${p1}${p2}${p3} :key="versaComponentKey"${p4}`;
+            },
+        );
+        //
+
         const { descriptor, errors } = vCompiler.parse(data, {
             filename: fileName,
             sourceMap: false,
@@ -163,21 +182,16 @@ export const preCompileVue = async (data, source, isProd = false) => {
             ${compiledScript.content}
             ${compiledTemplate.code}
         `;
-        //añardir instancia de app
-
-        // output = `${appImport}${output}`;
 
         const componentName = `${fileName}_component`;
         const components = await getComponentsVue(data);
-        let addComponents = '';
-        if (components.length > 0) {
-            addComponents = `components: { ${components.join(', ')} },`;
-        }
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
                 name: '${fileName}',
-                ${addComponents}
+                components: {
+                    ${components}
+                },
             `;
 
         // quitamos export default y añadimos el nombre del archivo
@@ -202,12 +216,16 @@ export const preCompileVue = async (data, source, isProd = false) => {
             output = output.replaceAll(/_ctx\.(?!\$)/g, '$setup.');
             output = output.replace(
                 'export function render(_ctx, _cache) {',
-                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
+                `
+                function render(_ctx, _cache, $props, $setup, $data, $options) {
+                `,
             );
         } else {
             output = output.replace(
                 'export function render(_ctx, _cache) {',
-                `function render(_ctx, _cache, $props, $setup, $data, $options) {`,
+                `
+                function render(_ctx, _cache, $props, $setup, $data, $options) {
+                `,
             );
         }
 
@@ -220,13 +238,6 @@ export const preCompileVue = async (data, source, isProd = false) => {
         `;
 
         output = `${output}\n${finishComponent}`;
-
-        // await writeFile(
-        //     `./public/dashboard/js/${fileName}-temp.js`,
-        //     output,
-        //     'utf-8',
-        // );
-        // await unlink(`./public/dashboard/js/${fileName}-temp.js`);
 
         return {
             lang: compiledScript.lang,

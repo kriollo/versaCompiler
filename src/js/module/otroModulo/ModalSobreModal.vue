@@ -16,7 +16,7 @@
 <template>
     <modal idModal="modal" :showModal="showModal" size="max-w-2xl">
         <template #modalTitle>
-            <h1 class="text-lg font-bold">Título del Modal</h1>
+            <h1 class="text-lg font-bold">Título del Modalsssss</h1>
         </template>
         <template #modalBody>
             <p>Contenido del otro modal tratando de actualizar</p>
