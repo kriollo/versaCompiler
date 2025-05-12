@@ -1,5 +1,5 @@
-import getInstancia from '../hrm/instanciaVue.js';
 import { socketReload } from '../hrm/devMode.js';
+import getInstancia from '../hrm/instanciaVue.js';
 import { getVueInstance } from '../hrm/setupHMR.js';
 
 // Obtención robusta de la instancia de Vue

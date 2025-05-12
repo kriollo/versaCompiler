@@ -1,4 +1,23 @@
 let currentComponentTree = null;
+
+function findNodeByInstance(tree, instance) {
+    if (tree.name === instance) return tree;
+    for (const child of tree.children) {
+        const found = findNodeByInstance(child, instance);
+        if (found) return found;
+    }
+    return null;
+}
+
+function getPathToRoot(node) {
+    const path = [];
+    while (node) {
+        path.push(node);
+        node = node.parent;
+    }
+    return path; // Ordenado desde hijo hasta raíz
+}
+
 // Función auxiliar para encontrar componentes recursivamente dentro de un VNode genérico
 function recursivelyFindComponentsInVNode(vnode, parentTreeNode) {
     if (!vnode || typeof vnode !== 'object') {
@@ -35,6 +54,8 @@ function recursivelyFindComponentsInVNode(vnode, parentTreeNode) {
             name: componentName,
             instancia: childComponentInstance,
             children: [],
+            parent: parentTreeNode,
+            isRoot: false,
         };
         parentTreeNode.children.push(childTreeNode);
         traverseComponentInstance(childComponentInstance, childTreeNode);
@@ -67,46 +88,12 @@ export const buildComponentTree = componentRootInstance => {
             'Anonymous',
         instancia: componentRootInstance,
         children: [],
+        parent: null,
+        isRoot: true,
     };
     traverseComponentInstance(componentRootInstance, tree);
     return tree;
 };
-
-// Nueva función para encontrar el/los padre(s) de un nodo específico (por instancia) en el árbol.
-// Devuelve una lista de nodos padre. En un árbol bien formado, un nodo solo tiene un padre.
-function findParentNodesOfInstance(currentTree, childInstanceToFindParentFor) {
-    const parentsFound = [];
-    if (!currentTree || !childInstanceToFindParentFor) {
-        return parentsFound;
-    }
-
-    function traverse(potentialParentNode) {
-        if (
-            potentialParentNode.children &&
-            Array.isArray(potentialParentNode.children)
-        ) {
-            for (const childNode of potentialParentNode.children) {
-                if (childNode.instancia === childInstanceToFindParentFor) {
-                    parentsFound.push({
-                        name: potentialParentNode.name,
-                        instancia: potentialParentNode.instancia,
-                    });
-                    // En un árbol de componentes Vue, una instancia de componente tiene un solo padre.
-                    // Podríamos optimizar para no seguir buscando en este subárbol si solo esperamos un padre,
-                    // pero la estructura actual es segura.
-                }
-                // Continuar buscando recursivamente en los hijos de este childNode,
-                // ya que el childInstanceToFindParentFor podría estar más abajo.
-                if (childNode.instancia !== childInstanceToFindParentFor) {
-                    traverse(childNode);
-                }
-            }
-        }
-    }
-
-    traverse(currentTree);
-    return parentsFound;
-}
 
 // Nueva función auxiliar para intentar forzar la actualización de una instancia
 function tryForceUpdate(instance) {
@@ -118,6 +105,7 @@ function tryForceUpdate(instance) {
             'Versa HMR: Forcing update on component instance with $forceUpdate',
         );
         instance.proxy.$forceUpdate();
+        instance.update();
         return true;
     }
     if (typeof instance.update === 'function') {
@@ -130,102 +118,6 @@ function tryForceUpdate(instance) {
     return false;
 }
 
-function updateNestedComponents(
-    app,
-    componentName,
-    NewComponent,
-    parents = [],
-) {
-    if (parents.length === 0) {
-        return;
-    }
-    let pageReloaded = false;
-    parents.forEach(parent => {
-        if (pageReloaded) return;
-        const parentInstance = parent.instancia;
-        const parentName = parent.name;
-        if (parentName === 'KeepAlive') {
-            window.location.reload();
-            pageReloaded = true;
-            return;
-        }
-        let parentEffectivelyUpdated = false;
-        if (
-            parentName === 'Transition' ||
-            parentName === 'Suspense' ||
-            parentName === 'BaseTransition'
-        ) {
-            parentEffectivelyUpdated = tryForceUpdate(parentInstance);
-            console.log('paso por transition');
-        } else {
-            const componentsDefinition =
-                parentInstance?.type?.components || parentInstance?.components;
-            if (componentsDefinition && componentsDefinition[componentName]) {
-                componentsDefinition[componentName] = NewComponent;
-                if (tryForceUpdate(parentInstance)) {
-                    parentEffectivelyUpdated = true;
-                }
-            } else {
-                if (tryForceUpdate(parentInstance)) {
-                    parentEffectivelyUpdated = true;
-                }
-            }
-            const isParentThin =
-                !componentsDefinition ||
-                (typeof componentsDefinition === 'object' &&
-                    Object.keys(componentsDefinition).length === 0);
-            if (parentEffectivelyUpdated && isParentThin) {
-                // Si el padre no tiene componentes definidos, lo actualizamos
-                // y luego buscamos sus abuelos para forzar la actualización
-                // de los componentes que dependen de él.
-                // Esto es útil para componentes que no tienen un nombre específico
-                // o que son componentes de nivel superior.
-                console.log('Versa HMR: Parent is thin, updating its parents');
-                const currentFullTree = buildComponentTree(parentInstance);
-                if (currentFullTree && parentInstance) {
-                    const grandParents = findParentNodesOfInstance(
-                        currentFullTree,
-                        parentInstance,
-                    );
-                    if (grandParents.length > 0) {
-                        grandParents.forEach(grandParentNode => {
-                            tryForceUpdate(grandParentNode.instancia);
-                        });
-                    }
-                }
-            }
-        }
-    });
-    if (!pageReloaded && app && app._instance) {
-        currentComponentTree = buildComponentTree(app._instance);
-    }
-}
-
-function getParents(componentTreeToSearch, name) {
-    let parents = [];
-    if (!componentTreeToSearch) return parents;
-
-    function traverse(currentNode) {
-        if (
-            currentNode &&
-            Array.isArray(currentNode.children) &&
-            currentNode.children.length > 0
-        ) {
-            currentNode.children.forEach(child => {
-                if (child.name === name) {
-                    parents.push({
-                        name: currentNode.name,
-                        instancia: currentNode.instancia,
-                    });
-                }
-                traverse(child);
-            });
-        }
-    }
-    traverse(componentTreeToSearch);
-    return parents;
-}
-
 async function reloadComponent(
     app,
     componentName,
@@ -236,33 +128,45 @@ async function reloadComponent(
     try {
         const module = await import(`${relativePath}?t=${Date.now()}`);
         currentComponentTree = buildComponentTree(app._instance);
-        if (!currentComponentTree) {
-            // window.location.reload();
-            console.error('Versa HMR: No component tree found');
-            return;
-        }
-        const parents = getParents(currentComponentTree, componentName);
-        console.log('Versa HMR: Parents found', parents);
-        const isRootChild = parents.find(
-            parent => parent.instancia === app._instance,
+
+        const targetNode = findNodeByInstance(
+            currentComponentTree,
+            componentName,
         );
-        if (isRootChild || parents.length === 0) {
-            // Si el componente es un hijo directo de la raíz o no tiene padres, recargamos la página
-            console.log(
-                `Versa HMR: Component ${componentName} is a root child or has no parents, reloading page`,
-                componentName,
-            );
-            // window.location.reload();
-            return;
+        const path = getPathToRoot(targetNode);
+        for (const instanciaParent of path) {
+            if (
+                instanciaParent.isRoot ||
+                instanciaParent.name === 'KeepAlive'
+            ) {
+                window.location.reload();
+                return;
+            }
+            if (instanciaParent.name !== componentName) {
+                if (
+                    instanciaParent.name !== 'BaseTransition' &&
+                    instanciaParent.name !== 'Transition' &&
+                    instanciaParent.name !== 'Suspense'
+                ) {
+                    const componentsDefinition =
+                        instanciaParent.instancia?.type?.components ||
+                        instanciaParent.instancia?.components;
+
+                    if (
+                        componentsDefinition &&
+                        componentsDefinition[componentName]
+                    ) {
+                        componentsDefinition[componentName] = module.default;
+                        if (tryForceUpdate(instanciaParent.instancia)) {
+                            console.log(
+                                'Versa HMR: Component updated successfully',
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
         }
-        if (parents.some(parent => parent.name === 'KeepAlive')) {
-            console.log(
-                'Versa HMR: Component is inside a KeepAlive, reloading page',
-            );
-            // window.location.reload();
-            return;
-        }
-        updateNestedComponents(app, componentName, module.default, parents);
     } catch (error) {
         console.error(
             `Versa HMR: Error reloading component ${componentName}: ${error}`,

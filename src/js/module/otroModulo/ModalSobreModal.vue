@@ -22,7 +22,7 @@
             <p>Contenido del otro modal tratando de actualizar</p>
         </template>
         <template #modalFooter>
-            <button class="btn btn-primary">Aceptarsss</button>
+            <button class="btn btn-primary">Aceptar</button>
             <button class="btn btn-secondary" @click="closeModal">
                 cerrar
             </button>

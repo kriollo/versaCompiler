@@ -39,8 +39,9 @@ async function loadModule() {
                     if (debug.value) {
                         console.log('Debug mode is enabled');
                     }
+                    const componentKey = ref(Date.now());
                     return {
-                        componentKey: Date.now(),
+                        componentKey,
                     };
                 },
                 name: 'App',

@@ -30,36 +30,32 @@
     const modal = ref(null);
 </script>
 <template>
-    <Transition mode="in-out">
-        <div
-            v-if="showModal"
-            class="flex overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full backdrop-blur drop-shadow-versaWYS"
-            :id="idModal"
-            ref="modal"
-            tabindex="-1">
-            <div class="relative p-4 w-full max-h-full" :class="size">
-                <!-- Modal content -->
+    <div
+        v-if="showModal"
+        class="flex overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full backdrop-blur drop-shadow-versaWYS"
+        :id="idModal"
+        ref="modal"
+        tabindex="-1">
+        <div class="relative p-4 w-full max-h-full" :class="size">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="p-4 md:p-3 border-b rounded-t dark:border-gray-600">
+                    <slot name="modalTitle"></slot>
+                </div>
+                <!-- Modal body -->
+                <div class="p-4 md:p-5 space-y-4">
+                    <slot name="modalBody"></slot>
+                </div>
+                <!-- Modal footer -->
                 <div
-                    class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-                    <!-- Modal header -->
-                    <div
-                        class="p-4 md:p-3 border-b rounded-t dark:border-gray-600">
-                        <slot name="modalTitle"></slot>
-                    </div>
-                    <!-- Modal body -->
-                    <div class="p-4 md:p-5 space-y-4">
-                        <slot name="modalBody"></slot>
-                    </div>
-                    <!-- Modal footer -->
-                    <div
-                        v-if="showFooter"
-                        class="flex justify-between gap-2 items-center p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600">
-                        <slot name="modalFooter"></slot>
-                    </div>
+                    v-if="showFooter"
+                    class="flex justify-between gap-2 items-center p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600">
+                    <slot name="modalFooter"></slot>
                 </div>
             </div>
         </div>
-    </Transition>
+    </div>
 </template>
 <style scoped>
     .flex {
