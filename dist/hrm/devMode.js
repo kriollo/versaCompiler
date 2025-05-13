@@ -117,7 +117,7 @@ function tryForceUpdate(instance) {
     return false;
 }
 
-async function reloadComponent(
+export async function reloadComponent(
     app,
     componentName,
     relativePath,
@@ -125,7 +125,10 @@ async function reloadComponent(
     _type,
 ) {
     try {
-        const module = await import(`${relativePath}?t=${Date.now()}`);
+        const baseUrl = window.location.href;
+        const newBaseUrl = new URL(baseUrl);
+        const urlOrigin = `${newBaseUrl.origin}/${relativePath}`;
+        const module = await import(`${urlOrigin}?t=${Date.now()}`);
         currentComponentTree = buildComponentTree(app._instance);
 
         const targetNode = findNodeByInstance(
@@ -166,11 +169,13 @@ async function reloadComponent(
                 }
             }
         }
+        return null;
     } catch (error) {
-        console.error(
-            `❌ Versa HMR: Error reloading component ${componentName}: ${error}`,
+        console.log(error.stack);
+        return {
+            msg: `Error al recargar ${componentName}: ${error}`,
             error,
-        );
+        };
     }
 }
 
@@ -188,7 +193,7 @@ export function debounce(func, waitFor) {
     return debounced;
 }
 
-async function reloadJS(_relativePath) {
+export async function reloadJS(_relativePath) {
     location.reload();
 }
 
@@ -205,6 +210,12 @@ export function socketReload(app) {
             });
         }
         socket.on('vue:update', data => {
+            console.log('pasa');
+            if (document.querySelector('#versa-hmr-error-overlay')) {
+                window.location.reload();
+                return;
+            }
+
             const { component, relativePath, extension, type, timestamp } =
                 data;
             if (extension === 'vue') {

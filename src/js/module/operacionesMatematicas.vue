@@ -1,6 +1,6 @@
 <script setup lang="ts">
-    import { add, multiply, subtract } from '@/js/sampleFile';
     import lineHr from '@/js/components/lineHr.vue';
+    import { add, multiply, subtract } from '@/js/sampleFile';
     import { ref, toRefs, type Ref } from 'vue';
 
     type Props = {

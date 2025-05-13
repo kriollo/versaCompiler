@@ -712,7 +712,7 @@ const initChokidar = async () => {
                 port: uiPort, // Puerto aleatorio para la interfaz de usuario
             },
             socket: {
-                domain: `localhost:${port}`, // Dominio para la conexión de socket
+                // domain: `localhost:${port}`, // Dominio para la conexión de socket
                 path: '/browser-sync/socket.io', // Ruta correcta para socket.io
             },
             snippetOptions: {

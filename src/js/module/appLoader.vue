@@ -1,9 +1,9 @@
 <script setup lang="ts">
-    import primerModal from '@/js/module/modals/primerModal.vue';
-    import simpleComponent from '@/js/module/simpleComponent.vue';
     import lineHr from '@/js/components/lineHr.vue';
     import loader from '@/js/components/loader.vue';
-    import { ref, onMounted, nextTick } from 'vue';
+    import primerModal from '@/js/module/modals/primerModal.vue';
+    import simpleComponent from '@/js/module/simpleComponent.vue';
+    import { nextTick, onMounted, ref } from 'vue';
 
     const showLocalModal = ref(false);
     const isDark = ref(false);
