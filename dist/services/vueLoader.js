@@ -227,17 +227,14 @@ const initSocket = async (retries = 0) => {
             const appInstance = await getInstanceVue();
 
             if (!appInstance) {
-                if (typeof showErrorOverlay === 'function') {
-                    showErrorOverlay(
-                        'No se puede realizar HMR: Instancia de la aplicación Vue no disponible.',
-                        'Esto usualmente significa que la app no se inicializó o falló la configuración de HMR.',
-                    );
-                } else {
-                    console.error(
-                        '[HMR] showErrorOverlay no disponible, e instancia de Vue faltante para HMR.',
-                    );
-                }
-                return;
+                // Si la instancia de Vue no existe, la carga inicial probablemente falló.
+                // Una actualización de módulo (presumiblemente la corrección del error) ha llegado.
+                // Recargar la página completa para permitir que vue-loader.ts intente de nuevo.
+                console.log(
+                    '[HMR] La instancia de Vue no existe (posible fallo en la carga inicial). Se recibió una actualización de módulo. Recargando la página...',
+                );
+                window.location.reload();
+                return; // Detener la ejecución adicional de HMR para esta actualización.
             }
 
             try {

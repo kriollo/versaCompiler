@@ -53,9 +53,4 @@ export function handleError(
     );
 
     console.error('[Module Loader]', error);
-
-    // Enviar el error a Sentry si está configurado
-    if (window.Sentry) {
-        window.Sentry.captureException(error, { extra: { module } });
-    }
 }
