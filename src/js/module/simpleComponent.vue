@@ -2,10 +2,10 @@
     import operacionesMatematicas from '@/js/module/operacionesMatematicas.vue';
     import { ref } from 'vue';
 
-    const message = ref('Hello from versaCompiler!');
+    const message = ref('Hola desde versaCompiler!');
 
     setTimeout(() => {
-        message.value = 'Hello from versaCompiler after 3 seconds!';
+        message.value = 'Hola desde versaCompiler después de 3 segundos!';
     }, 3000);
 </script>
 <template>

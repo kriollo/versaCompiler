@@ -60,6 +60,14 @@
         font-size: 24px;
         text-align: center;
     }
+    input {
+        padding: 10px;
+        margin: 5px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        text-align: right;
+        width: 100px;
+    }
 
     .container {
         display: flex;

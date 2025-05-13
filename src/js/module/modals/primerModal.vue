@@ -31,7 +31,8 @@
         </template>
         <template #modalBody>
             <p class="text-gray-700 dark:text-gray-200">
-                Contenido del primer modal, probando el hot reload module
+                Contenido del primer modal, aquí puedes poner cualquier
+                información que desees mostrar al usuario.
             </p>
             <ModalSobreModal
                 :showModal="showOtroModal"

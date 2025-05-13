@@ -22,7 +22,7 @@
         </template>
         <template #modalBody>
             <p class="text-gray-700 dark:text-gray-200">
-                Contenido del otro modal tratando de actualizar con hrm
+                Contenido del otro modal, aquí puedes poner cualquier
             </p>
         </template>
         <template #modalFooter>
