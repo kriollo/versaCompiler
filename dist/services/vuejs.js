@@ -48,15 +48,23 @@ export const preCompileVue = async (data, source, isProd = false) => {
             ${ifExistsref ? '' : 'import { ref } from "vue";'};
             const versaComponentKey = ref(0);
         `;
-        data = data.replace(/(<script.*?>)/, `$1${varContent}`);
+        const ifExistScript = data.includes('<script');
+        if (!ifExistScript) {
+            data = `<script>${varContent}</script>` + data;
+        } else {
+            data = data.replace(/(<script.*?>)/, `$1${varContent}`);
+        }
 
         data = data.replace(
-            /(<template>[\s\S]*?)(<\w+)([^>]*)(>)/,
+            /(<template>[\s\S]*?)(<\w+)([^>]*)(\/?>)/,
             (match, p1, p2, p3, p4) => {
-                if (p3.includes(':key=')) return match; // Ya tiene key, no modificar
-                return `${p1}${p2}${p3} :key="versaComponentKey"${p4}`;
+                // Si es self-closing (termina con '/>'), no agregar key
+                const existeSlash = p3.trim().slice(-1) === '/';
+
+                return `${p1} ${p2} ${existeSlash ? p3.trim().slice(0, -1) : p3} :key="versaComponentKey" ${existeSlash ? '/' : ''}${p4}`;
             },
         );
+        // console.log(data);
         //
 
         const { descriptor, errors } = vCompiler.parse(data, {

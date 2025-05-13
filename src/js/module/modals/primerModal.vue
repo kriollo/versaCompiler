@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import modal from '@/js/components/modal.vue';
-    import { computed } from 'vue';
+    import ModalSobreModal from '@/js/module/modals/ModalSobreModal.vue';
+    import { computed, ref } from 'vue';
 
     const props = withDefaults(defineProps<{ showModal: boolean }>(), {
         showModal: false,
@@ -9,6 +10,14 @@
     const showModal = computed(() => props.showModal);
     const emit = defineEmits(['accion']);
 
+    const showOtroModal = ref(false);
+    const openOtroModal = () => {
+        showOtroModal.value = true;
+    };
+    const closeOtroModal = () => {
+        showOtroModal.value = false;
+    };
+
     const closeModal = () => {
         emit('accion', false);
     };
@@ -16,13 +25,18 @@
 <template>
     <modal idModal="modal" :showModal="showModal" size="max-w-2xl">
         <template #modalTitle>
-            <h1 class="text-lg font-bold">Título del Modalsssss</h1>
+            <h1 class="text-lg font-bold">Título del primer Modal</h1>
         </template>
         <template #modalBody>
-            <p>Contenido del otro modal tratando de actualizar</p>
+            <p>Contenido del primer modal</p>
+            <ModalSobreModal
+                :showModal="showOtroModal"
+                @accion="closeOtroModal" />
         </template>
         <template #modalFooter>
-            <button class="btn btn-primary">Aceptar</button>
+            <button class="btn btn-primary" @click="openOtroModal">
+                Abrir segundo modal
+            </button>
             <button class="btn btn-secondary" @click="closeModal">
                 cerrar
             </button>

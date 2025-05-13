@@ -1,6 +1,6 @@
 <script setup lang="ts">
-    import simpleComponent from '@/js/components/simpleComponent.vue';
-    import showModal from '@/js/module/otroModulo/showModal.vue';
+    import primerModal from '@/js/module/modals/primerModal.vue';
+    import simpleComponent from '@/js/module/simpleComponent.vue';
     import { ref } from 'vue';
 
     const showLocalModal = ref(false);
@@ -13,10 +13,12 @@
 </script>
 <template>
     <div class="appContainer">
-        <h1>App Loader</h1>
+        <h1>App Loader VueJS</h1>
         <simpleComponent />
-        <button @click="openModal" class="btn btn-primary">Abrir Modal</button>
-        <showModal :showModal="showLocalModal" @accion="closeModal" />
+        <button @click="openModal" class="btn btn-primary">
+            Abrir primer Modals
+        </button>
+        <primerModal :showModal="showLocalModal" @accion="closeModal" />
     </div>
 </template>
 <style lang="css">

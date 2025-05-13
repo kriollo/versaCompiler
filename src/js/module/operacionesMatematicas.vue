@@ -33,11 +33,11 @@
     <div class="container">
         <div class="numOperations">
             <div>
-                <label for="num1">Number 1:</label>
+                <label for="num1">Numero 1:</label>
                 <input id="num1" type="number" v-model="num1" />
             </div>
             <div>
-                <label for="num2">Number 2:</label>
+                <label for="num2">Numero 2:</label>
                 <input id="num2" type="number" v-model="num2" />
             </div>
         </div>

@@ -708,16 +708,19 @@ const initChokidar = async () => {
                 port: uiPort, // Puerto aleatorio para la interfaz de usuario
             },
             socket: {
-                domain: `localhost:${port}`, // Mismo puerto que arriba
                 path: '/browser-sync/socket.io', // Ruta correcta para socket.io
             },
             snippetOptions: {
                 rule: {
                     match: /<\/body>/i,
-
-                    fn: (snippet, match) => `${snippet}${match}
-                    <script type="module" src="/dist/services/vueLoader.js"></script>
-                    `,
+                    fn: (snippet, match) => {
+                        console.log(
+                            '🟢 Inyectando snippet de BrowserSync y vueLoader.js en el HTML',
+                        );
+                        return `${snippet}${match}
+                        <script type="module" src="/dist/services/vueLoader.js"></script>
+                        `;
+                    },
                 },
             },
             logLevel: 'debug',
@@ -727,6 +730,7 @@ const initChokidar = async () => {
             watchEvents: ['change', 'add', 'unlink', 'addDir', 'unlinkDir'],
             reloadDelay: 500,
             reloadDebounce: 500,
+            reloadOnRestart: true,
             notify: true,
             watchOptions: {
                 ignoreInitial: true,
@@ -789,6 +793,9 @@ const initChokidar = async () => {
                 next();
             },
         });
+        console.log(
+            '🟢 BrowserSync inicializado. Esperando conexiones de socket...',
+        );
     } catch (error) {
         console.error(
             chalk.red('🚩 :Error al iniciar:'),

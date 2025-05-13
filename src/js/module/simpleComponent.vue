@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import vComponent from '@/js/components/vComponent.vue';
+    import operacionesMatematicas from '@/js/module/operacionesMatematicas.vue';
     import { ref } from 'vue';
 
     const message = ref('Hello from versaCompiler!');
@@ -15,7 +15,7 @@
             <input type="text" v-model="message" />
         </div>
         <div class="componentContainer">
-            <vComponent :message="message" />
+            <operacionesMatematicas :message="message" />
         </div>
     </div>
 </template>

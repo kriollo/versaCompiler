@@ -107,9 +107,7 @@ function tryForceUpdate(instance) {
         instance.proxy.$forceUpdate();
         instance.update();
         // buscar una varible en el componente que se llame versaComponentKey y sumarle 1
-        if (instance.ctx._.setupState.versaComponentKey) {
-            instance.ctx._.setupState.versaComponentKey++;
-        }
+        instance.ctx._.setupState.versaComponentKey++;
         return true;
     }
     if (typeof instance.update === 'function') {
