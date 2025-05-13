@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { add, multiply, subtract } from '@/js/sampleFile';
+    import lineHr from '@/js/components/lineHr.vue';
     import { ref, toRefs, type Ref } from 'vue';
 
     type Props = {
@@ -29,6 +30,7 @@
     </div>
 
     <h1>Operaciones Matemáticas</h1>
+    <lineHr />
 
     <div class="container">
         <div class="numOperations">

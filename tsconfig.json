@@ -28,7 +28,7 @@
         "target": 3.5
     },
     "exclude": ["./public/**/*"],
-    "include": ["src/**/*", "vite.config.ts", "vite.entries.ts"],
+    "include": ["src/**/*", "vite.config.ts", "vite.entries.ts", "vite/viteLoader.ts"],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]

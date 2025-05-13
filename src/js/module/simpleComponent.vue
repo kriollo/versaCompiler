@@ -9,41 +9,22 @@
     }, 3000);
 </script>
 <template>
-    <div class="container">
-        <h1>componente Simple</h1>
-        <div class="inputContainer">
-            <input type="text" v-model="message" />
+    <div
+        class="flex flex-col items-center p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
+        <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+            componente Simple para cargar
+        </h1>
+        <div class="w-full mb-4">
+            <input
+                type="text"
+                v-model="message"
+                class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
         </div>
-        <div class="componentContainer">
+        <div class="w-full">
             <operacionesMatematicas :message="message" />
         </div>
     </div>
 </template>
-<style lang="css" scoped>
-    .container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-        background-color: #f9f9f9;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-
-    .inputContainer {
-        width: 100%;
-        margin-bottom: 20px;
-    }
-
-    input {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-
-    .componentContainer {
-        width: 100%;
-    }
+<style scoped>
+    /* Eliminadas las clases personalizadas, todo es TailwindCSS */
 </style>
