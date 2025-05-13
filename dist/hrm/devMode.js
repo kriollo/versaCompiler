@@ -101,9 +101,6 @@ function tryForceUpdate(instance) {
         return false;
     }
     if (instance.proxy && typeof instance.proxy.$forceUpdate === 'function') {
-        console.log(
-            'Versa HMR: Forcing update on component instance with $forceUpdate',
-        );
         instance.proxy.$forceUpdate();
         instance.update();
         // buscar una varible en el componente que se llame versaComponentKey y sumarle 1
@@ -111,9 +108,6 @@ function tryForceUpdate(instance) {
         return true;
     }
     if (typeof instance.update === 'function') {
-        console.log(
-            'Versa HMR: Forcing update on component instance with update',
-        );
         if (instance.ctx._.setupState.versaComponentKey) {
             instance.ctx._.setupState.versaComponentKey++;
         }
@@ -164,7 +158,7 @@ async function reloadComponent(
                         componentsDefinition[componentName] = module.default;
                         if (tryForceUpdate(instanciaParent.instancia)) {
                             console.log(
-                                'Versa HMR: Component updated successfully',
+                                `✔️ Versa HMR: Component updated successfully`,
                             );
                             return;
                         }
@@ -174,10 +168,9 @@ async function reloadComponent(
         }
     } catch (error) {
         console.error(
-            `Versa HMR: Error reloading component ${componentName}: ${error}`,
+            `❌ Versa HMR: Error reloading component ${componentName}: ${error}`,
             error,
         );
-        // window.location.reload();
     }
 }
 
@@ -208,8 +201,6 @@ export function socketReload(app) {
             initializeMutationObserver(app._container, () => {
                 if (app._instance) {
                     currentComponentTree = buildComponentTree(app._instance);
-                    // updateComponentTree(tree);
-                    console.log(`✔️ Versa HMR: Component tree updated`);
                 }
             });
         }

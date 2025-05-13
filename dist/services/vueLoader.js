@@ -1,10 +1,15 @@
-import { socketReload } from '../hrm/devMode.js';
-import getInstancia from '../hrm/instanciaVue.js';
-import { getVueInstance } from '../hrm/setupHMR.js';
+let socketReload, getInstancia, getVueInstance;
+
+// En navegador: usar rutas relativas estáticas
+(async () => {
+    socketReload = (await import('./hrm/devMode.js')).socketReload;
+    getInstancia = (await import('./hrm/instanciaVue.js')).default;
+    getVueInstance = (await import('./hrm/setupHMR.js')).getVueInstance;
+})();
 
 // Obtención robusta de la instancia de Vue
 const getInstanceVue = async () => {
-    let instance = getVueInstance();
+    let instance = getVueInstance && getVueInstance();
     if (instance) return instance;
     if (typeof window !== 'undefined') {
         if (window.__VUE_APP__) return window.__VUE_APP__;
@@ -16,7 +21,7 @@ const getInstanceVue = async () => {
             if (winInstance) return winInstance;
         }
     }
-    instance = getInstancia.methods.get();
+    instance = getInstancia && getInstancia.methods.get();
     if (instance) return instance;
     return null;
 };
@@ -27,7 +32,9 @@ async function waitForVueInstance(maxTries = 5, delay = 300) {
     while (tries < maxTries) {
         const instance = await getInstanceVue();
         if (instance) return instance;
-        await new Promise(resolve => globalThis.setTimeout(resolve, delay * 2 ** tries));
+        await new Promise(resolve =>
+            globalThis.setTimeout(resolve, delay * 2 ** tries),
+        );
         tries++;
     }
     // Si no se encuentra, recarga la página
@@ -48,7 +55,9 @@ const initSocket = async (retries = 0) => {
             if (vueAppInstance && vueAppInstance._instance) {
                 socketReload(vueAppInstance);
             } else {
-                window.location.reload();
+                console.error(
+                    `❌ Versa HMR: Vue instance not found after socket connection`,
+                );
             }
             console.log(`✔️ Versa HMR: Socket connected`);
         });
@@ -59,7 +68,9 @@ const initSocket = async (retries = 0) => {
                 if (!connected && retries < maxRetries) {
                     initSocket(retries + 1);
                 } else if (!connected) {
-                    window.location.reload();
+                    console.error(
+                        `❌ Versa HMR: Socket not connected after ${maxRetries} retries, reloading...`,
+                    );
                 }
             }, retryDelay);
         });
@@ -69,7 +80,9 @@ const initSocket = async (retries = 0) => {
                 console.warn('Versa HMR: No socket connection, retrying...');
                 initSocket(retries + 1);
             } else if (!connected) {
-                window.location.reload();
+                console.error(
+                    `❌ Versa HMR: Socket not connected after ${maxRetries} retries, reloading...`,
+                );
             }
         }, 5000);
     } else {
@@ -80,7 +93,9 @@ const initSocket = async (retries = 0) => {
             if (retries < maxRetries) {
                 initSocket(retries + 1);
             } else {
-                window.location.reload();
+                console.error(
+                    `❌ Versa HMR: Socket not found after ${maxRetries} retries, reloading...`,
+                );
             }
         }, retryDelay);
     }

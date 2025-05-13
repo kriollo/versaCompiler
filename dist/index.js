@@ -15,6 +15,10 @@ import {
     writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { checkSintaxysAcorn } from './services/acorn.js';
 import { linter } from './services/linter.js';
@@ -708,6 +712,7 @@ const initChokidar = async () => {
                 port: uiPort, // Puerto aleatorio para la interfaz de usuario
             },
             socket: {
+                domain: `localhost:${port}`, // Dominio para la conexión de socket
                 path: '/browser-sync/socket.io', // Ruta correcta para socket.io
             },
             snippetOptions: {
@@ -718,7 +723,7 @@ const initChokidar = async () => {
                             '🟢 Inyectando snippet de BrowserSync y vueLoader.js en el HTML',
                         );
                         return `${snippet}${match}
-                        <script type="module" src="/dist/services/vueLoader.js"></script>
+                        <script type="module" src="/__versa/vueLoader.js"></script>
                         `;
                     },
                 },
@@ -736,7 +741,62 @@ const initChokidar = async () => {
                 ignoreInitial: true,
                 ignored: ['node_modules', '.git'],
             },
-            middleware: function (req, res, next) {
+            middleware: async function (req, res, next) {
+                // para evitar el error de CORS
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader('Access-Control-Allow-Methods', '*');
+                res.setHeader('Access-Control-Allow-Headers', '*');
+                res.setHeader('Access-Control-Allow-Credentials', 'true');
+                res.setHeader('Access-Control-Max-Age', '3600');
+
+                //para redigir a la ubicación correcta
+                if (req.url === '/__versa/vueLoader.js') {
+                    // Busca vueLoader.js en la carpeta de salida configurada
+                    const vueLoaderPath = path.join(
+                        __dirname,
+                        'services/vueLoader.js',
+                    );
+                    res.setHeader('Content-Type', 'application/javascript');
+                    try {
+                        const fileContent = await readFile(
+                            vueLoaderPath,
+                            'utf-8',
+                        );
+                        res.end(fileContent);
+                    } catch (error) {
+                        console.error(
+                            chalk.red(
+                                `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}`,
+                            ),
+                        );
+                        res.statusCode = 404;
+                        res.end('// vueLoader.js not found');
+                    }
+                    return;
+                }
+                // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
+                if (req.url.startsWith('/__versa/hrm/')) {
+                    // Sirve archivos de dist/hrm como /__versa/hrm/*
+                    const filePath = path.join(
+                        __dirname,
+                        req.url.replace('/__versa/', ''),
+                    );
+                    res.setHeader('Content-Type', 'application/javascript');
+                    try {
+                        const fileContent = await readFile(filePath, 'utf-8');
+                        res.end(fileContent);
+                    } catch (error) {
+                        console.error(
+                            chalk.red(
+                                `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
+                            ),
+                        );
+                        res.statusCode = 404;
+                        res.end('// Not found');
+                    }
+                    return;
+                }
+
                 // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
                 const isAssets = req.url.match(
                     /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
