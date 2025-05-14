@@ -161,7 +161,7 @@ const initSocket = async (retries = 0) => {
                     '[HMR] hideErrorOverlay no es una función al momento de la conexión',
                 );
             }
-            // const vueAppInstance = await waitForVueInstance();
+            await waitForVueInstance();
             // if (vueAppInstance && vueAppInstance._instance) {
             //     if (typeof socketReload === 'function') {
             //         socketReload(vueAppInstance);
