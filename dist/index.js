@@ -348,26 +348,38 @@ const estandarizaData = async data => {
  * @param {string} source - La ruta del archivo fuente.
  * @param {string} destination - La ruta del archivo de destino.
  *
- * @returns {Promise<void>} - Una promesa que se resuelve después de la compilación.
+ * @returns {Promise<Object>} - Un objeto con información sobre la compilación.
  */
 const compileJS = async (source, destination) => {
     try {
-        const startTime = Date.now(); // optener la hora actual
+        const startTime = Date.now();
+        const originalExtension = source.split('.').pop();
+        const baseName = path.basename(destination, path.extname(destination));
+        const finalFileName = baseName.endsWith('.js')
+            ? baseName.slice(0, -3)
+            : baseName;
 
-        const filename = path.basename(source);
-        await log(chalk.blue(`🪄  :start compilation`));
+        await log(chalk.blue(`🪄  :Iniciando compilación de ${source}`));
 
         let data = await readFile(source, 'utf-8');
-        if (!data) {
-            await error(chalk.yellow('⚠️ :Archivo vacío\n'));
-            return;
+        if (!data || data.trim().length === 0) {
+            await error(
+                chalk.yellow(
+                    `⚠️ :Archivo fuente ${source} está vacío. No se procesará.`,
+                ),
+            );
+            return {
+                contentWasWritten: false,
+                extension: originalExtension,
+                normalizedPath: destination,
+                fileName: finalFileName,
+            };
         }
 
-        const extension = source.split('.').pop();
         let resultVue = null;
-        if (extension === 'vue') {
+        if (originalExtension === 'vue') {
             vueFiles++;
-            await log(chalk.green(`💚 :Pre Compile VUE`));
+            await log(chalk.green(`💚 :Precompilando VUE: ${source}`));
             resultVue = await preCompileVue(data, source, isProd);
             data = resultVue.data;
             if (resultVue.error !== null) {
@@ -379,20 +391,25 @@ const compileJS = async (source, destination) => {
                 });
                 await error(
                     chalk.red(
-                        `🚩 :Error durante la compilación Vue :${resultVue.error}\n`,
+                        `🚩 :Error durante la compilación Vue para ${source} :${resultVue.error}\n`,
                     ),
                 );
-                return;
+                return {
+                    contentWasWritten: false,
+                    extension: originalExtension,
+                    normalizedPath: destination,
+                    fileName: finalFileName,
+                };
             }
             destination = destination.replace('.vue', '.js');
         }
 
-        if (extension === 'ts' || resultVue?.lang === 'ts') {
+        if (originalExtension === 'ts' || resultVue?.lang === 'ts') {
             tsFiles++;
-            await log(chalk.blue(`🔄️ :Pre Compilando TS`));
+            await log(chalk.blue(`🔄️ :Precompilando TS: ${source}`));
             const Resultdata = await preCompileTS(
                 data,
-                filename,
+                path.basename(source),
                 PATH_CONFIG_FILE,
             );
             if (Resultdata.error !== null) {
@@ -404,10 +421,15 @@ const compileJS = async (source, destination) => {
                 });
                 await error(
                     chalk.red(
-                        `🚩 :Error durante la compilación TS: ${Resultdata.error}\n`,
+                        `🚩 :Error durante la compilación TS para ${source}: ${Resultdata.error}\n`,
                     ),
                 );
-                return;
+                return {
+                    contentWasWritten: false,
+                    extension: originalExtension,
+                    normalizedPath: destination,
+                    fileName: finalFileName,
+                };
             }
             destination = destination.replace('.ts', '.js');
             data = Resultdata.data;
@@ -415,9 +437,7 @@ const compileJS = async (source, destination) => {
 
         data = await estandarizaData(data);
 
-        // await writeFile(`${destination}-temp.js`, data, 'utf-8');
-
-        await log(chalk.green(`🔍 :Validando Sintaxis`));
+        await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);
         if (resultAcorn.error !== null) {
             errorFiles++;
@@ -426,29 +446,43 @@ const compileJS = async (source, destination) => {
                 error: resultAcorn.error.message,
                 proceso: 'Validación Sintaxis',
             });
-            return;
+            await error(
+                chalk.red(
+                    `🚩 :Error de sintaxis Acorn para ${source}: ${resultAcorn.error.message}\n`,
+                ),
+            );
+            return {
+                contentWasWritten: false,
+                extension: originalExtension,
+                normalizedPath: destination,
+                fileName: finalFileName,
+            };
         }
         acornFiles++;
 
         let result = null;
         if (isProd) {
-            await log(chalk.blue(`🤖 :minifying`));
-            result = await minifyJS(data, filename, isProd);
+            await log(chalk.blue(`🤖 :Minificando ${source}`));
+            result = await minifyJS(data, path.basename(source), isProd);
         } else {
             result = { code: data };
         }
-        await log(chalk.green(`📝 :Escribiendo ${destination}`));
+        await log(chalk.green(`📝 :Intentando escribir ${destination}`));
 
-        if (result.code.length === 0) {
+        if (!result.code || result.code.trim().length === 0) {
             await error(
                 chalk.yellow(
-                    '⚠️ :Warning al compilar JS: El archivo está vacío\n',
+                    `⚠️ :Advertencia al compilar JS para ${source}: El archivo resultante está vacío. No se escribirá en disco.\n`,
                 ),
             );
-            await unlink(destination);
+            return {
+                contentWasWritten: false,
+                extension: originalExtension,
+                normalizedPath: destination,
+                fileName: finalFileName,
+            };
         } else {
             if (!isProd) {
-                result.code = result.code.replaceAll('*/export', '*/\nexport');
                 result.code = result.code.replaceAll('*/export', '*/\nexport');
             }
             const destinationDir = path.dirname(destination);
@@ -458,22 +492,127 @@ const compileJS = async (source, destination) => {
             const endTime = Date.now();
             const elapsedTime = showTimingForHumans(endTime - startTime);
             await log(
-                chalk.gray(`✅ :Compilación exitosa (${elapsedTime}) \n`),
+                chalk.gray(
+                    `✅ :Compilación exitosa para ${finalFileName} (${elapsedTime}) \n`,
+                ),
             );
             successfulFiles++;
+            return {
+                contentWasWritten: true,
+                extension: originalExtension,
+                normalizedPath: destination,
+                fileName: finalFileName,
+            };
         }
     } catch (errora) {
         errorFiles++;
+        const ext = source.split('.').pop() || 'unknown';
+        const fName = path.basename(source, path.extname(source));
         errorList.push({
             file: source,
             error: errora.message,
-            proceso: 'Compilación JS',
+            proceso: 'Compilación JS (Catch General)',
         });
         await error(
-            chalk.red(`🚩 :Error durante la compilación JS: ${errora}\n`),
-            errora,
+            chalk.red(
+                `🚩 :Error catastrófico durante la compilación JS para ${source}: ${errora.message}\n`,
+            ),
+            errora.stack,
         );
+        return {
+            contentWasWritten: false,
+            extension: ext,
+            normalizedPath: destination || source,
+            fileName: fName,
+        };
     }
+};
+
+/**
+ * Compila un archivo dado su ruta.
+ * @param {string} path - La ruta del archivo a compilar.
+ * @returns {Promise<Object>} - Un objeto con información sobre la compilación.
+ */
+const compile = async filePath => {
+    if (!filePath || typeof filePath !== 'string') {
+        console.error(
+            chalk.red('⚠️ :Ruta inválida proporcionada a compile():', filePath),
+        );
+        return {
+            contentWasWritten: false,
+            extension: null,
+            normalizedPath: filePath,
+            fileName: null,
+        };
+    }
+    if (filePath.includes('.d.ts')) {
+        return {
+            contentWasWritten: false,
+            extension: 'd.ts',
+            normalizedPath: filePath,
+            fileName: path.basename(filePath),
+        };
+    }
+
+    const normalizedPathSource = path.normalize(filePath).replace(/\\/g, '/');
+    const sourceForDist = normalizedPathSource.startsWith('./')
+        ? normalizedPathSource
+        : `./${normalizedPathSource}`;
+    const outputPath = sourceForDist.replace(PATH_SOURCE, PATH_DIST);
+    const finalOutputJsPath = outputPath.replace(/\.(vue|ts)$/, '.js');
+
+    console.log(
+        chalk.green(`🔜 :Fuente para compilar: ${normalizedPathSource}`),
+    );
+    console.log(chalk.green(`🔚 :Destino potencial: ${finalOutputJsPath}`));
+
+    if (outputPath) {
+        return await compileJS(normalizedPathSource, finalOutputJsPath);
+    } else {
+        const ext = normalizedPathSource.split('.').pop() || null;
+        const fName = path.basename(
+            normalizedPathSource,
+            path.extname(normalizedPathSource),
+        );
+        await log(
+            chalk.yellow(
+                `⚠️ :Tipo de archivo no reconocido o ruta de salida no determinada para: ${normalizedPathSource}, extensión: ${ext}`,
+            ),
+        );
+        return {
+            contentWasWritten: false,
+            extension: ext,
+            normalizedPath: finalOutputJsPath,
+            fileName: fName,
+        };
+    }
+};
+
+/**
+ * Emite cambios a través de BrowserSync.
+ * @param {Object} bs - Instancia de BrowserSync.
+ * @param {string} extension - Extensión del archivo.
+ * @param {string} normalizedPath - Ruta normalizada del archivo.
+ * @param {string} fileName - Nombre del archivo.
+ * @param {string} type - Tipo de cambio (add, change, delete).
+ */
+const emitirCambios = async (bs, extension, normalizedPath, fileName, type) => {
+    
+    const serverRelativePath = path
+        .normalize(normalizedPath)
+        .replace(/^\\|^\//, '')
+        .replace(/\\/g, '/');
+
+    bs.sockets.emit('vue:update', {
+        component: fileName,
+        timestamp: Date.now(),
+        relativePath: serverRelativePath,
+        extension,
+        type,
+    });
+    console.log(
+        `📡 : Emitiendo evento 'vue:update' para ${fileName} (${type}) -> ${serverRelativePath} \n`,
+    );
 };
 
 async function generateTailwindCSS(_filePath = null) {
@@ -495,42 +634,6 @@ async function generateTailwindCSS(_filePath = null) {
         );
     });
 }
-
-/**
- * Compila un archivo dado su ruta.
- * @param {string} path - La ruta del archivo a compilar.
- */
-const compile = async filePath => {
-    if (!filePath || typeof filePath !== 'string') {
-        console.error(chalk.red('⚠️ :Ruta inválida:', filePath));
-        return;
-    }
-    if (filePath.includes('.d.ts')) {
-        return;
-    }
-    const normalizedPath = path.normalize(filePath).replace(/\\/g, '/'); // Normalizar la ruta para que use barras inclinadas hacia adelante
-    const filePathForReplate = `./${normalizedPath}`;
-    const outputPath = filePathForReplate.replace(PATH_SOURCE, PATH_DIST);
-    const outFileJs = outputPath.replace('.ts', '.js').replace('.vue', '.js');
-
-    console.log(chalk.green(`🔜 :Source ${filePathForReplate}`));
-    console.log(chalk.green(`🔚 :destination ${outFileJs}`));
-
-    const extension = normalizedPath.split('.').pop();
-    //sólo el filename sin extesion
-    const fileName = path
-        .basename(normalizedPath)
-        .replace('.vue', '')
-        .replace('.ts', '')
-        .replace('.js', '');
-
-    if (outputPath) {
-        await compileJS(normalizedPath, outputPath);
-    } else {
-        await log(chalk.yellow(`⚠️ :Tipo no reconocido: ${extension}`));
-    }
-    return { extension, normalizedPath: path.normalize(outFileJs), fileName };
-};
 
 /**
  * Compila todos los archivos en los directorios de origen.
@@ -616,17 +719,6 @@ const compileAll = async () => {
     }
 };
 
-const emitirCambios = async (bs, extension, normalizedPath, fileName, type) => {
-    bs.sockets.emit('vue:update', {
-        component: fileName,
-        timestamp: Date.now(),
-        relativePath: normalizedPath,
-        extension,
-        type,
-    });
-    console.log(`📡 : Emitiendo evento 'vue:update' para ${fileName} \n`);
-};
-
 /**
  * Inicializa el proceso de compilación y observación de archivos.
  */
@@ -652,19 +744,47 @@ const initChokidar = async () => {
         // Evento cuando se añade un archivo
         watcher.on('add', async filePath => {
             await generateTailwindCSS(filePath);
-            const { extension, normalizedPath, fileName } = await compile(
+            const result = await compile(
                 path.normalize(filePath).replace(/\\/g, '/'),
             );
-            emitirCambios(bs, extension, normalizedPath, fileName, 'add');
+            if (result && result.contentWasWritten) {
+                emitirCambios(
+                    bs,
+                    result.extension,
+                    result.normalizedPath,
+                    result.fileName,
+                    'add',
+                );
+            } else {
+                console.log(
+                    chalk.yellow(
+                        `[HMR] No se emite evento para archivo nuevo no escrito o vacío: ${filePath}. Razón: contentWasWritten es false o resultado inválido.`,
+                    ),
+                );
+            }
         });
 
         // Evento cuando se modifica un archivo
         watcher.on('change', async filePath => {
             await generateTailwindCSS(filePath);
-            const { extension, normalizedPath, fileName } = await compile(
+            const result = await compile(
                 path.normalize(filePath).replace(/\\/g, '/'),
             );
-            emitirCambios(bs, extension, normalizedPath, fileName, 'change');
+            if (result && result.contentWasWritten) {
+                emitirCambios(
+                    bs,
+                    result.extension,
+                    result.normalizedPath,
+                    result.fileName,
+                    'change',
+                );
+            } else {
+                console.log(
+                    chalk.yellow(
+                        `[HMR] No se emite evento para archivo modificado a vacío, con errores, o no escrito: ${filePath}. Razón: contentWasWritten es false o resultado inválido.`,
+                    ),
+                );
+            }
         });
 
         // Evento cuando se elimina un archivo
