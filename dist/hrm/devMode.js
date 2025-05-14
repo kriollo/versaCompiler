@@ -126,6 +126,7 @@ export async function reloadComponent(
 ) {
     try {
         const baseUrl = window.location.href;
+        // console.log(relativePath);
         const newBaseUrl = new URL(baseUrl);
         const urlOrigin = `${newBaseUrl.origin}/${relativePath}`;
         const module = await import(`${urlOrigin}?t=${Date.now()}`);
@@ -199,7 +200,7 @@ export async function reloadJS(_relativePath) {
 
 export function socketReload(app) {
     if (window.___browserSync___?.socket) {
-        const socket = window.___browserSync___.socket;
+        // const socket = window.___browserSync___.socket;
         // Configura el observer para actualizar el árbol de componentes en cada mutación relevante
         if (app && app._container) {
             currentComponentTree = buildComponentTree(app._instance);
@@ -209,27 +210,27 @@ export function socketReload(app) {
                 }
             });
         }
-        socket.on('vue:update', data => {
-            console.log('pasa');
-            if (document.querySelector('#versa-hmr-error-overlay')) {
-                window.location.reload();
-                return;
-            }
+        // socket.on('vue:update', data => {
+        //     console.log('pasa');
+        //     if (document.querySelector('#versa-hmr-error-overlay')) {
+        //         window.location.reload();
+        //         return;
+        //     }
 
-            const { component, relativePath, extension, type, timestamp } =
-                data;
-            if (extension === 'vue') {
-                reloadComponent(
-                    app,
-                    component,
-                    `/${relativePath}`,
-                    type,
-                    extension,
-                );
-            } else {
-                reloadJS(`/${relativePath}?t=${timestamp}`);
-            }
-        });
+        //     const { component, relativePath, extension, type, timestamp } =
+        //         data;
+        //     if (extension === 'vue') {
+        //         reloadComponent(
+        //             app,
+        //             component,
+        //             `/${relativePath}`,
+        //             type,
+        //             extension,
+        //         );
+        //     } else {
+        //         reloadJS(`/${relativePath}?t=${timestamp}`);
+        //     }
+        // });
     } else {
         setTimeout(() => {
             window.location.reload();

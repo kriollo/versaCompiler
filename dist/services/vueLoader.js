@@ -161,20 +161,20 @@ const initSocket = async (retries = 0) => {
                     '[HMR] hideErrorOverlay no es una función al momento de la conexión',
                 );
             }
-            const vueAppInstance = await waitForVueInstance();
-            if (vueAppInstance && vueAppInstance._instance) {
-                if (typeof socketReload === 'function') {
-                    socketReload(vueAppInstance);
-                } else {
-                    console.warn(
-                        '[HMR] socketReload no es una función al momento de la conexión',
-                    );
-                }
-            } else {
-                console.error(
-                    '❌ Versa HMR: Instancia de Vue no encontrada después de la conexión del socket',
-                );
-            }
+            // const vueAppInstance = await waitForVueInstance();
+            // if (vueAppInstance && vueAppInstance._instance) {
+            //     if (typeof socketReload === 'function') {
+            //         socketReload(vueAppInstance);
+            //     } else {
+            //         console.warn(
+            //             '[HMR] socketReload no es una función al momento de la conexión',
+            //         );
+            //     }
+            // } else {
+            //     console.error(
+            //         '❌ Versa HMR: Instancia de Vue no encontrada después de la conexión del socket',
+            //     );
+            // }
             console.log('✔️ Versa HMR: Socket conectado');
         });
 
