@@ -1,5 +1,4 @@
-let socketReload,
-    getInstancia,
+let getInstancia,
     getVueInstance,
     showErrorOverlay,
     hideErrorOverlay,
@@ -12,7 +11,6 @@ let socketReload,
         // Importa todas las dependencias HMR necesarias aquí
         // CORREGIR RUTA DE IMPORTACIÓN PARA devMode.js
         const devModeModule = await import('./hrm/devMode.js');
-        socketReload = devModeModule.socketReload;
         reloadComponent = devModeModule.reloadComponent;
         reloadJS = devModeModule.reloadJS;
 
@@ -238,8 +236,9 @@ const initSocket = async (retries = 0) => {
             }
 
             try {
+                let result;
                 if (extension === 'vue') {
-                    const result = await reloadComponent(
+                    result = await reloadComponent(
                         appInstance,
                         component,
                         `${relativePath}`,
@@ -251,7 +250,10 @@ const initSocket = async (retries = 0) => {
                     }
                 } else {
                     // Asumiendo que reloadJS existe
-                    await reloadJS(`/${relativePath}?t=${timestamp}`);
+                    result = await reloadJS(`/${relativePath}?t=${timestamp}`);
+                    if (result && result.msg) {
+                        throw new Error(result.msg);
+                    }
                 }
             } catch (hmrError) {
                 const errorMsg = `HMR falló para ${relativePath}`;

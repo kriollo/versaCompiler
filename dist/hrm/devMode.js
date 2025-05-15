@@ -256,7 +256,7 @@ export async function reloadJS(pathWithTimestamp) {
         // si el módulo se auto-ejecuta (ej. añade event listeners, modifica el DOM globalmente).
         // ¡CUIDADO con efectos secundarios duplicados en este caso!
 
-        return true; // Indicar éxito
+        return null; // Indicar éxito
     } catch (error) {
         console.error(
             `[HMR] Error al re-importar el módulo JS ${pathWithTimestamp}:`,
@@ -264,7 +264,10 @@ export async function reloadJS(pathWithTimestamp) {
         );
         // Aquí podrías decidir si mostrar un error en el overlay o, como último recurso, recargar.
         // Por ahora, solo retornamos false para que el llamador (vueLoader.js) decida.
-        return false; // Indicar fallo
+        return {
+            msg: `Error al re-importar el módulo JS ${pathWithTimestamp}:`,
+            error,
+        }; // Indicar fallo
     }
 }
 
