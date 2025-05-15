@@ -26,7 +26,12 @@ import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
 
-import { addImportEndJs, mapRuta, showTimingForHumans } from './utils/utils.js';
+import {
+    addImportEndJs,
+    mapRuta,
+    showTimingForHumans,
+    transformStaticImports,
+} from './utils/utils.js';
 
 const log = console.log.bind(console);
 const error = console.error.bind(console);
@@ -340,6 +345,10 @@ const estandarizaData = async data => {
     data = await replaceAliasImportsAsync(data);
     data = await addImportEndJs(data);
 
+    if (!isProd) {
+        data = await transformStaticImports(data);
+    }
+
     return data;
 };
 
@@ -436,6 +445,8 @@ const compileJS = async (source, destination) => {
         }
 
         data = await estandarizaData(data);
+        // await writeFile(destination, data, 'utf-8');
+        // return;
 
         await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);
@@ -597,7 +608,6 @@ const compile = async filePath => {
  * @param {string} type - Tipo de cambio (add, change, delete).
  */
 const emitirCambios = async (bs, extension, normalizedPath, fileName, type) => {
-    
     const serverRelativePath = path
         .normalize(normalizedPath)
         .replace(/^\\|^\//, '')
@@ -868,6 +878,15 @@ const initChokidar = async () => {
                 res.setHeader('Access-Control-Allow-Headers', '*');
                 res.setHeader('Access-Control-Allow-Credentials', 'true');
                 res.setHeader('Access-Control-Max-Age', '3600');
+
+                if (req.url.endsWith('.js')) {
+                    res.setHeader(
+                        'Cache-Control',
+                        'no-cache, no-store, must-revalidate',
+                    );
+                    res.setHeader('Pragma', 'no-cache');
+                    res.setHeader('Expires', '0');
+                }
 
                 //para redigir a la ubicación correcta
                 if (req.url === '/__versa/vueLoader.js') {

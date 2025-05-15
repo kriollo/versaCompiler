@@ -194,8 +194,53 @@ export function debounce(func, waitFor) {
     return debounced;
 }
 
-export async function reloadJS(_relativePath) {
-    location.reload();
+export async function reloadJS(pathWithTimestamp) {
+    // El parámetro ya incluye / y ?t=...
+    try {
+        console.log(`[HMR] Intentando re-importar JS: ${pathWithTimestamp}`);
+        // La URL ya está completa y lista para usar.
+        // El `import()` dinámico usa la URL base del script actual si la ruta es relativa,
+        // o la URL tal cual si es absoluta (comenzando con / o http/https).
+        // Como pathWithTimestamp comienza con '/', se resolverá desde la raíz del host.
+        const newModule = await import(pathWithTimestamp);
+        console.log(
+            `[HMR] Módulo JS ${pathWithTimestamp} re-importado exitosamente.`,
+        );
+
+        // Lógica de ejemplo: si el módulo exporta una función 'onHotUpdate' o 'init', llamarla.
+        // Esto es una convención que tus módulos JS tendrían que seguir.
+        if (newModule && typeof newModule.onHotUpdate === 'function') {
+            console.log(
+                `[HMR] Llamando a onHotUpdate() para el módulo ${pathWithTimestamp}`,
+            );
+            newModule.onHotUpdate();
+        } else if (newModule && typeof newModule.init === 'function') {
+            // Alternativamente, una función 'init' si es más genérico
+            console.log(
+                `[HMR] Llamando a init() para el módulo ${pathWithTimestamp}`,
+            );
+            newModule.init();
+        } else if (newModule && typeof newModule.main === 'function') {
+            // O una función 'main'
+            console.log(
+                `[HMR] Llamando a main() para el módulo ${pathWithTimestamp}`,
+            );
+            newModule.main();
+        }
+        // Si no hay una función específica, la simple re-importación podría ser suficiente
+        // si el módulo se auto-ejecuta (ej. añade event listeners, modifica el DOM globalmente).
+        // ¡CUIDADO con efectos secundarios duplicados en este caso!
+
+        return true; // Indicar éxito
+    } catch (error) {
+        console.error(
+            `[HMR] Error al re-importar el módulo JS ${pathWithTimestamp}:`,
+            error,
+        );
+        // Aquí podrías decidir si mostrar un error en el overlay o, como último recurso, recargar.
+        // Por ahora, solo retornamos false para que el llamador (vueLoader.js) decida.
+        return false; // Indicar fallo
+    }
 }
 
 export function socketReload(app) {

@@ -46,3 +46,106 @@ export const addImportEndJs = async data => {
         return match; // Devolver el match original si no se cumple ninguna condición
     });
 };
+
+/**
+ * Reemplaza las importaciones estáticas en el código JavaScript proporcionado por importaciones dinámicas, sólo para archivos JS.
+ * @param {string} data - La cadena de entrada que contiene el código JavaScript.
+ * @returns {string} - La cadena modificada con las importaciones actualizadas.
+ */
+export const transformStaticImports = data => {
+    // Detectar archivos sensibles que NO deben transformarse
+    const isSystemFile =
+        data.includes('vue-loader') ||
+        data.includes('loadModule') ||
+        data.includes('handleError') ||
+        data.includes('createApp(') ||
+        data.includes('system/');
+
+    // Si es un archivo del sistema, dejarlo intacto
+    if (isSystemFile) {
+        return data;
+    }
+
+    // Proceder con la transformación normal para archivos regulares
+    let updatedData = data;
+
+    // Verificar si un componente se usa con _resolveComponent
+    const isVueComponent = varName => {
+        const pattern1 = `_resolveComponent(${varName})`;
+        const pattern2 = `_resolveComponent("${varName}")`;
+        const pattern3 = `_resolveComponent('${varName}')`;
+
+        return (
+            data.includes(pattern1) ||
+            data.includes(pattern2) ||
+            data.includes(pattern3)
+        );
+    };
+
+    // Caso 1: import defaultExport from "./module.js";
+    const defaultImportRegex =
+        /import\s+([a-zA-Z_$][\w$]*)\s+from\s+['"]([^'"]+\.js)['"];?/g;
+    updatedData = updatedData.replace(
+        defaultImportRegex,
+        (match, varName, filePath) => {
+            // Si es un componente Vue (usado con _resolveComponent), mantenerlo estático
+            if (isVueComponent(varName)) {
+                return match; // Mantener el import original
+            }
+
+            return `let ${varName}; // Declaración adelantada\n(async () => { ${varName} = (await import('${filePath}?t=${Date.now()}')).default; })();`;
+        },
+    );
+
+    // Caso 2: import * as namespace from "./module.js";
+    const namespaceImportRegex =
+        /import\s+\*\s+as\s+([a-zA-Z_$][\w$]*)\s+from\s+['"]([^'"]+\.js)['"];?/g;
+    updatedData = updatedData.replace(
+        namespaceImportRegex,
+        (match, namespaceName, filePath) => {
+            // Si es un componente Vue, mantenerlo estático
+            if (isVueComponent(namespaceName)) {
+                return match;
+            }
+
+            return `let ${namespaceName}; // Declaración adelantada\n(async () => { ${namespaceName} = await import('${filePath}?t=${Date.now()}'); })();`;
+        },
+    );
+
+    // Caso 3: import { ... } from "./module.js";
+    const namedImportRegex =
+        /import\s*\{([^}]*?)\}\s*from\s+['"]([^'"]+\.js)['"];?/g;
+    updatedData = updatedData.replace(
+        namedImportRegex,
+        (match, namedExports, filePath) => {
+            const trimmedNamedExports = namedExports
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            // Extraer los nombres de variables
+            const variables = trimmedNamedExports.split(',').map(e => {
+                const parts = e.trim().split(' as ');
+                return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+            });
+
+            // Verificar si alguna de las variables es un componente Vue
+            const isVueImport = variables.some(varName =>
+                isVueComponent(varName),
+            );
+            if (isVueImport) {
+                return match; // Mantener el import original
+            }
+
+            let varNames = variables.join(', ');
+            if (varNames.endsWith(', ')) {
+                varNames = varNames.slice(0, -2);
+            }
+            return `let ${varNames}; // Declaración adelantada\n(async () => { ({ ${trimmedNamedExports} } = await import('${filePath}?t=${Date.now()}')); })();`;
+        },
+    );
+
+    // El archivo ya ha sido procesado y no es un archivo del sistema
+    // por lo que podemos proceder con seguridad
+
+    return updatedData;
+};
