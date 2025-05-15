@@ -195,7 +195,32 @@ export function debounce(func, waitFor) {
 }
 
 export async function reloadJS(pathWithTimestamp) {
-    // El parámetro ya incluye / y ?t=...
+    // Extraer la ruta base sin el timestamp
+    const pathParts = pathWithTimestamp.split('?');
+    const basePath = pathParts[0];
+
+    // Verificar si tenemos una función de recarga registrada para este módulo
+    if (
+        window.__VERSA_HMR &&
+        window.__VERSA_HMR.modules &&
+        window.__VERSA_HMR.modules[basePath]
+    ) {
+        console.log(
+            `[HMR] Usando sistema HMR interno para recargar: ${basePath}`,
+        );
+        try {
+            const result = await window.__VERSA_HMR.modules[basePath]();
+            return result;
+        } catch (error) {
+            console.error(
+                `[HMR] Error al recargar el módulo usando sistema HMR interno:`,
+                error,
+            );
+            // Si falla el sistema interno, intentamos el enfoque tradicional
+        }
+    }
+
+    // Si no hay una función específica, usar la lógica existente
     try {
         console.log(`[HMR] Intentando re-importar JS: ${pathWithTimestamp}`);
         // La URL ya está completa y lista para usar.

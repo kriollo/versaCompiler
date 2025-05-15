@@ -445,8 +445,6 @@ const compileJS = async (source, destination) => {
         }
 
         data = await estandarizaData(data);
-        // await writeFile(destination, data, 'utf-8');
-        // return;
 
         await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);

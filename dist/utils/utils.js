@@ -93,7 +93,7 @@ export const transformStaticImports = data => {
                 return match; // Mantener el import original
             }
 
-            return `let ${varName}; // Declaración adelantada\n(async () => { ${varName} = (await import('${filePath}?t=${Date.now()}')).default; })();`;
+            return `let ${varName}; // Declaración adelantada\n(async () => { \n  // Generar timestamp fresco en runtime, no en compilación\n  const importWithTimestamp = (path) => import(path + '?t=' + Date.now());\n  ${varName} = (await importWithTimestamp('${filePath}')).default;\n  \n  // Registrar función de recarga para HMR\n  window.__VERSA_HMR = window.__VERSA_HMR || {};\n  window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};\n  window.__VERSA_HMR.modules['${filePath}'] = async () => {\n    try {\n      ${varName} = (await import('${filePath}?t=' + Date.now())).default;\n      console.log('[HMR] Módulo ${filePath} recargado');\n      return true;\n    } catch (e) {\n      console.error('[HMR] Error recargando ${filePath}', e);\n      return false;\n    }\n  };\n})();`;
         },
     );
 
@@ -108,7 +108,7 @@ export const transformStaticImports = data => {
                 return match;
             }
 
-            return `let ${namespaceName}; // Declaración adelantada\n(async () => { ${namespaceName} = await import('${filePath}?t=${Date.now()}'); })();`;
+            return `let ${namespaceName}; // Declaración adelantada\n(async () => { \n  // Generar timestamp fresco en runtime, no en compilación\n  const importWithTimestamp = (path) => import(path + '?t=' + Date.now());\n  ${namespaceName} = await importWithTimestamp('${filePath}');\n  \n  // Registrar función de recarga para HMR\n  window.__VERSA_HMR = window.__VERSA_HMR || {};\n  window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};\n  window.__VERSA_HMR.modules['${filePath}'] = async () => {\n    try {\n      ${namespaceName} = await import('${filePath}?t=' + Date.now());\n      console.log('[HMR] Módulo ${filePath} recargado');\n      return true;\n    } catch (e) {\n      console.error('[HMR] Error recargando ${filePath}', e);\n      return false;\n    }\n  };\n})();`;
         },
     );
 
@@ -140,7 +140,7 @@ export const transformStaticImports = data => {
             if (varNames.endsWith(', ')) {
                 varNames = varNames.slice(0, -2);
             }
-            return `let ${varNames}; // Declaración adelantada\n(async () => { ({ ${trimmedNamedExports} } = await import('${filePath}?t=${Date.now()}')); })();`;
+            return `let ${varNames}; // Declaración adelantada\n(async () => { \n  // Generar timestamp fresco en runtime, no en compilación\n  const importWithTimestamp = (path) => import(path + '?t=' + Date.now());\n  ({ ${trimmedNamedExports} } = await importWithTimestamp('${filePath}'));\n  \n  // Registrar función de recarga para HMR\n  window.__VERSA_HMR = window.__VERSA_HMR || {};\n  window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};\n  window.__VERSA_HMR.modules['${filePath}'] = async () => {\n    try {\n      ({ ${trimmedNamedExports} } = await import('${filePath}?t=' + Date.now()));\n      console.log('[HMR] Módulo ${filePath} recargado');\n      return true;\n    } catch (e) {\n      console.error('[HMR] Error recargando ${filePath}', e);\n      return false;\n    }\n  };\n})();`;
         },
     );
 
