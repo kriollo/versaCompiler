@@ -2,19 +2,28 @@ import {
     handleError,
     isValidModuleName,
     sanitizeModulePath,
+    $dom,
 } from '@/js/devUtils';
 import { createApp, ref } from 'vue';
 
 const debug = ref(false);
-const $contenedor = document.querySelector('#app') as HTMLElement;
-
-const url = new URL(import.meta.url);
-const urlParams = url.search;
-const searchParams = new URLSearchParams(urlParams);
-let module = searchParams.get('m');
+const $contenedor = ref(null);
 
 async function loadModule() {
     try {
+        const url = new URL(import.meta.url);
+        const urlParams = url.search;
+        const searchParams = new URLSearchParams(urlParams);
+        let module = searchParams.get('m');
+
+        $contenedor.value = $dom('#app');
+
+        if (!$contenedor.value) {
+            throw new Error(
+                'No se ha encontrado el contenedor para cargar el módulo.',
+            );
+        }
+
         if (!module) {
             throw new Error('No se ha especificado un módulo para cargar.');
         }
@@ -63,7 +72,7 @@ async function loadModule() {
             app.config.performance = true;
             app.config.compilerOptions.whitespace = 'condense';
 
-            app.mount($contenedor, true);
+            app.mount($contenedor.value, true);
 
             // --- FRAGMENTO CLAVE PARA HMR Y ACCESO GLOBAL ---
             if (typeof window !== 'undefined') {

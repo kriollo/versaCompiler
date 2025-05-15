@@ -144,8 +144,5 @@ export const transformStaticImports = data => {
         },
     );
 
-    // El archivo ya ha sido procesado y no es un archivo del sistema
-    // por lo que podemos proceder con seguridad
-
     return updatedData;
 };

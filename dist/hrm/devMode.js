@@ -199,6 +199,18 @@ export async function reloadJS(pathWithTimestamp) {
     const pathParts = pathWithTimestamp.split('?');
     const basePath = pathParts[0];
 
+    const contenidoArchivo = await fetch(pathWithTimestamp).then(res =>
+        res.text(),
+    );
+
+    if (
+        contenidoArchivo.includes('createApp') ||
+        contenidoArchivo.includes('.mount')
+    ) {
+        window.location.reload();
+        return;
+    }
+
     // Verificar si tenemos una función de recarga registrada para este módulo
     if (
         window.__VERSA_HMR &&

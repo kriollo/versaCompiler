@@ -54,3 +54,8 @@ export function handleError(
 
     console.error('[Module Loader]', error);
 }
+
+export const $dom = (
+    selector: string,
+    context: Document | Element = document,
+): Element | null => context.querySelector(selector);
