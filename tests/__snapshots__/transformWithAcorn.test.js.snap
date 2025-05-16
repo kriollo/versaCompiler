@@ -1,0 +1,302 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`transformModuleWithAcorn NO debería transformar imports de librerías externas como "vue" 1`] = `
+"import { ref, computed } from 'vue';
+let localUtil;
+
+(async () => {
+    ({ localUtil } = await import('./local.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./local.js'] = async () => {
+            try {
+                ({ localUtil } = await importWithTimestamp('./local.js'));
+                console.log('[HMR] Módulo ./local.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./local.js', e);
+                return false;
+            }
+        };
+    const count = ref(0);
+    const double = computed(() => count.value * 2);
+    localUtil();
+})();"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar imports si el archivo contiene "createApp" y debería añadir marca de recarga 1`] = `
+"//versaHRM-reloadFILE
+import { createApp } from 'vue';
+import App from './App.vue';
+import { router } from './router.js';
+const app = createApp(App);
+app.use(router);
+app.mount('#app');"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar imports si el archivo contiene "defineComponent" y debería añadir marca de recarga 1`] = `
+"//versaHRM-reloadFILE
+import { ref } from 'vue';
+import { anotherUtil } from './another.js';
+import { defineComponent } from 'vue';
+
+
+export default defineComponent({
+  setup() {
+    const count = ref(0);
+    anotherUtil();
+    return { count };
+  }
+});"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar imports si el archivo contiene "mount" (y no createApp) y debería añadir marca de recarga 1`] = `
+"//versaHRM-reloadFILE
+import { h, render } from 'vue';
+import App from './App.vue';
+const vnode = h(App);
+render(vnode, document.getElementById('#app'));
+const someObject = { mount: () => {} };
+someObject.mount();"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar un archivo que es principalmente imports/exports (CoreDefinitionFile) y debería añadir marca de recarga 1`] = `
+"//versaHRM-reloadFILE
+import { firstUtil } from './utils/first.js';
+import { secondUtil } from './utils/second.js';
+import { thirdUtil } from './utils/third.js';
+const combined = () => firstUtil() + secondUtil();
+
+export { firstUtil, secondUtil, thirdUtil, combined };
+export const CONST_A = 123;"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar un archivo que está justo por debajo del ratio de CoreDefinitionFile 1`] = `
+"let utilOne;
+let utilTwo;
+
+(async () => {
+    ({ utilOne } = await import('./utils/utilOne.js'));
+    ({ utilTwo } = await import('./utils/utilTwo.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./utils/utilOne.js'] = async () => {
+            try {
+                ({ utilOne } = await importWithTimestamp('./utils/utilOne.js'));
+                console.log('[HMR] Módulo ./utils/utilOne.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./utils/utilOne.js', e);
+                return false;
+            }
+        };
+        window.__VERSA_HMR.modules['./utils/utilTwo.js'] = async () => {
+            try {
+                ({ utilTwo } = await importWithTimestamp('./utils/utilTwo.js'));
+                console.log('[HMR] Módulo ./utils/utilTwo.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./utils/utilTwo.js', e);
+                return false;
+            }
+        };
+    function localLogic1() { /* ... */ }
+    function localLogic2() { /* ... */ }
+    const localValue = 123;
+})();
+
+export { utilOne, utilTwo };"
+`;
+
+exports[`transformModuleWithAcorn NO debería transformar un import .js si su variable se usa en _resolveComponent, pero SÍ otros imports .js 1`] = `
+"//versaHRM-reloadFILE
+import MyComponent from './MyComponent.js';
+import anotherUtil from './anotherUtil.js';
+import { defineComponent } from 'vue';
+
+
+export default defineComponent({
+  components: {
+    'my-component': _resolveComponent("MyComponent")
+  },
+  setup() {
+    anotherUtil();
+    return {};
+  }
+});"
+`;
+
+exports[`transformModuleWithAcorn debería manejar re-exportaciones de librerías externas (manteniendo imports estáticos) 1`] = `
+"export { ref, computed } from 'vue';
+export { default as anotherDefault } from './anotherDefault.js';"
+`;
+
+exports[`transformModuleWithAcorn debería manejar re-exportaciones de módulos .js locales (considerándolos CoreDefinitionFile) 1`] = `
+"export * from './myNamespaceExports.js';
+
+export { default as myDefault } from './myDefaultExport.js';
+export { namedExport, originalName as localReExport } from './myNamedExports.js';"
+`;
+
+exports[`transformModuleWithAcorn debería manejar un archivo solo con exports 1`] = `
+"export const message = "Hola";
+export function greet(name) {
+  return \`Hola, \${name}\`;
+}"
+`;
+
+exports[`transformModuleWithAcorn debería manejar un archivo solo con imports .js locales y sin exports 1`] = `
+"let setup;
+
+(async () => {
+    ({ setup } = await import('./setupModule.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./setupModule.js'] = async () => {
+            try {
+                ({ setup } = await importWithTimestamp('./setupModule.js'));
+                console.log('[HMR] Módulo ./setupModule.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./setupModule.js', e);
+                return false;
+            }
+        };
+    setup();
+    console.log('Módulo de solo imports ejecutado');
+})();"
+`;
+
+exports[`transformModuleWithAcorn debería manejar un archivo vacío o solo con comentarios 1`] = `""`;
+
+exports[`transformModuleWithAcorn debería manejar un archivo vacío o solo con comentarios 2`] = `""`;
+
+exports[`transformModuleWithAcorn debería mover el cuerpo del código dentro del IIFE si hay imports dinámicos 1`] = `
+"let $dom;
+
+(async () => {
+    ({ $dom } = await import('./dom-utils.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./dom-utils.js'] = async () => {
+            try {
+                ({ $dom } = await importWithTimestamp('./dom-utils.js'));
+                console.log('[HMR] Módulo ./dom-utils.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./dom-utils.js', e);
+                return false;
+            }
+        };
+    const button = $dom('#myButton');
+    button.addEventListener('click', () => {
+        console.log('Button clicked!');
+    });
+})();
+
+export const testVar = 123;"
+`;
+
+exports[`transformModuleWithAcorn debería preservar comentarios en el código 1`] = `
+"let myUtil;
+
+(async () => {
+    ({ myUtil } = await import('./utils.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./utils.js'] = async () => {
+            try {
+                ({ myUtil } = await importWithTimestamp('./utils.js'));
+                console.log('[HMR] Módulo ./utils.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./utils.js', e);
+                return false;
+            }
+        };
+    function doWork() {
+        // Comentario dentro de una función
+        myUtil();
+    }
+})();
+
+export { doWork };"
+`;
+
+exports[`transformModuleWithAcorn debería transformar diferentes tipos de imports .js locales 1`] = `
+"let myDefault;
+let allUtils;
+let specificUtil;
+let aliasUtil;
+
+(async () => {
+    myDefault = (await import('./defaultUtil.js')).default;
+    allUtils = await import('./allUtils.js');
+    ({ specificUtil, originalName as aliasUtil } = await import('./specificUtils.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./defaultUtil.js'] = async () => {
+            try {
+                myDefault = (await importWithTimestamp('./defaultUtil.js')).default;
+                console.log('[HMR] Módulo ./defaultUtil.js (default) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./defaultUtil.js', e);
+                return false;
+            }
+        };
+        window.__VERSA_HMR.modules['./allUtils.js'] = async () => {
+            try {
+                allUtils = await importWithTimestamp('./allUtils.js');
+                console.log('[HMR] Módulo ./allUtils.js (namespace) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./allUtils.js', e);
+                return false;
+            }
+        };
+        window.__VERSA_HMR.modules['./specificUtils.js'] = async () => {
+            try {
+                ({ specificUtil,originalName as aliasUtil } = await importWithTimestamp('./specificUtils.js'));
+                console.log('[HMR] Módulo ./specificUtils.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./specificUtils.js', e);
+                return false;
+            }
+        };
+    myDefault();
+    allUtils.doSomething();
+    specificUtil();
+    aliasUtil();
+})();"
+`;
+
+exports[`transformModuleWithAcorn debería transformar un import .js local a dinámico y añadir HMR 1`] = `
+"let myUtil;
+
+(async () => {
+    ({ myUtil } = await import('./utils.js'));
+const importWithTimestamp = (path) => import(path);
+                window.__VERSA_HMR = window.__VERSA_HMR || {};
+                window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+            window.__VERSA_HMR.modules['./utils.js'] = async () => {
+            try {
+                ({ myUtil } = await importWithTimestamp('./utils.js'));
+                console.log('[HMR] Módulo ./utils.js (named) recargado');
+                return true;
+            } catch (e) {
+                console.error('[HMR] Error recargando ./utils.js', e);
+                return false;
+            }
+        };
+    myUtil();
+    console.log('Hola desde el módulo');
+})();"
+`;
