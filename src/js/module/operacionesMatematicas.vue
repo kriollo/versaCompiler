@@ -50,7 +50,7 @@
             <div class="btnOperations">
                 <button @click="addNumber">add</button>
                 <button @click="subtractNumber">subtract</button>
-                <button @click="multiplyNumber">divide</button>
+                <button @click="multiplyNumber">multiply</button>
             </div>
             <div v-if="result !== null" class="result">
                 <h2>Resultado: {{ result }}</h2>

@@ -23,8 +23,20 @@ function recursivelyFindComponentsInVNode(vnode, parentTreeNode) {
     if (!vnode || typeof vnode !== 'object') {
         return;
     }
-
-    if (vnode.component) {
+    console.log(vnode);
+    if (vnode?.type.name === 'Suspense') {
+        console.log('pasa por suspense');
+        const childComponentInstance = vnode?.suspense.activeBranch;
+        const childTreeNode = {
+            name: vnode?.type.name,
+            instancia: childComponentInstance,
+            children: [],
+            parent: parentTreeNode,
+            isRoot: false,
+        };
+        parentTreeNode.children.push(childTreeNode);
+        recursivelyFindComponentsInVNode(childComponentInstance, childTreeNode);
+    } else if (vnode.component) {
         const childComponentInstance = vnode.component;
 
         let componentName = 'Anonymous';
@@ -81,6 +93,12 @@ function traverseComponentInstance(componentInstance, currentTreeNode) {
 }
 
 export const buildComponentTree = componentRootInstance => {
+    if (!componentRootInstance || !componentRootInstance.type) {
+        console.warn(
+            'No se pudo construir el árbol de componentes: instancia inválida',
+        );
+        return null;
+    }
     const tree = {
         name:
             componentRootInstance.type?.name ||
@@ -90,8 +108,10 @@ export const buildComponentTree = componentRootInstance => {
         children: [],
         parent: null,
         isRoot: true,
+        from: 'root',
     };
     traverseComponentInstance(componentRootInstance, tree);
+
     return tree;
 };
 
@@ -131,6 +151,7 @@ export async function reloadComponent(
         const urlOrigin = `${newBaseUrl.origin}/${relativePath}`;
         const module = await import(`${urlOrigin}?t=${Date.now()}`);
         currentComponentTree = buildComponentTree(app._instance);
+        console.log(currentComponentTree);
 
         const targetNode = findNodeByInstance(
             currentComponentTree,
