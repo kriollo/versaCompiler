@@ -4,6 +4,7 @@ import {
     isValidModuleName,
     sanitizeModulePath,
 } from '@/js/devUtils';
+import { html } from 'code-tag';
 import { createApp, ref } from 'vue';
 
 const debug = ref(false);
@@ -53,7 +54,11 @@ async function loadModule() {
                     };
                 },
                 name: 'App',
-                template: `<${component} :key="componentKey" />`,
+                template: html`
+                    <Suspense>
+                        <${component} :key="componentKey" />
+                    </Suspense>
+                `,
             });
 
             // Configuración de la aplicación según el modo de depuración

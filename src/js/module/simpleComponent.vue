@@ -12,7 +12,7 @@
     <div
         class="flex flex-col items-center p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md">
         <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-            componente Simple para cargar
+            componente Simple
         </h1>
         <div class="w-full mb-4">
             <input
@@ -21,7 +21,7 @@
                 class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
         </div>
         <div class="w-full">
-            <operacionesMatematicas :message="message" />
+            <operacionesMatematicas :message="message"></operacionesMatematicas>
         </div>
     </div>
 </template>

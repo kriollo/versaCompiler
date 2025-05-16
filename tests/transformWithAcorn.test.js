@@ -11,20 +11,36 @@ console.log('Hola desde el módulo');
         expect(transformModuleWithAcorn(inputCode)).toMatchSnapshot();
     });
 
-    test('NO debería transformar imports si el archivo contiene "defineComponent" y debería añadir marca de recarga', () => {
+    // MODIFICADO: Ahora los componentes Vue SÍ transforman sus dependencias .js locales,
+    // el cuerpo del componente queda fuera del IIFE, y NO reciben la marca de recarga.
+    test('componente Vue: imports .js locales se transforman, cuerpo fuera de IIFE, sin marca de recarga', () => {
         const inputCode = `
-import { ref } from 'vue';
-import { anotherUtil } from './another.js';
-import { defineComponent } from 'vue';
+import { ref, defineComponent, h } from 'vue'; // Import externo, no se transforma
+import { utilidadLocal } from './utilidadLocal.js'; // .js local, SÍ se transforma
+import UnComponenteHijo from './UnComponenteHijo.vue'; // Asumimos que .vue no es .js local, no se transforma
 
 export default defineComponent({
+  name: 'MiComponente',
+  components: { UnComponenteHijo },
   setup() {
-    const count = ref(0);
-    anotherUtil();
-    return { count };
+    const mensaje = ref("Hola");
+    utilidadLocal(); // Se usa la utilidad local
+    const renderHijo = () => h(UnComponenteHijo);
+    return { mensaje, renderHijo };
   }
 });
         `;
+        // El snapshot esperado reflejará:
+        // - 'vue' y './UnComponenteHijo.vue' como imports estáticos.
+        // - 'let utilidadLocal;'
+        // - Un IIFE:
+        //   - const importWithTimestamp = ...
+        //   - try/catch para cargar './utilidadLocal.js' usando importWithTimestamp.
+        //   - window.__VERSA_HMR inicialización.
+        //   - window.__VERSA_HMR.modules['./utilidadLocal.js'] = async () => { ... lógica HMR para utilidadLocal ... }
+        //   - window.__VERSA_HMR.reload = ...
+        // - El defineComponent({...}) FUERA del IIFE.
+        // - SIN '//versaHRM-reloadFILE'.
         expect(transformModuleWithAcorn(inputCode)).toMatchSnapshot();
     });
 
@@ -143,28 +159,31 @@ aliasUtil();
         expect(transformModuleWithAcorn(inputCode)).toMatchSnapshot();
     });
 
-    test('NO debería transformar un import .js si su variable se usa en _resolveComponent, pero SÍ otros imports .js', () => {
+    // MODIFICADO: El componente Vue ya no recibe la marca de recarga.
+    // El import de .js local (anotherUtil) SÍ se transforma con la nueva lógica HMR.
+    // El import resuelto por _resolveComponent (MyComponentImported.js) NO se transforma.
+    test('componente Vue con _resolveComponent: import resuelto no se transforma, otro .js local sí, sin marca de recarga', () => {
         const inputCode = `
-import MyComponent from './MyComponent.js'; // Usado en _resolveComponent
-import anotherUtil from './anotherUtil.js'; // No usado en _resolveComponent
-import { defineComponent } from 'vue';
+import MyComponentImported from './MyComponentImported.js'; // Usado en _resolveComponent, NO se transforma
+import anotherUtil from './anotherUtil.js'; // No usado en _resolveComponent, .js local, SÍ se transforma
+import { defineComponent, _resolveComponent } from 'vue';
 
 export default defineComponent({
   components: {
-    'my-component': _resolveComponent("MyComponent")
+    'my-component': _resolveComponent("MyComponentImported")
   },
   setup() {
-    anotherUtil();
+    anotherUtil(); // Se usa la utilidad local
     return {};
   }
 });
         `;
-        // Esperamos que MyComponent.js NO se transforme (se mantenga estático)
-        // pero anotherUtil.js SÍ se transforme a dinámico.
-        // El archivo general NO debería tener la marca //versaHRM-reloadFILE porque contiene defineComponent,
-        // pero la lógica de _resolveComponent es una capa adicional de no-transformación para imports específicos.
-        // Sin embargo, la presencia de defineComponent hará que TODO el archivo sea marcado para recarga.
-        // Este test verifica principalmente que _resolveComponent no cause errores y que la marca se aplique correctamente.
+        // El snapshot esperado:
+        // - './MyComponentImported.js' como import estático.
+        // - 'let anotherUtil;'
+        // - IIFE con carga dinámica y HMR para './anotherUtil.js'.
+        // - defineComponent fuera del IIFE.
+        // - SIN '//versaHRM-reloadFILE'.
         expect(transformModuleWithAcorn(inputCode)).toMatchSnapshot();
     });
 
@@ -240,6 +259,4 @@ export { default as anotherDefault } from './anotherDefault.js'; // .js local
         `;
         expect(transformModuleWithAcorn(inputCode)).toMatchSnapshot();
     });
-
-
 });

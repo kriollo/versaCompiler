@@ -3,17 +3,29 @@ import * as acorn from 'acorn';
 function generateHMRBlock(imports) {
     let moduleRegistrationBlocks = [];
 
+    // Helper para generar el cuerpo de la función de recarga HMR para default/namespace
+    const createHandlerBodySimple = (varName, filePath, isDefault) => {
+        const assignment = isDefault
+            ? `${varName} = mod.default;`
+            : `${varName} = mod;`;
+        const typeString = isDefault ? 'default' : 'namespace';
+        return (
+            `        try {\n` +
+            `            const mod = await importWithTimestamp('${filePath}');\n` +
+            `            ${assignment}\n` +
+            `            console.log('[HMR] Módulo ${filePath} (${typeString}) recargado con éxito');\n` +
+            `            return true;\n` +
+            `        } catch (e) {\n` +
+            `            console.error('[HMR] Error recargando ${filePath}', e);\n` +
+            `            return false;\n` +
+            `        }\n`
+        );
+    };
+
     imports.default.forEach(imp => {
         moduleRegistrationBlocks.push(
             `window.__VERSA_HMR.modules['${imp.filePath}'] = async () => {\n` +
-                `        try {\n` +
-                `            ${imp.varName} = (await importWithTimestamp('${imp.filePath}')).default;\n` +
-                `            console.log('[HMR] Módulo ${imp.filePath} (default) recargado');\n` +
-                `            return true;\n` +
-                `        } catch (e) {\n` +
-                `            console.error('[HMR] Error recargando ${imp.filePath}', e);\n` +
-                `            return false;\n` +
-                `        }\n` +
+                createHandlerBodySimple(imp.varName, imp.filePath, true) +
                 `    };`,
         );
     });
@@ -21,42 +33,64 @@ function generateHMRBlock(imports) {
     imports.namespace.forEach(imp => {
         moduleRegistrationBlocks.push(
             `window.__VERSA_HMR.modules['${imp.filePath}'] = async () => {\n` +
-                `        try {\n` +
-                `            ${imp.varName} = await importWithTimestamp('${imp.filePath}');\n` +
-                `            console.log('[HMR] Módulo ${imp.filePath} (namespace) recargado');\n` +
-                `            return true;\n` +
-                `        } catch (e) {\n` +
-                `            console.error('[HMR] Error recargando ${imp.filePath}', e);\n` +
-                `            return false;\n` +
-                `        }\n` +
+                createHandlerBodySimple(imp.varName, imp.filePath, false) +
                 `    };`,
         );
     });
 
     imports.named.forEach(imp => {
-        moduleRegistrationBlocks.push(
-            `window.__VERSA_HMR.modules['${imp.filePath}'] = async () => {\n` +
-                `        try {\n` +
-                `            ({ ${imp.namedExports} } = await importWithTimestamp('${imp.filePath}'));\n` +
-                `            console.log('[HMR] Módulo ${imp.filePath} (named) recargado');\n` +
-                `            return true;\n` +
-                `        } catch (e) {\n` +
-                `            console.error('[HMR] Error recargando ${imp.filePath}', e);\n` +
-                `            return false;\n` +
-                `        }\n` +
-                `    };`,
-        );
+        // Para named imports, la reasignación es variable por variable.
+        // imp.variables tiene los nombres locales. imp.namedExports tiene los strings de exportación originales.
+        let assignments = imp.variables
+            .map(localVar => {
+                let originalExportName = localVar; // Por defecto, si no es un alias
+                // Buscar si esta variable local fue importada con un alias
+                const aliasEntry = imp.namedExports.find(ne =>
+                    ne.endsWith(` as ${localVar}`),
+                );
+                if (aliasEntry) {
+                    originalExportName = aliasEntry.split(' as ')[0];
+                } else {
+                    // Si no es un alias, el nombre exportado debe coincidir con el nombre local
+                    const directExport = imp.namedExports.find(
+                        ne => ne === localVar,
+                    );
+                    if (directExport) {
+                        originalExportName = directExport;
+                    } else {
+                        // Fallback si no se encuentra (debería ser raro si hmrImports está bien construido)
+                        console.warn(
+                            `[HMR transform] No se pudo determinar el nombre original exportado para ${localVar} desde ${imp.filePath}`,
+                        );
+                    }
+                }
+                return `            ${localVar} = mod.${originalExportName};`;
+            })
+            .join('\n');
+
+        if (assignments) {
+            // Solo si hay variables que reasignar
+            moduleRegistrationBlocks.push(
+                `window.__VERSA_HMR.modules['${imp.filePath}'] = async () => {\n` +
+                    `        try {\n` +
+                    `            const mod = await importWithTimestamp('${imp.filePath}');\n` +
+                    `${assignments}\n` +
+                    `            console.log('[HMR] Módulo ${imp.filePath} (named) recargado con éxito');\n` +
+                    `            return true;\n` +
+                    `        } catch (e) {\n` +
+                    `            console.error('[HMR] Error recargando ${imp.filePath}', e);\n` +
+                    `            return false;\n` +
+                    `        }\n` +
+                    `    };`,
+            );
+        }
     });
 
-    if (moduleRegistrationBlocks.length === 0) return '';
-
-    // Se incluye la definición de importWithTimestamp y la inicialización de __VERSA_HMR
-    // solo si hay módulos que registrar.
-    return `
-            const importWithTimestamp = (path) => import(path);
-            window.__VERSA_HMR = window.__VERSA_HMR || {};
-            window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
-        ${moduleRegistrationBlocks.join('\n    ')}`;
+    if (moduleRegistrationBlocks.length === 0) {
+        return '';
+    }
+    // Devuelve solo los bloques de registro de módulos, la indentación se maneja en el ensamblaje.
+    return moduleRegistrationBlocks.join('\n');
 }
 
 // Función auxiliar para obtener nombres de _resolveComponent
@@ -70,6 +104,12 @@ const getResolvedComponents = codeString => {
     }
     return resolved;
 };
+
+function isExternalImport(sourceValue) {
+    // A simple check: if it doesn't start with '.' or '/', it's likely external or a Node module.
+    // This doesn't handle aliased paths like '@/' without further configuration.
+    return !/^[./]/.test(sourceValue) && !sourceValue.includes(':'); // Basic check
+}
 
 /**
  * Transforma código fuente JS/TS usando Acorn AST.
@@ -94,22 +134,11 @@ export function transformModuleWithAcorn(code) {
 
     const getCode = node => code.slice(node.start, node.end);
     const resolvedComponents = getResolvedComponents(code);
-    const isFileAComponent = code.includes('defineComponent'); // Detectar si el archivo es un componente Vue
+    const isFileAComponent =
+        code.includes('defineComponent') || code.includes('_defineComponent');
     const isVueInitializationFile =
-        code.includes('mount') || code.includes('createApp'); // Detectar si es un archivo de inicialización de Vue
+        code.includes('createApp') && code.includes('.mount(');
 
-    // Heurística para isExternalImport (debe estar definida antes de usarse en isCoreDefinitionFile)
-    const isExternalImport = src => {
-        if (src.startsWith('vue') || src.startsWith('react')) {
-            return true;
-        }
-        if (!src.endsWith('.js')) {
-            return true;
-        }
-        return false;
-    };
-
-    // Nueva detección generalizada para archivos de definición central
     let isCoreDefinitionFile = false;
     try {
         if (!isFileAComponent && !isVueInitializationFile) {
@@ -123,10 +152,10 @@ export function transformModuleWithAcorn(code) {
                     if (node.type === 'ImportDeclaration') {
                         importExportNodeCount++;
                         const sourceValue = node.source.value;
-                        if (
-                            sourceValue.endsWith('.js') &&
-                            !isExternalImport(sourceValue)
-                        ) {
+                        const isExternal =
+                            !/^[./]/.test(sourceValue) &&
+                            !sourceValue.includes(':');
+                        if (sourceValue.endsWith('.js') && !isExternal) {
                             hasLocalJsImport = true;
                         }
                     } else if (
@@ -138,10 +167,8 @@ export function transformModuleWithAcorn(code) {
                 }
 
                 if (hasLocalJsImport && totalTopLevelNodes >= 2) {
-                    // Mínimo 2 nodos para aplicar ratio
                     const ratio = importExportNodeCount / totalTopLevelNodes;
                     if (ratio >= 0.7) {
-                        // Umbral ajustable (70%)
                         isCoreDefinitionFile = true;
                     }
                 }
@@ -157,8 +184,8 @@ export function transformModuleWithAcorn(code) {
     let nonDynamicImportStatements = [];
     let hmrImports = { default: [], namespace: [], named: [] };
     let importVarDecls = new Set();
+    let dynamicImportInitialLoadLines = [];
 
-    // Primera pasada: clasificar imports
     ast.body.forEach(node => {
         if (node.type === 'ImportDeclaration') {
             const sourceValue = node.source.value;
@@ -173,32 +200,41 @@ export function transformModuleWithAcorn(code) {
                     break;
                 }
             }
+            const isExternal =
+                !/^[./]/.test(sourceValue) && !sourceValue.includes(':');
 
-            // Condición actualizada para mantener el import estático
             if (
-                isFileAComponent ||
                 isVueInitializationFile ||
-                isCoreDefinitionFile || // Usando la nueva heurística de ratio
-                isExternalImport(sourceValue) ||
+                isCoreDefinitionFile ||
+                isExternal ||
                 isResolvedCompImport
             ) {
                 nonDynamicImportStatements.push(getCode(node));
             } else {
-                // .js local, no es componente resuelto, y el archivo no cumple ninguna de las condiciones de exclusión -> transformar
                 node.specifiers.forEach(spec => {
                     const localName = spec.local.name;
-                    importVarDecls.add(`let ${localName};`); // Declarar variable
+                    importVarDecls.add(`let ${localName};`);
 
                     if (spec.type === 'ImportDefaultSpecifier') {
                         hmrImports.default.push({
                             varName: localName,
                             filePath: sourceValue,
                         });
+                        if (!isFileAComponent) {
+                            dynamicImportInitialLoadLines.push(
+                                `${localName} = (await import('${sourceValue}')).default;`,
+                            );
+                        }
                     } else if (spec.type === 'ImportNamespaceSpecifier') {
                         hmrImports.namespace.push({
                             varName: localName,
                             filePath: sourceValue,
                         });
+                        if (!isFileAComponent) {
+                            dynamicImportInitialLoadLines.push(
+                                `${localName} = await import('${sourceValue}');`,
+                            );
+                        }
                     } else if (spec.type === 'ImportSpecifier') {
                         let namedEntry = hmrImports.named.find(
                             e => e.filePath === sourceValue,
@@ -223,94 +259,284 @@ export function transformModuleWithAcorn(code) {
                         }
                     }
                 });
+                if (!isFileAComponent) {
+                    const namedImportEntry = hmrImports.named.find(
+                        e => e.filePath === sourceValue,
+                    );
+                    if (
+                        namedImportEntry &&
+                        namedImportEntry.variables.length > 0
+                    ) {
+                        const varString = namedImportEntry.variables.join(', ');
+                        if (
+                            !dynamicImportInitialLoadLines.some(
+                                line =>
+                                    line.includes(
+                                        `await import('${sourceValue}')`,
+                                    ) &&
+                                    line.includes(
+                                        namedImportEntry.variables[0],
+                                    ),
+                            )
+                        ) {
+                            dynamicImportInitialLoadLines.push(
+                                `({ ${varString} } = await import('${sourceValue}'));`,
+                            );
+                        }
+                    }
+                }
             }
         }
     });
 
-    // Construir dynamicImportInitialLoadLines a partir de hmrImports consolidados
-    let dynamicImportInitialLoadLines = [];
-    hmrImports.default.forEach(imp => {
-        dynamicImportInitialLoadLines.push(
-            `${imp.varName} = (await import('${imp.filePath}')).default;`,
-        );
-    });
-    hmrImports.namespace.forEach(imp => {
-        dynamicImportInitialLoadLines.push(
-            `${imp.varName} = await import('${imp.filePath}');`,
-        );
-    });
-    hmrImports.named.forEach(imp => {
-        if (imp.namedExports.length > 0) {
-            dynamicImportInitialLoadLines.push(
-                `({ ${imp.namedExports.join(', ')} } = await import('${imp.filePath}'));`,
-            );
-        }
-    });
-
-    let exportStatements = [];
-    ast.body.forEach(node => {
-        if (
-            node.type === 'ExportNamedDeclaration' ||
-            node.type === 'ExportDefaultDeclaration'
-        ) {
-            exportStatements.push(getCode(node));
-        }
-    });
-
-    const bodyNodes = ast.body.filter(
-        n =>
-            n.type !== 'ImportDeclaration' &&
-            n.type !== 'ExportNamedDeclaration' &&
-            n.type !== 'ExportDefaultDeclaration',
-    );
-    const bodyNodesCode = bodyNodes.map(getCode).join('\n');
-
-    let result = nonDynamicImportStatements.join('\n');
-    if (importVarDecls.size > 0) {
-        result += '\n' + Array.from(importVarDecls).join('\n') + '\n';
-    }
-
     const hasDynamicImports =
         hmrImports.default.length > 0 ||
         hmrImports.namespace.length > 0 ||
-        hmrImports.named.some(e => e.namedExports.length > 0);
+        hmrImports.named.some(imp => imp.variables && imp.variables.length > 0);
 
-    if (hasDynamicImports) {
-        let hmrBlock = hasDynamicImports ? generateHMRBlock(hmrImports) : '';
-        const indentedHMRBlock = hmrBlock
-            .split('\n')
-            .map(line => '    ' + line)
-            .join('\n')
-            .trimStart();
+    const bodyNodes = ast.body.filter(
+        node =>
+            node.type !== 'ImportDeclaration' &&
+            node.type !== 'ExportDeclaration',
+    );
+    const exportNodes = ast.body.filter(
+        node => node.type === 'ExportDeclaration',
+    );
 
-        // Indentar todo el bodyNodesCode si se mueve al IIFE
-        const indentedBodyNodesCode = bodyNodesCode
-            .split('\n')
-            .map(line => '    ' + line)
-            .join('\n')
-            .trimStart();
+    let bodyNodesCode = bodyNodes.map(getCode).join('\n');
+    const exportStatements = exportNodes.map(getCode);
 
-        result += `\n(async () => {\n    ${dynamicImportInitialLoadLines.join('\n    ')}`;
-        if (indentedHMRBlock) result += `\n${indentedHMRBlock}`;
-        if (indentedBodyNodesCode) result += `\n    ${indentedBodyNodesCode}`;
-        result += `\n})();\n`;
-    } else {
-        // Si no hay imports dinámicos, añadir bodyNodesCode directamente
-        result += '\n' + bodyNodesCode + '\n';
-    }
-
-    result += '\n' + exportStatements.join('\n');
-
-    let finalOutput = result.trim(); // Limpiar espacios extra del ensamblaje
-
-    const shouldBeMarkedForReload =
-        isFileAComponent || isVueInitializationFile || isCoreDefinitionFile;
-
-    if (shouldBeMarkedForReload) {
-        // Asegurarse de no duplicar la marca
-        if (!finalOutput.startsWith('//versaHRM-reloadFILE')) {
-            finalOutput = '//versaHRM-reloadFILE\n' + finalOutput;
+    if (isFileAComponent && hasDynamicImports) {
+        // 1. Asegurar que 'setup' sea async
+        const setupSignatureRegex =
+            /(setup\s*(?::\s*(?:async\s+)?function)?\s*\([^)]*\)\s*\{)/m;
+        if (!bodyNodesCode.match(/async\s+setup/)) {
+            // Chequeo simple, puede mejorarse
+            bodyNodesCode = bodyNodesCode.replace(
+                setupSignatureRegex,
+                match => {
+                    if (match.includes('async ')) return match;
+                    if (
+                        match.includes('setup:') &&
+                        match.includes('function')
+                    ) {
+                        return match.replace('function', 'async function');
+                    }
+                    return (
+                        'async ' +
+                        match.replace(/setup\s*(?::\s*function)?/, 'setup')
+                    );
+                },
+            );
         }
+
+        // 2. Preparar el bloque de código HMR
+        let varDeclarations = '';
+        if (importVarDecls.size > 0) {
+            varDeclarations = Array.from(importVarDecls).join('\n');
+        }
+
+        const importWithTimestampFunc =
+            'const importWithTimestamp = path => { const url = `${path}?t=${Date.now()}`; return import(url); };';
+
+        let loadFunctionStrings = [];
+        let initialLoadCallStrings = [];
+        let hrRegistrationStrings = [];
+
+        const allImports = [
+            ...hmrImports.default.map(imp => ({ ...imp, type: 'default' })),
+            ...hmrImports.namespace.map(imp => ({ ...imp, type: 'namespace' })),
+            ...hmrImports.named.map(imp => ({ ...imp, type: 'named' })),
+        ];
+
+        allImports.forEach(imp => {
+            const loadFunctionName = `load_${imp.filePath.replace(/[^a-zA-Z0-9_]/g, '_')}_module`;
+            let assignments = '';
+            if (imp.type === 'default') {
+                assignments = `    ${imp.varName} = mod.default;`;
+            } else if (imp.type === 'namespace') {
+                assignments = `    ${imp.varName} = mod;`;
+            } else if (imp.type === 'named') {
+                assignments = imp.variables
+                    .map(localVar => {
+                        let originalExportName = localVar;
+                        const aliasEntry = imp.namedExports.find(ne =>
+                            ne.endsWith(` as ${localVar}`),
+                        );
+                        if (aliasEntry) {
+                            originalExportName = aliasEntry.split(' as ')[0];
+                        } else {
+                            const directExport = imp.namedExports.find(
+                                ne => ne === localVar,
+                            );
+                            if (directExport) originalExportName = directExport;
+                        }
+                        return `    ${localVar} = mod.${originalExportName};`;
+                    })
+                    .join('\n');
+            }
+            loadFunctionStrings.push(
+                `const ${loadFunctionName} = async () => {\n    const mod = await importWithTimestamp('${imp.filePath}');\n${assignments}\n};`,
+            );
+            initialLoadCallStrings.push(`await ${loadFunctionName}();`);
+            hrRegistrationStrings.push(
+                `window.__VERSA_HMR.modules['${imp.filePath}'] = async () => {\n    try {\n        await ${loadFunctionName}();\n        console.log('[HMR] Módulo recargado: ${imp.filePath}');\n        return true;\n    } catch (e) {\n        console.error('[HMR] Falló recarga ${imp.filePath}', e);\n        return false;\n    }\n};`,
+            );
+        });
+
+        const hmrInitialization =
+            'window.__VERSA_HMR = window.__VERSA_HMR || {};\nwindow.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};';
+
+        let baseBodyIndent = '    ';
+        const setupBodyMatch = bodyNodesCode.match(
+            /async\s+setup\s*\([^)]*\)\s*\{[^\n]*\n(\s+)/m,
+        );
+        if (setupBodyMatch && setupBodyMatch[1]) {
+            baseBodyIndent = setupBodyMatch[1];
+        }
+
+        const injectedCodeLines = [
+            varDeclarations,
+            importWithTimestampFunc,
+            ...loadFunctionStrings,
+            ...initialLoadCallStrings,
+            hmrInitialization,
+            ...hrRegistrationStrings,
+        ].filter(line => line && line.trim() !== '');
+
+        let completeInjectionBlock = '';
+        if (injectedCodeLines.length > 0) {
+            completeInjectionBlock = injectedCodeLines
+                .map(line =>
+                    line
+                        .split('\n')
+                        .map(subLine => baseBodyIndent + subLine)
+                        .join('\n'),
+                )
+                .join('\n');
+            if (completeInjectionBlock.trim() !== '') {
+                completeInjectionBlock = '\n' + completeInjectionBlock + '\n';
+            }
+        }
+
+        const returnStatementRegex = /(\s*const\s+__returned__\s*=)/m;
+        let setupModifiedForHMR = false;
+        bodyNodesCode = bodyNodesCode.replace(returnStatementRegex, match => {
+            setupModifiedForHMR = true;
+            return `${completeInjectionBlock}${match}`;
+        });
+
+        if (!setupModifiedForHMR) {
+            console.warn(
+                '[transformModuleWithAcorn] No se encontró "const __returned__ =" para inyección HMR en componente Vue.',
+            );
+        }
+
+        let resultParts = [];
+        if (nonDynamicImportStatements.length > 0) {
+            resultParts.push(nonDynamicImportStatements.join('\n'));
+        }
+        resultParts.push(bodyNodesCode);
+        if (exportStatements.length > 0) {
+            resultParts.push(exportStatements.join('\n'));
+        }
+        let finalOutput = resultParts.filter(p => p && p.trim()).join('\n\n');
+        finalOutput = finalOutput.replace(/\n{3,}/g, '\n\n').trim();
+
+        return finalOutput;
+    } else {
+        let resultParts = [];
+        if (nonDynamicImportStatements.length > 0) {
+            resultParts.push(nonDynamicImportStatements.join('\n'));
+        }
+        if (importVarDecls.size > 0) {
+            resultParts.push(Array.from(importVarDecls).join('\n'));
+        }
+
+        let bodyHandled = false;
+
+        if (hasDynamicImports) {
+            let currentIifeParts = [];
+            currentIifeParts.push(
+                '    const importWithTimestamp = path => { const url = `${path}?t=${Date.now()}`; return import(url); };',
+            );
+
+            if (dynamicImportInitialLoadLines.length > 0) {
+                currentIifeParts.push('    try {');
+                dynamicImportInitialLoadLines.forEach(line => {
+                    let modifiedLine = line.replace(
+                        /await import\(([^)]+)\)/g,
+                        'await importWithTimestamp($1)',
+                    );
+                    currentIifeParts.push(`        ${modifiedLine}`);
+                });
+                currentIifeParts.push(
+                    "        console.log('[HMR] Módulos dinámicos cargados inicialmente');",
+                );
+                currentIifeParts.push('    } catch (e) {');
+                currentIifeParts.push(
+                    "        console.error('[HMR] Error en carga inicial de módulos dinámicos', e);",
+                );
+                currentIifeParts.push('    }');
+            }
+
+            currentIifeParts.push(
+                '    window.__VERSA_HMR = window.__VERSA_HMR || {};',
+            );
+            currentIifeParts.push(
+                '    window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};',
+            );
+
+            let hmrModuleRegistrations = generateHMRBlock(hmrImports);
+            if (hmrModuleRegistrations.trim()) {
+                const indentedHmrRegistrations = hmrModuleRegistrations
+                    .split('\n')
+                    .map(line => '    ' + line)
+                    .join('\n');
+                currentIifeParts.push(indentedHmrRegistrations);
+            }
+
+            currentIifeParts.push(
+                '    window.__VERSA_HMR.reload = async () => { console.log("[HMR] Reload all invoked"); const P = Object.values(window.__VERSA_HMR.modules).map(f=>f()); await Promise.all(P); };',
+            );
+
+            if (!isFileAComponent) {
+                const indentedBodyNodesCode = bodyNodesCode
+                    .split('\n')
+                    .map(line => '    ' + line)
+                    .join('\n')
+                    .trimStart();
+                if (indentedBodyNodesCode.trim()) {
+                    currentIifeParts.push(indentedBodyNodesCode);
+                }
+                bodyHandled = true;
+            }
+
+            if (currentIifeParts.length > 0) {
+                const iifeBlock = `\n(async () => {\n${currentIifeParts.join(
+                    '\n',
+                )}\n})();`;
+                resultParts.push(iifeBlock);
+            }
+        }
+
+        if (!bodyHandled && bodyNodesCode.trim()) {
+            resultParts.push(bodyNodesCode);
+        }
+
+        if (exportStatements.length > 0) {
+            resultParts.push(exportStatements.join('\n'));
+        }
+        let finalOutput = resultParts.filter(p => p && p.trim()).join('\n\n');
+        finalOutput = finalOutput.replace(/\n{3,}/g, '\n\n').trim();
+
+        const shouldBeMarkedForReload =
+            isVueInitializationFile || isCoreDefinitionFile;
+        if (shouldBeMarkedForReload) {
+            if (!finalOutput.startsWith('//versaHRM-reloadFILE')) {
+                finalOutput = '//versaHRM-reloadFILE\n' + finalOutput;
+            }
+        }
+        return finalOutput;
     }
-    return finalOutput;
 }

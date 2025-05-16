@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import lineHr from '@/js/components/lineHr.vue';
     import { add, multiply, subtract } from '@/js/sampleFile';
-    import { ref, toRefs, type Ref } from 'vue';
+    import { onMounted, ref, toRefs, type Ref } from 'vue';
 
     type Props = {
         message: string;
@@ -23,33 +23,38 @@
     const multiplyNumber = () => {
         result.value = multiply(num1.value, num2.value);
     };
+    onMounted(() => {
+        console.log('el resultado de la suma entre 2 y 3 es: ', add(2, 3));
+    });
 </script>
 <template>
     <div>
-        <h1>{{ message }}</h1>
-    </div>
-
-    <h1>Operaciones Matemáticas</h1>
-    <lineHr />
-
-    <div class="container">
-        <div class="numOperations">
-            <div>
-                <label for="num1">Numero 1:</label>
-                <input id="num1" type="number" v-model="num1" />
-            </div>
-            <div>
-                <label for="num2">Numero 2:</label>
-                <input id="num2" type="number" v-model="num2" />
-            </div>
+        <div>
+            <h1>{{ message }}</h1>
         </div>
-        <div class="btnOperations">
-            <button @click="addNumber">sumar</button>
-            <button @click="subtractNumber">restar</button>
-            <button @click="multiplyNumber">multiplicar</button>
-        </div>
-        <div v-if="result !== null" class="result">
-            <h2>Resultado: {{ result }}</h2>
+
+        <h1>Operaciones Matemáticas</h1>
+        <lineHr />
+
+        <div class="container">
+            <div class="numOperations">
+                <div>
+                    <label for="num1">Numero 1:</label>
+                    <input id="num1" type="number" v-model="num1" />
+                </div>
+                <div>
+                    <label for="num2">Numero 2:</label>
+                    <input id="num2" type="number" v-model="num2" />
+                </div>
+            </div>
+            <div class="btnOperations">
+                <button @click="addNumber">add</button>
+                <button @click="subtractNumber">subtract</button>
+                <button @click="multiplyNumber">divide</button>
+            </div>
+            <div v-if="result !== null" class="result">
+                <h2>Resultado: {{ result }}</h2>
+            </div>
         </div>
     </div>
 </template>

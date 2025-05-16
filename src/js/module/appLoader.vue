@@ -157,7 +157,7 @@
             <button
                 @click="openModal"
                 class="mt-4 active:bg-blue-700 text-white font-bold py-2 px-4 rounded bg-blue-500 hover:bg-blue-700 focus:outline-none focus:shadow-outline">
-                Abrir primer Modal
+                Abrir
             </button>
         </div>
         <primerModal :showModal="showLocalModal" @accion="closeModal" />
