@@ -203,6 +203,16 @@ export async function reloadJS(pathWithTimestamp) {
         res.text(),
     );
 
+    // Verificar la marca para recarga completa
+    if (contenidoArchivo.startsWith('//versaHRM-reloadFILE')) {
+        console.log(
+            `[HMR] Marca //versaHRM-reloadFILE detectada en ${basePath}. Recargando página completa.`,
+        );
+        window.location.reload();
+        return; // Detener procesamiento adicional para este archivo
+    }
+
+    /* La lógica anterior para createApp/mount ya no es necesaria aquí, la marca la cubre.
     if (
         contenidoArchivo.includes('createApp') ||
         contenidoArchivo.includes('.mount')
@@ -210,6 +220,7 @@ export async function reloadJS(pathWithTimestamp) {
         window.location.reload();
         return;
     }
+    */
 
     // Verificar si tenemos una función de recarga registrada para este módulo
     if (

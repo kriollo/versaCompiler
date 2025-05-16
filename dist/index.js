@@ -25,6 +25,7 @@ import { linter } from './services/linter.js';
 import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
+import { transformModuleWithAcorn } from './utils/transformWithAcorn.js';
 
 import {
     addImportEndJs,
@@ -346,7 +347,7 @@ const estandarizaData = async data => {
     data = await addImportEndJs(data);
 
     if (!isProd) {
-        data = await transformStaticImports(data);
+        data = await transformModuleWithAcorn(data);
     }
 
     return data;
@@ -446,7 +447,9 @@ const compileJS = async (source, destination) => {
 
         data = await estandarizaData(data);
 
-        // await writeFile(destination, data, 'utf-8');
+        const destinationDir = path.dirname(destination);
+        await mkdir(destinationDir, { recursive: true });
+        await writeFile(destination, data, 'utf-8');
 
         await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);

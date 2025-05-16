@@ -1,8 +1,8 @@
 import {
+    $dom,
     handleError,
     isValidModuleName,
     sanitizeModulePath,
-    $dom,
 } from '@/js/devUtils';
 import { createApp, ref } from 'vue';
 
@@ -10,12 +10,11 @@ const debug = ref(false);
 const $contenedor = ref(null);
 
 async function loadModule() {
+    const url = new URL(import.meta.url);
+    const urlParams = url.search;
+    const searchParams = new URLSearchParams(urlParams);
+    let module = searchParams.get('m');
     try {
-        const url = new URL(import.meta.url);
-        const urlParams = url.search;
-        const searchParams = new URLSearchParams(urlParams);
-        let module = searchParams.get('m');
-
         $contenedor.value = $dom('#app');
 
         if (!$contenedor.value) {
@@ -83,8 +82,7 @@ async function loadModule() {
             }
         }
     } catch (e) {
-        handleError(e, module, $contenedor);
+        handleError(e, module, $contenedor.value);
     }
 }
-
 loadModule();
