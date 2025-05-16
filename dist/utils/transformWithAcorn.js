@@ -1,24 +1,5 @@
 import * as acorn from 'acorn';
 
-/**
- * Transforma código fuente JS/TS usando Acorn AST.
- * Extrae imports, exports, funciones y bloques ejecutables para manipulación avanzada.
- * Por ahora, solo imprime el tipo y nombre de cada declaración top-level.
- * @param {string} code - El código fuente a analizar.
- * @returns {void}
- */
-
-/**
- * Genera el bloque HMR idéntico al de utils.js, pero parametrizado para ser reutilizable.
- * Este bloque permite recarga en caliente de módulos importados dinámicamente.
- * Solo debe ser insertado si el archivo contiene defineComponent y existen imports dinámicos.
- * @param {Object} imports - Objeto con arrays de imports dinámicos (default, namespace, named).
- * @returns {string} - Bloque de código HMR listo para insertar en el IIFE.
- *
- * Ejemplo de uso:
- *   const hmrBlock = generateHMRBlock(hmrImports);
- *   // Insertar hmrBlock dentro del cuerpo del IIFE si corresponde
- */
 function generateHMRBlock(imports) {
     let moduleRegistrationBlocks = [];
 
@@ -72,10 +53,10 @@ function generateHMRBlock(imports) {
     // Se incluye la definición de importWithTimestamp y la inicialización de __VERSA_HMR
     // solo si hay módulos que registrar.
     return `
-    const importWithTimestamp = (path) => import(path);
-    window.__VERSA_HMR = window.__VERSA_HMR || {};
-    window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
-${moduleRegistrationBlocks.join('\n    ')}`;
+            const importWithTimestamp = (path) => import(path);
+            window.__VERSA_HMR = window.__VERSA_HMR || {};
+            window.__VERSA_HMR.modules = window.__VERSA_HMR.modules || {};
+        ${moduleRegistrationBlocks.join('\n    ')}`;
 }
 
 // Función auxiliar para obtener nombres de _resolveComponent
@@ -333,75 +314,3 @@ export function transformModuleWithAcorn(code) {
     }
     return finalOutput;
 }
-
-export function analyzeModuleWithAcorn(code) {
-    // Parsear el código a AST
-    const ast = acorn.parse(code, {
-        sourceType: 'module',
-        ecmaVersion: 'latest',
-        locations: true,
-    });
-
-    // Recorrer nodos top-level
-    ast.body.forEach(node => {
-        switch (node.type) {
-            case 'ImportDeclaration':
-                console.log(
-                    'Import:',
-                    node.source.value,
-                    node.specifiers.map(s => s.local.name),
-                );
-                break;
-            case 'ExportNamedDeclaration':
-                if (node.declaration) {
-                    if (node.declaration.type === 'VariableDeclaration') {
-                        node.declaration.declarations.forEach(decl => {
-                            console.log('Exported variable:', decl.id.name);
-                        });
-                    } else if (
-                        node.declaration.type === 'FunctionDeclaration'
-                    ) {
-                        console.log(
-                            'Exported function:',
-                            node.declaration.id.name,
-                        );
-                    }
-                } else if (node.specifiers.length > 0) {
-                    node.specifiers.forEach(spec => {
-                        console.log('Exported specifier:', spec.exported.name);
-                    });
-                }
-                break;
-            case 'ExportDefaultDeclaration':
-                if (node.declaration.type === 'Identifier') {
-                    console.log('Export default:', node.declaration.name);
-                } else if (node.declaration.type === 'FunctionDeclaration') {
-                    console.log(
-                        'Export default function:',
-                        node.declaration.id && node.declaration.id.name,
-                    );
-                }
-                break;
-            case 'FunctionDeclaration':
-                console.log('Function:', node.id.name);
-                break;
-            case 'VariableDeclaration':
-                node.declarations.forEach(decl => {
-                    if (
-                        decl.init &&
-                        (decl.init.type === 'ArrowFunctionExpression' ||
-                            decl.init.type === 'FunctionExpression')
-                    ) {
-                        console.log('Function variable:', decl.id.name);
-                    }
-                });
-                break;
-            default:
-                console.log('Other node type:', node.type);
-                break;
-        }
-    });
-}
-
-// Ejemplo de uso:
-// analyzeModuleWithAcorn('import {foo} from "bar"; export const x = () => {}; function y(){}; export function z(){};');

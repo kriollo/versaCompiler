@@ -27,12 +27,7 @@ import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
 import { transformModuleWithAcorn } from './utils/transformWithAcorn.js';
 
-import {
-    addImportEndJs,
-    mapRuta,
-    showTimingForHumans,
-    transformStaticImports,
-} from './utils/utils.js';
+import { addImportEndJs, mapRuta, showTimingForHumans } from './utils/utils.js';
 
 const log = console.log.bind(console);
 const error = console.error.bind(console);
