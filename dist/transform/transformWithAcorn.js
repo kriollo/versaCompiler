@@ -3,6 +3,7 @@ import { transformModuleDefault } from './transformModuleDefault.js';
 import { transformModuleWithDynamicImports } from './transformModuleWithDynamicImports.js';
 import { transformModuleWithStaticImportsOnly } from './transformModuleWithStaticImportsOnly.js';
 import { transformVueComponentWithDynamicImports } from './transformVueComponentWithDynamicImports.js';
+
 // Función auxiliar para obtener nombres de _resolveComponent
 const getResolvedComponents = codeString => {
     const resolved = new Set();

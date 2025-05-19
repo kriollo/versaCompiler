@@ -25,7 +25,7 @@ import { linter } from './services/linter.js';
 import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
-import { transformModuleWithAcorn } from './utils/transformWithAcorn.js';
+import { transformModuleWithAcorn } from './transform/transformWithAcorn.js';
 
 import { addImportEndJs, mapRuta, showTimingForHumans } from './utils/utils.js';
 
