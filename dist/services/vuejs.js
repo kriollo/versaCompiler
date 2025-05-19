@@ -51,7 +51,8 @@ export const preCompileVue = async (data, source, isProd = false) => {
         `;
             const ifExistScript = data.includes('<script');
             if (!ifExistScript) {
-                data = `<script setup>${varContent}</script>` + data;
+                data =
+                    `<script setup lang="ts">${varContent}</script>/n` + data;
             } else {
                 data = data.replace(/(<script.*?>)/, `$1${varContent}`);
             }
@@ -67,6 +68,8 @@ export const preCompileVue = async (data, source, isProd = false) => {
             );
             // console.log(data);
         }
+
+        // console.log(data);
 
         const { descriptor, errors } = vCompiler.parse(data, {
             filename: fileName,
