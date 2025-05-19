@@ -54,7 +54,7 @@ export function transformVueComponentWithDynamicImports({
     const bodyNodes = acornAstClean.body.filter(
         node =>
             node.type !== 'ImportDeclaration' &&
-            node.type !== 'ExportDeclaration',
+            !node.type.startsWith('Export'), // Corregido para excluir todos los tipos de exportación
     );
     let bodyNodesCodeClean = bodyNodes.map(getCode).join('\n');
     // 3. Buscar la línea __expose(); y su indentación

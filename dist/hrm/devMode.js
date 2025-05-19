@@ -144,12 +144,10 @@ export async function reloadComponent(
 ) {
     try {
         const baseUrl = window.location.href;
-        // console.log(relativePath);
         const newBaseUrl = new URL(baseUrl);
         const urlOrigin = `${newBaseUrl.origin}/${relativePath}`;
         const module = await import(`${urlOrigin}?t=${Date.now()}`);
         currentComponentTree = buildComponentTree(app._instance);
-        console.log(currentComponentTree);
 
         const targetNode = findNodeByInstance(
             currentComponentTree,
