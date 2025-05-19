@@ -212,6 +212,8 @@ export function debounce(func, waitFor) {
 }
 
 export async function reloadJS(pathWithTimestamp) {
+    window.location.reload();
+
     // Extraer la ruta base sin el timestamp
     const pathParts = pathWithTimestamp.split('?');
     const basePath = pathParts[0];

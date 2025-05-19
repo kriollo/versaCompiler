@@ -9,7 +9,6 @@ function ExtractOnMountedBlocks(code, ast) {
                 node.arguments.length === 1 &&
                 node.arguments[0].type === 'ArrowFunctionExpression'
             ) {
-                console.log(code.slice(node.start, node.end));
                 onMountedBlocks.push({
                     start: node.start,
                     end: node.end,
