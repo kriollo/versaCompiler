@@ -340,9 +340,9 @@ const estandarizaData = async data => {
     data = await replaceAliasImportsAsync(data);
     data = await addImportEndJs(data);
 
-    // if (!isProd) {
-    //     data = await transformModuleWithAcorn(data);
-    // }
+    if (!isProd) {
+        data = await transformModuleWithAcorn(data);
+    }
 
     return data;
 };

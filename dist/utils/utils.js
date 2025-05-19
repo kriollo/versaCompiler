@@ -37,7 +37,7 @@ export const addImportEndJs = async data => {
     return data.replace(importRegExp, (match, ruta1, ruta2) => {
         const ruta = ruta1 || ruta2; // Usar la ruta capturada, ya sea estática o dinámica
         if (ruta.endsWith('.vue') || ruta.endsWith('.ts')) {
-            const fullPath = ruta.replace(/\.(vue|ts)$/, '.js');
+            const fullPath = ruta.replace(/\.(vue|ts)$/, `.js`);
             return match.replace(ruta, fullPath);
         } else if (!ruta.match(/\/.*\.(js|mjs|css)$/) && ruta.includes('/')) {
             return match.replace(ruta, `${ruta}.js`);
