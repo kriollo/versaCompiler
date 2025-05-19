@@ -2,7 +2,7 @@ import * as acorn from 'acorn';
 import { transformModuleDefault } from './transformModuleDefault.js';
 import { transformModuleWithDynamicImports } from './transformModuleWithDynamicImports.js';
 import { transformModuleWithStaticImportsOnly } from './transformModuleWithStaticImportsOnly.js';
-import { transformVueComponentWithDynamicImports } from './transformVueComponentWithDynamicImports.js';
+import { transformVueComponentWithDynamicImports } from './transformVueComponent.js';
 
 // Función auxiliar para obtener nombres de _resolveComponent
 const getResolvedComponents = codeString => {
@@ -40,7 +40,6 @@ export function transformModuleWithAcorn(code) {
     const resolvedComponents = getResolvedComponents(code);
     const isFileAComponent =
         code.includes('defineComponent') || code.includes('_defineComponent');
-    console.log('isFileAComponent', isFileAComponent);
     const isVueInitializationFile =
         code.includes('createApp') && code.includes('.mount(');
 
@@ -88,8 +87,10 @@ export function transformModuleWithAcorn(code) {
 
     let nonDynamicImportStatements = [];
     let hmrImports = { default: [], namespace: [], named: [] };
+    let hmrNamedByPath = {};
     let importVarDecls = new Set();
     let dynamicImportInitialLoadLines = [];
+    let namedImportLineGeneratedForPath = new Set();
     let exportStatements = [];
 
     ast.body.forEach(node => {
@@ -107,9 +108,7 @@ export function transformModuleWithAcorn(code) {
                 }
             }
             const isExternal =
-                (!/^[./]/.test(sourceValue) &&
-                    !/^[a-zA-Z\/].*$/.test(sourceValue)) ||
-                sourceValue.includes(':');
+                !/^[./]/.test(sourceValue) || sourceValue.includes(':'); // Corregida la lógica de isExternal
 
             if (
                 isVueInitializationFile ||
@@ -144,81 +143,74 @@ export function transformModuleWithAcorn(code) {
                             );
                         }
                     } else if (spec.type === 'ImportSpecifier') {
-                        let namedEntry = hmrImports.named.find(
-                            e => e.filePath === sourceValue,
-                        );
-                        if (!namedEntry) {
-                            namedEntry = {
+                        if (!hmrNamedByPath[sourceValue]) {
+                            hmrNamedByPath[sourceValue] = {
                                 filePath: sourceValue,
-                                namedExports: [],
-                                variables: [],
+                                namedExportsSet: new Set(),
+                                variablesSet: new Set(),
                             };
-                            hmrImports.named.push(namedEntry);
                         }
+                        const namedEntry = hmrNamedByPath[sourceValue];
                         const exportString =
                             spec.imported.name === localName
                                 ? localName
                                 : `${spec.imported.name} as ${localName}`;
-                        if (!namedEntry.namedExports.includes(exportString)) {
-                            namedEntry.namedExports.push(exportString);
-                        }
-                        if (!namedEntry.variables.includes(localName)) {
-                            namedEntry.variables.push(localName);
-                        }
+                        namedEntry.namedExportsSet.add(exportString);
+                        namedEntry.variablesSet.add(localName);
                     }
                 });
+
                 if (!isFileAComponent) {
-                    const namedImportEntry = hmrImports.named.find(
-                        e => e.filePath === sourceValue,
-                    );
+                    const namedImportEntry = hmrNamedByPath[sourceValue];
                     if (
                         namedImportEntry &&
-                        namedImportEntry.variables.length > 0
+                        namedImportEntry.variablesSet.size > 0 &&
+                        !namedImportLineGeneratedForPath.has(sourceValue)
                     ) {
-                        const varString = namedImportEntry.variables.join(', ');
-                        if (
-                            !dynamicImportInitialLoadLines.some(
-                                line =>
-                                    line.includes(
-                                        `await import('${sourceValue}')`,
-                                    ) &&
-                                    line.includes(
-                                        namedImportEntry.variables[0],
-                                    ),
-                            )
-                        ) {
-                            dynamicImportInitialLoadLines.push(
-                                `({ ${varString} } = await import('${sourceValue}'));`,
-                            );
-                        }
+                        const varString = Array.from(
+                            namedImportEntry.variablesSet,
+                        ).join(', ');
+                        dynamicImportInitialLoadLines.push(
+                            `({ ${varString} } = await import('${sourceValue}'));`,
+                        );
+                        namedImportLineGeneratedForPath.add(sourceValue);
                     }
                 }
             }
-        } else if (node.type === 'ExportDeclaration') {
+        } else if (node.type.startsWith('Export')) {
+            // Corrected condition
             exportStatements.push(getCode(node));
+        } else {
+            // Consider other node types if necessary, or they become part of bodyNodes by default if not filtered
         }
     });
 
+    // Convertir hmrNamedByPath al formato de array esperado por hmrImports.named
+    hmrImports.named = Object.values(hmrNamedByPath).map(entry => ({
+        filePath: entry.filePath,
+        namedExports: Array.from(entry.namedExportsSet),
+        variables: Array.from(entry.variablesSet),
+    }));
+
+    // Asegurar que hasDynamicImports se defina aquí
     const hasDynamicImports =
         hmrImports.default.length > 0 ||
         hmrImports.namespace.length > 0 ||
-        hmrImports.named.some(imp => imp.variables && imp.variables.length > 0);
+        hmrImports.named.some(
+            imp => imp.variablesSet && imp.variablesSet.size > 0,
+        ) || // Corregido para usar variablesSet.size de hmrNamedByPath antes de la conversión final
+        hmrImports.named.some(imp => imp.variables && imp.variables.length > 0); // Mantenido por si se usa hmrImports.named directamente en otro lado
 
     const bodyNodes = ast.body.filter(
         node =>
             node.type !== 'ImportDeclaration' &&
-            node.type !== 'ExportDeclaration',
+            !node.type.startsWith('Export'), // Corrected condition
     );
 
     let bodyNodesCode = bodyNodes.map(getCode).join('\n');
 
-    // Check for the specific case: only local static imports, no exports, no Vue entry points
-    const hasOnlyLocalStaticImports =
-        !isFileAComponent &&
-        !isVueInitializationFile &&
-        exportStatements.length === 0 &&
-        !hasDynamicImports;
-
+    // Estructura de decisión reorganizada
+    // 1. Manejo de Componentes Vue
     if (isFileAComponent) {
         if (hasDynamicImports) {
             return transformVueComponentWithDynamicImports({
@@ -230,10 +222,15 @@ export function transformModuleWithAcorn(code) {
                 exportStatements,
                 nonDynamicImportStatements,
             });
-        } else if (isFileAComponent) {
-            return code;
+        } else {
+            return code; // Componente Vue sin imports dinámicos, no se transforma
         }
-    } else if (hasDynamicImports) {
+    }
+
+    // A partir de este punto, el archivo NO es un componente Vue.
+
+    // 2. Manejo de Módulos JS estándar con Imports Dinámicos
+    if (hasDynamicImports) {
         return transformModuleWithDynamicImports({
             code,
             ast,
@@ -244,27 +241,36 @@ export function transformModuleWithAcorn(code) {
             nonDynamicImportStatements,
             exportStatements,
         });
-    } else if (hasOnlyLocalStaticImports) {
+    }
+
+    // A partir de este punto, el archivo NO es un componente Vue Y NO tiene imports dinámicos.
+
+    // 3. Manejo de Módulos JS con solo Imports Estáticos (sin exports, no es punto de entrada Vue)
+    const criteriaForStaticOnlyTransform =
+        !isVueInitializationFile && exportStatements.length === 0;
+
+    if (criteriaForStaticOnlyTransform) {
         return transformModuleWithStaticImportsOnly({
             code,
             ast,
             bodyNodesCode,
             nonDynamicImportStatements,
-            importVarDecls,
-        });
-    } else {
-        return transformModuleDefault({
-            code,
-            ast,
-            bodyNodesCode,
-            hmrImports,
-            importVarDecls,
-            dynamicImportInitialLoadLines,
-            nonDynamicImportStatements,
-            exportStatements,
-            isFileAComponent,
-            isVueInitializationFile,
-            isCoreDefinitionFile,
+            importVarDecls, // Este Set estará vacío si !hasDynamicImports
         });
     }
+
+    // 4. Caso por Defecto para Módulos JS
+    return transformModuleDefault({
+        code,
+        ast,
+        bodyNodesCode,
+        hmrImports, // Vacío aquí
+        importVarDecls, // Vacío aquí
+        dynamicImportInitialLoadLines, // Vacío aquí
+        nonDynamicImportStatements,
+        exportStatements,
+        isFileAComponent, // false aquí
+        isVueInitializationFile,
+        isCoreDefinitionFile,
+    });
 }

@@ -1,4 +1,4 @@
-import { transformModuleWithAcorn } from '../dist/utils/transformWithAcorn';
+import { transformModuleWithAcorn } from '../dist/transform/transformWithAcorn';
 
 describe('transformModuleWithAcorn', () => {
     test('debería transformar un import .js local a dinámico y añadir HMR', () => {

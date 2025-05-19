@@ -442,9 +442,9 @@ const compileJS = async (source, destination) => {
 
         data = await estandarizaData(data);
 
-        // const destinationDir = path.dirname(destination);
-        // await mkdir(destinationDir, { recursive: true });
-        // await writeFile(destination, data, 'utf-8');
+        const destinationDir = path.dirname(destination);
+        await mkdir(destinationDir, { recursive: true });
+        await writeFile(destination, data, 'utf-8');
 
         await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);
