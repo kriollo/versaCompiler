@@ -10,8 +10,8 @@
 
     const { message } = toRefs(props);
 
-    const num1 = ref(0);
-    const num2 = ref(0);
+    const num1 = ref(4);
+    const num2 = ref(2);
     const result: Ref<number | null> = ref(null);
 
     const addNumber = () => {

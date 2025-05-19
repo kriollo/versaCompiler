@@ -220,6 +220,11 @@ export const preCompileVue = async (data, source, isProd = false) => {
             );
         }
 
+        // buscar setup( y reemplazar por async setup(
+        if (output.includes('setup(')) {
+            output = output.replace('setup(', 'async setup(');
+        }
+
         // reemplazamos cuando usamos script setup
         if (descriptor.scriptSetup) {
             output = output.replaceAll(/_ctx\.(?!\$)/g, '$setup.');
@@ -247,6 +252,7 @@ export const preCompileVue = async (data, source, isProd = false) => {
         `;
 
         output = `${output}\n${finishComponent}`;
+        // console.log(output);
 
         return {
             lang: compiledScript.lang,

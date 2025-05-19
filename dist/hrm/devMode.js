@@ -23,9 +23,7 @@ function recursivelyFindComponentsInVNode(vnode, parentTreeNode) {
     if (!vnode || typeof vnode !== 'object') {
         return;
     }
-    console.log(vnode);
     if (vnode?.type.name === 'Suspense') {
-        console.log('pasa por suspense');
         const childComponentInstance = vnode?.suspense.activeBranch;
         const childTreeNode = {
             name: vnode?.type.name,
