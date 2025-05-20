@@ -66,7 +66,7 @@ async function main() {
         if (!bs) {
             process.exit(1);
         }
-        const watch = await initChokidar();
+        const watch = await initChokidar(bs);
         env.firstInit = 'false';
         if (!watch) {
             process.exit(1);

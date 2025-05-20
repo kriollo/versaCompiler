@@ -13,4 +13,9 @@ export default {
         assetsOmit: true,
     },
     aditionalWatch: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
+    tailwindConfig: {
+        cli: 'npx tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
 };

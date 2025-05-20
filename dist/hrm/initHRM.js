@@ -36,66 +36,21 @@ async function initSocket(retries = 0) {
             }, retryDelay);
         });
 
-        // socket.on('vue:update', async data => {
-        //     // Log para verificar reloadComponent al inicio del evento
-        //     if (typeof reloadComponent !== 'function') {
-        //         console.error(
-        //             '[HMR] ERROR en vue:update: reloadComponent no es una función.',
-        //         );
-        //         showErrorOverlay(
-        //             'Error Crítico de HMR',
-        //             'reloadComponent no está disponible. Verifique la consola para errores de carga.',
-        //         );
-        //         return;
-        //     }
-        //     hideErrorOverlay();
+        socket.on('reloadFull', () => window.location.reload());
+        socket.on('HRMVue', data => {
+            console.log('Versa HMR: Recibiendo datos de HMR:', data);
+        });
+        socket.on('HRM', data => {
+            console.log('Versa HMR: Recibiendo datos de HMR:', data);
+        });
 
-        //     const { component, relativePath, extension, type, timestamp } =
-        //         data;
-        //     const appInstance = await getInstanceVue();
-
-        //     if (!appInstance) {
-        //         // Si la instancia de Vue no existe, la carga inicial probablemente falló.
-        //         // Una actualización de módulo (presumiblemente la corrección del error) ha llegado.
-        //         // Recargar la página completa para permitir que vue-loader.ts intente de nuevo.
-        //         console.log(
-        //             '[HMR] La instancia de Vue no existe (posible fallo en la carga inicial). Se recibió una actualización de módulo. Recargando la página...',
-        //         );
-        //         window.location.reload();
-        //         return; // Detener la ejecución adicional de HMR para esta actualización.
-        //     }
-
-        //     try {
-        //         let result;
-        //         if (extension === 'vue') {
-        //             result = await reloadComponent(
-        //                 appInstance,
-        //                 component,
-        //                 `${relativePath}`,
-        //                 type,
-        //                 extension,
-        //             );
-        //             if (result && result.msg) {
-        //                 throw new Error(result.msg);
-        //             }
-        //         } else {
-        //             // Asumiendo que reloadJS existe
-        //             result = await reloadJS(`/${relativePath}?t=${timestamp}`);
-        //             if (result && result.msg) {
-        //                 throw new Error(result.msg);
-        //             }
-        //         }
-        //     } catch (hmrError) {
-        //         const errorMsg = `HMR falló para ${relativePath}`;
-        //         const errorStack =
-        //             hmrError.stack ||
-        //             (hmrError.toString
-        //                 ? hmrError.toString()
-        //                 : 'No hay stack disponible');
-        //         showErrorOverlay(errorMsg, errorStack);
-        //         console.error(errorMsg, hmrError);
-        //     }
-        // });
+        socket.on('error', err => {
+            console.error('❌ Versa HMR: Error en el socket:', err);
+            showErrorOverlay(
+                'Error de Socket',
+                'Se produjo un error en la conexión de BrowserSync.',
+            );
+        });
 
         // Watchdog para la conexión inicial si el socket existe pero no está conectado
         if (!connected) {

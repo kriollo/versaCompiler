@@ -34,16 +34,16 @@ export async function readConfig() {
         }
         env.PATH_ALIAS = JSON.stringify(pathAlias);
 
-        env.tailwindcss = tsConfig.tailwindcss || false;
+        env.tailwindcss = tsConfig.tailwindConfig || false;
         env.proxyUrl = tsConfig?.proxyConfig?.proxyUrl || '';
         env.AssetsOmit = tsConfig?.proxyConfig?.assetsOmit || false;
 
-        env.PATH_SOURCE = tsConfig.compilerOptions.sourceRoot || './src';
+        env.PATH_SOURCE = tsConfig?.compilerOptions.sourceRoot || './src';
         env.PATH_SOURCE = (env.PATH_SOURCE || '').endsWith('/')
             ? (env.PATH_SOURCE || '').slice(0, -1)
             : env.PATH_SOURCE || '';
 
-        const outDir = tsConfig.compilerOptions.outDir || './dist';
+        const outDir = tsConfig?.compilerOptions.outDir || './dist';
         env.PATH_DIST = outDir.endsWith('/') ? outDir.slice(0, -1) : outDir;
 
         env.aditionalWatch = JSON.stringify(tsConfig?.aditionalWatch || []);

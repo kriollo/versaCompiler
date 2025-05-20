@@ -3,7 +3,9 @@ import chokidar from 'chokidar';
 import { env } from 'node:process';
 import { logger } from './pino.ts';
 
-export async function initChokidar() {
+import { emitirCambios } from './browserSync.ts';
+
+export async function initChokidar(bs: any) {
     try {
         if (!env.PATH_SOURCE) {
             logger.error(
@@ -11,7 +13,6 @@ export async function initChokidar() {
             );
             process.exit(1);
         }
-        //todo: agregar watch adicional sólo para recarga completa
         const watchJS = `${env.PATH_SOURCE}/**/*.js`;
         const watchVue = `${env.PATH_SOURCE}/**/*.vue`;
         const watchTS = `${env.PATH_SOURCE}/**/*.ts`;
@@ -32,12 +33,22 @@ export async function initChokidar() {
         const extendsionWatch = fileWatch.map(item => {
             const ext = item.split('.').pop();
             if (ext) {
-                return ext;
+                return {
+                    ext,
+                    action:
+                        ext === 'vue'
+                            ? 'HRMVue'
+                            : ext === 'js' || ext === 'ts'
+                              ? 'HRM'
+                              : 'reloadFull',
+                };
             }
-            return '';
         });
         const regExtExtension = new RegExp(
-            `\\.(?!${extendsionWatch.join('$|')}).+$`,
+            `\\.(?!${extendsionWatch
+                .filter(item => item !== undefined)
+                .map(item => item!.ext)
+                .join('$|')}$).+$`,
         );
 
         fileWatch = fileWatch.map(item => item.replace(/\/\*\*\//g, '/'));
@@ -88,6 +99,13 @@ export async function initChokidar() {
         // Evento cuando se modifica un archivo
         watcher.on('change', async ruta => {
             logger.info(ruta, 'change');
+            const action = extendsionWatch
+                .filter(
+                    (item): item is { ext: string; action: string } =>
+                        item !== undefined,
+                )
+                .find(item => item.ext === ruta.split('.').pop())?.action;
+            emitirCambios(bs, action || 'reloadFull', ruta);
             // console.log(chalk.yellow(`\n🔄 Archivo modificado: ${ruta}`));
             // // Invalidar caché si el archivo .vue original cambia
             // if (ruta.endsWith('.vue')) {

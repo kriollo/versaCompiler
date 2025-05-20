@@ -164,3 +164,8 @@ export async function browserSyncServer() {
         process.exit(1);
     }
 }
+
+export function emitirCambios(bs: any, action: string, filePath: string) {
+    logger.info(chalk.green(`[HMR] Emitiendo cambios: ${action} ${filePath}`));
+    bs.sockets.emit(action, { action, filePath });
+}

@@ -38,7 +38,4 @@
         "enable": true,
         "include": ["vue", "vite/client"]
     },
-    "versaCompiler": {
-
-    }
 }
