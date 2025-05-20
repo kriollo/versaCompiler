@@ -1,13 +1,21 @@
 import chalk from 'chalk';
+import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
+import { fileURLToPath } from 'node:url'; // Importar fileURLToPath para módulos ES
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { browserSyncServer } from './servicios/browserSync.ts';
 import { initChokidar } from './servicios/chokidar.ts';
 import { logger } from './servicios/pino.ts';
 
-import { readTsConfig } from './servicios/readTsConfig.ts';
-env.PATH_CONFIG_FILE = './tsconfig.json';
+import { initConfig, readConfig } from './servicios/readConfig.ts';
+
+// Obtener el directorio del archivo actual (dist/)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+env.PATH_DIST = __dirname;
+
+env.PATH_CONFIG_FILE = path.resolve(__dirname, '../versacompile.config.ts');
 
 function stopCompile() {
     logger.info('VersaCompiler cerrado correctamente');
@@ -27,30 +35,41 @@ async function main() {
             type: 'boolean',
             description: 'Modo producción',
         })
+        .option('init', {
+            type: 'boolean',
+            description: 'Inicializar la configuración',
+        })
         .help()
         .parse();
     try {
+        env.firstInit = 'true';
         console.log(
             `\n\n` +
                 chalk.blue('VersaCompiler') +
-                ' - Compilador de archivos\n\n',
+                ' - Servidor de Desarrollo HRM y compilador de archivos Vue/ts/js\n\n',
         );
+
+        if (argv.init) {
+            logger.info('Iniciando la configuración...');
+            await initConfig();
+            process.exit(0);
+        }
+
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
-        logger.info(`isAll: ${env.isALL}`);
-        logger.info(`isProd: ${env.isPROD}`);
+        logger.info(chalk.green(`isAll: ${env.isALL}`));
+        logger.info(chalk.green(`isProd: ${env.isPROD}`));
 
-        if (!(await readTsConfig())) {
+        if (!(await readConfig())) {
             process.exit(1);
         }
 
-        logger.info('Iniciando el servidor de desarrollo...');
         const bs = await browserSyncServer();
         if (!bs) {
             process.exit(1);
         }
-        logger.info('Iniciando el servidor de observación...');
         const watch = await initChokidar();
+        env.firstInit = 'false';
         if (!watch) {
             process.exit(1);
         }

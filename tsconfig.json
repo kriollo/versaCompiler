@@ -39,13 +39,6 @@
         "include": ["vue", "vite/client"]
     },
     "versaCompiler": {
-        "proxyConfig": {
-            "proxyUrl": "",
-            "assetsOmit": true
-        },
-        "aditionalWatch": [
-            "./app/templates/**/*.twig",
-            "./app/templates/**/*.html"
-        ]
+
     }
 }

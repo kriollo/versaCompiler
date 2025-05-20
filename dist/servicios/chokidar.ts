@@ -21,9 +21,9 @@ export async function initChokidar() {
         if (fileWatch.length > 0) {
             logger.info(
                 chalk.green(
-                    `Observando ${fileWatch
+                    `👀 : Observando \n${fileWatch
                         .map((item: string) => `${item}`)
-                        .join(', ')}\n`,
+                        .join('\n')}\n`,
                 ),
             );
         }
@@ -53,12 +53,16 @@ export async function initChokidar() {
 
         const watcher = chokidar.watch(DirWatch, {
             persistent: true,
-            ignoreInitial: true,
+            ignoreInitial: false,
             ignored: regExtExtension,
         });
 
         // Evento cuando se añade un archivo
         watcher.on('add', async ruta => {
+            if (env.firstInit) {
+                // AQUI ES DONDE DEBO PASAR POR PARSER PARA LLENAR cache de los imports de vue
+                return;
+            }
             logger.info(ruta);
             // await generateTailwindCSS(ruta);
             // const result = await compile(
@@ -83,7 +87,7 @@ export async function initChokidar() {
 
         // Evento cuando se modifica un archivo
         watcher.on('change', async ruta => {
-            logger.info(ruta);
+            logger.info(ruta, 'change');
             // console.log(chalk.yellow(`\n🔄 Archivo modificado: ${ruta}`));
             // // Invalidar caché si el archivo .vue original cambia
             // if (ruta.endsWith('.vue')) {

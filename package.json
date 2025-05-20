@@ -17,7 +17,7 @@
     "type": "module",
     "scripts": {
         "dev": "node --watch dist/main.ts",
-        "compile": "node dist/index.js",
+        "compile": "node dist/main.ts",
         "compile-dev": "node dist/index.js --all",
         "compile-prod": "node dist/index.js --all --prod",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"

@@ -2,6 +2,8 @@ import browserSync from 'browser-sync';
 import chalk from 'chalk';
 import { html } from 'code-tag';
 import getPort from 'get-port';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { env } from 'node:process';
 import { logger } from './pino.ts';
 
@@ -45,7 +47,7 @@ export async function browserSyncServer() {
                             ${snippet}${match}
                             <script
                                 type="module"
-                                src="/__versa/vueLoader.js"></script>
+                                src="/__versa/initHRM.js"></script>
                         `;
                     },
                 },
@@ -78,53 +80,56 @@ export async function browserSyncServer() {
                     res.setHeader('Pragma', 'no-cache');
                     res.setHeader('Expires', '0');
 
-                    // //para redigir a la ubicación correcta
-                    // if (req.url === '/__versa/vueLoader.js') {
-                    //     // Busca vueLoader.js en la carpeta de salida configurada
-                    //     const vueLoaderPath = path.join(
-                    //         __dirname,
-                    //         'services/vueLoader.js',
-                    //     );
-                    //     res.setHeader('Content-Type', 'application/javascript');
-                    //     try {
-                    //         const fileContent = await readFile(
-                    //             vueLoaderPath,
-                    //             'utf-8',
-                    //         );
-                    //         res.end(fileContent);
-                    //     } catch (error) {
-                    //         console.error(
-                    //             chalk.red(
-                    //                 `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}`,
-                    //             ),
-                    //         );
-                    //         res.statusCode = 404;
-                    //         res.end('// vueLoader.js not found');
-                    //     }
-                    //     return;
-                    // }
-                    // // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
-                    // if (req.url.startsWith('/__versa/hrm/')) {
-                    //     // Sirve archivos de dist/hrm como /__versa/hrm/*
-                    //     const filePath = path.join(
-                    //         __dirname,
-                    //         req.url.replace('/__versa/', ''),
-                    //     );
-                    //     res.setHeader('Content-Type', 'application/javascript');
-                    //     try {
-                    //         const fileContent = await readFile(filePath, 'utf-8');
-                    //         res.end(fileContent);
-                    //     } catch (error) {
-                    //         console.error(
-                    //             chalk.red(
-                    //                 `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
-                    //             ),
-                    //         );
-                    //         res.statusCode = 404;
-                    //         res.end('// Not found');
-                    //     }
-                    //     return;
-                    // }
+                    //para redigir a la ubicación correcta
+                    if (req.url === '/__versa/initHRM.js') {
+                        // Busca vueLoader.js en la carpeta de salida configurada
+                        const vueLoaderPath = path.join(
+                            env.PATH_DIST || '',
+                            'hrm/initHRM.js',
+                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        try {
+                            const fileContent = await fs.readFile(
+                                vueLoaderPath,
+                                'utf-8',
+                            );
+                            res.end(fileContent);
+                        } catch (error) {
+                            console.error(
+                                chalk.red(
+                                    `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}/n ${error.stack}`,
+                                ),
+                            );
+                            res.statusCode = 404;
+                            res.end('// vueLoader.js not found');
+                        }
+                        return;
+                    }
+                    // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
+                    if (req.url.startsWith('/__versa/hrm/')) {
+                        // Sirve archivos de dist/hrm como /__versa/hrm/*
+                        const filePath = path.join(
+                            env.PATH_DIST || '',
+                            req.url.replace('/__versa/', ''),
+                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        try {
+                            const fileContent = await fs.readFile(
+                                filePath,
+                                'utf-8',
+                            );
+                            res.end(fileContent);
+                        } catch (error) {
+                            console.error(
+                                chalk.red(
+                                    `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
+                                ),
+                            );
+                            res.statusCode = 404;
+                            res.end('// Not found');
+                        }
+                        return;
+                    }
 
                     // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
                     const isAssets = req.url.match(
@@ -150,45 +155,6 @@ export async function browserSyncServer() {
                     // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
                     next();
                 },
-                // async function (req, res, next) {
-                //     const requestedPath = path.join(
-                //         PATH_DIST,
-                //         req.url.split('?')[0],
-                //     ); // Eliminar query params para la búsqueda
-                //     let originalVuePath = null;
-                //     for (const vuePath of serverComponentCache.keys()) {
-                //         const distJsPathString = await mapRuta(
-                //             vuePath,
-                //             PATH_DIST,
-                //             PATH_SOURCE,
-                //         );
-                //         const distJsPath = distJsPathString.replace('.vue', '.js');
-                //         if (
-                //             path.normalize(requestedPath) ===
-                //             path.normalize(distJsPath)
-                //         ) {
-                //             originalVuePath = vuePath;
-                //             break;
-                //         }
-                //     }
-
-                //     if (
-                //         originalVuePath &&
-                //         serverComponentCache.has(originalVuePath)
-                //     ) {
-                //         const cachedEntry =
-                //             serverComponentCache.get(originalVuePath);
-                //         console.log(
-                //             chalk.greenBright(
-                //                 `📦 Sirviendo desde caché HMR: ${req.url}`,
-                //             ),
-                //         );
-                //         res.setHeader('Content-Type', 'application/javascript');
-                //         res.end(cachedEntry.jsWithPlaceholders); // Servir el JS con timestamps actualizados
-                //         return;
-                //     }
-                //     next();
-                // },
             ],
         });
 
