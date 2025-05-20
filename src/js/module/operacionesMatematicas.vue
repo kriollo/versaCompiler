@@ -48,9 +48,9 @@
                 </div>
             </div>
             <div class="btnOperations">
-                <button @click="addNumber">add</button>
-                <button @click="subtractNumber">Restar</button>
-                <button @click="multiplyNumber">Multiplicar</button>
+                <button @click="addNumber">sumar</button>
+                <button @click="subtractNumber">restar</button>
+                <button @click="multiplyNumber">multiplicar</button>
             </div>
             <div v-if="result !== null" class="result">
                 <h2>Resultado: {{ result }}</h2>

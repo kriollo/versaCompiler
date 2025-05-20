@@ -26,6 +26,8 @@ import { minifyJS } from './services/minify.js';
 import { preCompileTS } from './services/typescript.js';
 import { preCompileVue } from './services/vuejs.js';
 
+import { transformModuleWithAcorn } from './transform/transformWithAcorn.js';
+
 import { addImportEndJs, mapRuta, showTimingForHumans } from './utils/utils.js';
 
 const log = console.log.bind(console);
@@ -69,6 +71,9 @@ let acornFiles = 0;
 let successfulFiles = 0;
 let errorFiles = 0;
 const errorList = [];
+
+// Cache para componentes Vue compilados (para HMR de dependencias JS)
+const serverComponentCache = new Map();
 
 /**
  * Obtiene los alias de ruta desde el archivo tsconfig.json.
@@ -328,23 +333,59 @@ const removePreserverComent = async data => {
 /**
  * Estandariza la cadena de datos proporcionada aplicando varias transformaciones.
  * @param {string} data - La cadena de entrada que contiene el código JavaScript.
- * @returns {Promise<string>} - Una promesa que se resuelve con la cadena estandarizada.
+ * @param {boolean} isVueComponent - Indica si el archivo es un componente Vue.
+ * @returns {Promise<string|Object>} - Una promesa que se resuelve con la cadena estandarizada o un objeto con código y hmrDepsInfo.
  */
-const estandarizaData = async data => {
-    if (isProd) {
-        data = await removePreserverComent(data);
-    }
-    data = await removehtmlOfTemplateString(data);
-    data = await removeCodeTagImport(data);
-    data = await replaceAlias(data);
-    data = await replaceAliasImportsAsync(data);
-    data = await addImportEndJs(data);
+const estandarizaData = async (data, isVueComponent = false) => {
+    let originalCodeForHmr = data;
+    let hmrDepsInfo = null;
+    let codeToProcess = originalCodeForHmr;
 
+    // 1. Transformar con Acorn ANTES de modificar los imports a rutas de /dist
+    // Esto es para que hmrDepsInfo se genere con las rutas de importación originales (fuente).
     if (!isProd) {
-        data = await transformModuleWithAcorn(data);
+        const transformResult =
+            await transformModuleWithAcorn(originalCodeForHmr);
+        if (typeof transformResult === 'object' && transformResult.code) {
+            codeToProcess = transformResult.code; // Código con placeholders, imports aún son rutas fuente/alias
+            if (isVueComponent) {
+                hmrDepsInfo = transformResult.hmrDepsInfo; // Capturar hmrDepsInfo solo si es un componente Vue
+            }
+        } else {
+            codeToProcess = transformResult; // Caso antiguo o si no devuelve objeto
+        }
     }
 
-    return data;
+    // 2. Aplicar el resto de las transformaciones (incluyendo reemplazo de alias a /dist)
+    // Si es producción y Acorn no corrió, codeToProcess sigue siendo originalCodeForHmr (igual a data).
+    // Si es desarrollo, codeToProcess es el resultado de Acorn.
+    if (isProd) {
+        // En producción, Acorn no se ejecuta arriba, así que partimos de `data` original para estas transformaciones.
+        // No necesitamos `removePreserverComent` si Acorn no corrió, ya que no se habrán añadido comentarios HMR.
+        // Sin embargo, si `data` original tiene comentarios @preserve, deben quitarse.
+        let prodCode = data; // Empezar con data original para producción
+        prodCode = await removePreserverComent(prodCode);
+        prodCode = await removehtmlOfTemplateString(prodCode);
+        prodCode = await removeCodeTagImport(prodCode);
+        prodCode = await replaceAlias(prodCode);
+        prodCode = await replaceAliasImportsAsync(prodCode);
+        prodCode = await addImportEndJs(prodCode);
+        codeToProcess = prodCode;
+    } else {
+        // En desarrollo, codeToProcess ya es el resultado de Acorn (o el original si Acorn no hizo nada útil)
+        // No aplicar removePreserverComent aquí si Acorn ya lo manejó o si no es relevante para HMR.
+        codeToProcess = await removehtmlOfTemplateString(codeToProcess);
+        codeToProcess = await removeCodeTagImport(codeToProcess);
+        codeToProcess = await replaceAlias(codeToProcess);
+        codeToProcess = await replaceAliasImportsAsync(codeToProcess);
+        codeToProcess = await addImportEndJs(codeToProcess);
+    }
+
+    // Devolver el código final y hmrDepsInfo si es un componente Vue en desarrollo
+    if (isVueComponent && hmrDepsInfo) {
+        return { code: codeToProcess, hmrDepsInfo };
+    }
+    return codeToProcess;
 };
 
 /**
@@ -439,11 +480,36 @@ const compileJS = async (source, destination) => {
             data = Resultdata.data;
         }
 
-        data = await estandarizaData(data);
+        let estandarizaResult = await estandarizaData(
+            data,
+            originalExtension === 'vue',
+        );
+        let hmrDepsInfo = null;
 
-        // const destinationDir = path.dirname(destination);
-        // await mkdir(destinationDir, { recursive: true });
-        // await writeFile(destination, data, 'utf-8');
+        if (typeof estandarizaResult === 'object' && estandarizaResult.code) {
+            data = estandarizaResult.code;
+            hmrDepsInfo = estandarizaResult.hmrDepsInfo; // Capturamos hmrDepsInfo
+        } else {
+            data = estandarizaResult; // Mantener compatibilidad si estandarizaData no devuelve objeto
+        }
+
+        // Si es un componente Vue y tenemos hmrDepsInfo, lo almacenamos en caché
+        if (
+            originalExtension === 'vue' &&
+            hmrDepsInfo &&
+            Object.keys(hmrDepsInfo).length > 0
+        ) {
+            serverComponentCache.set(source, {
+                // Usamos la ruta original del .vue como clave
+                jsWithPlaceholders: data, // Este es el JS del componente con los placeholders
+                hmrDepsInfo: hmrDepsInfo,
+            });
+            console.log(
+                chalk.cyan(
+                    `📦 Componente Vue ${source} cacheado con información HMR de dependencias.`,
+                ),
+            );
+        }
 
         await log(chalk.green(`🔍 :Validando Sintaxis para ${source}`));
         const resultAcorn = await checkSintaxysAcorn(data);
@@ -600,26 +666,223 @@ const compile = async filePath => {
  * Emite cambios a través de BrowserSync.
  * @param {Object} bs - Instancia de BrowserSync.
  * @param {string} extension - Extensión del archivo.
- * @param {string} normalizedPath - Ruta normalizada del archivo.
+ * @param {string} ruta - Ruta del archivo.
  * @param {string} fileName - Nombre del archivo.
  * @param {string} type - Tipo de cambio (add, change, delete).
  */
-const emitirCambios = async (bs, extension, normalizedPath, fileName, type) => {
+const emitirCambios = async (bs, extension, ruta, fileName, type) => {
     const serverRelativePath = path
-        .normalize(normalizedPath)
+        .normalize(ruta) // ruta es la ruta de SALIDA
         .replace(/^\\|^\//, '')
         .replace(/\\/g, '/');
 
+    // Notificación original para vue:update (puede ser genérica o específica del componente)
     bs.sockets.emit('vue:update', {
-        component: fileName,
+        component: fileName, // Nombre del archivo que cambió (sin extensión si es de compileJS)
         timestamp: Date.now(),
-        relativePath: serverRelativePath,
-        extension,
+        relativePath: serverRelativePath, // Ruta de salida relativa al servidor
+        extension, // Extensión original del archivo fuente
         type,
     });
     console.log(
         `📡 : Emitiendo evento 'vue:update' para ${fileName} (${type}) -> ${serverRelativePath} \n`,
     );
+
+    // Lógica para actualizar componentes Vue cacheados si una de sus dependencias JS cambia
+    // ruta es la ruta de SALIDA del archivo que cambió (ej: public/js/helpers/util.js)
+    if (serverComponentCache.size > 0 && ruta.endsWith('.js')) {
+        const changedOutputFileNormalized = path.normalize(ruta);
+        console.log(
+            chalk.blueBright(
+                `[HMR DEBUG] Archivo JS/TS modificado (salida): ${changedOutputFileNormalized}, extensión original del fuente: ${extension}`,
+            ),
+        );
+
+        console.log(serverComponentCache);
+
+        for (const [
+            vueComponentPath,
+            cachedData,
+        ] of serverComponentCache.entries()) {
+            // vueComponentPath es la ruta FUENTE del .vue
+            console.log(
+                chalk.blueBright(
+                    `[HMR DEBUG] Verificando componente cacheado: ${vueComponentPath}`,
+                ),
+            );
+            if (cachedData.hmrDepsInfo) {
+                for (const depImportString in cachedData.hmrDepsInfo) {
+                    // depImportString es como '@js/helper.js' o './util.js'
+                    console.log(
+                        chalk.blueBright(
+                            `[HMR DEBUG]   Dependencia registrada en caché para ${vueComponentPath}: "${depImportString}"`,
+                        ),
+                    );
+
+                    let resolvedSourcePath;
+                    const depIsRelative = depImportString.startsWith('.');
+
+                    if (depIsRelative) {
+                        const vueComponentDirPath =
+                            path.dirname(vueComponentPath);
+                        resolvedSourcePath = path.resolve(
+                            vueComponentDirPath,
+                            depImportString,
+                        );
+                        console.log(
+                            chalk.blueBright(
+                                `[HMR DEBUG]     Ruta relativa. Resuelta a (ruta fuente): ${resolvedSourcePath}`,
+                            ),
+                        );
+                    } else {
+                        let pathAfterAlias = depImportString;
+                        if (pathAlias) {
+                            for (const aliasKey in pathAlias) {
+                                const prefixToMatch = aliasKey.replace(
+                                    '/*',
+                                    '',
+                                );
+                                if (depImportString.startsWith(prefixToMatch)) {
+                                    const aliasTargetBase = pathAlias[
+                                        aliasKey
+                                    ][0].replace('/*', '');
+                                    // Asegurarse de que aliasTargetBase es un directorio completo desde la raíz del proyecto si es necesario
+                                    // o relativo a PATH_SOURCE.
+                                    // pathAlias normalmente define rutas relativas a baseUrl (que es PATH_SOURCE)
+                                    const resolvedAliasTarget = path.resolve(
+                                        PATH_SOURCE,
+                                        aliasTargetBase,
+                                    );
+                                    pathAfterAlias = depImportString.replace(
+                                        prefixToMatch,
+                                        resolvedAliasTarget,
+                                    );
+                                    console.log(
+                                        chalk.blueBright(
+                                            `[HMR DEBUG]     Alias "${aliasKey}" (${prefixToMatch} -> ${resolvedAliasTarget}) aplicado. Ruta post-alias (base para resolver fuente): "${pathAfterAlias}"`,
+                                        ),
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                        // Si después de los alias, la ruta no es absoluta, resolverla desde PATH_SOURCE
+                        if (!path.isAbsolute(pathAfterAlias)) {
+                            resolvedSourcePath = path.resolve(
+                                PATH_SOURCE,
+                                pathAfterAlias,
+                            );
+                        } else {
+                            resolvedSourcePath = path.resolve(pathAfterAlias); // path.resolve normaliza la ruta si ya es absoluta
+                        }
+                        console.log(
+                            chalk.blueBright(
+                                `[HMR DEBUG]     Ruta con alias o absoluta. Resuelta a (ruta fuente): ${resolvedSourcePath}`,
+                            ),
+                        );
+                    }
+
+                    const absolutePathSourceDir = path.resolve(PATH_SOURCE);
+                    if (!resolvedSourcePath.startsWith(absolutePathSourceDir)) {
+                        console.log(
+                            chalk.yellow(
+                                `[HMR DEBUG]     Dependencia resuelta ${resolvedSourcePath} no está dentro de ${absolutePathSourceDir}. Saltando.`,
+                            ),
+                        );
+                        continue;
+                    }
+
+                    const relativePathFromSourceDir = path.relative(
+                        absolutePathSourceDir,
+                        resolvedSourcePath,
+                    );
+                    const finalRelativePathForOutput =
+                        relativePathFromSourceDir.replace(
+                            /\.(ts|vue)$/i,
+                            '.js',
+                        );
+                    const expectedOutputDepPath = path.join(
+                        PATH_DIST,
+                        finalRelativePathForOutput,
+                    );
+                    const normalizedExpectedOutputDepPath = path.normalize(
+                        expectedOutputDepPath,
+                    );
+
+                    console.log(
+                        chalk.blueBright(
+                            `[HMR DEBUG]     Ruta de SALIDA ESPERADA para esta dependencia: ${normalizedExpectedOutputDepPath}`,
+                        ),
+                    );
+
+                    if (
+                        normalizedExpectedOutputDepPath ===
+                        changedOutputFileNormalized
+                    ) {
+                        console.log(
+                            chalk.magenta(
+                                `[HMR] ¡COINCIDENCIA! Componente "${vueComponentPath}" depende del archivo modificado "${depImportString}".`,
+                            ),
+                        );
+
+                        const placeholder =
+                            cachedData.hmrDepsInfo[depImportString];
+                        let newTimestampedJs = cachedData.jsWithPlaceholders;
+                        newTimestampedJs = newTimestampedJs.replace(
+                            placeholder,
+                            `t=${Date.now()}`,
+                        );
+
+                        serverComponentCache.set(vueComponentPath, {
+                            ...cachedData,
+                            jsWithPlaceholders: newTimestampedJs,
+                        });
+                        console.log(
+                            chalk.magenta(
+                                `   Actualizado placeholder en caché para "${vueComponentPath}".`,
+                            ),
+                        );
+
+                        const vueComponentDistPath = (
+                            await mapRuta(
+                                vueComponentPath,
+                                PATH_DIST,
+                                PATH_SOURCE,
+                            )
+                        ).replace(/\.vue$/i, '.js');
+                        console.log(
+                            chalk.blue(
+                                `📢 Notificando HMR para componente Vue afectado: ${vueComponentDistPath} (debido a cambio en ${depImportString})`,
+                            ),
+                        );
+                        bs.sockets.emit('hmr:versaVueComponentUpdate', {
+                            path: vueComponentDistPath,
+                        });
+                    } else {
+                        // console.log(chalk.gray(`[HMR DEBUG]     No hay coincidencia: ${normalizedExpectedOutputDepPath} !== ${changedOutputFileNormalized}`));
+                    }
+                }
+            }
+        }
+    }
+
+    // Lógica HMR existente para otros archivos JS o Vue directamente modificados
+    if (bs) {
+        if (path.extname(ruta) === '.css') {
+            // ruta es la ruta de SALIDA
+            bs.reload('*css');
+        } else {
+            // Esta notificación es para el archivo que cambió directamente.
+            // Si el archivo que cambió era una dependencia JS de un componente Vue,
+            // el componente Vue ya habrá sido notificado para recargarse (con el nuevo timestamp para la dep).
+            console.log(
+                chalk.blue(
+                    `📢 Notificando HMR genérico para: ${serverRelativePath}`,
+                ),
+            );
+            bs.sockets.emit('hmr:versa', { path: serverRelativePath }); // Usar serverRelativePath para consistencia con cliente
+        }
+    }
 };
 
 async function generateTailwindCSS(_filePath = null) {
@@ -738,6 +1001,45 @@ const initChokidar = async () => {
             ),
         );
 
+        // Compilación inicial de componentes Vue para HMR en modo desarrollo
+        (async () => {
+            if (!isProd && !isAll) {
+                log(
+                    chalk.cyanBright(
+                        '⚙️  Compilando componentes Vue iniciales para HMR...',
+                    ),
+                );
+                try {
+                    const vueFilePattern = `${PATH_SOURCE}/**/*.vue`;
+                    const vueFiles = await glob(vueFilePattern);
+
+                    if (vueFiles && vueFiles.length > 0) {
+                        await Promise.all(
+                            vueFiles.map(filePath => compile(filePath)),
+                        );
+                        log(
+                            chalk.greenBright(
+                                '✅ Componentes Vue iniciales compilados y HMR deps cacheados.',
+                            ),
+                        );
+                    } else {
+                        log(
+                            chalk.yellow(
+                                'ℹ️ No se encontraron archivos Vue para la compilación HMR inicial.',
+                            ),
+                        );
+                    }
+                } catch (error) {
+                    log(
+                        chalk.red(
+                            '❌ Error durante la compilación HMR inicial de componentes Vue:',
+                        ),
+                        error,
+                    );
+                }
+            }
+        })();
+
         // Inicializar chokidar
         const watcher = chokidar.watch(PATH_SOURCE, {
             persistent: true,
@@ -772,33 +1074,59 @@ const initChokidar = async () => {
         });
 
         // Evento cuando se modifica un archivo
-        watcher.on('change', async filePath => {
-            await generateTailwindCSS(filePath);
-            const result = await compile(
-                path.normalize(filePath).replace(/\\/g, '/'),
-            );
+        watcher.on('change', async ruta => {
+            console.log(chalk.yellow(`\n🔄 Archivo modificado: ${ruta}`));
+            // Invalidar caché si el archivo .vue original cambia
+            if (ruta.endsWith('.vue')) {
+                const normalizedVuePath = path.normalize(ruta);
+                if (serverComponentCache.has(normalizedVuePath)) {
+                    serverComponentCache.delete(normalizedVuePath);
+                    console.log(
+                        chalk.magenta(
+                            `🗑️ Caché invalidada para ${normalizedVuePath} debido a modificación directa.`,
+                        ),
+                    );
+                }
+            }
+            // Recompilar el archivo modificado
+            const normalizedRuta = path.normalize(ruta).replace(/\\/g, '/');
+            const result = await compile(normalizedRuta);
+
             if (result && result.contentWasWritten) {
+                // Emitir cambios si la compilación fue exitosa y se escribió contenido
                 emitirCambios(
                     bs,
                     result.extension,
-                    result.normalizedPath,
+                    result.normalizedPath, // Ruta al archivo en /dist
                     result.fileName,
-                    'change',
+                    'change', // Tipo de evento
                 );
             } else {
                 console.log(
                     chalk.yellow(
-                        `[HMR] No se emite evento para archivo modificado a vacío, con errores, o no escrito: ${filePath}. Razón: contentWasWritten es false o resultado inválido.`,
+                        `[HMR] No se emite evento para archivo modificado no escrito o vacío: ${ruta}. Razón: contentWasWritten es false o resultado inválido.`,
                     ),
                 );
             }
         });
 
         // Evento cuando se elimina un archivo
-        watcher.on('unlink', async filePath => {
-            await generateTailwindCSS();
+        watcher.on('unlink', async ruta => {
+            console.log(chalk.red(`\n🗑️ Archivo eliminado: ${ruta}`));
+            // Invalidar caché si el archivo .vue original se elimina
+            if (ruta.endsWith('.vue')) {
+                const normalizedVuePath = path.normalize(ruta);
+                if (serverComponentCache.has(normalizedVuePath)) {
+                    serverComponentCache.delete(normalizedVuePath);
+                    console.log(
+                        chalk.magenta(
+                            `🗑️ Caché invalidada para ${normalizedVuePath} debido a eliminación.`,
+                        ),
+                    );
+                }
+            }
             const { extension, normalizedPath, fileName } = await deleteFile(
-                path.normalize(filePath).replace(/\\/g, '/'),
+                path.normalize(ruta).replace(/\\/g, '/'),
             );
             emitirCambios(bs, extension, normalizedPath, fileName, 'delete');
         });
@@ -868,126 +1196,173 @@ const initChokidar = async () => {
                 ignoreInitial: true,
                 ignored: ['node_modules', '.git'],
             },
-            middleware: async function (req, res, next) {
-                // para evitar el error de CORS
-                res.setHeader('Access-Control-Allow-Origin', '*');
-                res.setHeader('Access-Control-Allow-Methods', '*');
-                res.setHeader('Access-Control-Allow-Headers', '*');
-                res.setHeader('Access-Control-Allow-Credentials', 'true');
-                res.setHeader('Access-Control-Max-Age', '3600');
+            middleware: [
+                async function (req, res, next) {
+                    // para evitar el error de CORS
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    res.setHeader('Access-Control-Allow-Methods', '*');
+                    res.setHeader('Access-Control-Allow-Headers', '*');
+                    res.setHeader('Access-Control-Allow-Credentials', 'true');
+                    res.setHeader('Access-Control-Max-Age', '3600');
 
-                if (req.url.endsWith('.js')) {
+                    if (req.url.endsWith('.js')) {
+                        res.setHeader(
+                            'Cache-Control',
+                            'no-cache, no-store, must-revalidate',
+                        );
+                        res.setHeader('Pragma', 'no-cache');
+                        res.setHeader('Expires', '0');
+                    }
+
+                    //para redigir a la ubicación correcta
+                    if (req.url === '/__versa/vueLoader.js') {
+                        // Busca vueLoader.js en la carpeta de salida configurada
+                        const vueLoaderPath = path.join(
+                            __dirname,
+                            'services/vueLoader.js',
+                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        try {
+                            const fileContent = await readFile(
+                                vueLoaderPath,
+                                'utf-8',
+                            );
+                            res.end(fileContent);
+                        } catch (error) {
+                            console.error(
+                                chalk.red(
+                                    `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}`,
+                                ),
+                            );
+                            res.statusCode = 404;
+                            res.end('// vueLoader.js not found');
+                        }
+                        return;
+                    }
+                    // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
+                    if (req.url.startsWith('/__versa/hrm/')) {
+                        // Sirve archivos de dist/hrm como /__versa/hrm/*
+                        const filePath = path.join(
+                            __dirname,
+                            req.url.replace('/__versa/', ''),
+                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        try {
+                            const fileContent = await readFile(
+                                filePath,
+                                'utf-8',
+                            );
+                            res.end(fileContent);
+                        } catch (error) {
+                            console.error(
+                                chalk.red(
+                                    `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
+                                ),
+                            );
+                            res.statusCode = 404;
+                            res.end('// Not found');
+                        }
+                        return;
+                    }
+
+                    // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
+                    const isAssets = req.url.match(
+                        /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
+                    );
+                    if (req.method === 'GET') {
+                        // omitir archivos estáticos sólo si AssetsOmit es true
+                        if (isAssets && !AssetsOmit) {
+                            console.log(
+                                chalk.white(
+                                    `${new Date().toLocaleString()} :GET: ${req.url}`,
+                                ),
+                            );
+                        } else if (!isAssets) {
+                            console.log(
+                                chalk.cyan(
+                                    `${new Date().toLocaleString()} :GET: ${req.url}`,
+                                ),
+                            );
+                        }
+                    } else if (req.method === 'POST') {
+                        console.log(
+                            chalk.blue(
+                                `${new Date().toLocaleString()} :POST: ${req.url}`,
+                            ),
+                        );
+                    } else if (req.method === 'PUT') {
+                        console.log(
+                            chalk.yellow(
+                                `${new Date().toLocaleString()} :PUT: ${req.url}`,
+                            ),
+                        );
+                    } else if (req.method === 'DELETE') {
+                        console.log(
+                            chalk.red(
+                                `${new Date().toLocaleString()} :DELETE: ${req.url}`,
+                            ),
+                        );
+                    } else {
+                        console.log(
+                            chalk.gray(
+                                `${new Date().toLocaleString()} :${req.method}: ${req.url}`,
+                            ),
+                        );
+                    }
+
                     res.setHeader(
                         'Cache-Control',
                         'no-cache, no-store, must-revalidate',
                     );
                     res.setHeader('Pragma', 'no-cache');
                     res.setHeader('Expires', '0');
-                }
 
-                //para redigir a la ubicación correcta
-                if (req.url === '/__versa/vueLoader.js') {
-                    // Busca vueLoader.js en la carpeta de salida configurada
-                    const vueLoaderPath = path.join(
-                        __dirname,
-                        'services/vueLoader.js',
-                    );
-                    res.setHeader('Content-Type', 'application/javascript');
-                    try {
-                        const fileContent = await readFile(
-                            vueLoaderPath,
-                            'utf-8',
+                    // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
+                    next();
+                },
+                async function (req, res, next) {
+                    const requestedPath = path.join(
+                        PATH_DIST,
+                        req.url.split('?')[0],
+                    ); // Eliminar query params para la búsqueda
+                    let originalVuePath = null;
+                    for (const vuePath of serverComponentCache.keys()) {
+                        const distJsPathString = await mapRuta(
+                            vuePath,
+                            PATH_DIST,
+                            PATH_SOURCE,
                         );
-                        res.end(fileContent);
-                    } catch (error) {
-                        console.error(
-                            chalk.red(
-                                `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}`,
-                            ),
+                        const distJsPath = distJsPathString.replace(
+                            '.vue',
+                            '.js',
                         );
-                        res.statusCode = 404;
-                        res.end('// vueLoader.js not found');
+                        if (
+                            path.normalize(requestedPath) ===
+                            path.normalize(distJsPath)
+                        ) {
+                            originalVuePath = vuePath;
+                            break;
+                        }
                     }
-                    return;
-                }
-                // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
-                if (req.url.startsWith('/__versa/hrm/')) {
-                    // Sirve archivos de dist/hrm como /__versa/hrm/*
-                    const filePath = path.join(
-                        __dirname,
-                        req.url.replace('/__versa/', ''),
-                    );
-                    res.setHeader('Content-Type', 'application/javascript');
-                    try {
-                        const fileContent = await readFile(filePath, 'utf-8');
-                        res.end(fileContent);
-                    } catch (error) {
-                        console.error(
-                            chalk.red(
-                                `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
-                            ),
-                        );
-                        res.statusCode = 404;
-                        res.end('// Not found');
-                    }
-                    return;
-                }
 
-                // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
-                const isAssets = req.url.match(
-                    /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
-                );
-                if (req.method === 'GET') {
-                    // omitir archivos estáticos sólo si AssetsOmit es true
-                    if (isAssets && !AssetsOmit) {
+                    if (
+                        originalVuePath &&
+                        serverComponentCache.has(originalVuePath)
+                    ) {
+                        const cachedEntry =
+                            serverComponentCache.get(originalVuePath);
                         console.log(
-                            chalk.white(
-                                `${new Date().toLocaleString()} :GET: ${req.url}`,
+                            chalk.greenBright(
+                                `📦 Sirviendo desde caché HMR: ${req.url}`,
                             ),
                         );
-                    } else if (!isAssets) {
-                        console.log(
-                            chalk.cyan(
-                                `${new Date().toLocaleString()} :GET: ${req.url}`,
-                            ),
-                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        res.end(cachedEntry.jsWithPlaceholders); // Servir el JS con timestamps actualizados
+                        return;
                     }
-                } else if (req.method === 'POST') {
-                    console.log(
-                        chalk.blue(
-                            `${new Date().toLocaleString()} :POST: ${req.url}`,
-                        ),
-                    );
-                } else if (req.method === 'PUT') {
-                    console.log(
-                        chalk.yellow(
-                            `${new Date().toLocaleString()} :PUT: ${req.url}`,
-                        ),
-                    );
-                } else if (req.method === 'DELETE') {
-                    console.log(
-                        chalk.red(
-                            `${new Date().toLocaleString()} :DELETE: ${req.url}`,
-                        ),
-                    );
-                } else {
-                    console.log(
-                        chalk.gray(
-                            `${new Date().toLocaleString()} :${req.method}: ${req.url}`,
-                        ),
-                    );
-                }
-
-                res.setHeader(
-                    'Cache-Control',
-                    'no-cache, no-store, must-revalidate',
-                );
-                res.setHeader('Pragma', 'no-cache');
-                res.setHeader('Expires', '0');
-
-                // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
-                next();
-            },
+                    next();
+                },
+            ],
         });
         console.log(
             '🟢 BrowserSync inicializado. Esperando conexiones de socket...',

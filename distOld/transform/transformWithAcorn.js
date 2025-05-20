@@ -118,6 +118,66 @@ export function transformModuleWithAcorn(code) {
             ) {
                 nonDynamicImportStatements.push(getCode(node));
             } else {
+                // INICIO: Lógica para HMR de dependencias JS en componentes Vue
+                if (isFileAComponent && sourceValue.endsWith('.js')) {
+                    // Para componentes Vue, preparamos para HMR de dependencias JS
+                    // Generamos un placeholder único para esta dependencia.
+                    const placeholder = `__VERSA_DEP_PLACEHOLDER_${sourceValue.replace(/[^a-zA-Z0-9]/g, '_')}__`;
+                    const newImportPath = `${sourceValue}?t=${placeholder}`;
+
+                    // Reconstruimos la declaración de importación con el placeholder
+                    let importStatementWithPlaceholder = `import `;
+                    const defaultSpecifier = node.specifiers.find(
+                        s => s.type === 'ImportDefaultSpecifier',
+                    );
+                    const namespaceSpecifier = node.specifiers.find(
+                        s => s.type === 'ImportNamespaceSpecifier',
+                    );
+                    const namedSpecifiers = node.specifiers.filter(
+                        s => s.type === 'ImportSpecifier',
+                    );
+
+                    if (defaultSpecifier) {
+                        importStatementWithPlaceholder += `${defaultSpecifier.local.name}`;
+                        if (namedSpecifiers.length > 0 || namespaceSpecifier) {
+                            importStatementWithPlaceholder += ', ';
+                        }
+                    }
+                    if (namespaceSpecifier) {
+                        importStatementWithPlaceholder += `* as ${namespaceSpecifier.local.name}`;
+                    }
+                    if (namedSpecifiers.length > 0) {
+                        importStatementWithPlaceholder += `{ ${namedSpecifiers.map(s => (s.imported.name === s.local.name ? s.imported.name : `${s.imported.name} as ${s.local.name}`)).join(', ')} }`;
+                    }
+                    if (
+                        defaultSpecifier ||
+                        namespaceSpecifier ||
+                        namedSpecifiers.length > 0
+                    ) {
+                        importStatementWithPlaceholder += ` from '${newImportPath}';`;
+                    } else {
+                        // Importar solo por efecto secundario
+                        importStatementWithPlaceholder += `'${newImportPath}';`;
+                    }
+
+                    nonDynamicImportStatements.push(
+                        importStatementWithPlaceholder,
+                    );
+
+                    // Guardamos la información para hmrDepsInfo
+                    if (!hmrNamedByPath[sourceValue]) {
+                        // Usamos hmrNamedByPath temporalmente para almacenar esta info
+                        hmrNamedByPath[sourceValue] = {
+                            filePath: sourceValue,
+                            placeholder: placeholder,
+                            isVueDependency: true, // Marca especial para diferenciar
+                        };
+                    }
+                    // No procesar más como import dinámico HMR tradicional para este caso
+                    return;
+                }
+                // FIN: Lógica para HMR de dependencias JS en componentes Vue
+
                 node.specifiers.forEach(spec => {
                     const localName = spec.local.name;
                     importVarDecls.add(`let ${localName};`);
@@ -186,11 +246,27 @@ export function transformModuleWithAcorn(code) {
     });
 
     // Convertir hmrNamedByPath al formato de array esperado por hmrImports.named
-    hmrImports.named = Object.values(hmrNamedByPath).map(entry => ({
-        filePath: entry.filePath,
-        namedExports: Array.from(entry.namedExportsSet),
-        variables: Array.from(entry.variablesSet),
-    }));
+    // Y también extraer hmrDepsInfo para componentes Vue
+    let hmrDepsInfo = null; // Inicializar como null
+
+    const tempNamedImports = [];
+    const vueDepPlaceholders = {};
+
+    Object.values(hmrNamedByPath).forEach(entry => {
+        if (entry.isVueDependency) {
+            // Si es una dependencia JS de un componente Vue
+            if (!hmrDepsInfo) hmrDepsInfo = {};
+            hmrDepsInfo[entry.filePath] = entry.placeholder;
+        } else {
+            // Si es un import HMR-able estándar
+            tempNamedImports.push({
+                filePath: entry.filePath,
+                namedExports: Array.from(entry.namedExportsSet),
+                variables: Array.from(entry.variablesSet),
+            });
+        }
+    });
+    hmrImports.named = tempNamedImports;
 
     // Asegurar que hasDynamicImports se defina aquí
     const hasDynamicImports =
@@ -213,17 +289,38 @@ export function transformModuleWithAcorn(code) {
     // 1. Manejo de Componentes Vue
     if (isFileAComponent) {
         if (hasDynamicImports) {
-            return transformVueComponentWithDynamicImports({
-                code,
-                ast,
-                bodyNodesCode,
-                hmrImports,
-                importVarDecls,
-                exportStatements,
-                nonDynamicImportStatements,
-            });
+            // Esto se refiere a los imports dinámicos HMR tradicionales
+            // Si es un componente Vue y tiene dependencias JS HMR-ables (con placeholders)
+            // o si tiene los imports dinámicos HMR tradicionales.
+            const resultFromVueTransform =
+                transformVueComponentWithDynamicImports({
+                    code, // El código original del componente Vue (script part)
+                    ast,
+                    bodyNodesCode,
+                    hmrImports, // Puede estar vacío si solo hay dependencias JS con placeholders
+                    importVarDecls,
+                    exportStatements,
+                    nonDynamicImportStatements, // Contendrá los imports con placeholders
+                });
+            // Devolver el código transformado y hmrDepsInfo si existe
+            return { code: resultFromVueTransform, hmrDepsInfo: hmrDepsInfo };
         } else {
-            return code; // Componente Vue sin imports dinámicos, no se transforma
+            // Componente Vue sin imports dinámicos HMR tradicionales,
+            // pero podría tener dependencias JS con placeholders.
+            if (hmrDepsInfo && Object.keys(hmrDepsInfo).length > 0) {
+                // Reconstruir el código solo con los imports (con placeholders) y el resto del cuerpo.
+                // Esto es simplificado; transformVueComponentWithDynamicImports podría ser adaptado
+                // para manejar este caso también si se necesita más lógica de Vue.
+                // Por ahora, asumimos que nonDynamicImportStatements ya tiene los imports correctos.
+                const reconstructedCode = [
+                    ...nonDynamicImportStatements,
+                    bodyNodesCode,
+                    ...exportStatements,
+                ].join('\n');
+                return { code: reconstructedCode, hmrDepsInfo: hmrDepsInfo };
+            }
+            // Si no hay ni imports HMR tradicionales ni dependencias JS con placeholders
+            return { code: code, hmrDepsInfo: null };
         }
     }
 
