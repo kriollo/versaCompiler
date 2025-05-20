@@ -1,7 +1,6 @@
 import chalk from 'chalk';
 import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
-import { fileURLToPath } from 'node:url'; // Importar fileURLToPath para módulos ES
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { browserSyncServer } from './servicios/browserSync.ts';
@@ -11,11 +10,10 @@ import { logger } from './servicios/pino.ts';
 import { initConfig, readConfig } from './servicios/readConfig.ts';
 
 // Obtener el directorio del archivo actual (dist/)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = process.cwd();
 env.PATH_DIST = __dirname;
 
-env.PATH_CONFIG_FILE = path.resolve(__dirname, '../versacompile.config.ts');
+env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
 
 function stopCompile() {
     logger.info('VersaCompiler cerrado correctamente');

@@ -1,5 +1,6 @@
 import { hideErrorOverlay, showErrorOverlay } from './hrm/errorScreen.js';
-export const initSocket = async (retries = 0) => {
+
+async function initSocket(retries = 0) {
     const maxRetries = 10;
     const retryDelay = Math.min(2000 * (retries + 1), 10000); // backoff hasta 10s
 
@@ -104,7 +105,7 @@ export const initSocket = async (retries = 0) => {
                 }/${maxRetries})`,
             );
             setTimeout(() => {
-                if (!socket.connected && retries < maxRetries) {
+                if (!socket.connected && retries <= maxRetries) {
                     console.warn(
                         'Versa HMR: Sin conexión de socket después del tiempo de espera inicial, reintentando initSocket...',
                     );
@@ -138,4 +139,5 @@ export const initSocket = async (retries = 0) => {
             );
         }
     }
-};
+}
+initSocket();
