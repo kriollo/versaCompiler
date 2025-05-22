@@ -40,7 +40,6 @@ async function main() {
         .help()
         .parse();
     try {
-        env.firstInit = 'true';
         console.log(
             `\n\n` +
                 chalk.blue('VersaCompiler') +
@@ -67,7 +66,6 @@ async function main() {
             process.exit(1);
         }
         const watch = await initChokidar(bs);
-        env.firstInit = 'false';
         if (!watch) {
             process.exit(1);
         }

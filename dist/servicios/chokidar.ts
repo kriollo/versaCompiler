@@ -3,7 +3,52 @@ import chokidar from 'chokidar';
 import { env } from 'node:process';
 import { logger } from './pino.ts';
 
+import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { getOutputPath, normalizeRuta } from '../compiler/compile.ts';
 import { emitirCambios } from './browserSync.ts';
+
+const cacheImportMap = new Map<string, string[]>();
+const cacheComponentMap = new Map<string, string[]>();
+
+async function deleteFile(ruta) {
+    try {
+        const stats = await stat(ruta).catch(() => null);
+        if (!stats) {
+            throw new Error(`El archivo o directorio no existe: ${ruta}`);
+        }
+
+        if (stats.isDirectory()) {
+            await rmdir(ruta, { recursive: true });
+        } else if (stats.isFile()) {
+            await unlink(ruta);
+        }
+
+        const dir = path.dirname(ruta);
+        const files = await readdir(dir);
+        if (files.length === 0) {
+            await rmdir(dir);
+        }
+
+        return true;
+    } catch (error) {
+        logger.error(`🚩 ${error.message}\n`);
+        return false;
+    }
+}
+
+function getAction(
+    ruta: string,
+    extendsionWatch: { ext: string; action: string }[],
+) {
+    const action = extendsionWatch
+        .filter(
+            (item): item is { ext: string; action: string } =>
+                item !== undefined,
+        )
+        .find(item => item.ext === ruta.split('.').pop())?.action;
+    return action || 'reloadFull';
+}
 
 export async function initChokidar(bs: any) {
     try {
@@ -19,15 +64,6 @@ export async function initChokidar(bs: any) {
 
         const watchAditional = JSON.parse(env.aditionalWatch || '[]');
         let fileWatch = [watchJS, watchVue, watchTS, ...watchAditional];
-        if (fileWatch.length > 0) {
-            logger.info(
-                chalk.green(
-                    `👀 : Observando \n${fileWatch
-                        .map((item: string) => `${item}`)
-                        .join('\n')}\n`,
-                ),
-            );
-        }
 
         //extraer sólo las extesniones  de fileWatch
         const extendsionWatch = fileWatch.map(item => {
@@ -39,11 +75,15 @@ export async function initChokidar(bs: any) {
                         ext === 'vue'
                             ? 'HRMVue'
                             : ext === 'js' || ext === 'ts'
-                              ? 'HRM'
+                              ? 'HRMHelper'
                               : 'reloadFull',
                 };
             }
         });
+        if (extendsionWatch.length === 0 || extendsionWatch[0] === undefined) {
+            throw new Error('No se encontraron extensiones para observar');
+        }
+
         const regExtExtension = new RegExp(
             `\\.(?!${extendsionWatch
                 .filter(item => item !== undefined)
@@ -68,99 +108,43 @@ export async function initChokidar(bs: any) {
             ignored: regExtExtension,
         });
 
+        watcher.on('ready', () => {
+            logger.info(
+                chalk.green(
+                    `👀 : Listo para observar \n${fileWatch
+                        .map((item: string) => `${item}`)
+                        .join('\n')}\n`,
+                ),
+            );
+        });
+
         // Evento cuando se añade un archivo
         watcher.on('add', async ruta => {
-            if (env.firstInit) {
-                // AQUI ES DONDE DEBO PASAR POR PARSER PARA LLENAR cache de los imports de vue
-                return;
-            }
-            logger.info(ruta);
-            // await generateTailwindCSS(ruta);
-            // const result = await compile(
-            //     path.normalize(filePath).replace(/\\/g, '/'),
-            // );
-            // if (result && result.contentWasWritten) {
-            //     emitirCambios(
-            //         bs,
-            //         result.extension,
-            //         result.normalizedPath,
-            //         result.fileName,
-            //         'add',
-            //     );
-            // } else {
-            //     console.log(
-            //         chalk.yellow(
-            //             `[HMR] No se emite evento para archivo nuevo no escrito o vacío: ${filePath}. Razón: contentWasWritten es false o resultado inválido.`,
-            //         ),
-            //     );
-            // }
+            // cargar manifiesto
         });
 
         // Evento cuando se modifica un archivo
         watcher.on('change', async ruta => {
-            logger.info(ruta, 'change');
-            const action = extendsionWatch
-                .filter(
+            logger.info(`📝 modificando archivo: ${ruta}`);
+            const action = getAction(
+                ruta,
+                extendsionWatch.filter(
                     (item): item is { ext: string; action: string } =>
                         item !== undefined,
-                )
-                .find(item => item.ext === ruta.split('.').pop())?.action;
+                ),
+            );
+            logger.info(`Acción a realizar: ${action}`);
             emitirCambios(bs, action || 'reloadFull', ruta);
-            // console.log(chalk.yellow(`\n🔄 Archivo modificado: ${ruta}`));
-            // // Invalidar caché si el archivo .vue original cambia
-            // if (ruta.endsWith('.vue')) {
-            //     const normalizedVuePath = path.normalize(ruta);
-            //     if (serverComponentCache.has(normalizedVuePath)) {
-            //         serverComponentCache.delete(normalizedVuePath);
-            //         console.log(
-            //             chalk.magenta(
-            //                 `🗑️ Caché invalidada para ${normalizedVuePath} debido a modificación directa.`,
-            //             ),
-            //         );
-            //     }
-            // }
-            // // Recompilar el archivo modificado
-            // const normalizedRuta = path.normalize(ruta).replace(/\\/g, '/');
-            // const result = await compile(normalizedRuta);
-
-            // if (result && result.contentWasWritten) {
-            //     // Emitir cambios si la compilación fue exitosa y se escribió contenido
-            //     emitirCambios(
-            //         bs,
-            //         result.extension,
-            //         result.normalizedPath, // Ruta al archivo en /dist
-            //         result.fileName,
-            //         'change', // Tipo de evento
-            //     );
-            // } else {
-            //     console.log(
-            //         chalk.yellow(
-            //             `[HMR] No se emite evento para archivo modificado no escrito o vacío: ${ruta}. Razón: contentWasWritten es false o resultado inválido.`,
-            //         ),
-            //     );
-            // }
         });
 
         // Evento cuando se elimina un archivo
         watcher.on('unlink', async ruta => {
-            logger.info(ruta);
-            // console.log(chalk.red(`\n🗑️ Archivo eliminado: ${ruta}`));
-            // // Invalidar caché si el archivo .vue original se elimina
-            // if (ruta.endsWith('.vue')) {
-            //     const normalizedVuePath = path.normalize(ruta);
-            //     if (serverComponentCache.has(normalizedVuePath)) {
-            //         serverComponentCache.delete(normalizedVuePath);
-            //         console.log(
-            //             chalk.magenta(
-            //                 `🗑️ Caché invalidada para ${normalizedVuePath} debido a eliminación.`,
-            //             ),
-            //         );
-            //     }
-            // }
-            // const { extension, normalizedPath, fileName } = await deleteFile(
-            //     path.normalize(ruta).replace(/\\/g, '/'),
-            // );
-            // emitirCambios(bs, extension, normalizedPath, fileName, 'delete');
+            logger.info(`🗑️ eliminando archivo: ${ruta}`);
+            const result = await deleteFile(getOutputPath(normalizeRuta(ruta)));
+            if (result) {
+                logger.info(`Archivo eliminado: ${ruta}`);
+                emitirCambios(bs, 'reloadFull', ruta);
+            }
         });
         return watcher;
     } catch (error) {

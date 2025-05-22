@@ -34,7 +34,7 @@ export async function readConfig() {
         }
         env.PATH_ALIAS = JSON.stringify(pathAlias);
 
-        env.tailwindcss = tsConfig.tailwindConfig || false;
+        env.tailwindcss = JSON.stringify(tsConfig?.tailwindConfig) || 'false';
         env.proxyUrl = tsConfig?.proxyConfig?.proxyUrl || '';
         env.AssetsOmit = tsConfig?.proxyConfig?.assetsOmit || false;
 
@@ -60,7 +60,6 @@ export async function readConfig() {
 }
 
 export async function initConfig() {
-    //validar si existe el archivo versacompile.config.ts
     try {
         const fs = await import('fs');
         const path = await import('path');
@@ -77,7 +76,6 @@ export async function initConfig() {
             return true;
         }
 
-        // Crear un archivo de configuración básico
         const configContent = `// Archivo de configuración de VersaCompiler
 export default {
     compilerOptions: {
@@ -93,6 +91,11 @@ export default {
         assetsOmit: true,
     },
     aditionalWatch: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
+    tailwindConfig: {
+        cli: 'npx @tailwindcss/cli',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
 };
 `;
 

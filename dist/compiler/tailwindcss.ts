@@ -1,21 +1,41 @@
-import { exec as execCb } from 'child_process';
+import { spawnSync } from 'node:child_process';
 import { env } from 'process';
-import { promisify } from 'util';
-const exec = promisify(execCb);
+import { logger } from '../servicios/pino.ts';
 
 export async function generateTailwindCSS(_filePath = null) {
-    if (env.tailwindcss !== 'false') {
+    if (env.tailwindcss === 'false' || env.tailwindcss === undefined) {
         return;
     }
     try {
         const tailwindcssConfig = JSON.parse(env.tailwindcss);
-        console.log('Compilando TailwindCSS...');
-        const { stdout } = await exec(
-            `npx tailwindcss -i ${tailwindcssConfig.input} -o ${tailwindcssConfig.output}`,
-        );
-        console.log('Tailwind actualizado:', stdout);
+        if (
+            !tailwindcssConfig ||
+            !tailwindcssConfig.input ||
+            !tailwindcssConfig.output ||
+            !tailwindcssConfig.cli
+        ) {
+            return;
+        }
+        logger.info('Compilando TailwindCSS...');
+        const cli = tailwindcssConfig.cli || 'npx tailwindcss';
+        const arg = [
+            '-i',
+            ' ',
+            tailwindcssConfig.input,
+            ' ',
+            '-o',
+            tailwindcssConfig.output,
+        ];
+        const pressTailwind = spawnSync(cli, arg, {
+            stdio: ['ignore', 'ignore', 'ignore'],
+            shell: true,
+        });
+        if (pressTailwind.error) {
+            throw pressTailwind.error;
+        }
+        logger.info('TailwindCSS compilado correctamente');
     } catch (err) {
-        console.error('Error al compilar Tailwind:', err.stderr || err);
+        logger.error('Error al compilar Tailwind:', err.stderr || err);
         throw err;
     }
 }
