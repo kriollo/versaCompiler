@@ -8,9 +8,10 @@ import * as ts from 'typescript';
  *
  * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
  */
-export const preCompileTS = async (data, fileName, PATH_CONFIG_FILE) => {
+export const preCompileTS = async (data:string, fileName:string): Promise<{ error: Error | null; data: string | null }> => {
     try {
         // Leer tsconfig.json
+        const PATH_CONFIG_FILE = path.resolve(process.cwd(), 'tsconfig.json');
         const tsConfigContent = await readFile(PATH_CONFIG_FILE, 'utf-8');
         if (!tsConfigContent) {
             throw new Error(
@@ -68,7 +69,7 @@ export const preCompileTS = async (data, fileName, PATH_CONFIG_FILE) => {
         });
         if (result.diagnostics && result.diagnostics.length > 0) {
             const errors = result.diagnostics.map(diagnostic => {
-                if (diagnostic.file) {
+                if (diagnostic.file && diagnostic.start !== undefined) {
                     const { line, character } =
                         diagnostic.file.getLineAndCharacterOfPosition(
                             diagnostic.start,

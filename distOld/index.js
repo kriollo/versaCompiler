@@ -349,7 +349,7 @@ const estandarizaData = async (data, isVueComponent = false) => {
         // En desarrollo, codeToProcess ya es el resultado de Acorn (o el original si Acorn no hizo nada útil)
         // No aplicar removePreserverComent aquí si Acorn ya lo manejó o si no es relevante para HMR.
         codeToProcess = await removehtmlOfTemplateString(codeToProcess);
-        codeToProcess = await removeCodeTagImport(codeToProcess);
+        codeToProcess = await removeCodeTagImport();
         codeToProcess = await replaceAlias(codeToProcess);
         codeToProcess = await replaceAliasImportsAsync(codeToProcess);
         codeToProcess = await addImportEndJs(codeToProcess);

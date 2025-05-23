@@ -10,8 +10,7 @@ import { logger } from './servicios/pino.ts';
 import { initConfig, readConfig } from './servicios/readConfig.ts';
 
 // Obtener el directorio del archivo actual (dist/)
-const __dirname = process.cwd();
-env.PATH_DIST = __dirname;
+env.PATH_PROY = process.cwd();
 
 env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
 

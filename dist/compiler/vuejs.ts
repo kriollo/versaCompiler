@@ -1,8 +1,8 @@
 import path from 'node:path';
 import * as vCompiler from 'vue/compiler-sfc';
 
-const getComponentsVue = async data => {
-    let components = [];
+const getComponentsVue = async (data: string) => {
+    let components: string[] = [];
 
     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
 
@@ -37,7 +37,11 @@ const _compileCustomBlock = async (_block, _source) => {};
  * @param {string} source - La fuente del componente Vue.
  * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
  */
-export const preCompileVue = async (data, source, isProd = false) => {
+export const preCompileVue = async (
+    data: string,
+    source: string,
+    isProd = false,
+): Promise<{ error: Error | null; data: string | null }> => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
 

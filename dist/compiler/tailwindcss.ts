@@ -4,7 +4,7 @@ import { logger } from '../servicios/pino.ts';
 
 export async function generateTailwindCSS(_filePath = null) {
     if (env.tailwindcss === 'false' || env.tailwindcss === undefined) {
-        return;
+        return false;
     }
     try {
         const tailwindcssConfig = JSON.parse(env.tailwindcss);
@@ -14,9 +14,9 @@ export async function generateTailwindCSS(_filePath = null) {
             !tailwindcssConfig.output ||
             !tailwindcssConfig.cli
         ) {
-            return;
+            return false;
         }
-        logger.info('Compilando TailwindCSS...');
+
         const cli = tailwindcssConfig.cli || 'npx tailwindcss';
         const arg = [
             '-i',
@@ -33,9 +33,9 @@ export async function generateTailwindCSS(_filePath = null) {
         if (pressTailwind.error) {
             throw pressTailwind.error;
         }
-        logger.info('TailwindCSS compilado correctamente');
+        return true;
     } catch (err) {
-        logger.error('Error al compilar Tailwind:', err.stderr || err);
+        logger.error('❌ :Error al compilar Tailwind:', err.stderr || err);
         throw err;
     }
 }

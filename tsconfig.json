@@ -8,9 +8,9 @@
         "target": "ESNext",
         "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
-        "sourceRoot": "./src/",
-        "sourceMap": true,
-        "rootDir": ".",
+        "sourceMap": false,
+        "inlineSourceMap": false,
+        "inlineSources": false,
         "baseUrl": ".",
         "paths": {
             "@/*": ["src/*"],
@@ -37,5 +37,5 @@
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]
-    },
+    }
 }

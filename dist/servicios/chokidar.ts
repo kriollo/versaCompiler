@@ -5,7 +5,11 @@ import { logger } from './pino.ts';
 
 import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { getOutputPath, normalizeRuta } from '../compiler/compile.ts';
+import {
+    getOutputPath,
+    initCompile,
+    normalizeRuta,
+} from '../compiler/compile.ts';
 import { emitirCambios } from './browserSync.ts';
 
 const cacheImportMap = new Map<string, string[]>();
@@ -125,7 +129,6 @@ export async function initChokidar(bs: any) {
 
         // Evento cuando se modifica un archivo
         watcher.on('change', async ruta => {
-            logger.info(`📝 modificando archivo: ${ruta}`);
             const action = getAction(
                 ruta,
                 extendsionWatch.filter(
@@ -133,8 +136,12 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
-            logger.info(`Acción a realizar: ${action}`);
-            emitirCambios(bs, action || 'reloadFull', ruta);
+            const result = await initCompile(ruta);
+            if (result.success) {
+                let accion = result.action || action;
+                accion = accion == 'extension' ? action : accion;
+                emitirCambios(bs, accion || 'reloadFull', result.output);
+            }
         });
 
         // Evento cuando se elimina un archivo

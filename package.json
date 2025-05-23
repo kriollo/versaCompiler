@@ -39,7 +39,7 @@
         "chalk": "5.4.1",
         "chokidar": "^4.0.3",
         "get-port": "^7.1.0",
-        "oxc-minify": "^0.70.0",
+        "oxc-minify": "^0.71.0",
         "oxc-parser": "^0.71.0",
         "typescript": "^5.8.3",
         "vue": "3.5.14",
