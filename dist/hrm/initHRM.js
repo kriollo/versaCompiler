@@ -8,6 +8,14 @@ async function initSocket(retries = 0) {
         const socket = window.___browserSync___.socket;
         let connected = socket.connected; // Verificar estado inicial
 
+        // Limpiar listeners previos para evitar duplicados
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.off('reloadFull');
+        socket.off('HRMVue');
+        socket.off('HRMHelper');
+        socket.off('error');
+
         // Listener para conexión
         socket.on('connect', async () => {
             connected = true;
