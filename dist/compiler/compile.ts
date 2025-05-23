@@ -71,7 +71,7 @@ async function compileJS(inPath: string, outPath: string) {
     let vueResult;
     if (extension === '.vue') {
         logger.info(chalk.green(`💚 :Precompilando VUE: ${inPath}`));
-        vueResult = await preCompileVue(code, inPath, !!env.isPROD);
+        vueResult = await preCompileVue(code, inPath, !env.isPROD);
         if (vueResult.error) {
             throw new Error(vueResult.error);
         }

@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import path from 'node:path';
 import * as vCompiler from 'vue/compiler-sfc';
 import { logger } from '../servicios/pino.ts';
+import { parser } from './parser.ts';
 
 const getComponentsVue = async (data: string) => {
     let components: string[] = [];
@@ -23,6 +24,25 @@ const getComponentsVue = async (data: string) => {
         return match; // Devolver el match original si no se cumple ninguna condición
     });
 
+    return components;
+};
+
+const getComponentsVueMap = async ast => {
+    let components: string[] = [];
+    const importsStatic = ast?.module?.staticImports;
+    if (importsStatic) {
+        const vueImports = importsStatic.filter(item =>
+            item.moduleRequest.value.endsWith('.vue'),
+        );
+        components = vueImports.map(item => {
+            return item.entries.map(entry => entry.localName.value);
+        });
+        components = components.flat();
+    }
+
+    components = components.map(item => {
+        return item.replace(/['"]/g, '');
+    });
     return components;
 };
 
@@ -149,8 +169,8 @@ export const preCompileVue = async (
                     scoped: !!scopeId,
                     slotted: descriptor.slotted,
                     isProd,
-                    sourceMap: !isProd,
-                    comments: isProd ? false : 'all',
+                    // sourceMap: !isProd,
+                    // comments: isProd ? false : 'all',
                     compilerOptions: {
                         scopeId,
                         mode: 'module',
@@ -160,16 +180,16 @@ export const preCompileVue = async (
                         cacheHandlers: isProd,
                         runtimeGlobalName: 'Vue',
                         runtimeModuleName: 'vue',
-                        optimizeBindings: true,
-                        runtimeContextBuiltins: true,
-                        runtimeDirectives: true,
-                        runtimeVNode: true,
-                        runtimeProps: true,
-                        runtimeSlots: true,
-                        runtimeComponents: true,
-                        runtimeCompiledRender: true,
+                        // optimizeBindings: true,
+                        //runtimeContextBuiltins: true,
+                        // runtimeDirectives: true,
+                        // runtimeVNode: true,
+                        // runtimeProps: true,
+                        // runtimeSlots: true,
+                        // runtimeComponents: true,
+                        // runtimeCompiledRender: true,
                         whitespace: 'condense',
-                        ssrCssExternal: true,
+                        // ssrCssExternal: true,
                         ssr: false,
                         nodeTransforms: [],
                         directiveTransforms: {},
@@ -205,17 +225,36 @@ export const preCompileVue = async (
         }
 
         // Compile styles Y obtener el contenido de los estilos
-        const compiledStyles = descriptor.styles.map(style =>
-            vCompiler.compileStyle({
+        const compiledStyles = descriptor.styles.map(style => {
+            const lang = style.lang?.toLowerCase();
+            let currentPreprocessLang:
+                | 'less'
+                | 'sass'
+                | 'scss'
+                | 'styl'
+                | 'stylus'
+                | undefined = undefined;
+
+            if (
+                lang === 'scss' ||
+                lang === 'sass' ||
+                lang === 'less' ||
+                lang === 'styl' ||
+                lang === 'stylus'
+            ) {
+                currentPreprocessLang = lang;
+            }
+
+            return vCompiler.compileStyle({
                 id,
                 source: style.content,
-                scoped: style.scoped,
-                preprocessLang: style.lang,
+                scoped: style.scoped, // Esto maneja si el estilo es scoped o global
+                preprocessLang: currentPreprocessLang,
                 isProd,
                 trim: true,
                 filename: `${fileName}.vue`,
-            }),
-        );
+            });
+        });
 
         const insertStyles = compiledStyles.length
             ? `(function(){
@@ -233,8 +272,17 @@ export const preCompileVue = async (
             ${finalCompiledTemplate.code}
         `;
 
+        const ast = await parser(`temp.${scriptLang}`, output, scriptLang);
+        if (ast?.errors.length > 0) {
+            throw new Error(
+                `Error al analizar el script del componente Vue ${source}:\n${ast.errors
+                    .map(e => e.message)
+                    .join('\n')}`,
+            );
+        }
+
         const componentName = `${fileName}_component`;
-        const components = await getComponentsVue(data);
+        const components = await getComponentsVueMap(ast);
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
@@ -282,7 +330,7 @@ export const preCompileVue = async (
         `;
 
         output = `${output}\n${finishComponent}`;
-        console.log(output);
+        // console.log(output);
 
         return {
             lang: finalCompiledScript.lang,

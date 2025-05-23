@@ -10,10 +10,15 @@ import oxc from 'oxc-parser';
  * @returns {Promise<Object|null>} The parsed AST object if successful, or null if an error occurs.
  * @throws {Error} If there is an error during parsing, it logs the error details and stack trace.
  */
-export const parser = async (filename: string, code: string) => {
+export const parser = async (
+    filename: string,
+    code: string,
+    astType: 'js' | 'ts' = 'js',
+) => {
     const ast = oxc.parseSync(filename, code, {
         sourceType: 'module',
         showSemanticErrors: true,
+        astType,
     });
     return ast;
 };
