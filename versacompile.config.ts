@@ -15,7 +15,7 @@ export default {
     aditionalWatch: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
     // puede dejar en false o no agregarlo si no quiere que se ejecute el compilador de tailwind
     tailwindConfig: {
-        cli: 'pnpx @tailwindcss/cli',
+        bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
         output: './public/css/output.css',
     },

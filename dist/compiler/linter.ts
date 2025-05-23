@@ -1,3 +1,4 @@
+import { OxlintNode } from '@teambit/oxc.linter.oxlint-node';
 import chalk from 'chalk';
 import { spawnSync } from 'node:child_process';
 export const linter = async filePath => {
@@ -48,3 +49,15 @@ export const linter = async filePath => {
         errorList,
     };
 };
+
+export async function OxLint() {
+    const oxlintNodes = await OxlintNode.create({
+        formats: ['json', 'default'],
+        configPath: './.oxlintrc.json',
+    });
+    try {
+        await oxlintNodes.run(['src']);
+    } catch (error) {
+        return error.stdout;
+    }
+}

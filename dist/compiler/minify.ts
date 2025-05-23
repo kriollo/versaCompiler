@@ -12,16 +12,16 @@ export const minifyJS = async (data, filename, isProd = false) => {
     try {
         const options = {
             compress: {
-                target: 'esnext',
+                target: 'es2020' as const,
             },
             mangle: {
                 toplevel: true,
-                debug: isProd ? false : true,
+                debug: !isProd,
             },
             codegen: {
                 removeWhitespace: true,
             },
-            sourcemap: false,
+            sourcemap: !isProd,
         };
         const result = await minify(filename, data, options);
         return { code: result.code, error: null };
