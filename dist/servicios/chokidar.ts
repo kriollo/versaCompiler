@@ -66,21 +66,24 @@ export async function initChokidar(bs: any) {
         const watchVue = `${env.PATH_SOURCE}/**/*.vue`;
         const watchTS = `${env.PATH_SOURCE}/**/*.ts`;
 
+        //TODO: agregar watch para CSS
         const watchAditional = JSON.parse(env.aditionalWatch || '[]');
         let fileWatch = [watchJS, watchVue, watchTS, ...watchAditional];
 
         //extraer sólo las extesniones  de fileWatch
+        const accionExtension = {
+            vue: 'HRMVue',
+            js: 'HRMHelper',
+            ts: 'HRMHelper',
+        };
         const extendsionWatch = fileWatch.map(item => {
             const ext = item.split('.').pop();
             if (ext) {
                 return {
                     ext,
                     action:
-                        ext === 'vue'
-                            ? 'HRMVue'
-                            : ext === 'js' || ext === 'ts'
-                              ? 'HRMHelper'
-                              : 'reloadFull',
+                        accionExtension[ext as keyof typeof accionExtension] ||
+                        'reloadFull',
                 };
             }
         });
