@@ -1,11 +1,11 @@
 import chalk from 'chalk';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
 import { Worker } from 'node:worker_threads'; // Añadir esta línea
 import { logger } from '../servicios/pino.ts';
 import { showTimingForHumans } from '../utils/utils.ts';
-import { getCodeFile, parser } from './parser.ts';
+import { getCodeFile } from './parser.ts';
 import { estandarizaCode } from './transforms.ts';
 import { preCompileTS } from './typescript.ts';
 import { preCompileVue } from './vuejs.ts';
@@ -24,32 +24,6 @@ export function getOutputPath(ruta: string) {
     const pathDist = env.PATH_DIST ?? '';
     return ruta.replace(pathSource, pathDist).replace(/\.(vue|ts)$/, '.js');
 }
-
-export const initLoadCacheVueMap = async (ruta: string) => {
-    const { code, error } = await getCodeFile(
-        getOutputPath(normalizeRuta(ruta)),
-    );
-    if (error) {
-        throw new Error('Error al leer el archivo');
-    }
-    const { ast } = await parser(ruta, code);
-    console.log('AST:', ast?.module?.staticImports);
-
-    // extraer los imports estaticos
-    const imports = ast?.module.staticImports.map(item => {
-        return {
-            name: item.moduleRequest.value,
-            source: item.entries.map(entry => {
-                return {
-                    name: entry.importName.name,
-                    type: entry.localName.value,
-                };
-            }),
-        };
-    });
-
-    return imports;
-};
 
 async function compileJS(inPath: string, outPath: string) {
     const extension = path.extname(inPath);
@@ -157,9 +131,11 @@ async function execCompileTailwindcss() {
     });
 }
 
-export async function initCompile(ruta: string) {
+export async function initCompile(ruta: string, compileTailwind = true) {
     try {
-        execCompileTailwindcss();
+        if (compileTailwind) {
+            execCompileTailwindcss();
+        }
         const startTime = Date.now();
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
@@ -175,7 +151,7 @@ export async function initCompile(ruta: string) {
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}`);
+        logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}\n\n`);
 
         return {
             success: true,
@@ -185,6 +161,56 @@ export async function initCompile(ruta: string) {
     } catch (error) {
         logger.error(
             `🚩 :Error al compilar ${ruta}: ${error.message}\n${error.stack}\n`,
+        );
+        return {
+            success: false,
+            output: '',
+        };
+    }
+}
+
+export async function initCompileAll() {
+    try {
+        const startTime = Date.now();
+        const rawPathSource = env.PATH_SOURCE ?? '';
+        const pathDist = env.PATH_DIST ?? '';
+
+        // Normalizar la ruta para usar barras inclinadas en patrones glob
+        const normalizedGlobPathSource = rawPathSource.replace(/\\/g, '/');
+
+        const patterns = [
+            `${normalizedGlobPathSource}/**/*.js`,
+            `${normalizedGlobPathSource}/**/*.vue`,
+            `${normalizedGlobPathSource}/**/*.ts`,
+        ];
+
+        logger.info(`📝 :Compilando todos los archivos...`);
+        logger.info(`🔜 :Fuente para compilar (original): ${rawPathSource}`);
+        logger.info(`🔚 :Destino para compilar: ${pathDist}`);
+
+        execCompileTailwindcss();
+
+        for await (const file of glob(patterns)) {
+            if (file.endsWith('.d.ts')) {
+                continue;
+            }
+            await initCompile(
+                file.startsWith('./') ? file : `./${file}`,
+                false,
+            );
+        }
+
+        const endTime = Date.now();
+        const elapsedTime = showTimingForHumans(endTime - startTime);
+        logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}`);
+
+        return {
+            success: true,
+            output: pathDist,
+        };
+    } catch (error) {
+        logger.error(
+            `🚩 :Error al compilar todos los archivos: ${error.message}\n${error.stack}\n`,
         );
         return {
             success: false,

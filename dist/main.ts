@@ -7,6 +7,7 @@ import { browserSyncServer } from './servicios/browserSync.ts';
 import { initChokidar } from './servicios/chokidar.ts';
 import { logger } from './servicios/pino.ts';
 
+import { initCompileAll } from './compiler/compile.ts';
 import { initConfig, readConfig } from './servicios/readConfig.ts';
 
 // Obtener el directorio del archivo actual (dist/)
@@ -58,6 +59,12 @@ async function main() {
 
         if (!(await readConfig())) {
             process.exit(1);
+        }
+
+        if (argv.all) {
+            logger.info(chalk.green('Compilando todos los archivos...'));
+            await initCompileAll();
+            process.exit(0);
         }
 
         const bs = await browserSyncServer();

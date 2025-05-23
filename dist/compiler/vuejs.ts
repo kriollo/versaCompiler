@@ -4,28 +4,28 @@ import * as vCompiler from 'vue/compiler-sfc';
 import { logger } from '../servicios/pino.ts';
 import { parser } from './parser.ts';
 
-const getComponentsVue = async (data: string) => {
-    let components: string[] = [];
+// const getComponentsVue = async (data: string) => {
+//     let components: string[] = [];
 
-    const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
+//     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
 
-    const _a = data.replace(importRegExp, match => {
-        const ruta = match.match(/from\s+['"](.*)['"];/)[1];
+//     const _a = data.replace(importRegExp, match => {
+//         const ruta = match.match(/from\s+['"](.*)['"];/)[1];
 
-        if (ruta.endsWith('.vue')) {
-            const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
-            if (resultVue) {
-                const fullPath = resultVue[1].replace('.vue', '');
-                const fileName = resultVue[2];
-                components.push(fileName);
-                return `import ${fileName} from '${fullPath}.js';`;
-            }
-        }
-        return match; // Devolver el match original si no se cumple ninguna condición
-    });
+//         if (ruta.endsWith('.vue')) {
+//             const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
+//             if (resultVue) {
+//                 const fullPath = resultVue[1].replace('.vue', '');
+//                 const fileName = resultVue[2];
+//                 components.push(fileName);
+//                 return `import ${fileName} from '${fullPath}.js';`;
+//             }
+//         }
+//         return match; // Devolver el match original si no se cumple ninguna condición
+//     });
 
-    return components;
-};
+//     return components;
+// };
 
 const getComponentsVueMap = async ast => {
     let components: string[] = [];
