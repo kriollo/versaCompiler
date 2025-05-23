@@ -11,18 +11,11 @@ import oxc from 'oxc-parser';
  * @throws {Error} If there is an error during parsing, it logs the error details and stack trace.
  */
 export const parser = async (filename: string, code: string) => {
-    try {
-        const ast = oxc.parseSync(filename, code, {
-            sourceType: 'module',
-            showSemanticErrors: true,
-        });
-        return { ast, errors: null };
-    } catch (error) {
-        return {
-            ast: null,
-            errors: [error],
-        };
-    }
+    const ast = oxc.parseSync(filename, code, {
+        sourceType: 'module',
+        showSemanticErrors: true,
+    });
+    return ast;
 };
 
 export const getCodeFile = async (filename: string) => {

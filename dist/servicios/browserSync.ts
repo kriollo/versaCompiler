@@ -29,7 +29,7 @@ export async function browserSyncServer() {
 
         bs.init({
             ...proxy,
-            files: ['./public/**/*.css'], // Observa cambios en archivos CSS
+            files: [`${env.PATH_DIST}/**/*.css`], // Observa cambios en archivos CSS
             injectChanges: true, // Inyecta CSS sin recargar la página
             open: false, // No abre automáticamente el navegador
             port, // Puerto aleatorio para BrowserSync
@@ -84,8 +84,8 @@ export async function browserSyncServer() {
                     if (req.url === '/__versa/initHRM.js') {
                         // Busca vueLoader.js en la carpeta de salida configurada
                         const vueLoaderPath = path.join(
-                            env.PATH_DIST || '',
-                            'hrm/initHRM.js',
+                            env.PATH_PROY || '',
+                            'dist/hrm/initHRM.js',
                         );
                         res.setHeader('Content-Type', 'application/javascript');
                         try {
@@ -109,7 +109,8 @@ export async function browserSyncServer() {
                     if (req.url.startsWith('/__versa/hrm/')) {
                         // Sirve archivos de dist/hrm como /__versa/hrm/*
                         const filePath = path.join(
-                            env.PATH_DIST || '',
+                            env.PATH_PROY || '',
+                            'dist',
                             req.url.replace('/__versa/', ''),
                         );
                         res.setHeader('Content-Type', 'application/javascript');

@@ -15,7 +15,7 @@ async function replaceAliasImportStatic(
     for (const item of imports) {
         for (const key in pathAlias) {
             const pathAliasEntry =
-                '/' + String(pathAlias[key]).replace(/^\/|\/$/g, '') + '/';
+                '/' + String(env.PATH_DIST).replace(/^\/|\/$/g, '') + '/';
 
             const escapedKey = escapeRegExp(key.replace('/*', '/'));
             if (item.moduleRequest.value.startsWith(escapedKey)) {
@@ -53,7 +53,7 @@ async function replaceAliasImportDynamic(
     for (const item of imports) {
         for (const key in pathAlias) {
             const pathAliasEntry =
-                '/' + String(pathAlias[key]).replace(/^\/|\/$/g, '') + '/';
+                '/' + String(env.PATH_DIST).replace(/^\/|\/$/g, '') + '/';
 
             const escapedKey = escapeRegExp(key.replace('/*', '/'));
             const importDynamic = code.slice(item.start, item.end);
@@ -93,8 +93,11 @@ const removehtmlOfTemplateString = async data => {
  * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada sin los comentarios @preserve.
  */
 const removePreserverComent = async data => {
-    const preserverRegExp = /\/\*[\s\S]*?@preserve[\s\S]*?\*\/|\/\/.*?@preserve.*?(?=\n|$)/g;
-    data = data.replace(preserverRegExp, match => match.replace(/@preserve/g, ''));
+    const preserverRegExp =
+        /\/\*[\s\S]*?@preserve[\s\S]*?\*\/|\/\/.*?@preserve.*?(?=\n|$)/g;
+    data = data.replace(preserverRegExp, match =>
+        match.replace(/@preserve/g, ''),
+    );
     return data;
 };
 
@@ -115,12 +118,11 @@ export async function estandarizaCode(
     file: string,
 ): Promise<{ code: string; error: string | null }> {
     try {
-        const { ast, errors } = await parser(file, code);
-        if (errors) {
-            logger.error(errors);
-        }
+        const ast = await parser(file, code);
+
         if (ast && ast.errors && ast.errors.length > 0) {
-            throw new Error('Error de análisis: ' + ast.errors.join(', '));
+            logger.warn(ast?.errors[0].codeframe);
+            throw new Error(ast?.errors[0].message);
         }
         code = await replaceAliasImportStatic(code, ast?.module.staticImports);
         code = await replaceAliasImportDynamic(
@@ -136,7 +138,6 @@ export async function estandarizaCode(
 
         return { code, error: null };
     } catch (error) {
-        logger.error('Error al estandarizar el código:', error);
         return { code: '', error: error.message };
     }
 }

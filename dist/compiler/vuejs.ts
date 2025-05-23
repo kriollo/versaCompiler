@@ -1,5 +1,7 @@
+import chalk from 'chalk';
 import path from 'node:path';
 import * as vCompiler from 'vue/compiler-sfc';
+import { logger } from '../servicios/pino.ts';
 
 const getComponentsVue = async (data: string) => {
     let components: string[] = [];
@@ -41,7 +43,11 @@ export const preCompileVue = async (
     data: string,
     source: string,
     isProd = false,
-): Promise<{ error: Error | null; data: string | null }> => {
+): Promise<{
+    error: Error | null;
+    data: string | null;
+    lang: 'ts' | 'js' | null;
+}> => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
 
@@ -52,7 +58,7 @@ export const preCompileVue = async (
             const varContent = `
             ${ifExistsref ? '' : 'import { ref } from "vue";'};
             const versaComponentKey = ref(0);
-        `;
+            `;
             const ifExistScript = data.includes('<script');
             if (!ifExistScript) {
                 data =
@@ -70,14 +76,11 @@ export const preCompileVue = async (
                     return `${p1} ${p2} ${existeSlash ? p3.trim().slice(0, -1) : p3} :key="versaComponentKey" ${existeSlash ? '/' : ''}${p4}`;
                 },
             );
-            // console.log(data);
         }
-
-        // console.log(data);
 
         const { descriptor, errors } = vCompiler.parse(data, {
             filename: fileName,
-            sourceMap: false,
+            sourceMap: !isProd, // Generalmente querrás sourcemaps en desarrollo
             sourceRoot: path.dirname(source),
         });
 
@@ -91,77 +94,108 @@ export const preCompileVue = async (
         const scopeId = descriptor.styles.some(s => s.scoped)
             ? `data-v-${id}`
             : null;
-        const templateOptions = {
-            sourceMap: false,
-            filename: `${fileName}.vue`,
-            id,
-            scoped: !!scopeId,
-            slotted: descriptor.slotted,
-            source: descriptor.template?.content,
-            comments: isProd ? false : 'all',
-            isProd,
-            compilerOptions: {
-                scopeId,
-                mode: 'module',
-                isProd,
-                inlineTemplate: true,
-                prefixIdentifiers: true,
-                hoistStatic: true,
-                cacheHandlers: true,
-                runtimeGlobalName: 'Vue',
-                runtimeModuleName: 'vue',
-                optimizeBindings: true,
-                runtimeContextBuiltins: true,
-                runtimeDirectives: true,
-                runtimeVNode: true,
-                runtimeProps: true,
-                runtimeSlots: true,
-                runtimeComponents: true,
-                runtimeCompiledRender: true,
-                whitespace: 'condense',
-                ssrCssExternal: true,
-                ssr: false,
-                nodeTransforms: [],
-                directiveTransforms: {},
-            },
-        };
 
-        // Compile script
-        let compiledScript;
+        // --- 1. Compilación del Script ---
+        let scriptContent: string;
+        let scriptLang: 'ts' | 'js' = 'js'; // Default a js
+        let scriptBindings: vCompiler.BindingMetadata | undefined;
+        let scriptType: 'script' | 'scriptSetup' | undefined;
+
         if (descriptor.script || descriptor.scriptSetup) {
-            const scriptDescriptor =
-                descriptor.script || descriptor.scriptSetup;
+            scriptType = descriptor.script ? 'script' : 'scriptSetup';
+            const scriptToCompile =
+                descriptor.script || descriptor.scriptSetup!;
 
-            compiledScript = {
-                content: descriptor.script
-                    ? scriptDescriptor.content
-                    : vCompiler.compileScript(descriptor, {
-                          id,
-                          templateOptions,
-                      }).content,
-                lang:
-                    scriptDescriptor.lang === 'ts' ||
-                    scriptDescriptor.lang === 'typescript'
-                        ? 'ts'
-                        : 'js',
+            const scriptCompileOptions: vCompiler.SFCScriptCompileOptions = {
+                id,
+                isProd,
+                sourceMap: !isProd,
+                inlineTemplate: false,
+                propsDestructure: true,
+                templateOptions: descriptor.scriptSetup
+                    ? {
+                          compilerOptions: {
+                              scopeId,
+                          },
+                      }
+                    : undefined,
             };
+
+            const compiledScriptResult = vCompiler.compileScript(
+                descriptor,
+                scriptCompileOptions,
+            );
+
+            scriptContent = compiledScriptResult.content;
+            scriptLang =
+                scriptToCompile.lang?.toLowerCase() === 'ts' ||
+                scriptToCompile.lang?.toLowerCase() === 'typescript'
+                    ? 'ts'
+                    : 'js';
+            scriptBindings = compiledScriptResult.bindings;
         } else {
-            compiledScript = { content: `export default {}`, lang: 'js' };
+            scriptContent = 'export default {};';
+            scriptLang = 'js';
         }
 
-        // Compile template y obtener el contenido del template
-        const compiledTemplate = descriptor.template?.content // Usar optional chaining
-            ? vCompiler.compileTemplate({
-                  ...templateOptions,
-              })
-            : { code: '' }; // Manejar caso sin template
-        if (!descriptor.template?.content) {
-            console.warn(
+        // --- 2. Compilación de la Plantilla ---
+        let templateCode = '';
+        if (descriptor.template) {
+            const templateCompileOptions: vCompiler.SFCTemplateCompileOptions =
+                {
+                    source: descriptor.template.content,
+                    filename: `${fileName}.vue`,
+                    id,
+                    scoped: !!scopeId,
+                    slotted: descriptor.slotted,
+                    isProd,
+                    sourceMap: !isProd,
+                    comments: isProd ? false : 'all',
+                    compilerOptions: {
+                        scopeId,
+                        mode: 'module',
+                        bindingMetadata: scriptBindings,
+                        prefixIdentifiers: true,
+                        hoistStatic: isProd,
+                        cacheHandlers: isProd,
+                        runtimeGlobalName: 'Vue',
+                        runtimeModuleName: 'vue',
+                        optimizeBindings: true,
+                        runtimeContextBuiltins: true,
+                        runtimeDirectives: true,
+                        runtimeVNode: true,
+                        runtimeProps: true,
+                        runtimeSlots: true,
+                        runtimeComponents: true,
+                        runtimeCompiledRender: true,
+                        whitespace: 'condense',
+                        ssrCssExternal: true,
+                        ssr: false,
+                        nodeTransforms: [],
+                        directiveTransforms: {},
+                    },
+                };
+            const compiledTemplateResult = vCompiler.compileTemplate(
+                templateCompileOptions,
+            );
+            templateCode = compiledTemplateResult.code;
+        } else {
+            logger.warn(
                 chalk.yellow(
                     `Advertencia: El componente Vue ${source} no tiene una sección de plantilla.`,
                 ),
             );
         }
+
+        const finalCompiledScript = {
+            content: scriptContent,
+            lang: scriptLang,
+            type: scriptType,
+        };
+
+        const finalCompiledTemplate = {
+            code: templateCode,
+        };
 
         let customBlocks = '';
         if (descriptor.customBlocks.length > 0) {
@@ -195,8 +229,8 @@ export const preCompileVue = async (
         // Combine all parts into a single module
         let output = `
             ${insertStyles}
-            ${compiledScript.content}
-            ${compiledTemplate.code}
+            ${finalCompiledScript.content}
+            ${finalCompiledTemplate.code}
         `;
 
         const componentName = `${fileName}_component`;
@@ -218,6 +252,13 @@ export const preCompileVue = async (
                 \n${exportComponent}
                 `,
             );
+        } else if (output.includes('export default defineComponent({')) {
+            output = output.replace(
+                'export default defineComponent({',
+                `const ${componentName} = defineComponent({
+                \n${exportComponent}
+                `,
+            );
         } else {
             output = output.replace(
                 'export default /*@__PURE__*/_defineComponent({',
@@ -232,24 +273,6 @@ export const preCompileVue = async (
             output = output.replace('setup(', 'async setup(');
         }
 
-        // reemplazamos cuando usamos script setup
-        if (descriptor.scriptSetup) {
-            output = output.replaceAll(/_ctx\.(?!\$)/g, '$setup.');
-            output = output.replace(
-                'export function render(_ctx, _cache) {',
-                `
-                function render(_ctx, _cache, $props, $setup, $data, $options) {
-                `,
-            );
-        } else {
-            output = output.replace(
-                'export function render(_ctx, _cache) {',
-                `
-                function render(_ctx, _cache, $props, $setup, $data, $options) {
-                `,
-            );
-        }
-
         const finishComponent = `
             ${componentName}.render = render;
             ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
@@ -259,10 +282,10 @@ export const preCompileVue = async (
         `;
 
         output = `${output}\n${finishComponent}`;
-        // console.log(output);
+        console.log(output);
 
         return {
-            lang: compiledScript.lang,
+            lang: finalCompiledScript.lang,
             error: null,
             data: output,
         };
