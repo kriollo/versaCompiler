@@ -20,7 +20,11 @@ function stopCompile() {
 }
 
 async function main() {
-    const argv = await yargs(hideBin(process.argv))
+    if (!(await readConfig())) {
+        process.exit(1);
+    }
+
+    let yargInstance = yargs(hideBin(process.argv))
         .scriptName('versa')
         .usage(
             chalk.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
@@ -36,9 +40,22 @@ async function main() {
         .option('init', {
             type: 'boolean',
             description: 'Inicializar la configuración',
-        })
-        .help()
-        .parse();
+        });
+
+    // Definir la opción tailwind dinámicamente
+    // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
+    if (env.tailwindcss !== 'false') {
+        yargInstance = yargInstance.option('tailwind', {
+            type: 'boolean',
+            description:
+                'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=true',
+            // No se establece un 'default' aquí para que argv.tailwind sea undefined si no se usa el flag,
+            // permitiendo que la lógica posterior decida basada en la configuración global.
+        });
+    }
+
+    const argv = await yargInstance.help().parse();
+
     try {
         console.log(
             `\n\n` +
@@ -51,15 +68,12 @@ async function main() {
             await initConfig();
             process.exit(0);
         }
-
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
+        env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
         logger.info(chalk.green(`isAll: ${env.isALL}`));
         logger.info(chalk.green(`isProd: ${env.isPROD}`));
-
-        if (!(await readConfig())) {
-            process.exit(1);
-        }
+        logger.info(chalk.green(`isTailwind: ${env.TAILWIND}`));
 
         if (argv.all) {
             logger.info(chalk.green('Compilando todos los archivos...'));

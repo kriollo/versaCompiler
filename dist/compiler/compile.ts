@@ -104,7 +104,7 @@ async function compileJS(inPath: string, outPath: string) {
     let vueResult;
     if (extension === '.vue') {
         logger.info(chalk.green(`💚 :Precompilando VUE: ${inPath}`));
-        vueResult = await preCompileVue(code, inPath, !env.isPROD);
+        vueResult = await preCompileVue(code, inPath, Boolean(env.isPROD));
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
             registerInventoryError(inPath, vueResult.message, 'error');
@@ -180,8 +180,8 @@ async function compileJS(inPath: string, outPath: string) {
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
-    if (!env.isPROD) {
-        const resultMinify = await minifyJS(code, inPath, !env.isPROD);
+    if (Boolean(env.isPROD)) {
+        const resultMinify = await minifyJS(code, inPath, Boolean(env.isPROD));
         if (resultMinify.error) {
             registerInventoryResume('minifyJS', 1, 0);
             registerInventoryError(inPath, resultMinify.error, 'error');
@@ -203,12 +203,16 @@ async function compileJS(inPath: string, outPath: string) {
 
 export async function initCompile(ruta: string, compileTailwind = true) {
     try {
-        if (compileTailwind) {
+        if (compileTailwind && Boolean(env.TAILWIND)) {
             const resultTW = await generateTailwindCSS();
-            if (resultTW) {
-                logger.info(`💚 :Compilando Tailwind CSS...`);
-            } else {
-                logger.info(`❌ :No se pudo compilar Tailwind CSS...`);
+            if (typeof resultTW !== 'boolean') {
+                if (resultTW?.success) {
+                    logger.info(`🎨 :${resultTW.message}\n`);
+                } else {
+                    logger.error(
+                        `❌ :${resultTW.message}\n${resultTW.details}\n`,
+                    );
+                }
             }
         }
         const startTime = Date.now();
@@ -265,10 +269,12 @@ export async function initCompileAll() {
 
         // execCompileTailwindcss();
         const resultTW = await generateTailwindCSS();
-        if (resultTW) {
-            logger.info(`💚 :Compilando Tailwind CSS...`);
-        } else {
-            logger.info(`❌ :No se pudo compilar Tailwind CSS...`);
+        if (typeof resultTW !== 'boolean') {
+            if (resultTW?.success) {
+                logger.info(`🎨 :${resultTW.message}\n`);
+            } else {
+                logger.error(`❌ :${resultTW.message}\n${resultTW.details}\n`);
+            }
         }
 
         // await linter(env.PATH_SOURCE ?? '');
