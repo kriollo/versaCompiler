@@ -9,7 +9,6 @@ import { createApp, ref } from 'vue';
 
 const debug = ref(false);
 const $contenedor = ref(null);
-const a = window.location.href.split('?')[1];
 
 async function loadModule() {
     const url = new URL(import.meta.url);

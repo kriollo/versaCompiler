@@ -8,7 +8,7 @@ import { minify } from 'oxc-minify';
  * @param {boolean} isProd - Indica si está en modo producción.
  * @returns {Promise<Object>} The result of the minification process.
  */
-export const minifyJS = async (data, filename, isProd = false) => {
+export const minifyJS = async (data, filename, isProd = true) => {
     try {
         const options = {
             compress: {

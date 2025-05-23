@@ -40,7 +40,7 @@ async function initSocket(retries = 0) {
         socket.on('HRMVue', data => {
             console.log('Versa HMR: Recibiendo datos de HMR:', data);
         });
-        socket.on('HRM', data => {
+        socket.on('HRMHelper', data => {
             console.log('Versa HMR: Recibiendo datos de HMR:', data);
         });
 

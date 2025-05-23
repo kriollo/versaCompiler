@@ -24,6 +24,7 @@ export async function generateTailwindCSS() {
             binPath: tailwindcssConfig.bin,
             input: tailwindcssConfig.input,
             output: tailwindcssConfig.output,
+            minify: env.isProd === 'true',
         });
         return await tnode.run();
     } catch (err) {

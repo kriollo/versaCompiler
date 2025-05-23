@@ -108,7 +108,7 @@ export async function initChokidar(bs: any) {
 
         const watcher = chokidar.watch(DirWatch, {
             persistent: true,
-            ignoreInitial: false,
+            ignoreInitial: true,
             ignored: regExtExtension,
         });
 
@@ -124,7 +124,19 @@ export async function initChokidar(bs: any) {
 
         // Evento cuando se añade un archivo
         watcher.on('add', async ruta => {
-            // cargar manifiesto
+            const action = getAction(
+                ruta,
+                extendsionWatch.filter(
+                    (item): item is { ext: string; action: string } =>
+                        item !== undefined,
+                ),
+            );
+            const result = await initCompile(ruta);
+            if (result.success) {
+                let accion = result.action || action;
+                accion = accion == 'extension' ? action : accion;
+                emitirCambios(bs, accion || 'reloadFull', result.output);
+            }
         });
 
         // Evento cuando se modifica un archivo

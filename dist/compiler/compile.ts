@@ -103,8 +103,8 @@ async function compileJS(inPath: string, outPath: string) {
     //aca se debe pasar de vue a js
     let vueResult;
     if (extension === '.vue') {
-        logger.info(chalk.green(`💚 :Precompilando VUE: ${inPath}`));
-        vueResult = await preCompileVue(code, inPath, Boolean(env.isPROD));
+        logger.info(chalk.green(`💚 :Precompilando VUE`));
+        vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
             registerInventoryError(inPath, vueResult.message, 'error');
@@ -131,7 +131,7 @@ async function compileJS(inPath: string, outPath: string) {
     //aca se debe pasar de ts a js
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
-        logger.info(chalk.blue(`🔄️ :Precompilando TS: ${inPath}`));
+        logger.info(chalk.blue(`🔄️ :Precompilando TS`));
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
             registerInventoryResume('preCompileTS', 1, 0);
@@ -157,6 +157,7 @@ async function compileJS(inPath: string, outPath: string) {
     }
 
     //aca se debe pasar de js a js
+    logger.info(chalk.yellow(`💛 :Estandarizando`));
     const resultSTD = await estandarizaCode(code, inPath);
     if (resultSTD.error) {
         registerInventoryResume('estandarizaCode', 1, 0);
@@ -180,8 +181,9 @@ async function compileJS(inPath: string, outPath: string) {
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
-    if (Boolean(env.isPROD)) {
-        const resultMinify = await minifyJS(code, inPath, Boolean(env.isPROD));
+    if (env.isPROD === 'true') {
+        logger.info(chalk.red(`🤖 :Minificando`));
+        const resultMinify = await minifyJS(code, inPath, true);
         if (resultMinify.error) {
             registerInventoryResume('minifyJS', 1, 0);
             registerInventoryError(inPath, resultMinify.error, 'error');
@@ -218,10 +220,8 @@ export async function initCompile(ruta: string, compileTailwind = true) {
         const startTime = Date.now();
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
-        logger.info(`📝 :Compilando archivo: ${file}`);
 
         logger.info(`🔜 :Fuente para compilar: ${file}`);
-        logger.info(`🔚 :Destino para compilar: ${outFile}`);
 
         const result = await compileJS(file, outFile);
         if (result.error) {
@@ -230,6 +230,7 @@ export async function initCompile(ruta: string, compileTailwind = true) {
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
+        logger.info(`🔚 :Destino para publicar: ${outFile}`);
         logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}\n\n`);
 
         return {
