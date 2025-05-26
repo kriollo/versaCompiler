@@ -2,6 +2,13 @@ import { env } from 'node:process';
 import { pathToFileURL } from 'node:url'; // Importar pathToFileURL
 import { logger } from './pino.ts';
 
+export type typeLinter = {
+    name: string;
+    bin: string;
+    configFile: string;
+    fix?: boolean;
+};
+
 export async function readConfig() {
     try {
         if (!env.PATH_CONFIG_FILE) {
@@ -37,7 +44,8 @@ export async function readConfig() {
         env.tailwindcss = JSON.stringify(tsConfig?.tailwindConfig) || 'false';
         env.proxyUrl = tsConfig?.proxyConfig?.proxyUrl || '';
         env.AssetsOmit = tsConfig?.proxyConfig?.assetsOmit || false;
-        env.oxlint = JSON.stringify(tsConfig?.oxlint || false);
+        env.linter = JSON.stringify(tsConfig?.linter || false);
+        env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
         env.PATH_SOURCE = tsConfig?.compilerOptions.sourceRoot || './src';
         env.PATH_SOURCE = (env.PATH_SOURCE || '').endsWith('/')
@@ -79,6 +87,7 @@ export async function initConfig() {
 
         const configContent = `// Archivo de configuración de VersaCompiler
 export default {
+    tsconfig: './tsconfig.json',
     compilerOptions: {
         sourceRoot: './src',
         outDir: './dist',
@@ -98,11 +107,20 @@ export default {
         input: './src/css/input.css',
         output: './public/css/output.css',
     },
-    oxlint: {
-        bin: './node_modules/.bin/oxlint',
-        configFile: './.oxlintrc.json',
-        fix: false
-    },
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './.eslintrc.json',
+            fix: false,
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+        },
+    ],
 };
 `;
 
