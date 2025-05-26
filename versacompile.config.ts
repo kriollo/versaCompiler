@@ -19,4 +19,9 @@ export default {
         input: './src/css/input.css',
         output: './public/css/output.css',
     },
+    oxlint: {
+        bin: './node_modules/.bin/oxlint',
+        configFile: './.oxlintrc.json',
+        fix: false
+    },
 };
