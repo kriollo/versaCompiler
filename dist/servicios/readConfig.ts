@@ -44,7 +44,7 @@ export async function readConfig() {
         env.tailwindcss = JSON.stringify(tsConfig?.tailwindConfig) || 'false';
         env.proxyUrl = tsConfig?.proxyConfig?.proxyUrl || '';
         env.AssetsOmit = tsConfig?.proxyConfig?.assetsOmit || false;
-        env.linter = JSON.stringify(tsConfig?.linter || false);
+        env.linter = JSON.stringify(tsConfig?.linter) || 'false';
         env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
         env.PATH_SOURCE = tsConfig?.compilerOptions.sourceRoot || './src';
