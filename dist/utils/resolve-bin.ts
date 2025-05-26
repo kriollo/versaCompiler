@@ -1,4 +1,3 @@
-// TODO: move to another package / component
 import findRoot from 'find-root';
 import fs from 'fs-extra';
 import { createRequire } from 'node:module';
