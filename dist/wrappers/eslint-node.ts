@@ -1,4 +1,6 @@
 import { execa } from 'execa';
+import path from 'node:path'; // Añadir importación de path
+import { cwd } from 'node:process'; // Añadir importación de cwd
 import { resolveBin } from '../utils/resolve-bin.ts';
 
 // Tipos para ESLint
@@ -102,6 +104,7 @@ export class ESLintNode {
         const results: ESLintMultiFormatResult = {};
 
         const targetPaths = paths.length > 0 ? paths : ['.'];
+        const projectRoot = cwd(); // Obtener la ruta raíz del proyecto
 
         await Promise.all(
             this.formats.map(async format => {
@@ -132,9 +135,13 @@ export class ESLintNode {
 
                         for (const fileResult of eslintOutput) {
                             for (const message of fileResult.messages || []) {
+                                // Calcular ruta relativa
+                                const relativeFilePath = path
+                                    .relative(projectRoot, fileResult.filePath)
+                                    .replace(/\\/g, '/');
                                 flattenedResults.push({
-                                    filePath: fileResult.filePath,
-                                    file: fileResult.filePath, // Alias para compatibilidad
+                                    filePath: relativeFilePath, // Usar ruta relativa
+                                    file: relativeFilePath, // Alias para compatibilidad
                                     message: message.message,
                                     severity: message.severity,
                                     ruleId: message.ruleId,
