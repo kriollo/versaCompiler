@@ -1,5 +1,6 @@
 // Archivo de configuración de VersaCompiler
 export default {
+    tsconfig: './tsconfig.json',
     compilerOptions: {
         sourceRoot: './src',
         outDir: './public',
@@ -19,9 +20,18 @@ export default {
         input: './src/css/input.css',
         output: './public/css/output.css',
     },
-    oxlint: {
-        bin: './node_modules/.bin/oxlint',
-        configFile: './.oxlintrc.json',
-        fix: false
-    },
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './.eslintrc.json',
+            fix: false,
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+        },
+    ],
 };
