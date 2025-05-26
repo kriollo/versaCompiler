@@ -4,7 +4,7 @@ import path from 'node:path';
 import { env } from 'node:process';
 import { logger } from '../servicios/pino.ts';
 import { showTimingForHumans } from '../utils/utils.ts';
-import { OxLint } from './linter.ts';
+import { ESLint, OxLint } from './linter.ts';
 import { minifyJS } from './minify.ts';
 import { getCodeFile } from './parser.ts';
 import { generateTailwindCSS } from './tailwindcss.ts';
@@ -278,8 +278,6 @@ export async function initCompileAll() {
             }
         }
 
-        // await linter(env.PATH_SOURCE ?? '');
-
         for await (const file of glob(patterns)) {
             if (file.endsWith('.d.ts')) {
                 continue;
@@ -289,25 +287,50 @@ export async function initCompileAll() {
                 false,
             );
         }
-
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}`);
+        logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}\n`);
 
-        const result = await OxLint();
-        if (typeof result !== 'boolean') {
-            for (const file of result['json']) {
-                inventoryError.push({
-                    severity: 'Linter_' + file.severity,
-                    message: file.message,
-                    file: file.filename,
-                    help: file.help,
-                });
-                registerInventoryResume('Linter_' + file.severity, 1, 0);
+        const linterENV = env.linter;
+        if (typeof linterENV !== 'boolean' && linterENV !== undefined) {
+            logger.info('🔍 Ejecutando linting...');
+
+            for (const item of JSON.parse(linterENV)) {
+                if (item.name.toLowerCase() === 'eslint') {
+                    // Aquí puedes agregar la lógica específica para ESLint
+                    logger.info(`🔧 Ejecutando ESLint en ${item.bin}...`);
+                    const eslintResult = await ESLint(item);
+                    if (eslintResult) {
+                        eslintResult['json'].forEach((result: any) => {
+                            registerInventoryError(
+                                result.filePath || result.file,
+                                result.message,
+                                result.severity === 2 ? 'error' : 'warning',
+                                result.ruleId
+                                    ? `Regla: ${result.ruleId}`
+                                    : undefined,
+                            );
+                        });
+                    }
+                } else if (item.name.toLowerCase() === 'oxlint') {
+                    // Aquí puedes agregar la lógica específica para OxLint
+                    logger.info(`🔧 Ejecutando OxLint en ${item.bin}...`);
+                    const oxlintResult = await OxLint(item);
+                    if (oxlintResult['json']) {
+                        oxlintResult['json'].forEach((result: any) => {
+                            registerInventoryError(
+                                result.filename,
+                                result.message,
+                                result.severity,
+                                result.help,
+                            );
+                        });
+                    }
+                }
             }
+        } else {
+            console.log('\n⏭️ Linting deshabilitado');
         }
-
-        console.table(inventoryResume, ['tipo', 'result']);
         if (inventoryError.length > 0) {
             console.table(inventoryError, [
                 'file',
@@ -315,6 +338,9 @@ export async function initCompileAll() {
                 'severity',
                 'help',
             ]);
+        }
+        if (inventoryResume.length > 0) {
+            console.table(inventoryResume, ['tipo', 'result']);
         }
     } catch (error) {
         logger.error(
