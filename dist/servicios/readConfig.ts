@@ -37,6 +37,7 @@ export async function readConfig() {
         env.tailwindcss = JSON.stringify(tsConfig?.tailwindConfig) || 'false';
         env.proxyUrl = tsConfig?.proxyConfig?.proxyUrl || '';
         env.AssetsOmit = tsConfig?.proxyConfig?.assetsOmit || false;
+        env.oxlint = JSON.stringify(tsConfig?.oxlint || false);
 
         env.PATH_SOURCE = tsConfig?.compilerOptions.sourceRoot || './src';
         env.PATH_SOURCE = (env.PATH_SOURCE || '').endsWith('/')
@@ -96,6 +97,11 @@ export default {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
         output: './public/css/output.css',
+    },
+    oxlint: {
+        bin: './node_modules/.bin/oxlint',
+        configFile: './.oxlintrc.json',
+        fix: false
     },
 };
 `;
