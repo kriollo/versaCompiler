@@ -1,4 +1,4 @@
-import { execa, ExecaError } from 'execa';
+import { execa } from 'execa';
 import { resolveBin } from '../utils/resolve-bin.ts';
 
 // Tipos basados en el código de referencia y tu implementación actual
@@ -48,15 +48,6 @@ export interface OxlintConfigOptions {
  */
 export type OxlintMultiFormatResult = Partial<Record<OxlintFormat, any>>; // 'any' para el resultado parseado o string
 
-/**
- * Resultado detallado para una sola ejecución de formato, incluyendo estado de éxito.
- */
-interface OxlintSingleRunDetails {
-    success: boolean;
-    output?: any; // string o JSON parseado
-    error?: ExecaError;
-}
-
 export class OxlintNode {
     public readonly binPath: string;
     public readonly fix: boolean;
@@ -82,7 +73,7 @@ export class OxlintNode {
         this.noIgnore = options.noIgnore || false;
         this.ignorePath = options.ignorePath;
         this.ignorePattern = options.ignorePattern;
-        this.formats = options.formats || ['default']; // Por defecto, solo 'default'
+        this.formats = options.formats || ['json']; // Por defecto, solo 'json'
         this.additionalArgs = options.additionalArgs;
     }
 
