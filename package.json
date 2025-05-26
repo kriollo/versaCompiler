@@ -20,7 +20,11 @@
         "compile": "node dist/main.ts",
         "compile-dev": "node dist/main.ts --all",
         "compile-prod": "node dist/main.ts --all --prod",
-        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "lint": "eslint src/ --ext .vue,.ts,.js",
+        "lint:fix": "eslint src/ --ext .vue,.ts,.js --fix",
+        "lint:check": "eslint --print-config src/js/components/modal.vue",
+        "lint:oxlint": "oxlint src/"
     },
     "keywords": [
         "vue",
@@ -33,6 +37,7 @@
     "author": "Jorge Jara H (kriollone@gmail.com)",
     "license": "MIT",
     "dependencies": {
+        "@teambit/oxc.linter.oxlint-node": "^0.0.1",
         "acorn": "^8.14.1",
         "acorn-walk": "^8.3.4",
         "browser-sync": "^3.0.4",
@@ -42,22 +47,32 @@
         "find-root": "^1.1.0",
         "fs-extra": "^11.3.0",
         "get-port": "^7.1.0",
-        "oxc-minify": "^0.71.0",
-        "oxc-parser": "^0.71.0",
-        "typescript": "^5.8.3",
-        "vue": "3.5.14",
-        "yargs": "^17.7.2",
+        "oxc-minify": "^0.72.0",
+        "oxc-parser": "^0.72.0",
         "pino": "^9.7.0",
-        "@teambit/oxc.linter.oxlint-node": "^0.0.1",
-        "pino-pretty": "^13.0.0"
+        "pino-pretty": "^13.0.0",
+        "typescript": "^5.8.3",
+        "vue": "3.5.15",
+        "yargs": "^17.7.2"
     },
     "devDependencies": {
-        "@tailwindcss/cli": "^4.1.6",
-        "@types/node": "^22.15.17",
+        "@eslint/eslintrc": "^3.3.1",
+        "@tailwindcss/cli": "^4.1.7",
+        "@types/node": "^22.15.21",
+        "@typescript-eslint/eslint-plugin": "^8.32.1",
+        "@typescript-eslint/parser": "^8.32.1",
+        "@vue/eslint-config-typescript": "^14.5.0",
         "code-tag": "^1.2.0",
+        "eslint": "^9.27.0",
+        "eslint-plugin-import": "^2.31.0",
+        "eslint-plugin-oxlint": "^0.16.12",
+        "eslint-plugin-promise": "^7.2.1",
+        "eslint-plugin-unicorn": "^59.0.1",
+        "eslint-plugin-vue": "^10.1.0",
         "jest": "^29.7.0",
-        "oxlint": "^0.16.10",
+        "oxlint": "^0.16.12",
         "prettier": "3.5.3",
-        "tailwindcss": "^4.1.6"
+        "tailwindcss": "^4.1.7",
+        "vue-eslint-parser": "^10.1.3"
     }
 }
