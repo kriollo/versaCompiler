@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 import { env } from 'node:process';
-import { logger } from './pino.ts';
+import { logger } from './logger.ts';
 
 import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';

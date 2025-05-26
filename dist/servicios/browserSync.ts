@@ -5,7 +5,7 @@ import getPort from 'get-port';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { env } from 'node:process';
-import { logger } from './pino.ts';
+import { logger } from './logger.ts';
 
 export async function browserSyncServer() {
     try {

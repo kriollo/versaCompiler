@@ -1,5 +1,5 @@
 import { env } from 'node:process';
-import { logger } from './../servicios/pino.ts';
+import { logger } from '../servicios/logger.ts';
 import { parser } from './parser.ts';
 
 async function replaceAliasImportStatic(

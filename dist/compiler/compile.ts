@@ -1,9 +1,9 @@
 import chalk from 'chalk';
 import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { env } from 'node:process';
-import { setTimeout } from 'node:timers';
-import { logger } from '../servicios/pino.ts';
+import { env, stdin as input, stdout as output } from 'node:process';
+import * as readline from 'node:readline/promises';
+import { logger } from '../servicios/logger.ts';
 import { showTimingForHumans } from '../utils/utils.ts';
 import { ESLint, OxLint } from './linter.ts';
 import { minifyJS } from './minify.ts';
@@ -32,6 +32,30 @@ type InventoryResume = {
 
 const inventoryResume: InventoryResume[] = [];
 const inventoryError: InventoryError[] = [];
+
+function displayLintErrors(errors: InventoryError[]): void {
+    if (errors.length === 0) {
+        return;
+    }
+    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
+    logger.table(errors, ['file', 'message', 'severity', 'help']);
+    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
+}
+
+async function displayLintingAndCompilationSummary(
+    errors: InventoryError[],
+    resume: InventoryResume[],
+): Promise<void> {
+    if (errors.length > 0) {
+        displayLintErrors(errors);
+    }
+
+    if (resume.length > 0) {
+        logger.info(chalk.bold('--- Resumen de Compilación ---'));
+        await logger.table(resume, ['tipo', 'result']);
+        logger.info(chalk.bold('--- Fin del Resumen de Compilación ---\n'));
+    }
+}
 
 export function normalizeRuta(ruta: string) {
     const file = path
@@ -104,7 +128,8 @@ async function compileJS(inPath: string, outPath: string) {
     //aca se debe pasar de vue a js
     let vueResult;
     if (extension === '.vue') {
-        logger.info(chalk.green(`💚 :Precompilando VUE`));
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(chalk.green(`💚 :Precompilando VUE`));
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
@@ -132,7 +157,8 @@ async function compileJS(inPath: string, outPath: string) {
     //aca se debe pasar de ts a js
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
-        logger.info(chalk.blue(`🔄️ :Precompilando TS`));
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(chalk.blue(`🔄️ :Precompilando TS`));
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
             registerInventoryResume('preCompileTS', 1, 0);
@@ -158,7 +184,8 @@ async function compileJS(inPath: string, outPath: string) {
     }
 
     //aca se debe pasar de js a js
-    logger.info(chalk.yellow(`💛 :Estandarizando`));
+    if (env.VERBOSE === 'true' && env.isAll === 'true')
+        logger.info(chalk.yellow(`💛 :Estandarizando`));
     const resultSTD = await estandarizaCode(code, inPath);
     if (resultSTD.error) {
         registerInventoryResume('estandarizaCode', 1, 0);
@@ -183,7 +210,8 @@ async function compileJS(inPath: string, outPath: string) {
     }
 
     if (env.isPROD === 'true') {
-        logger.info(chalk.red(`🤖 :Minificando`));
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(chalk.red(`🤖 :Minificando`));
         const resultMinify = await minifyJS(code, inPath, true);
         if (resultMinify.error) {
             registerInventoryResume('minifyJS', 1, 0);
@@ -222,7 +250,8 @@ export async function initCompile(ruta: string, compileTailwind = true) {
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
 
-        logger.info(`🔜 :Fuente para compilar: ${file}`);
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(`🔜 :Fuente para compilar: ${file}`);
 
         const result = await compileJS(file, outFile);
         if (result.error) {
@@ -231,8 +260,10 @@ export async function initCompile(ruta: string, compileTailwind = true) {
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`🔚 :Destino para publicar: ${outFile}`);
-        logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}\n\n`);
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(`🔚 :Destino para publicar: ${outFile}`);
+        if (env.VERBOSE === 'true' && env.isAll === 'true')
+            logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}\n\n`);
 
         return {
             success: true,
@@ -250,19 +281,23 @@ export async function initCompile(ruta: string, compileTailwind = true) {
     }
 }
 
-export async function runLinter(showResult: boolean = false) {
+export async function runLinter(showResult: boolean = false): Promise<boolean> {
     const linterENV = env.linter;
+    let proceedWithCompilation = true;
+    inventoryError.length = 0; // Limpiar errores de ejecuciones anteriores de linter
+
     if (
         typeof linterENV === 'string' &&
         linterENV.trim() !== '' &&
         env.ENABLE_LINTER !== 'false'
     ) {
         logger.info('🔍 Ejecutando linting...');
-        const linterPromises: Promise<void>[] = []; // Array para almacenar las promesas de los linters
+        const linterPromises: Promise<void>[] = [];
+
+        inventoryError.length = 0;
 
         const parsedLinterEnv = JSON.parse(linterENV);
         if (Array.isArray(parsedLinterEnv)) {
-            // Asegurarse que el parseo resulta en un array
             for (const item of parsedLinterEnv) {
                 if (item.name.toLowerCase() === 'eslint') {
                     logger.info(
@@ -271,7 +306,6 @@ export async function runLinter(showResult: boolean = false) {
                     const eslintPromise = ESLint(item)
                         .then(eslintResult => {
                             if (eslintResult && eslintResult.json) {
-                                // Comprobar si eslintResult.json es directamente el array de mensajes (versiones antiguas)
                                 if (Array.isArray(eslintResult.json)) {
                                     eslintResult.json.forEach((result: any) => {
                                         registerInventoryError(
@@ -286,7 +320,6 @@ export async function runLinter(showResult: boolean = false) {
                                                 : undefined,
                                         );
                                     });
-                                    // Comprobar la estructura con `results` (versiones más nuevas de ESLint)
                                 } else if (
                                     eslintResult.json.results &&
                                     Array.isArray(eslintResult.json.results)
@@ -379,24 +412,51 @@ export async function runLinter(showResult: boolean = false) {
         await Promise.all(linterPromises);
         if (showResult) {
             if (inventoryError.length > 0) {
-                await console.table(inventoryError, [
-                    'file',
-                    'message',
-                    'severity',
-                    'help',
-                ]);
+                displayLintErrors(inventoryError);
+            } else {
+                logger.info(
+                    chalk.green(
+                        '✅ No se encontraron errores ni advertencias de linting.',
+                    ),
+                );
+            }
+        }
+        if (!showResult && inventoryError.length > 0) {
+            displayLintErrors(inventoryError); // Mostrar errores antes de preguntar
+            logger.warn(
+                '🚨 Se encontraron errores o advertencias durante el linting.',
+            );
+
+            const rl = readline.createInterface({ input, output });
+            try {
+                const answer = await rl.question(
+                    '\n\n¿Deseas continuar con la compilación? (s/N): ',
+                );
+                if (answer.toLowerCase() !== 's') {
+                    logger.info('🛑 Compilación cancelada por el usuario.');
+                    proceedWithCompilation = false;
+                }
+            } finally {
+                rl.close();
             }
         }
     }
+    return proceedWithCompilation;
 }
 
 export async function initCompileAll() {
     try {
+        const shouldContinue = await runLinter();
+        if (!shouldContinue) {
+            // Mostrar errores que llevaron a la detención, sin resumen de compilación.
+            await displayLintingAndCompilationSummary(inventoryError, []);
+            return;
+        }
+
         const startTime = Date.now();
         const rawPathSource = env.PATH_SOURCE ?? '';
         const pathDist = env.PATH_DIST ?? '';
 
-        // Normalizar la ruta para usar barras inclinadas en patrones glob
         const normalizedGlobPathSource = rawPathSource.replace(/\\/g, '/');
 
         const patterns = [
@@ -409,7 +469,6 @@ export async function initCompileAll() {
         logger.info(`🔜 :Fuente para compilar (original): ${rawPathSource}`);
         logger.info(`🔚 :Destino para compilar: ${pathDist}\n`);
 
-        // execCompileTailwindcss();
         const resultTW = await generateTailwindCSS();
         if (typeof resultTW !== 'boolean') {
             if (resultTW?.success) {
@@ -432,23 +491,12 @@ export async function initCompileAll() {
         const elapsedTime = showTimingForHumans(endTime - startTime);
         logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}\n`);
 
-        await runLinter();
+        logger.info(`🚀 :Compilación de todos los archivos finalizada.\n`);
 
-        setTimeout(() => {
-            logger.info(`🚀 :Compilación de todos los archivos finalizada.\n`);
-        }, 1000);
-
-        if (inventoryError.length > 0) {
-            await console.table(inventoryError, [
-                'file',
-                'message',
-                'severity',
-                'help',
-            ]);
-        }
-        if (inventoryResume.length > 0) {
-            await console.table(inventoryResume, ['tipo', 'result']);
-        }
+        await displayLintingAndCompilationSummary(
+            inventoryError,
+            inventoryResume,
+        );
     } catch (error) {
         logger.error(
             `🚩 :Error al compilar todos los archivos: ${error.message}\n${error.stack}\n`,

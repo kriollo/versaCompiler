@@ -5,7 +5,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { browserSyncServer } from './servicios/browserSync.ts';
 import { initChokidar } from './servicios/chokidar.ts';
-import { logger } from './servicios/pino.ts';
+import { logger } from './servicios/logger.ts';
 
 import { initCompileAll, runLinter } from './compiler/compile.ts';
 import { initConfig, readConfig } from './servicios/readConfig.ts';
@@ -45,7 +45,13 @@ async function main() {
         .option('prod', {
             type: 'boolean',
             description: 'Modo producción',
-        });
+        })
+        .option('verbose', {
+            type: 'boolean',
+            description: 'Habilitar salida detallada (verbose)',
+            default: false, // Por defecto, verbose está deshabilitado
+        })
+        .alias('v', 'verbose');
 
     // Definir la opción tailwind dinámicamente
     // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
@@ -86,16 +92,16 @@ async function main() {
         env.isALL = argv.all ? 'true' : 'false';
         env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
         env.ENABLE_LINTER = argv.linter === undefined ? 'true' : argv.linter;
+        env.VERBOSE = argv.verbose ? 'true' : 'false';
 
         logger.info(chalk.green('Configuración de VersaCompiler:'));
         logger.info(chalk.green(`isWatch: ${argv.watch}`));
         logger.info(chalk.green(`isAll: ${env.isALL}`));
         logger.info(chalk.green(`isProd: ${env.isPROD}`));
         logger.info(chalk.green(`isTailwind: ${env.TAILWIND}`));
-        logger.info(chalk.green(`isLinter: ${env.ENABLE_LINTER}`));
+        logger.info(chalk.green(`isLinter: ${env.ENABLE_LINTER}\n`));
 
         if (argv.all) {
-            logger.info(chalk.green('Compilando todos los archivos...'));
             await initCompileAll();
             process.exit(0);
         }

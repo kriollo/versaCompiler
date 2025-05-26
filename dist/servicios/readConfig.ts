@@ -1,6 +1,6 @@
 import { env } from 'node:process';
 import { pathToFileURL } from 'node:url'; // Importar pathToFileURL
-import { logger } from './pino.ts';
+import { logger } from './logger.ts';
 
 export type typeLinter = {
     name: string;

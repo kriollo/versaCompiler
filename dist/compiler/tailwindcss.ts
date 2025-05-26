@@ -1,5 +1,5 @@
 import { env } from 'process';
-import { logger } from '../servicios/pino.ts';
+import { logger } from '../servicios/logger.ts';
 import { TailwindNode } from '../wrappers/tailwind-node.ts';
 export async function generateTailwindCSS() {
     if (

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import path from 'node:path';
 import * as vCompiler from 'vue/compiler-sfc';
-import { logger } from '../servicios/pino.ts';
+import { logger } from '../servicios/logger.ts';
 import { parser } from './parser.ts';
 
 // const getComponentsVue = async (data: string) => {
