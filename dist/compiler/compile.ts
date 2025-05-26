@@ -295,14 +295,15 @@ export async function initCompileAll() {
         logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}`);
 
         const result = await OxLint();
-        if (result) {
-            for (const file of JSON.parse(result)) {
+        if (typeof result !== 'boolean') {
+            for (const file of result['json']) {
                 inventoryError.push({
                     severity: 'Linter_' + file.severity,
                     message: file.message,
                     file: file.filename,
                     help: file.help,
                 });
+                registerInventoryResume('Linter_' + file.severity, 1, 0);
             }
         }
 
