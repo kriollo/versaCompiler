@@ -7,7 +7,7 @@ import { browserSyncServer } from './servicios/browserSync.ts';
 import { initChokidar } from './servicios/chokidar.ts';
 import { logger } from './servicios/pino.ts';
 
-import { initCompileAll } from './compiler/compile.ts';
+import { initCompileAll, runLinter } from './compiler/compile.ts';
 import { initConfig, readConfig } from './servicios/readConfig.ts';
 
 // Obtener el directorio del archivo actual (dist/)
@@ -29,6 +29,15 @@ async function main() {
         .usage(
             chalk.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
         )
+        .option('init', {
+            type: 'boolean',
+            description: 'Inicializar la configuración',
+        })
+        .option('watch', {
+            type: 'boolean',
+            description: 'Habilitar el modo de observación (watch)',
+            default: false, // Por defecto, el modo watch está habilitado
+        })
         .option('all', {
             type: 'boolean',
             description: 'Compilar todos los archivos',
@@ -36,10 +45,6 @@ async function main() {
         .option('prod', {
             type: 'boolean',
             description: 'Modo producción',
-        })
-        .option('init', {
-            type: 'boolean',
-            description: 'Inicializar la configuración',
         });
 
     // Definir la opción tailwind dinámicamente
@@ -49,8 +54,16 @@ async function main() {
             type: 'boolean',
             description:
                 'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=true',
-            // No se establece un 'default' aquí para que argv.tailwind sea undefined si no se usa el flag,
-            // permitiendo que la lógica posterior decida basada en la configuración global.
+            default: false,
+        });
+    }
+
+    if (env.linter !== 'false') {
+        yargInstance = yargInstance.option('linter', {
+            type: 'boolean',
+            description:
+                'Habilitar/Deshabilitar el linter. Por defecto --linter=true',
+            default: false,
         });
     }
 
@@ -68,12 +81,18 @@ async function main() {
             await initConfig();
             process.exit(0);
         }
+
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
         env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
+        env.ENABLE_LINTER = argv.linter === undefined ? 'true' : argv.linter;
+
+        logger.info(chalk.green('Configuración de VersaCompiler:'));
+        logger.info(chalk.green(`isWatch: ${argv.watch}`));
         logger.info(chalk.green(`isAll: ${env.isALL}`));
         logger.info(chalk.green(`isProd: ${env.isPROD}`));
         logger.info(chalk.green(`isTailwind: ${env.TAILWIND}`));
+        logger.info(chalk.green(`isLinter: ${env.ENABLE_LINTER}`));
 
         if (argv.all) {
             logger.info(chalk.green('Compilando todos los archivos...'));
@@ -81,13 +100,17 @@ async function main() {
             process.exit(0);
         }
 
-        const bs = await browserSyncServer();
-        if (!bs) {
-            process.exit(1);
-        }
-        const watch = await initChokidar(bs);
-        if (!watch) {
-            process.exit(1);
+        let bs;
+        let watch;
+        if (argv.watch) {
+            bs = await browserSyncServer();
+            if (!bs) {
+                process.exit(1);
+            }
+            watch = await initChokidar(bs);
+            if (!watch) {
+                process.exit(1);
+            }
         }
         process.on('SIGINT', async () => {
             bs.exit();
@@ -100,6 +123,12 @@ async function main() {
             stopCompile();
             process.exit(0);
         });
+        if (!argv.watch) {
+            if (env.ENABLE_LINTER === 'true') {
+                await runLinter(true);
+                process.exit(1);
+            }
+        }
     } catch (error) {
         logger.error('Error en la aplicación:', error);
         stopCompile();

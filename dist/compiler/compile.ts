@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
+import { setTimeout } from 'node:timers';
 import { logger } from '../servicios/pino.ts';
 import { showTimingForHumans } from '../utils/utils.ts';
 import { ESLint, OxLint } from './linter.ts';
@@ -249,6 +250,146 @@ export async function initCompile(ruta: string, compileTailwind = true) {
     }
 }
 
+export async function runLinter(showResult: boolean = false) {
+    const linterENV = env.linter;
+    if (
+        typeof linterENV === 'string' &&
+        linterENV.trim() !== '' &&
+        env.ENABLE_LINTER !== 'false'
+    ) {
+        logger.info('🔍 Ejecutando linting...');
+        const linterPromises: Promise<void>[] = []; // Array para almacenar las promesas de los linters
+
+        const parsedLinterEnv = JSON.parse(linterENV);
+        if (Array.isArray(parsedLinterEnv)) {
+            // Asegurarse que el parseo resulta en un array
+            for (const item of parsedLinterEnv) {
+                if (item.name.toLowerCase() === 'eslint') {
+                    logger.info(
+                        `🔧 Ejecutando ESLint con config: ${item.configFile || 'por defecto'}`,
+                    );
+                    const eslintPromise = ESLint(item)
+                        .then(eslintResult => {
+                            if (eslintResult && eslintResult.json) {
+                                // Comprobar si eslintResult.json es directamente el array de mensajes (versiones antiguas)
+                                if (Array.isArray(eslintResult.json)) {
+                                    eslintResult.json.forEach((result: any) => {
+                                        registerInventoryError(
+                                            result.filePath ||
+                                                'archivo no especificado',
+                                            result.message,
+                                            result.severity === 2
+                                                ? 'error'
+                                                : 'warning',
+                                            result.ruleId
+                                                ? `Regla ESLint: ${result.ruleId}`
+                                                : undefined,
+                                        );
+                                    });
+                                    // Comprobar la estructura con `results` (versiones más nuevas de ESLint)
+                                } else if (
+                                    eslintResult.json.results &&
+                                    Array.isArray(eslintResult.json.results)
+                                ) {
+                                    eslintResult.json.results.forEach(
+                                        (fileResult: any) => {
+                                            if (
+                                                fileResult.messages &&
+                                                Array.isArray(
+                                                    fileResult.messages,
+                                                )
+                                            ) {
+                                                fileResult.messages.forEach(
+                                                    (msg: any) => {
+                                                        registerInventoryError(
+                                                            fileResult.filePath ||
+                                                                'archivo no especificado',
+                                                            msg.message,
+                                                            msg.severity === 2
+                                                                ? 'error'
+                                                                : 'warning',
+                                                            msg.ruleId
+                                                                ? `Regla ESLint: ${msg.ruleId}`
+                                                                : undefined,
+                                                        );
+                                                    },
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                            }
+                        })
+                        .catch(err => {
+                            logger.error(
+                                `❌ Error durante la ejecución de ESLint: ${err.message}`,
+                            );
+                            registerInventoryError(
+                                item.configFile || 'ESLint Config',
+                                `Fallo al ejecutar ESLint: ${err.message}`,
+                                'error',
+                            );
+                        });
+                    linterPromises.push(eslintPromise);
+                } else if (item.name.toLowerCase() === 'oxlint') {
+                    logger.info(
+                        `🔧 Ejecutando OxLint con config: ${item.configFile || 'por defecto'}`,
+                    );
+                    const oxlintPromise = OxLint(item)
+                        .then(oxlintResult => {
+                            if (
+                                oxlintResult &&
+                                oxlintResult['json'] &&
+                                Array.isArray(oxlintResult['json'])
+                            ) {
+                                oxlintResult['json'].forEach((result: any) => {
+                                    registerInventoryError(
+                                        result.filename ||
+                                            result.file ||
+                                            'archivo no especificado',
+                                        result.message,
+                                        typeof result.severity === 'string'
+                                            ? result.severity.toLowerCase()
+                                            : 'error',
+                                        result.help ||
+                                            (result.rule_id
+                                                ? `Regla Oxlint: ${result.rule_id}`
+                                                : undefined),
+                                    );
+                                });
+                            }
+                        })
+                        .catch(err => {
+                            logger.error(
+                                `❌ Error durante la ejecución de OxLint: ${err.message}`,
+                            );
+                            registerInventoryError(
+                                item.configFile || 'Oxlint Config',
+                                `Fallo al ejecutar Oxlint: ${err.message}`,
+                                'error',
+                            );
+                        });
+                    linterPromises.push(oxlintPromise);
+                }
+            }
+        } else {
+            logger.warn('⚠️ La configuración de linter no es un array válido.');
+        }
+
+        await Promise.all(linterPromises);
+        if (showResult) {
+            if (inventoryError.length > 0) {
+                await console.table(inventoryError, [
+                    'file',
+                    'message',
+                    'severity',
+                    'help',
+                ]);
+            }
+        }
+    }
+}
+
 export async function initCompileAll() {
     try {
         const startTime = Date.now();
@@ -291,48 +432,14 @@ export async function initCompileAll() {
         const elapsedTime = showTimingForHumans(endTime - startTime);
         logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}\n`);
 
-        const linterENV = env.linter;
-        if (typeof linterENV !== 'boolean' && linterENV !== undefined) {
-            logger.info('🔍 Ejecutando linting...');
+        await runLinter();
 
-            for (const item of JSON.parse(linterENV)) {
-                if (item.name.toLowerCase() === 'eslint') {
-                    // Aquí puedes agregar la lógica específica para ESLint
-                    logger.info(`🔧 Ejecutando ESLint en ${item.bin}...`);
-                    const eslintResult = await ESLint(item);
-                    if (eslintResult) {
-                        eslintResult['json'].forEach((result: any) => {
-                            registerInventoryError(
-                                result.filePath || result.file,
-                                result.message,
-                                result.severity === 2 ? 'error' : 'warning',
-                                result.ruleId
-                                    ? `Regla: ${result.ruleId}`
-                                    : undefined,
-                            );
-                        });
-                    }
-                } else if (item.name.toLowerCase() === 'oxlint') {
-                    // Aquí puedes agregar la lógica específica para OxLint
-                    logger.info(`🔧 Ejecutando OxLint en ${item.bin}...`);
-                    const oxlintResult = await OxLint(item);
-                    if (oxlintResult['json']) {
-                        oxlintResult['json'].forEach((result: any) => {
-                            registerInventoryError(
-                                result.filename,
-                                result.message,
-                                result.severity,
-                                result.help,
-                            );
-                        });
-                    }
-                }
-            }
-        } else {
-            console.log('\n⏭️ Linting deshabilitado');
-        }
+        setTimeout(() => {
+            logger.info(`🚀 :Compilación de todos los archivos finalizada.\n`);
+        }, 1000);
+
         if (inventoryError.length > 0) {
-            console.table(inventoryError, [
+            await console.table(inventoryError, [
                 'file',
                 'message',
                 'severity',
@@ -340,7 +447,7 @@ export async function initCompileAll() {
             ]);
         }
         if (inventoryResume.length > 0) {
-            console.table(inventoryResume, ['tipo', 'result']);
+            await console.table(inventoryResume, ['tipo', 'result']);
         }
     } catch (error) {
         logger.error(

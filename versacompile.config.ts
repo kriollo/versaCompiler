@@ -24,14 +24,16 @@ export default {
         {
             name: 'eslint',
             bin: './node_modules/.bin/eslint',
-            configFile: './.eslintrc.json',
+            configFile: './eslint.config.js',
             fix: false,
+            paths: ['src/'],
         },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
             fix: false,
+            paths: ['src/'],
         },
     ],
 };
