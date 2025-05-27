@@ -4,29 +4,6 @@ import * as vCompiler from 'vue/compiler-sfc';
 import { logger } from '../servicios/logger.ts';
 import { parser } from './parser.ts';
 
-// const getComponentsVue = async (data: string) => {
-//     let components: string[] = [];
-
-//     const importRegExp = /import\s+[\s\S]*?\s+from\s+['"].*['"];/g;
-
-//     const _a = data.replace(importRegExp, match => {
-//         const ruta = match.match(/from\s+['"](.*)['"];/)[1];
-
-//         if (ruta.endsWith('.vue')) {
-//             const resultVue = match.match(/from\s+['"](.+\/(\w+))\.vue['"];/);
-//             if (resultVue) {
-//                 const fullPath = resultVue[1].replace('.vue', '');
-//                 const fileName = resultVue[2];
-//                 components.push(fileName);
-//                 return `import ${fileName} from '${fullPath}.js';`;
-//             }
-//         }
-//         return match; // Devolver el match original si no se cumple ninguna condición
-//     });
-
-//     return components;
-// };
-
 const getComponentsVueMap = async ast => {
     let components: string[] = [];
     const importsStatic = ast?.module?.staticImports;
@@ -39,10 +16,10 @@ const getComponentsVueMap = async ast => {
         });
         components = components.flat();
     }
-
-    components = components.map(item => {
-        return item.replace(/['"]/g, '');
-    });
+    // console.log(components);
+    // components = components.map(item => {
+    //     return item.replace(/['"]/g, '');
+    // });
     return components;
 };
 
@@ -100,7 +77,7 @@ export const preCompileVue = async (
 
         const { descriptor, errors } = vCompiler.parse(data, {
             filename: fileName,
-            sourceMap: !isProd, // Generalmente querrás sourcemaps en desarrollo
+            sourceMap: !isProd,
             sourceRoot: path.dirname(source),
         });
 
@@ -117,7 +94,7 @@ export const preCompileVue = async (
 
         // --- 1. Compilación del Script ---
         let scriptContent: string;
-        let scriptLang: 'ts' | 'js' = 'js'; // Default a js
+        let scriptLang: 'ts' | 'js' = 'js';
         let scriptBindings: vCompiler.BindingMetadata | undefined;
         let scriptType: 'script' | 'scriptSetup' | undefined;
 
@@ -130,15 +107,21 @@ export const preCompileVue = async (
                 id,
                 isProd,
                 sourceMap: !isProd,
-                inlineTemplate: false,
+                inlineTemplate: false, // Siempre compilar por separado para tener control
                 propsDestructure: true,
-                templateOptions: descriptor.scriptSetup
-                    ? {
-                          compilerOptions: {
-                              scopeId,
-                          },
-                      }
-                    : undefined,
+                templateOptions: {
+                    compilerOptions: {
+                        mode: 'module',
+                        scopeId,
+                        prefixIdentifiers: true,
+                        hoistStatic: isProd,
+                        cacheHandlers: isProd,
+                        nodeTransforms: [],
+                        directiveTransforms: {},
+                    },
+                    transformAssetUrls: true,
+                },
+                customElement: false,
             };
 
             const compiledScriptResult = vCompiler.compileScript(
@@ -158,7 +141,29 @@ export const preCompileVue = async (
             scriptLang = 'js';
         }
 
-        // --- 2. Compilación de la Plantilla ---
+        const ast = await parser(
+            `temp.${scriptLang}`,
+            scriptContent,
+            scriptLang,
+        );
+        if (ast?.errors.length > 0) {
+            throw new Error(
+                `Error al analizar el script del componente Vue ${source}:\n${ast.errors
+                    .map(e => e.message)
+                    .join('\n')}`,
+            );
+        }
+        const components = await getComponentsVueMap(ast);
+
+        if (scriptBindings) {
+            Object.keys(scriptBindings).forEach(key => {
+                if (components.includes(key)) {
+                    delete scriptBindings[key];
+                }
+            });
+        }
+
+        // --- 2. Compilación de la Plantilla (CORREGIDA) ---
         let templateCode = '';
         if (descriptor.template) {
             const templateCompileOptions: vCompiler.SFCTemplateCompileOptions =
@@ -169,8 +174,6 @@ export const preCompileVue = async (
                     scoped: !!scopeId,
                     slotted: descriptor.slotted,
                     isProd,
-                    // sourceMap: !isProd,
-                    // comments: isProd ? false : 'all',
                     compilerOptions: {
                         scopeId,
                         mode: 'module',
@@ -180,24 +183,25 @@ export const preCompileVue = async (
                         cacheHandlers: isProd,
                         runtimeGlobalName: 'Vue',
                         runtimeModuleName: 'vue',
-                        // optimizeBindings: true,
-                        //runtimeContextBuiltins: true,
-                        // runtimeDirectives: true,
-                        // runtimeVNode: true,
-                        // runtimeProps: true,
-                        // runtimeSlots: true,
-                        // runtimeComponents: true,
-                        // runtimeCompiledRender: true,
                         whitespace: 'condense',
-                        // ssrCssExternal: true,
                         ssr: false,
                         nodeTransforms: [],
                         directiveTransforms: {},
                     },
                 };
+
             const compiledTemplateResult = vCompiler.compileTemplate(
                 templateCompileOptions,
             );
+
+            // DEBUGGING: Verificar errores en template
+            if (compiledTemplateResult.errors?.length > 0) {
+                console.error(
+                    'Template compilation errors:',
+                    compiledTemplateResult.errors,
+                );
+            }
+
             templateCode = compiledTemplateResult.code;
         } else {
             logger.warn(
@@ -219,12 +223,11 @@ export const preCompileVue = async (
 
         let customBlocks = '';
         if (descriptor.customBlocks.length > 0) {
-            // eliminar el ultimo caracter que es un punto y coma
             customBlocks =
                 descriptor?.customBlocks[0].content.slice(0, -1) ?? '';
         }
 
-        // Compile styles Y obtener el contenido de los estilos
+        // Compile styles
         const compiledStyles = descriptor.styles.map(style => {
             const lang = style.lang?.toLowerCase();
             let currentPreprocessLang:
@@ -248,7 +251,7 @@ export const preCompileVue = async (
             return vCompiler.compileStyle({
                 id,
                 source: style.content,
-                scoped: style.scoped, // Esto maneja si el estilo es scoped o global
+                scoped: style.scoped,
                 preprocessLang: currentPreprocessLang,
                 isProd,
                 trim: true,
@@ -265,24 +268,14 @@ export const preCompileVue = async (
                 })();`
             : '';
 
-        // Combine all parts into a single module
         let output = `
             ${insertStyles}
             ${finalCompiledScript.content}
             ${finalCompiledTemplate.code}
         `;
 
-        const ast = await parser(`temp.${scriptLang}`, output, scriptLang);
-        if (ast?.errors.length > 0) {
-            throw new Error(
-                `Error al analizar el script del componente Vue ${source}:\n${ast.errors
-                    .map(e => e.message)
-                    .join('\n')}`,
-            );
-        }
-
         const componentName = `${fileName}_component`;
-        const components = await getComponentsVueMap(ast);
+
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
@@ -292,7 +285,7 @@ export const preCompileVue = async (
                 },
             `;
 
-        // quitamos export default y añadimos el nombre del archivo
+        // MEJORAR: Manejo más robusto de export default
         if (output.includes('export default {')) {
             output = output.replace(
                 'export default {',
@@ -307,7 +300,18 @@ export const preCompileVue = async (
                 \n${exportComponent}
                 `,
             );
-        } else {
+        } else if (
+            output.includes('const default = /*@__PURE__*/_defineComponent({')
+        ) {
+            output = output.replace(
+                'const default = /*@__PURE__*/_defineComponent({',
+                `const ${componentName} = /*@__PURE__*/_defineComponent({
+                \n${exportComponent}
+                `,
+            );
+        } else if (
+            output.includes('export default /*@__PURE__*/_defineComponent({')
+        ) {
             output = output.replace(
                 'export default /*@__PURE__*/_defineComponent({',
                 `const ${componentName} = /*@__PURE__*/_defineComponent({
@@ -316,13 +320,27 @@ export const preCompileVue = async (
             );
         }
 
-        // buscar setup( y reemplazar por async setup(
-        if (output.includes('setup(')) {
-            output = output.replace('setup(', 'async setup(');
+        // MEJORAR: Manejo más robusto de render function
+        if (output.includes('export function render')) {
+            output = output.replace(
+                'export function render',
+                `function render_${componentName}`,
+            );
+        }
+
+        // AÑADIR: Verificar si render fue generado correctamente
+        const hasRenderFunction =
+            output.includes(`render_${componentName}`) ||
+            output.includes('function render(');
+
+        if (!hasRenderFunction && descriptor.template) {
+            console.warn(
+                'Warning: No render function found in compiled output',
+            );
         }
 
         const finishComponent = `
-            ${componentName}.render = render;
+            ${hasRenderFunction ? `${componentName}.render = render_${componentName};` : ''}
             ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
             ${customBlocks}
 
@@ -330,7 +348,9 @@ export const preCompileVue = async (
         `;
 
         output = `${output}\n${finishComponent}`;
-        // console.log(output);
+
+        // DEBUGGING FINAL
+        // console.log('Final compiled output:', output);
 
         return {
             lang: finalCompiledScript.lang,
@@ -338,6 +358,7 @@ export const preCompileVue = async (
             data: output,
         };
     } catch (error) {
-        return { lang: null, error, data: null }; // Devolver error en objeto
+        console.error('Vue compilation error:', error);
+        return { lang: null, error, data: null };
     }
 };
