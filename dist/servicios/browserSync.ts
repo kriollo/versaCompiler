@@ -170,5 +170,10 @@ export function emitirCambios(bs: any, action: string, filePath: string) {
     logger.info(
         chalk.green(`[HMR] Emitiendo cambios: ${action} ${filePath}\n`),
     );
-    bs.sockets.emit(action, { action, filePath });
+    const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
+    const nameFile = path.basename(
+        normalizedPath,
+        path.extname(normalizedPath),
+    );
+    bs.sockets.emit(action, { action, filePath, normalizedPath, nameFile });
 }
