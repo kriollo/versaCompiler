@@ -1,4 +1,6 @@
 import { hideErrorOverlay, showErrorOverlay } from './hrm/errorScreen.js';
+import obtenerInstanciaVue from './hrm/getInstanciaVue.js';
+import { reloadComponent } from './hrm/VueHRM.js';
 
 async function initSocket(retries = 0) {
     const maxRetries = 10;
@@ -45,8 +47,18 @@ async function initSocket(retries = 0) {
         });
 
         socket.on('reloadFull', () => window.location.reload());
-        socket.on('HRMVue', data => {
+
+        // Obtener la instancia de Vue con toda la lógica integrada
+        let vueInstance = await obtenerInstanciaVue();
+        socket.on('HRMVue', async data => {
             console.log('Versa HMR: Recibiendo datos de HMR:', data);
+            vueInstance = window.__VUE_APP__ || vueInstance;
+            if (vueInstance) {
+                console.log('🔥 Preparando HMR para Vue...');
+                await reloadComponent(vueInstance, data);
+            } else {
+                console.log('🔄 Usando método fallback:', vueInstance);
+            }
         });
         socket.on('HRMHelper', data => {
             console.log('Versa HMR: Recibiendo datos de HMR:', data);
