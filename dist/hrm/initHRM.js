@@ -51,7 +51,6 @@ async function initSocket(retries = 0) {
         // Obtener la instancia de Vue con toda la lógica integrada
         let vueInstance = await obtenerInstanciaVue();
         socket.on('HRMVue', async data => {
-            console.log('Versa HMR: Recibiendo datos de HMR:', data);
             vueInstance = window.__VUE_APP__ || vueInstance;
             if (vueInstance) {
                 console.log('🔥 Preparando HMR para Vue...');

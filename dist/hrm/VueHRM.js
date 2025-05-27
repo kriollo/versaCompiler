@@ -1,10 +1,17 @@
 function findNodeByInstance(tree, instance) {
-    if (tree.name === instance) return tree;
-    for (const child of tree.children) {
-        const found = findNodeByInstance(child, instance);
-        if (found) return found;
+    const matches = [];
+
+    function searchRecursively(node) {
+        if (node.name === instance) {
+            matches.push(node);
+        }
+        for (const child of node.children) {
+            searchRecursively(child);
+        }
     }
-    return null;
+
+    searchRecursively(tree);
+    return matches;
 }
 
 function getPathToRoot(node) {
@@ -138,49 +145,47 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
         console.error('❌ Parámetros inválidos para tryUpdateComponentPath');
         return false;
     }
-    for (const parent of path) {
+
+    // Recorrer el path desde el padre hacia la raíz (saltando el primer elemento que es el propio componente)
+    for (let i = 1; i < path.length; i++) {
+        const parent = path[i];
+
         if (parent.isRoot || parent.name === 'KeepAlive') {
             window.location.reload();
+            return true;
         }
 
-        if (parent.name !== componentName) {
-            console.log('🔄 Intentando actualizar componente:', componentName);
+        if (!parent || !parent.instancia) {
+            console.error('❌ Nodo padre no válido en el camino:', parent);
+            continue; // Continúa con el siguiente padre en lugar de fallar
+        }
 
-            if (!parent || !parent.instancia) {
-                console.error('❌ Nodo final no válido en el camino:', parent);
-                return false;
-            }
+        // Actualizar la instancia del componente
+        const componentsDefinition =
+            parent.instancia?.type?.components || parent.instancia?.components;
 
-            // Actualizar la instancia del componente
-            const componentsDefinition =
-                parent.instancia?.type?.components ||
-                parent.instancia?.components;
-            if (componentsDefinition) {
-                componentsDefinition[componentName] = newComponent;
-            }
+        if (componentsDefinition && componentsDefinition[componentName]) {
+            componentsDefinition[componentName] = newComponent;
 
-            // Forzar actualización de la instancia
-            if (tryForceUpdate(parent.instancia)) {
-                console.log('✅ Componente actualizado y forzado a renderizar');
-                return true;
-            } else {
-                console.error(
-                    '❌ No se pudo forzar la actualización del componente',
-                );
-                return false;
-            }
+            // Forzar actualización de la instancia padre
+            return (
+                tryForceUpdate(parent.instancia) ||
+                tryForceUpdate(parent.instancia.proxy)
+            );
         }
     }
+
+    return false;
 }
 
 export async function reloadComponent(App, Component) {
     try {
         const { normalizedPath: relativePath, nameFile: componentName } =
             Component;
-        console.log('🔄 Iniciando recarga de componente:', {
-            relativePath,
-            componentName,
-        });
+        if (!App || !App._instance) {
+            console.error('❌ App o App._instance no están definidos');
+            return false;
+        }
 
         if (!relativePath) {
             console.error('❌ No se proporcionó relativePath');
@@ -193,7 +198,6 @@ export async function reloadComponent(App, Component) {
         const timestamp = Date.now();
         const moduleUrl = `${urlOrigin}?t=${timestamp}`;
 
-        console.log('📥 Importando módulo:', moduleUrl);
         const module = await import(moduleUrl);
 
         if (!module.default) {
@@ -201,73 +205,52 @@ export async function reloadComponent(App, Component) {
             return false;
         }
 
-        console.log('📦 Componente cargado:', componentName);
-
         const componentTree = buildComponentTree(App._instance);
         if (!componentTree) {
             console.error('❌ No se pudo construir el árbol de componentes');
             return false;
         }
 
-        console.log(
-            '🌳 Árbol de componentes construido, buscando:',
-            componentName,
-        );
-        const targetNode = findNodeByInstance(componentTree, componentName);
-
-        if (!targetNode) {
+        const targetNodes = findNodeByInstance(componentTree, componentName);
+        if (!targetNodes) {
             console.warn(
                 '⚠️ No se encontró el nodo objetivo para:',
                 componentName,
             );
-            console.log(
-                '🔍 Componentes disponibles en el árbol:',
-                getAllComponentNames(componentTree),
-            );
 
-            // Intentar buscar por coincidencia parcial
-            const allNames = getAllComponentNames(componentTree);
-            const partialMatches = allNames.filter(
-                name =>
-                    name.toLowerCase().includes(componentName.toLowerCase()) ||
-                    componentName.toLowerCase().includes(name.toLowerCase()),
-            );
-
-            if (partialMatches.length > 0) {
-                console.log(
-                    '🔍 Posibles coincidencias parciales:',
-                    partialMatches,
-                );
-                // Intentar con la primera coincidencia parcial
-                const fallbackTarget = findNodeByInstance(
-                    componentTree,
-                    partialMatches[0],
-                );
-                if (fallbackTarget) {
-                    console.log(
-                        '🔄 Usando coincidencia parcial:',
-                        partialMatches[0],
-                    );
-                    const fallbackPath = getPathToRoot(fallbackTarget);
-                    return await tryUpdateComponentPath(
-                        fallbackPath,
-                        module.default,
-                        partialMatches[0],
-                        App,
-                    );
-                }
-            }
             return false;
         }
 
-        console.log('🎯 Nodo objetivo encontrado:', targetNode.name);
-        const path = getPathToRoot(targetNode);
-        return await tryUpdateComponentPath(
-            path,
-            module.default,
-            componentName,
-            App,
+        console.log(
+            `🔍 Se encontraron ${targetNodes.length} instancias del componente ${componentName}`,
         );
+
+        let successfulUpdates = 0;
+
+        // Procesar TODAS las instancias encontradas
+        for (let i = 0; i < targetNodes.length; i++) {
+            const node = targetNodes[i];
+            const path = getPathToRoot(node);
+            const updateResult = await tryUpdateComponentPath(
+                path,
+                module.default,
+                componentName,
+                App,
+            );
+
+            if (updateResult) {
+                successfulUpdates++;
+            } else {
+                console.error(`❌ No se pudo actualizar la instancia ${i + 1}`);
+            }
+        }
+
+        const hasSuccessfulUpdate = successfulUpdates > 0;
+        console.log(
+            `\n📊 Resultado final: ${successfulUpdates}/${targetNodes.length} instancias actualizadas`,
+        );
+
+        return hasSuccessfulUpdate;
     } catch (error) {
         console.error('❌ Error en reloadComponent:', error);
         return false;
