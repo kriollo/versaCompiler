@@ -1,7 +1,8 @@
 <script setup lang="ts">
+    import { onMounted, ref, toRefs, type Ref } from 'vue';
+
     import lineHr from '@/js/components/lineHr.vue';
     import { add, multiply, subtract } from '@/js/sampleFile';
-    import { onMounted, ref, toRefs, type Ref } from 'vue';
 
     type Props = {
         message: string;
@@ -24,7 +25,7 @@
         result.value = multiply(num1.value, num2.value);
     };
     onMounted(() => {
-        console.log('el resultado de la suma entre 2 y 3 es: ', add(2, 3));
+        console.log('el resultado de la suma entre 5 y 4 es: ', add(5, 4));
     });
 </script>
 <template>
@@ -33,7 +34,7 @@
             <h1>{{ message }}</h1>
         </div>
 
-        <h1>Operaciones Matemáticas</h1>
+        <h1>Operaciones Matemáticas - HMR Test 🧮</h1>
         <lineHr />
 
         <div class="container">
@@ -48,7 +49,7 @@
                 </div>
             </div>
             <div class="btnOperations">
-                <button @click="addNumber">sumar</button>
+                <button @click="addNumber">sumarsss</button>
                 <button @click="subtractNumber">restar</button>
                 <button @click="multiplyNumber">multiplicar</button>
             </div>

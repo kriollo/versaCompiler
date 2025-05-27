@@ -1,9 +1,10 @@
 <script setup lang="ts">
+    import { nextTick, onMounted, ref } from 'vue';
+
     import lineHr from '@/js/components/lineHr.vue';
     import loader from '@/js/components/loader.vue';
     import primerModal from '@/js/module/modals/primerModal.vue';
     import simpleComponent from '@/js/module/simpleComponent.vue';
-    import { nextTick, onMounted, ref } from 'vue';
 
     const showLocalModal = ref(false);
     const isDark = ref(false);
@@ -70,18 +71,16 @@
     };
 
     // Main toggle function
-    const toggleDark = async (event: MouseEvent) => {
+    const toggleDark = async (_event: MouseEvent) => {
         const newIsDark = !isDark.value;
         showLoader.value = true;
 
-        // @ts-ignore - document.startViewTransition might not be in all TS lib versions
         if (document.startViewTransition && !isAnimating.value) {
             isAnimating.value = true;
 
             // For a top-to-bottom fill, click coordinates are not used for the clip-path shape
             // The animation is defined in CSS to fill from top
 
-            // @ts-ignore
             const transition = document.startViewTransition(() => {
                 applyThemeAndIcons(newIsDark);
             });

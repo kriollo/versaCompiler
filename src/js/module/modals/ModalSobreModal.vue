@@ -1,6 +1,7 @@
 <script setup lang="ts">
-    import modal from '@/js/components/modal.vue';
     import { computed } from 'vue';
+
+    import modal from '@/js/components/modal.vue';
 
     const props = withDefaults(defineProps<{ showModal: boolean }>(), {
         showModal: false,

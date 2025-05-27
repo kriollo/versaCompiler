@@ -27,6 +27,16 @@
     const size = computed(() => props.size);
     const showFooter = computed(() => props.showFooter);
     const modal = ref(null);
+
+    const closeModal = () => {
+        emit('accion', false);
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+        if (modal.value && !modal.value.contains(event.target as Node)) {
+            closeModal();
+        }
+    };
 </script>
 <template>
     <Transition name="fade" mode="out-in" appear>

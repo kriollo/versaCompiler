@@ -1,11 +1,12 @@
+import { html } from 'code-tag';
+import { createApp, ref } from 'vue';
+
 import {
     $dom,
     handleError,
     isValidModuleName,
     sanitizeModulePath,
 } from '@/js/devUtils';
-import { html } from 'code-tag';
-import { createApp, ref } from 'vue';
 
 const debug = ref(false);
 const $contenedor = ref(null);
@@ -55,9 +56,7 @@ async function loadModule() {
                 },
                 name: 'App',
                 template: html`
-                    <Suspense>
-                        <${component} :key="componentKey" />
-                    </Suspense>
+                    <${component} :key="componentKey" />
                 `,
             });
 

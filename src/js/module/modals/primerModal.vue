@@ -1,7 +1,8 @@
 <script setup lang="ts">
+    import { computed, ref } from 'vue';
+
     import modal from '@/js/components/modal.vue';
     import ModalSobreModal from '@/js/module/modals/ModalSobreModal.vue';
-    import { computed, ref } from 'vue';
 
     const props = withDefaults(defineProps<{ showModal: boolean }>(), {
         showModal: false,
