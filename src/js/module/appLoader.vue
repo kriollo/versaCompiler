@@ -159,6 +159,7 @@
                 Abrir
             </button>
         </div>
+
         <primerModal :showModal="showLocalModal" @accion="closeModal" />
     </div>
 </template>

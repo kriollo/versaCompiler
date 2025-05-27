@@ -25,7 +25,7 @@
         result.value = multiply(num1.value, num2.value);
     };
     onMounted(() => {
-        console.log('el resultado de la suma entre 5 y 4 es: ', add(5, 4));
+        console.log('el resultado de la suma entre 6 y 4 es: ', add(6, 4));
     });
 </script>
 <template>
@@ -49,7 +49,7 @@
                 </div>
             </div>
             <div class="btnOperations">
-                <button @click="addNumber">sumarsss</button>
+                <button @click="addNumber">sumar</button>
                 <button @click="subtractNumber">restar</button>
                 <button @click="multiplyNumber">multiplicar</button>
             </div>

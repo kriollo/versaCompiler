@@ -76,14 +76,6 @@ async function loadModule() {
             app.config.compilerOptions.whitespace = 'condense';
 
             app.mount($contenedor.value, true);
-
-            // --- FRAGMENTO CLAVE PARA HMR Y ACCESO GLOBAL ---
-            if (typeof window !== 'undefined') {
-                // Exponemos la instancia de la app para HMR y depuración
-                (window as any).__VUE_APP__ = app;
-                // Exponemos el proxy raíz, útil para acceder a métodos, $forceUpdate, etc.
-                (window as any).__VUE_APP_PROXY__ = app._instance?.proxy;
-            }
         }
     } catch (e) {
         handleError(e, module, $contenedor.value);
