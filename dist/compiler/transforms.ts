@@ -94,12 +94,14 @@ export async function replaceAliasImportStatic(
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Solo reemplazar el alias con la ruta relativa, no incluir el target
-                const relativePath = moduleRequest.replace(aliasPattern, '');
-                let newImportPath = path.join(
+                const relativePath = moduleRequest.replace(aliasPattern, '');                let newImportPath = path.join(
                     '/',
                     env.PATH_DIST!,
                     relativePath,
                 );
+
+                // Normalizar la ruta para eliminar ./ extra
+                newImportPath = newImportPath.replace(/\/\.\//g, '/');
 
                 if (
                     newImportPath.endsWith('.ts') ||
@@ -131,14 +133,10 @@ async function replaceAliasImportDynamic(
 
     const pathAlias = JSON.parse(env.PATH_ALIAS);
     const pathDist = env.PATH_DIST;
-    let resultCode = code;
-
-    // Regex para imports dinámicos normales con string
-    const dynamicImportRegex = /import\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
-    // Regex para template literals 
-    const templateLiteralRegex = /import\s*\(\s*`([^`]+)`\s*\)/g;
-
-    // Manejar imports dinámicos normales con string
+    let resultCode = code; // Regex para imports dinámicos normales con string (solo comillas simples y dobles)
+    const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    // Regex para template literals (solo backticks)
+    const templateLiteralRegex = /import\s*\(\s*`([^`]+)`\s*\)/g; // Manejar imports dinámicos normales con string
     resultCode = resultCode.replace(
         dynamicImportRegex,
         (match, moduleRequest) => {
@@ -149,12 +147,10 @@ async function replaceAliasImportDynamic(
                     const relativePath = moduleRequest.replace(
                         aliasPattern,
                         '',
-                    );
-                    let newImportPath = path.join(
-                        '/',
-                        pathDist,
-                        relativePath,
-                    );
+                    );                    let newImportPath = path.join('/', pathDist, relativePath);
+
+                    // Normalizar la ruta para eliminar ./ extra
+                    newImportPath = newImportPath.replace(/\/\.\//g, '/');
 
                     if (
                         newImportPath.endsWith('.ts') ||
@@ -174,24 +170,21 @@ async function replaceAliasImportDynamic(
             }
             return match;
         },
-    );
-
-    // Manejar template literals (transformar solo la parte del alias)
+    ); // Manejar template literals (transformar solo la parte del alias)
     resultCode = resultCode.replace(
         templateLiteralRegex,
         (match, moduleRequest) => {
             for (const [alias, _target] of Object.entries(pathAlias)) {
                 const aliasPattern = alias.replace('/*', '');
-                if (moduleRequest.includes(aliasPattern)) {
-                    // Solo reemplazar el alias con pathDist
+                if (moduleRequest.includes(aliasPattern)) {                    // Solo reemplazar el alias con pathDist, sin agregar .js
+                    // porque en template literals la extensión puede estar en la variable
                     const newModuleRequest = moduleRequest.replace(
                         aliasPattern,
                         `/${pathDist}`,
                     );
-                    return match.replace(
-                        moduleRequest,
-                        newModuleRequest,
-                    );
+                    // Normalizar la ruta para eliminar ./ extra
+                    const normalizedModuleRequest = newModuleRequest.replace(/\/\.\//g, '/');
+                    return match.replace(moduleRequest, normalizedModuleRequest);
                 }
             }
             return match;
