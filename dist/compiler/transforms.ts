@@ -83,13 +83,8 @@ export async function replaceAliasImportStatic(
     if (!env.PATH_ALIAS || !env.PATH_DIST) {
         return code;
     }
-
     const pathAlias = JSON.parse(env.PATH_ALIAS);
     let resultCode = code;
-
-    const pathAliasEntry = '/' + String(env.PATH_DIST).replace(/^\/|\/$/g, '');
-    const escapeRegExp = string =>
-        string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Usar regex para transformar imports estáticos
     const importRegex =
@@ -98,16 +93,12 @@ export async function replaceAliasImportStatic(
         for (const [alias, target] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
-                const targetPath =
-                    './' +
-                    escapeRegExp((target as string[])[0].replace('/*', ''));
-                const relativePath = moduleRequest.replace(
-                    aliasPattern,
-                    targetPath,
-                );
-                let newImportPath = relativePath.replace(
-                    targetPath,
-                    pathAliasEntry,
+                // Solo reemplazar el alias con la ruta relativa, no incluir el target
+                const relativePath = moduleRequest.replace(aliasPattern, '');
+                let newImportPath = path.join(
+                    '/',
+                    env.PATH_DIST!,
+                    relativePath,
                 );
 
                 if (
@@ -120,7 +111,6 @@ export async function replaceAliasImportStatic(
                 }
 
                 const finalPath = newImportPath.replace(/\\/g, '/');
-
                 return match.replace(moduleRequest, finalPath);
             }
         }
@@ -159,17 +149,13 @@ async function replaceAliasImportDynamic(
             newImportDynamic = newImportDynamic.replace(
                 dynamicImportRegex,
                 (match, moduleRequest) => {
-                    for (const [alias, target] of Object.entries(pathAlias)) {
+                    for (const [alias, _target] of Object.entries(pathAlias)) {
                         const aliasPattern = alias.replace('/*', '');
                         if (moduleRequest.startsWith(aliasPattern)) {
-                            // Manejar tanto string como array para target
-                            const targetValue = Array.isArray(target)
-                                ? target[0]
-                                : target;
-                            const targetPath = targetValue.replace('/*', '');
+                            // Solo reemplazar el alias con la ruta relativa, no incluir el target
                             const relativePath = moduleRequest.replace(
                                 aliasPattern,
-                                targetPath,
+                                '',
                             );
                             let newImportPath = path.join(
                                 '/',
@@ -195,21 +181,17 @@ async function replaceAliasImportDynamic(
                     }
                     return match;
                 },
-            );            // Manejar template literals (transformar solo la parte del alias)
+            ); // Manejar template literals (transformar solo la parte del alias)
             newImportDynamic = newImportDynamic.replace(
                 templateLiteralRegex,
                 (match, moduleRequest) => {
-                    for (const [alias, target] of Object.entries(pathAlias)) {
+                    for (const [alias, _target] of Object.entries(pathAlias)) {
                         const aliasPattern = alias.replace('/*', '');
                         if (moduleRequest.includes(aliasPattern)) {
-                            // Manejar tanto string como array para target
-                            const targetValue = Array.isArray(target)
-                                ? target[0]
-                                : target;
-                            const targetPath = targetValue.replace('/*', '');
+                            // Solo reemplazar el alias con pathDist
                             const newModuleRequest = moduleRequest.replace(
                                 aliasPattern,
-                                `/${pathDist}/${targetPath}`,
+                                `/${pathDist}`,
                             );
                             return match.replace(
                                 moduleRequest,
