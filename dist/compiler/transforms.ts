@@ -94,7 +94,8 @@ export async function replaceAliasImportStatic(
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Solo reemplazar el alias con la ruta relativa, no incluir el target
-                const relativePath = moduleRequest.replace(aliasPattern, '');                let newImportPath = path.join(
+                const relativePath = moduleRequest.replace(aliasPattern, '');
+                let newImportPath = path.join(
                     '/',
                     env.PATH_DIST!,
                     relativePath,
@@ -147,7 +148,8 @@ async function replaceAliasImportDynamic(
                     const relativePath = moduleRequest.replace(
                         aliasPattern,
                         '',
-                    );                    let newImportPath = path.join('/', pathDist, relativePath);
+                    );
+                    let newImportPath = path.join('/', pathDist, relativePath);
 
                     // Normalizar la ruta para eliminar ./ extra
                     newImportPath = newImportPath.replace(/\/\.\//g, '/');
@@ -176,15 +178,22 @@ async function replaceAliasImportDynamic(
         (match, moduleRequest) => {
             for (const [alias, _target] of Object.entries(pathAlias)) {
                 const aliasPattern = alias.replace('/*', '');
-                if (moduleRequest.includes(aliasPattern)) {                    // Solo reemplazar el alias con pathDist, sin agregar .js
+                if (moduleRequest.includes(aliasPattern)) {
+                    // Solo reemplazar el alias con pathDist, sin agregar .js
                     // porque en template literals la extensión puede estar en la variable
                     const newModuleRequest = moduleRequest.replace(
                         aliasPattern,
                         `/${pathDist}`,
                     );
                     // Normalizar la ruta para eliminar ./ extra
-                    const normalizedModuleRequest = newModuleRequest.replace(/\/\.\//g, '/');
-                    return match.replace(moduleRequest, normalizedModuleRequest);
+                    const normalizedModuleRequest = newModuleRequest.replace(
+                        /\/\.\//g,
+                        '/',
+                    );
+                    return match.replace(
+                        moduleRequest,
+                        normalizedModuleRequest,
+                    );
                 }
             }
             return match;
