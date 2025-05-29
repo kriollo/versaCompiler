@@ -1,90 +1,113 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as ts from 'typescript';
+
+interface CompileResult {
+    error: Error | null;
+    data: string | null;
+    lang?: string;
+}
+
 /**
  * Precompila el código TypeScript proporcionado.
  * @param {string} data - El código TypeScript a precompilar.
  * @param {string} fileName - El nombre del archivo que contiene el código TypeScript.
  *
- * @returns {Promise<Object>} - Un objeto con el código precompilado o un error.
+ * @returns {Promise<CompileResult>} - Un objeto con el código precompilado o un error.
  */
-export const preCompileTS = async (data:string, fileName:string): Promise<{ error: Error | null; data: string | null }> => {
+export const preCompileTS = async (
+    data: string,
+    fileName: string,
+): Promise<CompileResult> => {
     try {
-        // Leer tsconfig.json
-        const PATH_CONFIG_FILE = path.resolve(process.cwd(), 'tsconfig.json');
-        const tsConfigContent = await readFile(PATH_CONFIG_FILE, 'utf-8');
-        if (!tsConfigContent) {
+        // Si el código está vacío, devolver cadena vacía
+        if (!data.trim()) {
+            return { error: null, data: '', lang: 'ts' };
+        }
+
+        // Buscar tsconfig.json en el directorio del archivo o sus padres
+        const fileDir = path.dirname(fileName);
+        const configPath =
+            ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
+            path.resolve(process.cwd(), 'tsconfig.json');
+
+        if (!configPath) {
+            throw new Error('No se pudo encontrar tsconfig.json');
+        }
+
+        // Cargar y parsear tsconfig.json
+        const { config, error: configError } = ts.readConfigFile(
+            configPath,
+            ts.sys.readFile,
+        );
+        if (configError) {
             throw new Error(
-                `No se pudo leer el archivo tsconfig.json en: ${PATH_CONFIG_FILE}`,
+                `Error al leer tsconfig.json: ${configError.messageText}`,
             );
         }
 
-        const tsConfig = JSON.parse(tsConfigContent);
-
-        // Obtener las opciones del compilador
-        const { compilerOptions } = tsConfig;
-
-        if (!compilerOptions) {
-            throw new Error(
-                'No se encontraron compilerOptions en tsconfig.json',
-            );
-        }
-
-        // Crear host de configuración de parseo
-        const parseConfigHost = {
-            useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
-            readDirectory: ts.sys.readDirectory,
-            fileExists: ts.sys.fileExists,
-            readFile: ts.sys.readFile,
-            onUnRecoverableConfigFileDiagnostic: diagnostic => {
-                throw new Error(
-                    ts.flattenDiagnosticMessageText(
-                        diagnostic.messageText,
-                        '\n',
-                    ),
-                );
-            },
+        // Parsear la configuración
+        const parsedConfig = ts.parseJsonConfigFileContent(
+            config,
+            ts.sys,
+            path.dirname(configPath),
+        ); // Usar las opciones del tsconfig.json directamente
+        const compilerOptions: ts.CompilerOptions = {
+            ...parsedConfig.options,
+            // Solo sobreescribir opciones críticas que no deben venir del tsconfig
+            noEmit: false,
+            noEmitOnError: false,
         };
 
-        // Parsear la configuración para que TS la entienda
-        const parsedConfig = ts.parseJsonConfigFileContent(
-            tsConfig,
-            parseConfigHost,
-            path.dirname(PATH_CONFIG_FILE),
-        );
-        if (parsedConfig.errors.length) {
-            const errors = parsedConfig.errors.map(diagnostic =>
-                ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-            );
-            throw new Error(
-                `Error al parsear tsconfig.json:\n${errors.join('\n')}`,
-            );
-        }
-
-        // Transpilar el código
-        const result = ts.transpileModule(data, {
-            compilerOptions: parsedConfig.options,
-            reportDiagnostics: true,
+        // Usar transpileModule para compilación
+        const transpileResult = ts.transpileModule(data, {
+            compilerOptions,
             fileName,
+            reportDiagnostics: true,
+            transformers: undefined,
+            moduleName: path.basename(fileName, path.extname(fileName)),
         });
-        if (result.diagnostics && result.diagnostics.length > 0) {
-            const errors = result.diagnostics.map(diagnostic => {
-                if (diagnostic.file && diagnostic.start !== undefined) {
-                    const { line, character } =
-                        diagnostic.file.getLineAndCharacterOfPosition(
-                            diagnostic.start,
-                        );
-                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')} - ${diagnostic.file.fileName} (${line + 1},${character + 1})`;
-                } else {
-                    return `${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
-                }
+
+        // Filtrar y procesar diagnósticos
+        const diagnostics = (transpileResult.diagnostics || [])
+            .filter(diag => diag.category === ts.DiagnosticCategory.Error)
+            .filter(diag => {
+                // Ignorar errores de módulos no encontrados
+                const messageText = ts.flattenDiagnosticMessageText(
+                    diag.messageText,
+                    '\n',
+                );
+                return (
+                    !messageText.includes('Cannot find module') &&
+                    !messageText.includes('Cannot find name')
+                );
             });
 
-            throw new Error(`${errors.join('\n')}`);
+        if (diagnostics.length > 0) {
+            const errorMessage = ts.formatDiagnosticsWithColorAndContext(
+                diagnostics,
+                {
+                    getCurrentDirectory: () => process.cwd(),
+                    getCanonicalFileName: fileName => fileName,
+                    getNewLine: () => ts.sys.newLine,
+                },
+            );
+            return { error: new Error(errorMessage), data: null, lang: 'ts' };
         }
 
-        return { error: null, data: result.outputText };
+        const output = transpileResult.outputText;
+
+        // Remover "export {};" si es la única línea
+        if (output.trim() === 'export {};') {
+            return { error: null, data: '', lang: 'ts' };
+        }
+
+        return { error: null, data: output, lang: 'ts' };
     } catch (error) {
-        return { error, data: null };
+        return {
+            error:
+                error instanceof Error ? error : new Error('Error desconocido'),
+            data: null,
+            lang: 'ts',
+        };
     }
 };

@@ -3,7 +3,7 @@
         "incremental": true,
         "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo",
         "noEmitOnError": true,
-
+        //comentario para probar si parsea bien el tsconfig.json
         "strict": true,
         "noImplicitAny": true,
         "strictNullChecks": true,
