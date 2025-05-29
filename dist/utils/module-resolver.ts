@@ -2,6 +2,7 @@
 import fs, { readdir, readFile, readFileSync, readlink, stat } from 'fs';
 import { dirname, join, relative } from 'path';
 import resolve from 'resolve';
+import { logger } from '../servicios/logger.ts';
 
 function resolveESMWithLibrary(moduleName: string): string | null {
     try {
@@ -20,7 +21,7 @@ function resolveESMWithLibrary(moduleName: string): string | null {
 
         return resolved;
     } catch (error) {
-        console.error(`Error resolviendo ${moduleName}:`, error.message);
+        logger.error(`Error resolviendo ${moduleName}:`, error.message);
         return null;
     }
 }
@@ -129,9 +130,7 @@ function findBrowserCompatibleVersion(
                                 /\\/g,
                                 '/',
                             );
-                            console.log(
-                                `🔄 Encontrada versión browser: ${originalEntry} → ${browserPath}`,
-                            );
+
                             return browserPath;
                         }
                     }
@@ -141,13 +140,10 @@ function findBrowserCompatibleVersion(
                         /\\/g,
                         '/',
                     );
-                    console.log(
-                        `🔄 Usando versión browser alternativa: ${originalEntry} → ${browserPath}`,
-                    );
                     return browserPath;
                 }
             } catch (error) {
-                console.warn(
+                logger.warn(
                     `No se pudo leer directorio ${searchDir}:`,
                     error.message,
                 );
@@ -245,7 +241,7 @@ function simpleESMResolver(moduleName: string): string | null {
         }
 
         if (typeof entryPoint !== 'string') {
-            console.warn(
+            logger.warn(
                 `Entry point no es string para ${moduleName}:`,
                 entryPoint,
             );
@@ -263,16 +259,15 @@ function simpleESMResolver(moduleName: string): string | null {
 
         // Verificar que el archivo existe
         if (!fs.existsSync(finalPath)) {
-            console.warn(
+            logger.warn(
                 `⚠️  Archivo no existe: ${finalPath}, usando original: ${entryPoint}`,
             );
             return join(moduleDir, entryPoint);
         }
 
-        console.log(`✅ Resuelto ${moduleName} → ${finalEntry}`);
         return finalPath;
     } catch (error) {
-        console.error(`Error resolviendo ${moduleName}: ${error.message}`);
+        logger.error(`Error resolviendo ${moduleName}: ${error.message}`);
         return null;
     }
 }
