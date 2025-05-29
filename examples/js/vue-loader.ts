@@ -9,7 +9,7 @@ import {
 } from '@/js/devUtils';
 
 const debug = ref(false);
-const $contenedor = ref(null);
+const $contenedor = ref<HTMLElement | null>(null);
 
 async function loadModule() {
     const url = new URL(import.meta.url);
@@ -17,7 +17,7 @@ async function loadModule() {
     const searchParams = new URLSearchParams(urlParams);
     let module = searchParams.get('m');
     try {
-        $contenedor.value = $dom('#app');
+        $contenedor.value = $dom('#app') as HTMLElement | null;
 
         if (!$contenedor.value) {
             throw new Error(
@@ -37,7 +37,10 @@ async function loadModule() {
             );
         }
 
-        const component = module.split('/').pop();
+        const component = module.split('/').pop() as string;
+        if (!component) {
+            throw new Error('No se ha especificado un componente para cargar.');
+        }
         // Importar dinámicamente el módulo
         const moduleResponse = await import(`@/${module}.js?v=${Date.now()}`);
         if (moduleResponse) {

@@ -25,8 +25,8 @@ export function isValidModuleName(module: string): module is ModuleName {
  */
 export function handleError(
     error: any,
-    module: string,
-    container: HTMLElement,
+    module: string | null,
+    container: HTMLElement | null = document.body,
 ): void {
     const errorMessage =
         error instanceof Error ? error.message : 'Error desconocido';
@@ -36,7 +36,12 @@ export function handleError(
         .replace(/>/g, '>');
 
     // Mostrar mensaje de error en el contenedor
-    container.textContent = ''; // Limpiar contenido previo
+    if (container) {
+        container.textContent = ''; // Limpiar contenido previo
+    }
+    if (!container) {
+        container = document.body; // Usar el body si no se proporciona un contenedor
+    }
     container.insertAdjacentHTML(
         'beforeend',
         html`
