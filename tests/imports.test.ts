@@ -126,6 +126,23 @@ import '@/styles/global.css';
             expect(result.code).toContain('/public/utils/namespace.js');
             expect(result.code).toContain('/public/styles/global.css');
         });
+
+        test('debe transformar imports con múltiples named imports en múltiples líneas', async () => {
+            const inputCode = `import {
+    $dom,
+    handleError,
+    isValidModuleName,
+    sanitizeModulePath,
+} from '@/js/devUtils';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toContain('/public/js/devUtils.js');
+            expect(result.code).toContain('$dom');
+            expect(result.code).toContain('handleError');
+            expect(result.code).toContain('isValidModuleName');
+            expect(result.code).toContain('sanitizeModulePath');
+        });
     });
 
     describe('Imports dinámicos simples (literals)', () => {
