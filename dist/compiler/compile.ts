@@ -58,6 +58,11 @@ async function displayLintingAndCompilationSummary(
 }
 
 export function normalizeRuta(ruta: string) {
+    // Si la ruta es absoluta, no agregar el prefijo './'
+    if (path.isAbsolute(ruta)) {
+        return path.normalize(ruta).replace(/\\/g, '/');
+    }
+
     const file = path
         .normalize(!ruta.startsWith('.') ? './' + ruta : ruta)
         .replace(/\\/g, '/');
@@ -69,7 +74,35 @@ export function normalizeRuta(ruta: string) {
 export function getOutputPath(ruta: string) {
     const pathSource = env.PATH_SOURCE ?? '';
     const pathDist = env.PATH_DIST ?? '';
-    return ruta.replace(pathSource, pathDist).replace(/\.(vue|ts)$/, '.js');
+
+    if (!pathSource || !pathDist) {
+        return ruta.replace(/\.(vue|ts)$/, '.js');
+    } // Normalizar las rutas para trabajar con barras forward
+    const normalizedRuta = path.normalize(ruta).replace(/\\/g, '/');
+    const normalizedSource = path.normalize(pathSource).replace(/\\/g, '/');
+    const normalizedDist = path.normalize(pathDist).replace(/\\/g, '/');
+
+    // Si la ruta ya es relativa a pathSource, calcular la ruta de salida
+    if (normalizedRuta.includes(normalizedSource)) {
+        // Extraer la parte relativa después de pathSource
+        const relativePath = normalizedRuta
+            .substring(
+                normalizedRuta.indexOf(normalizedSource) +
+                    normalizedSource.length,
+            )
+            .replace(/^[/\\]/, ''); // Remover barra inicial si existe        // Construir la ruta de salida
+        const outputPath = path
+            .join(normalizedDist, relativePath)
+            .replace(/\\/g, '/');
+        return outputPath.replace(/\.(vue|ts)$/, '.js');
+    } else {
+        // Si no está en pathSource, usar solo el nombre del archivo
+        const fileName = path.basename(normalizedRuta);
+        const outputPath = path
+            .join(normalizedDist, fileName)
+            .replace(/\\/g, '/');
+        return outputPath.replace(/\.(vue|ts)$/, '.js');
+    }
 }
 
 function registerInventoryResume(tipo: string, error: number, success: number) {
@@ -502,4 +535,9 @@ export async function initCompileAll() {
             `🚩 :Error al compilar todos los archivos: ${error.message}\n${error.stack}\n`,
         );
     }
+}
+
+// Función wrapper para compatibilidad con tests
+export async function compileFile(filePath: string) {
+    return await initCompile(filePath, true);
 }

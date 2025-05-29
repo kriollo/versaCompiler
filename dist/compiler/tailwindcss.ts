@@ -28,7 +28,12 @@ export async function generateTailwindCSS() {
         });
         return await tnode.run();
     } catch (err) {
+        // Si es un error de JSON parse, devolver false en lugar de lanzar error
         logger.error('❌ :Error al compilar Tailwind:', err.stderr || err);
+        if (err instanceof SyntaxError && err.message.includes('JSON')) {
+            return false;
+        }
+        // Para otros errores (como errores de ejecución de TailwindCSS), loggear y relanzar
         throw err;
     }
 }

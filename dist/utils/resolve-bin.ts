@@ -12,7 +12,7 @@ export function resolveBin(
 ): string {
     let rootDir;
     try {
-        const customRequire = createRequire(import.meta.url);
+        const customRequire = createRequire(__filename);
         const resolved = customRequire.resolve(moduleName, { paths });
         rootDir = findRoot(resolved);
     } catch (e) {

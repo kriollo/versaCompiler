@@ -24,6 +24,18 @@ export const minifyJS = async (data, filename, isProd = true) => {
             sourcemap: !isProd,
         };
         const result = await minify(filename, data, options);
+
+        // Si el código de entrada no estaba vacío pero el resultado sí,
+        // probablemente hay un error de sintaxis
+        if (data.trim() && !result.code.trim()) {
+            return {
+                error: new Error(
+                    `Minification failed: likely syntax error in ${filename}`,
+                ),
+                code: '',
+            };
+        }
+
         return { code: result.code, error: null };
     } catch (error) {
         return { error, code: '' };

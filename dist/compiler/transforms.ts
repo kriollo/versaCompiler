@@ -120,22 +120,22 @@ export async function replaceAliasImportStatic(
     for (const match of matches) {
         const [fullMatch, moduleRequest] = match;
         let newMatch = fullMatch;
-        let transformed = false;
-
-        // 1. Verificar si es un alias conocido (lógica existente)
-        for (const [alias, _target] of Object.entries(pathAlias)) {
+        let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
+        for (const [alias] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
-                // Solo reemplazar el alias con la ruta relativa, no incluir el target
+                // Reemplazar el alias con la ruta del target
                 const relativePath = moduleRequest.replace(aliasPattern, '');
+                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join(
                     '/',
                     env.PATH_DIST!,
                     relativePath,
-                );
-
-                // Normalizar la ruta para eliminar ./ extra
-                newImportPath = newImportPath.replace(/\/\.\//g, '/');
+                ); // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                newImportPath = newImportPath
+                    .replace(/\/\.\//g, '/')
+                    .replace(/\\/g, '/');
 
                 if (
                     newImportPath.endsWith('.ts') ||
@@ -146,7 +146,7 @@ export async function replaceAliasImportStatic(
                     newImportPath += '.js';
                 }
 
-                const finalPath = newImportPath.replace(/\\/g, '/');
+                const finalPath = newImportPath;
                 newMatch = fullMatch.replace(moduleRequest, finalPath);
                 transformed = true;
                 break;
@@ -198,18 +198,20 @@ async function replaceAliasImportDynamic(
     for (const match of dynamicMatches) {
         const [fullMatch, moduleRequest] = match;
         let newMatch = fullMatch;
-        let transformed = false;
-
-        // 1. Verificar si es un alias conocido (lógica existente)
-        for (const [alias, _target] of Object.entries(pathAlias)) {
+        let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
+        for (const [alias] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
-                // Solo reemplazar el alias con la ruta relativa, no incluir el target
+                // Reemplazar el alias con la ruta del target
                 const relativePath = moduleRequest.replace(aliasPattern, '');
+                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join('/', pathDist, relativePath);
 
-                // Normalizar la ruta para eliminar ./ extra
-                newImportPath = newImportPath.replace(/\/\.\//g, '/');
+                // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                newImportPath = newImportPath
+                    .replace(/\/\.\//g, '/')
+                    .replace(/\\/g, '/');
 
                 if (
                     newImportPath.endsWith('.ts') ||
@@ -220,7 +222,7 @@ async function replaceAliasImportDynamic(
                     newImportPath += '.js';
                 }
 
-                const finalPath = newImportPath.replace(/\\/g, '/');
+                const finalPath = newImportPath;
                 newMatch = fullMatch.replace(moduleRequest, finalPath);
                 transformed = true;
                 break;
@@ -245,32 +247,32 @@ async function replaceAliasImportDynamic(
         if (transformed) {
             resultCode = resultCode.replace(fullMatch, newMatch);
         }
-    }
-
-    // Manejar template literals - versión mejorada
+    } // Manejar template literals - versión mejorada
     resultCode = resultCode.replace(
         templateLiteralRegex,
         (match, moduleRequest) => {
             let transformed = false;
-            let result = match;
-
-            // 1. Verificar aliases en template literals
-            for (const [alias, _target] of Object.entries(pathAlias)) {
+            let result = match; // 1. Verificar aliases en template literals
+            for (const [alias] of Object.entries(pathAlias)) {
                 const aliasPattern = alias.replace('/*', '');
                 if (moduleRequest.includes(aliasPattern)) {
-                    const newModuleRequest = moduleRequest.replace(
+                    const relativePath = moduleRequest.replace(
                         aliasPattern,
-                        `/${pathDist}`,
+                        '',
                     );
-                    // Normalizar la ruta para eliminar ./ extra
-                    const normalizedModuleRequest = newModuleRequest.replace(
-                        /\/\.\//g,
+                    // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                    // solo usamos PATH_DIST + relativePath
+                    let newModuleRequest = path.join(
                         '/',
+                        pathDist,
+                        relativePath,
                     );
-                    result = match.replace(
-                        moduleRequest,
-                        normalizedModuleRequest,
-                    );
+                    // Normalizar la ruta para eliminar ./ extra y barras duplicadas
+                    newModuleRequest = newModuleRequest
+                        .replace(/\/\.\//g, '/')
+                        .replace(/\/+/g, '/')
+                        .replace(/\\/g, '/'); // Normalizar separadores de Windows a Unix
+                    result = match.replace(moduleRequest, newModuleRequest);
                     transformed = true;
                     break;
                 }

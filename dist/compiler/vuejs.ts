@@ -43,13 +43,17 @@ export const preCompileVue = async (
 }> => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
-
         if (!isProd) {
-            const ifExistsref = data.includes('ref(');
+            // Verificar si ya existe una importación de ref desde vue
+            const hasRefImport =
+                (data.includes('import {') &&
+                    data.includes('ref') &&
+                    data.includes("from 'vue'")) ||
+                data.includes('from "vue"');
 
             // esto es para HMR re re forzado
             const varContent = `
-            ${ifExistsref ? '' : 'import { ref } from "vue";'};
+            ${hasRefImport ? '' : 'import { ref } from "vue";'};
             const versaComponentKey = ref(0);
             `;
             const ifExistScript = data.includes('<script');
@@ -59,14 +63,22 @@ export const preCompileVue = async (
             } else {
                 data = data.replace(/(<script.*?>)/, `$1${varContent}`);
             }
-
             data = data.replace(
-                /(<template>[\s\S]*?)(<\w+)([^>]*)(\/?>)/,
-                (match, p1, p2, p3, p4) => {
-                    // Si es self-closing (termina con '/>'), no agregar key
-                    const existeSlash = p3.trim().slice(-1) === '/';
+                /(<template[^>]*>[\s\S]*?)(<(\w+)([^>]*?))(\/?>)/,
+                (match, p1, p2, p3, p4, p5) => {
+                    // Si ya tiene :key, no agregarlo de nuevo
+                    if (p4.includes(':key=') || p4.includes('key=')) {
+                        return match;
+                    }
 
-                    return `${p1} ${p2} ${existeSlash ? p3.trim().slice(0, -1) : p3} :key="versaComponentKey" ${existeSlash ? '/' : ''}${p4}`;
+                    // Si es self-closing (termina con '/>'), manejar diferente
+                    const isSelfClosing = p5 === '/>';
+
+                    if (isSelfClosing) {
+                        return `${p1}<${p3}${p4} :key="versaComponentKey" />`;
+                    } else {
+                        return `${p1}<${p3}${p4} :key="versaComponentKey">`;
+                    }
                 },
             );
         }
