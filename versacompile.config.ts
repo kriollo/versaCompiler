@@ -2,10 +2,10 @@
 export default {
     tsconfig: './tsconfig.json',
     compilerOptions: {
-        sourceRoot: './src',
+        sourceRoot: './examples',
         outDir: './public',
         pathsAlias: {
-            '@/*': ['src/*'],
+            '@/*': ['examples/*'],
             'P@/*': ['public/*'],
         },
     },
@@ -17,7 +17,7 @@ export default {
     // puede dejar en false o no agregarlo si no quiere que se ejecute el compilador de tailwind
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
-        input: './src/css/input.css',
+        input: './examples/css/input.css',
         output: './public/css/output.css',
     },
     linter: [
@@ -26,14 +26,14 @@ export default {
             bin: './node_modules/.bin/eslint',
             configFile: './eslint.config.js',
             fix: false,
-            paths: ['src/'],
+            paths: ['examples/'],
         },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
             fix: false,
-            paths: ['src/'],
+            paths: ['examples/'],
         },
     ],
 };

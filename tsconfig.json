@@ -1,7 +1,21 @@
 {
     "compilerOptions": {
+        "incremental": true,
+        "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo",
+        "noEmitOnError": true,
+
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+        "strictPropertyInitialization": true,
+        "noImplicitThis": true,
+        "useUnknownInCatchVariables": true,
+        "alwaysStrict": true,
+
         "noUncheckedIndexedAccess": true,
-        "moduleDetection": "auto",
+        "moduleDetection": "force",
         "allowJs": true,
         "checkJs": true,
         "allowImportingTsExtensions": true,
@@ -10,27 +24,33 @@
         "target": "ESNext",
         "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
-        "sourceMap": false,
+        "sourceMap": true,
         "inlineSourceMap": false,
         "inlineSources": false,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["src/*"],
+            "@/*": ["examples/*"],
             "P@/*": ["public/*"]
         },
-        "typeRoots": ["./node_modules/@types", "./src/types"],
+        "typeRoots": ["./node_modules/@types", "./examples/types"],
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true
     },
     "vueCompilerOptions": {
-        "target": 3.5
+        "target": 3.5,
+        "strictTemplates": true
     },
-    "exclude": ["./public/**/*"],
-    "include": ["src/**/*", "src/**/*.vue", "src/**/*.ts", "src/**/*.js"],
+    "exclude": ["./public/**/*", "coverage/**/*"],
+    "include": [
+        "examples/**/*",
+        "examples/**/*.vue",
+        "examples/**/*.ts",
+        "examples/**/*.js"
+    ],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]
