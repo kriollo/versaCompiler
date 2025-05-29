@@ -1,4 +1,4 @@
-import { env } from 'process';
+import { env } from 'node:process';
 import { logger } from '../servicios/logger.ts';
 import { TailwindNode } from '../wrappers/tailwind-node.ts';
 export async function generateTailwindCSS() {
