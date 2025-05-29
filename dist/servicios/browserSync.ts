@@ -94,7 +94,7 @@ export async function browserSyncServer() {
                             );
                             res.end(fileContent);
                         } catch (error) {
-                            console.error(
+                            logger.error(
                                 chalk.red(
                                     `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}/n ${error.stack}`,
                                 ),
@@ -121,7 +121,7 @@ export async function browserSyncServer() {
                             );
                             res.end(fileContent);
                         } catch (error) {
-                            console.error(
+                            logger.error(
                                 chalk.red(
                                     `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
                                 ),

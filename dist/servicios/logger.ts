@@ -3,21 +3,21 @@ class Logger {
         console.log('Logger initialized');
     }
 
-    info(message: string): void {
-        console.log(`INFO: ${message}`);
+    info(...args: any[]): void {
+        console.log('INFO:', ...args);
     }
 
-    error(message: string): void {
-        console.error(`ERROR: ${message}`);
+    error(...args: any[]): void {
+        console.error('ERROR:', ...args);
     }
-    warn(message: string): void {
-        console.warn(`WARN: ${message}`);
+    warn(...args: any[]): void {
+        console.warn('WARN:', ...args);
     }
-    debug(message: string): void {
-        console.debug(`DEBUG: ${message}`);
+    debug(...args: any[]): void {
+        console.debug('DEBUG:', ...args);
     }
-    fatal(message: string): void {
-        console.error(`FATAL: ${message}`);
+    fatal(...args: any[]): void {
+        console.error('FATAL:', ...args);
     }
     table(data: any, title?: string[]): void {
         if (title) {

@@ -16,10 +16,6 @@ const getComponentsVueMap = async ast => {
         });
         components = components.flat();
     }
-    // console.log(components);
-    // components = components.map(item => {
-    //     return item.replace(/['"]/g, '');
-    // });
     return components;
 };
 
@@ -196,7 +192,7 @@ export const preCompileVue = async (
 
             // DEBUGGING: Verificar errores en template
             if (compiledTemplateResult.errors?.length > 0) {
-                console.error(
+                logger.error(
                     'Template compilation errors:',
                     compiledTemplateResult.errors,
                 );
@@ -334,9 +330,7 @@ export const preCompileVue = async (
             output.includes('function render(');
 
         if (!hasRenderFunction && descriptor.template) {
-            console.warn(
-                'Warning: No render function found in compiled output',
-            );
+            logger.warn('Warning: No render function found in compiled output');
         }
 
         const finishComponent = `
@@ -358,7 +352,7 @@ export const preCompileVue = async (
             data: output,
         };
     } catch (error) {
-        console.error('Vue compilation error:', error);
+        logger.error('Vue compilation error:', error);
         return { lang: null, error, data: null };
     }
 };

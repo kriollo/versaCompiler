@@ -1,15 +1,15 @@
 import { env } from 'node:process';
+import { logger } from '../servicios/logger.ts';
 import {
     ESLintNode,
     type ESLintMultiFormatResult,
-    type ESLintResult,
 } from './../wrappers/eslint-node.ts';
 import { OxlintNode } from './../wrappers/oxlint-node.ts';
 
 // Tipos para el servicio de linting
 export interface LinterResult {
     success: boolean;
-    eslintResult?: ESLintMultiFormatResult | ESLintResult;
+    eslintResult?: ESLintMultiFormatResult | null;
     oxlintResult?: any;
     message: string;
     errorCount: number;
@@ -31,7 +31,7 @@ export async function OxLint(oxlintConfig: LinterConfig = {}) {
     try {
         if (!oxlintConfig || !oxlintConfig.bin) {
             // configFile es opcional si Oxlint lo encuentra por defecto
-            console.warn(
+            logger.warn(
                 '⚠️ Oxlint no se ejecutará: falta la propiedad "bin" en la configuración.',
             );
             return false; // O un resultado que indique fallo/no ejecución
@@ -50,7 +50,7 @@ export async function OxLint(oxlintConfig: LinterConfig = {}) {
         const targetPaths = oxlintConfig.paths || [env.PATH_SOURCE || './src']; // Usar paths de LinterConfig
         return await oxlintRunner.run(targetPaths);
     } catch (err) {
-        console.error('❌ :Error al compilar OxLint:', err);
+        logger.error('❌ :Error al compilar OxLint:', err);
         throw err;
     }
 }
@@ -64,7 +64,7 @@ export async function ESLint(
     try {
         if (!config || !config.bin) {
             // configFile es opcional si ESLint lo encuentra por defecto
-            console.warn(
+            logger.warn(
                 '⚠️ ESLint no se ejecutará: falta la propiedad "bin" en la configuración.',
             );
             // Devolver un ESLintMultiFormatResult vacío o que indique error
@@ -99,7 +99,7 @@ export async function ESLint(
 
         return result;
     } catch (err) {
-        console.error('❌ Error al ejecutar ESLint:', err);
+        logger.error('❌ Error al ejecutar ESLint:', err);
         throw err;
     }
 }
