@@ -52,16 +52,120 @@ function resolveESMEnhanced(moduleName: string): Promise<string | null> {
     });
 }
 
-// Función simple que no usa createRequire
+// Función dinámica para detectar versiones browser-compatible
+function findBrowserCompatibleVersion(
+    moduleDir: string,
+    originalEntry: string,
+): string | null {
+    const dir = dirname(originalEntry);
+    const baseName = originalEntry.split('/').pop() || '';
+    const extension = baseName.includes('.')
+        ? `.${baseName.split('.').pop()}`
+        : '.js';
+    const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
+
+    // Patrones que indican versiones NO compatibles con browser
+    const bundlerPatterns = ['bundler', 'runtime', 'node', 'cjs', 'commonjs'];
+
+    // Patrones que indican versiones SÍ compatibles con browser
+    const browserPatterns = [
+        'browser',
+        'esm-browser',
+        'es-browser',
+        'web',
+        'global',
+        'umd',
+    ];
+
+    // Si el archivo original ya es browser-compatible, devolverlo
+    const hasBrowserPattern = browserPatterns.some(pattern =>
+        originalEntry.toLowerCase().includes(pattern),
+    );
+
+    if (hasBrowserPattern) {
+        return originalEntry;
+    }
+
+    // Si contiene patrones de bundler, buscar alternativas
+    const hasBundlerPattern = bundlerPatterns.some(pattern =>
+        originalEntry.toLowerCase().includes(pattern),
+    );
+
+    if (hasBundlerPattern) {
+        // Buscar en el directorio del módulo
+        const searchDir = join(moduleDir, dir);
+
+        if (fs.existsSync(searchDir)) {
+            try {
+                const files = fs.readdirSync(searchDir);
+
+                // Buscar archivos que contengan patrones browser
+                const browserFiles = files.filter(file => {
+                    const lowerFile = file.toLowerCase();
+                    return (
+                        browserPatterns.some(pattern =>
+                            lowerFile.includes(pattern),
+                        ) &&
+                        (file.endsWith('.js') || file.endsWith('.mjs'))
+                    );
+                });
+
+                if (browserFiles.length > 0) {
+                    // Priorizar por orden de preferencia
+                    const priorityOrder = [
+                        'esm-browser',
+                        'browser',
+                        'web',
+                        'global',
+                        'umd',
+                    ];
+
+                    for (const priority of priorityOrder) {
+                        const found = browserFiles.find(file =>
+                            file.toLowerCase().includes(priority),
+                        );
+                        if (found) {
+                            const browserPath = join(dir, found).replace(
+                                /\\/g,
+                                '/',
+                            );
+                            console.log(
+                                `🔄 Encontrada versión browser: ${originalEntry} → ${browserPath}`,
+                            );
+                            return browserPath;
+                        }
+                    }
+
+                    // Si no hay coincidencia exacta, usar el primero encontrado
+                    const browserPath = join(dir, browserFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    console.log(
+                        `🔄 Usando versión browser alternativa: ${originalEntry} → ${browserPath}`,
+                    );
+                    return browserPath;
+                }
+            } catch (error) {
+                console.warn(
+                    `No se pudo leer directorio ${searchDir}:`,
+                    error.message,
+                );
+            }
+        }
+    }
+
+    return originalEntry; // Si no se encuentra alternativa, usar original
+}
+
+// Función mejorada para detectar automáticamente entry points browser-compatible
 function simpleESMResolver(moduleName: string): string | null {
     try {
-        // Para el entorno de testing, simulamos la resolución
-        // En lugar de usar require.resolve, construimos la ruta esperada
         const nodeModulesPath = join(process.cwd(), 'node_modules', moduleName);
         let packagePath: string;
         let packageJson: any;
+
         try {
-            // Método 1: Buscar package.json directamente en node_modules
             packagePath = join(nodeModulesPath, 'package.json');
             if (!fs.existsSync(packagePath)) {
                 throw new Error(
@@ -69,17 +173,16 @@ function simpleESMResolver(moduleName: string): string | null {
                 );
             }
         } catch {
-            // Si no se encuentra, retornar null
             return null;
         }
 
         packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
         const moduleDir = dirname(packagePath);
 
-        // Determinar el entry point ESM
+        // Determinar el entry point ESM con detección dinámica de versiones browser
         let entryPoint: string | null = null;
 
-        // 1. Revisar exports field (manejo mejorado)
+        // 1. Revisar exports field con prioridad para condiciones browser
         if (packageJson.exports) {
             if (typeof packageJson.exports === 'string') {
                 entryPoint = packageJson.exports;
@@ -88,19 +191,25 @@ function simpleESMResolver(moduleName: string): string | null {
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    // Manejar exports con condiciones: { import: "...", require: "...", default: "..." }
+                    // PRIORIZAR browser > import > module > default
                     entryPoint =
+                        dotExport.browser || // ← Prioridad para browser
                         dotExport.import ||
                         dotExport.module ||
                         dotExport.default ||
                         dotExport.main;
-                    // Si aún es un objeto, intentar extraer el string
+
                     if (typeof entryPoint === 'object' && entryPoint !== null) {
                         const entryObj = entryPoint as any;
                         entryPoint =
-                            entryObj.import || entryObj.default || null;
+                            entryObj.browser || // ← Prioridad para browser
+                            entryObj.import ||
+                            entryObj.default ||
+                            null;
                     }
                 }
+            } else if (packageJson.exports.browser) {
+                entryPoint = packageJson.exports.browser;
             } else if (packageJson.exports.import) {
                 entryPoint = packageJson.exports.import;
             } else if (packageJson.exports.default) {
@@ -108,22 +217,33 @@ function simpleESMResolver(moduleName: string): string | null {
             }
         }
 
-        // 2. Fallback a module field
+        // 2. Fallback a campo 'browser' específico del package.json
+        if (!entryPoint && packageJson.browser) {
+            if (typeof packageJson.browser === 'string') {
+                entryPoint = packageJson.browser;
+            } else if (
+                typeof packageJson.browser === 'object' &&
+                packageJson.browser['.']
+            ) {
+                entryPoint = packageJson.browser['.'];
+            }
+        }
+
+        // 3. Fallback a module field
         if (!entryPoint && packageJson.module) {
             entryPoint = packageJson.module;
         }
 
-        // 3. Fallback a main field
+        // 4. Fallback a main field
         if (!entryPoint && packageJson.main) {
             entryPoint = packageJson.main;
         }
 
-        // 4. Fallback por defecto
+        // 5. Fallback por defecto
         if (!entryPoint) {
             entryPoint = 'index.js';
         }
 
-        // Asegurar que entryPoint es un string
         if (typeof entryPoint !== 'string') {
             console.warn(
                 `Entry point no es string para ${moduleName}:`,
@@ -132,7 +252,25 @@ function simpleESMResolver(moduleName: string): string | null {
             entryPoint = 'index.js';
         }
 
-        return join(moduleDir, entryPoint);
+        // 🔍 DETECCIÓN DINÁMICA: Buscar versión browser-compatible
+        const browserCompatibleEntry = findBrowserCompatibleVersion(
+            moduleDir,
+            entryPoint,
+        );
+        const finalEntry = browserCompatibleEntry || entryPoint;
+
+        const finalPath = join(moduleDir, finalEntry);
+
+        // Verificar que el archivo existe
+        if (!fs.existsSync(finalPath)) {
+            console.warn(
+                `⚠️  Archivo no existe: ${finalPath}, usando original: ${entryPoint}`,
+            );
+            return join(moduleDir, entryPoint);
+        }
+
+        console.log(`✅ Resuelto ${moduleName} → ${finalEntry}`);
+        return finalPath;
     } catch (error) {
         console.error(`Error resolviendo ${moduleName}: ${error.message}`);
         return null;
@@ -144,10 +282,18 @@ function getNodeModulesRelativePath(fullPath: string | null): string | null {
     if (!fullPath) return null;
     const idx = fullPath.indexOf('node_modules');
     if (idx !== -1) {
-        return fullPath.substring(idx).replace(/\\/g, '/');
-    } // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
+        let relativePath = fullPath.substring(idx).replace(/\\/g, '/');
+        // Agrega / al inicio si no existe
+        if (!relativePath.startsWith('/')) {
+            relativePath = '/' + relativePath;
+        }
+        return relativePath;
+    }
+    // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
     let rel = relative(process.cwd(), fullPath).replace(/\\/g, '/');
     if (!rel) rel = '.';
+    // Agrega / al inicio si no existe
+    if (!rel.startsWith('/')) rel = '/' + rel;
     return rel;
 }
 
