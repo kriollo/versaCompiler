@@ -10,15 +10,19 @@ import { compileFile, runLinter } from '../dist/compiler/compile';
 describe('Compiler', () => {
     const testDir = path.join(process.cwd(), 'temp-test-compiler');
     let originalEnv: NodeJS.ProcessEnv;
-
     beforeEach(async () => {
         // Crear directorio temporal para tests
         await fs.ensureDir(testDir);
         await fs.ensureDir(path.join(testDir, 'src'));
         await fs.ensureDir(path.join(testDir, 'public'));
 
+        // Copiar tsconfig.json al directorio temporal
+        const tsconfigSource = path.join(process.cwd(), 'tsconfig.json');
+        const tsconfigDest = path.join(testDir, 'tsconfig.json');
+        await fs.copyFile(tsconfigSource, tsconfigDest);
+
         // Guardar el estado original del environment
-        originalEnv = { ...process.env };        // Configurar environment para tests
+        originalEnv = { ...process.env }; // Configurar environment para tests
         process.env.PATH_SOURCE = path.join(testDir, 'src');
         process.env.PATH_DIST = path.join(testDir, 'public');
         process.env.VERBOSE = 'false';

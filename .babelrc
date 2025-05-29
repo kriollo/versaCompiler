@@ -1,0 +1,45 @@
+{
+    "presets": [
+        [
+            "@babel/preset-env",
+            {
+                "targets": {
+                    "node": "current",
+                    "browsers": [">0.2%", "not dead", "not op_mini all"]
+                },
+                "modules": false,
+                "useBuiltIns": "usage",
+                "corejs": 3
+            }
+        ],
+        "@babel/preset-typescript"
+    ],
+    "env": {
+        "test": {
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "node": "current"
+                        }
+                    }
+                ],
+                "@babel/preset-typescript"
+            ]
+        },
+        "production": {
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "modules": false,
+                        "targets": {
+                            "browsers": [">0.2%", "not dead", "not op_mini all"]
+                        }
+                    }
+                ]
+            ]
+        }
+    }
+}
