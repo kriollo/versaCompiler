@@ -3,12 +3,12 @@
  * Cubre todos los casos: estáticos, dinámicos, literals, template literals, etc.
  */
 
-import { estandarizaCode } from '../dist/compiler/transforms.ts';
+import { estandarizaCode } from '../dist/compiler/transforms';
 
 // Configurar variables de entorno para las pruebas
 const setupEnv = () => {
-    process.env.PATH_ALIAS = JSON.stringify({ "@/*": "/src/*" });
-    process.env.PATH_DIST = "public";
+    process.env.PATH_ALIAS = JSON.stringify({ '@/*': '/src/*' });
+    process.env.PATH_DIST = 'public';
 };
 
 const cleanupEnv = () => {
@@ -31,7 +31,9 @@ describe('Sistema de transformación de imports', () => {
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { Component } from '/public/components/modal.js';`);
+            expect(result.code).toBe(
+                `import { Component } from '/public/components/modal.js';`,
+            );
         });
 
         test('debe transformar múltiples imports con diferentes alias', async () => {
@@ -53,7 +55,9 @@ import { config } from '@/config/app.js';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { helper } from '/public/utils/helper.js';`);
+            expect(result.code).toBe(
+                `import { helper } from '/public/utils/helper.js';`,
+            );
         });
 
         test('debe transformar extensiones .vue a .js', async () => {
@@ -61,7 +65,9 @@ import { config } from '@/config/app.js';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import Modal from '/public/components/modal.js';`);
+            expect(result.code).toBe(
+                `import Modal from '/public/components/modal.js';`,
+            );
         });
 
         test('debe añadir .js a imports sin extensión', async () => {
@@ -69,7 +75,9 @@ import { config } from '@/config/app.js';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { helper } from '/public/utils/helper.js';`);
+            expect(result.code).toBe(
+                `import { helper } from '/public/utils/helper.js';`,
+            );
         });
 
         test('debe mantener imports que ya tienen extensión .js', async () => {
@@ -77,7 +85,9 @@ import { config } from '@/config/app.js';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { helper } from '/public/utils/helper.js';`);
+            expect(result.code).toBe(
+                `import { helper } from '/public/utils/helper.js';`,
+            );
         });
 
         test('no debe transformar imports relativos', async () => {
@@ -85,16 +95,18 @@ import { config } from '@/config/app.js';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { helper } from './utils/helper.ts';`);
+            expect(result.code).toBe(
+                `import { helper } from './utils/helper.ts';`,
+            );
         });
-
-        test('no debe transformar imports externos (node_modules)', async () => {
+        test('debe transformar imports externos (node_modules) a rutas relativas', async () => {
             const inputCode = `import { ref } from 'vue';`;
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            // No debe cambiar porque vue es una librería externa
-            expect(result.code).toBe(`import { ref } from 'vue';`);
+            // Debe transformar vue a su ruta en node_modules
+            expect(result.code).toContain('node_modules/vue/');
+            expect(result.code).not.toBe(`import { ref } from 'vue';`);
         });
 
         test('debe manejar diferentes tipos de imports estáticos', async () => {
@@ -122,7 +134,9 @@ import '@/styles/global.css';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`const component = await import('/public/components/modal.js');`);
+            expect(result.code).toBe(
+                `const component = await import('/public/components/modal.js');`,
+            );
         });
 
         test('debe transformar import dinámico sin await', async () => {
@@ -130,7 +144,9 @@ import '@/styles/global.css';
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`const component = import('/public/components/modal.js');`);
+            expect(result.code).toBe(
+                `const component = import('/public/components/modal.js');`,
+            );
         });
 
         test('debe transformar múltiples imports dinámicos', async () => {
@@ -154,7 +170,9 @@ const config = import('@/config/app.js');
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`await import(\`/public/\${module}.js\`);`);
+            expect(result.code).toBe(
+                `await import(\`/public/\${module}.js\`);`,
+            );
         });
 
         test('debe transformar template literal complejo con cache busting', async () => {
@@ -162,7 +180,9 @@ const config = import('@/config/app.js');
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`await import(\`/public/\${module}.js?v=\${Date.now()}\`);`);
+            expect(result.code).toBe(
+                `await import(\`/public/\${module}.js?v=\${Date.now()}\`);`,
+            );
         });
 
         test('debe transformar template literal con subdirectorio', async () => {
@@ -170,7 +190,9 @@ const config = import('@/config/app.js');
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`await import(\`/public/components/\${name}.vue\`);`);
+            expect(result.code).toBe(
+                `await import(\`/public/components/\${name}.vue\`);`,
+            );
         });
 
         test('debe transformar múltiples template literals', async () => {
@@ -182,9 +204,13 @@ const config = import(\`@/config/\${env}.js?v=\${version}\`);
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toContain(`/public/components/\${componentName}.vue`);
+            expect(result.code).toContain(
+                `/public/components/\${componentName}.vue`,
+            );
             expect(result.code).toContain(`/public/utils/\${utilName}.ts`);
-            expect(result.code).toContain(`/public/config/\${env}.js?v=\${version}`);
+            expect(result.code).toContain(
+                `/public/config/\${env}.js?v=\${version}`,
+            );
         });
 
         test('no debe transformar template literals que no empiecen con alias', async () => {
@@ -192,7 +218,9 @@ const config = import(\`@/config/\${env}.js?v=\${version}\`);
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`await import(\`./components/\${name}.vue\`);`);
+            expect(result.code).toBe(
+                `await import(\`./components/\${name}.vue\`);`,
+            );
         });
 
         test('debe manejar template literals con expresiones complejas', async () => {
@@ -202,7 +230,9 @@ await import(\`@/modules/\${type}/\${name}.vue?v=\${Date.now()}&cache=\${Math.ra
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toContain(`/public/modules/\${type}/\${name}.vue?v=\${Date.now()}&cache=\${Math.random()}`);
+            expect(result.code).toContain(
+                `/public/modules/\${type}/\${name}.vue?v=\${Date.now()}&cache=\${Math.random()}`,
+            );
         });
     });
 
@@ -219,12 +249,11 @@ async function loadComponent(name) {
 }
 `;
             const result = await estandarizaCode(inputCode, 'test.ts');
-
             expect(result.error).toBeNull();
             expect(result.code).toContain(`from '/public/utils/helper.js'`);
             expect(result.code).toContain(`/public/components/\${name}.vue`);
             expect(result.code).toContain(`'/public/utils/runtime.js'`);
-            expect(result.code).toContain(`from 'vue'`); // Sin transformar
+            expect(result.code).toContain(`node_modules/vue/`); // Debe transformarse a node_modules
         });
 
         test('debe preservar comentarios y espacios', async () => {
@@ -254,8 +283,12 @@ const dynamic = await import(\`@/utils/helper-\${version}_final.ts\`);
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toContain('/public/components/special-name_v2.js');
-            expect(result.code).toContain(`/public/utils/helper-\${version}_final.ts`);
+            expect(result.code).toContain(
+                '/public/components/special-name_v2.js',
+            );
+            expect(result.code).toContain(
+                `/public/utils/helper-\${version}_final.ts`,
+            );
         });
     });
 
@@ -267,23 +300,27 @@ const dynamic = await import(\`@/utils/helper-\${version}_final.ts\`);
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { Component } from '@/components/modal.vue';`);
+            expect(result.code).toBe(
+                `import { Component } from '@/components/modal.vue';`,
+            );
         });
 
         test('debe usar PATH_DIST correctamente', async () => {
-            process.env.PATH_DIST = "build";
+            process.env.PATH_DIST = 'build';
 
             const inputCode = `import { Component } from '@/components/modal.vue';`;
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`import { Component } from '/build/components/modal.js';`);
+            expect(result.code).toBe(
+                `import { Component } from '/build/components/modal.js';`,
+            );
         });
 
         test('debe manejar PATH_ALIAS con múltiples alias', async () => {
             process.env.PATH_ALIAS = JSON.stringify({
-                "@/*": "/src/*",
-                "~/*": "/assets/*"
+                '@/*': '/src/*',
+                '~/*': '/assets/*',
             });
 
             const inputCode = `
@@ -323,7 +360,9 @@ import { image } from '~/images/logo.png';
             const result = await estandarizaCode(inputCode, 'vue-loader.js');
 
             expect(result.error).toBeNull();
-            expect(result.code).toBe(`await import(\`/public/\${module}.js?v=\${Date.now()}\`);`);
+            expect(result.code).toBe(
+                `await import(\`/public/\${module}.js?v=\${Date.now()}\`);`,
+            );
         });
 
         test('debe manejar imports condicionales', async () => {
