@@ -1,7 +1,104 @@
 import path from 'node:path';
 import { env } from 'node:process';
 import { logger } from '../servicios/logger.ts';
+import { getModulePath } from '../utils/module-resolver.ts';
 import { parser } from './parser.ts';
+
+// Módulos built-in de Node.js que no deben ser resueltos
+const NODE_BUILTIN_MODULES = new Set([
+    'fs',
+    'path',
+    'os',
+    'crypto',
+    'http',
+    'https',
+    'url',
+    'util',
+    'events',
+    'stream',
+    'buffer',
+    'child_process',
+    'cluster',
+    'dgram',
+    'dns',
+    'net',
+    'readline',
+    'repl',
+    'tls',
+    'tty',
+    'vm',
+    'zlib',
+    'assert',
+    'module',
+    'process',
+    'querystring',
+    'string_decoder',
+    'timers',
+    'v8',
+    'worker_threads',
+]);
+
+/**
+ * Determina si un moduleRequest es un módulo externo que debe ser resuelto
+ * @param moduleRequest - El string del import (ej: 'vue', './local', '/absolute')
+ * @param pathAlias - Objeto con los alias definidos
+ * @returns true si es un módulo externo que debe resolverse
+ */
+function isExternalModule(
+    moduleRequest: string,
+    pathAlias: Record<string, any>,
+): boolean {
+    // Descartar rutas relativas y absolutas
+    if (
+        moduleRequest.startsWith('./') ||
+        moduleRequest.startsWith('../') ||
+        moduleRequest.startsWith('/')
+    ) {
+        return false;
+    }
+
+    // Descartar rutas que parecen ser locales (contienen carpetas conocidas del proyecto)
+    const localPaths = [
+        'public/',
+        'src/',
+        'dist/',
+        'components/',
+        'utils/',
+        'assets/',
+        'styles/',
+    ];
+    if (localPaths.some(localPath => moduleRequest.startsWith(localPath))) {
+        return false;
+    }
+
+    // Descartar módulos built-in de Node.js (incluyendo node: prefix)
+    const cleanModuleName = moduleRequest.replace(/^node:/, '');
+    if (NODE_BUILTIN_MODULES.has(cleanModuleName)) {
+        return false;
+    }
+
+    // Descartar alias conocidos
+    for (const alias of Object.keys(pathAlias)) {
+        const aliasPattern = alias.replace('/*', '');
+        if (moduleRequest.startsWith(aliasPattern)) {
+            return false;
+        }
+    }
+
+    // Verificar si parece ser un módulo npm (no contiene extensiones de archivo)
+    if (
+        moduleRequest.includes('.js') ||
+        moduleRequest.includes('.ts') ||
+        moduleRequest.includes('.vue') ||
+        moduleRequest.includes('.css') ||
+        moduleRequest.includes('.json')
+    ) {
+        return false;
+    }
+
+    // Si llegamos aquí, es probablemente un módulo externo
+    return true;
+}
 
 export async function replaceAliasImportStatic(
     file: string,
@@ -23,8 +120,9 @@ export async function replaceAliasImportStatic(
     for (const match of matches) {
         const [fullMatch, moduleRequest] = match;
         let newMatch = fullMatch;
+        let transformed = false;
 
-        // Verificar si es un alias conocido
+        // 1. Verificar si es un alias conocido (lógica existente)
         for (const [alias, _target] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
@@ -50,11 +148,29 @@ export async function replaceAliasImportStatic(
 
                 const finalPath = newImportPath.replace(/\\/g, '/');
                 newMatch = fullMatch.replace(moduleRequest, finalPath);
+                transformed = true;
                 break;
             }
         }
 
-        resultCode = resultCode.replace(fullMatch, newMatch);
+        // 2. Si no es alias, verificar si es un módulo externo
+        if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
+            try {
+                const modulePath = getModulePath(moduleRequest);
+                if (modulePath) {
+                    newMatch = fullMatch.replace(moduleRequest, modulePath);
+                    transformed = true;
+                }
+            } catch (error) {
+                logger.warn(
+                    `Error resolviendo módulo ${moduleRequest}: ${error.message}`,
+                );
+            }
+        }
+
+        if (transformed) {
+            resultCode = resultCode.replace(fullMatch, newMatch);
+        }
     }
 
     return resultCode;
@@ -82,8 +198,9 @@ async function replaceAliasImportDynamic(
     for (const match of dynamicMatches) {
         const [fullMatch, moduleRequest] = match;
         let newMatch = fullMatch;
+        let transformed = false;
 
-        // Verificar si es un alias conocido
+        // 1. Verificar si es un alias conocido (lógica existente)
         for (const [alias, _target] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
@@ -105,16 +222,39 @@ async function replaceAliasImportDynamic(
 
                 const finalPath = newImportPath.replace(/\\/g, '/');
                 newMatch = fullMatch.replace(moduleRequest, finalPath);
+                transformed = true;
                 break;
             }
         }
 
-        resultCode = resultCode.replace(fullMatch, newMatch);
+        // 2. Si no es alias, verificar si es un módulo externo
+        if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
+            try {
+                const modulePath = getModulePath(moduleRequest);
+                if (modulePath) {
+                    newMatch = fullMatch.replace(moduleRequest, modulePath);
+                    transformed = true;
+                }
+            } catch (error) {
+                logger.warn(
+                    `Error resolviendo módulo dinámico ${moduleRequest}: ${error.message}`,
+                );
+            }
+        }
+
+        if (transformed) {
+            resultCode = resultCode.replace(fullMatch, newMatch);
+        }
     }
 
+    // Manejar template literals - versión mejorada
     resultCode = resultCode.replace(
         templateLiteralRegex,
         (match, moduleRequest) => {
+            let transformed = false;
+            let result = match;
+
+            // 1. Verificar aliases en template literals
             for (const [alias, _target] of Object.entries(pathAlias)) {
                 const aliasPattern = alias.replace('/*', '');
                 if (moduleRequest.includes(aliasPattern)) {
@@ -127,13 +267,33 @@ async function replaceAliasImportDynamic(
                         /\/\.\//g,
                         '/',
                     );
-                    return match.replace(
+                    result = match.replace(
                         moduleRequest,
                         normalizedModuleRequest,
                     );
+                    transformed = true;
+                    break;
                 }
             }
-            return match;
+
+            // 2. Si no es alias y parece ser módulo externo en template literal
+            if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
+                try {
+                    const modulePath = getModulePath(moduleRequest);
+                    if (modulePath) {
+                        logger.info(
+                            `Resolviendo módulo template literal: ${moduleRequest} → ${modulePath}`,
+                        );
+                        result = match.replace(moduleRequest, modulePath);
+                    }
+                } catch (error) {
+                    logger.warn(
+                        `Error resolviendo módulo template literal ${moduleRequest}: ${error.message}`,
+                    );
+                }
+            }
+
+            return result;
         },
     );
 

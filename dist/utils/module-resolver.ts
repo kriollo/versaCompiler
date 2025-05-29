@@ -1,6 +1,6 @@
 // Opción con librería 'resolve' (npm install resolve)
-import { readdir, readFile, readFileSync, readlink, stat } from 'fs';
-import { dirname, join } from 'path';
+import fs, { readdir, readFile, readFileSync, readlink, stat } from 'fs';
+import { dirname, join, relative } from 'path';
 import resolve from 'resolve';
 
 function resolveESMWithLibrary(moduleName: string): string | null {
@@ -52,21 +52,34 @@ function resolveESMEnhanced(moduleName: string): Promise<string | null> {
     });
 }
 
-// Función simple usando solo Node.js builtin APIs
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
+// Función simple que no usa createRequire
 function simpleESMResolver(moduleName: string): string | null {
     try {
-        // Resolver el package.json del módulo
-        const packagePath = require.resolve(`${moduleName}/package.json`);
-        const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+        // Para el entorno de testing, simulamos la resolución
+        // En lugar de usar require.resolve, construimos la ruta esperada
+        const nodeModulesPath = join(process.cwd(), 'node_modules', moduleName);
+        let packagePath: string;
+        let packageJson: any;
+        try {
+            // Método 1: Buscar package.json directamente en node_modules
+            packagePath = join(nodeModulesPath, 'package.json');
+            if (!fs.existsSync(packagePath)) {
+                throw new Error(
+                    `No se encontró package.json para ${moduleName}`,
+                );
+            }
+        } catch {
+            // Si no se encuentra, retornar null
+            return null;
+        }
+
+        packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
         const moduleDir = dirname(packagePath);
 
         // Determinar el entry point ESM
-        let entryPoint;
+        let entryPoint: string | null = null;
 
-        // 1. Revisar exports field
+        // 1. Revisar exports field (manejo mejorado)
         if (packageJson.exports) {
             if (typeof packageJson.exports === 'string') {
                 entryPoint = packageJson.exports;
@@ -74,12 +87,24 @@ function simpleESMResolver(moduleName: string): string | null {
                 const dotExport = packageJson.exports['.'];
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
-                } else {
+                } else if (typeof dotExport === 'object') {
+                    // Manejar exports con condiciones: { import: "...", require: "...", default: "..." }
                     entryPoint =
                         dotExport.import ||
                         dotExport.module ||
-                        dotExport.default;
+                        dotExport.default ||
+                        dotExport.main;
+                    // Si aún es un objeto, intentar extraer el string
+                    if (typeof entryPoint === 'object' && entryPoint !== null) {
+                        const entryObj = entryPoint as any;
+                        entryPoint =
+                            entryObj.import || entryObj.default || null;
+                    }
                 }
+            } else if (packageJson.exports.import) {
+                entryPoint = packageJson.exports.import;
+            } else if (packageJson.exports.default) {
+                entryPoint = packageJson.exports.default;
             }
         }
 
@@ -98,9 +123,18 @@ function simpleESMResolver(moduleName: string): string | null {
             entryPoint = 'index.js';
         }
 
+        // Asegurar que entryPoint es un string
+        if (typeof entryPoint !== 'string') {
+            console.warn(
+                `Entry point no es string para ${moduleName}:`,
+                entryPoint,
+            );
+            entryPoint = 'index.js';
+        }
+
         return join(moduleDir, entryPoint);
     } catch (error) {
-        console.error(`Error: ${error.message}`);
+        console.error(`Error resolviendo ${moduleName}: ${error.message}`);
         return null;
     }
 }
@@ -108,13 +142,11 @@ function simpleESMResolver(moduleName: string): string | null {
 // Función utilitaria para obtener solo la parte relativa de node_modules
 function getNodeModulesRelativePath(fullPath: string | null): string | null {
     if (!fullPath) return null;
-    const path = require('path');
     const idx = fullPath.indexOf('node_modules');
     if (idx !== -1) {
         return fullPath.substring(idx).replace(/\\/g, '/');
-    }
-    // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
-    let rel = path.relative(process.cwd(), fullPath).replace(/\\/g, '/');
+    } // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
+    let rel = relative(process.cwd(), fullPath).replace(/\\/g, '/');
     if (!rel) rel = '.';
     return rel;
 }
