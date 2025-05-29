@@ -281,9 +281,6 @@ async function replaceAliasImportDynamic(
                 try {
                     const modulePath = getModulePath(moduleRequest);
                     if (modulePath) {
-                        logger.info(
-                            `Resolviendo módulo template literal: ${moduleRequest} → ${modulePath}`,
-                        );
                         result = match.replace(moduleRequest, modulePath);
                     }
                 } catch (error) {
