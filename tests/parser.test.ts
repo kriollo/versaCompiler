@@ -5,7 +5,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { getCodeFile, parser } from '../dist/compiler/parser';
+import { getCodeFile, parser } from '../src/compiler/parser';
 
 describe('Parser', () => {
     const testDir = path.join(process.cwd(), 'temp-test-parser');

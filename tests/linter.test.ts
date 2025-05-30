@@ -5,7 +5,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { ESLint, OxLint, type LinterConfig } from '../dist/compiler/linter';
+import { ESLint, OxLint, type LinterConfig } from '../src/compiler/linter';
 
 describe('Linter', () => {
     const testDir = path.join(process.cwd(), 'temp-test-linter');

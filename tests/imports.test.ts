@@ -3,7 +3,7 @@
  * Cubre todos los casos: estáticos, dinámicos, literals, template literals, etc.
  */
 
-import { estandarizaCode } from '../dist/compiler/transforms';
+import { estandarizaCode } from '../src/compiler/transforms';
 
 // Configurar variables de entorno para las pruebas
 const setupEnv = () => {

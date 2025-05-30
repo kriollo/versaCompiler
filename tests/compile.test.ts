@@ -5,7 +5,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { compileFile, runLinter } from '../dist/compiler/compile';
+import { compileFile, runLinter } from '../src/compiler/compile';
 
 describe('Compiler', () => {
     const testDir = path.join(process.cwd(), 'temp-test-compiler');

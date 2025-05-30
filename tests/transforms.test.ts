@@ -1,7 +1,7 @@
 import oxc from 'oxc-parser';
 
 // Importamos las funciones que necesitamos testear
-import { estandarizaCode } from '../dist/compiler/transforms';
+import { estandarizaCode } from '../src/compiler/transforms';
 
 // Función simple de prueba para verificar que el parser funciona
 describe('Parser básico', () => {

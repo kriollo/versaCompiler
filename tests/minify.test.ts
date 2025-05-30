@@ -3,7 +3,7 @@
  * Verifica la minificación de código JavaScript con diferentes configuraciones
  */
 
-import { minifyJS } from '../dist/compiler/minify';
+import { minifyJS } from '../src/compiler/minify';
 
 describe('JavaScript Minifier', () => {
     describe('minifyJS', () => {

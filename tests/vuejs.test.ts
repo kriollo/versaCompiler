@@ -3,7 +3,7 @@
  * Verifica la compilación de componentes Vue con diferentes configuraciones
  */
 
-import { preCompileVue } from '../dist/compiler/vuejs';
+import { preCompileVue } from '../src/compiler/vuejs';
 
 describe('Vue.js Compiler', () => {
     describe('preCompileVue', () => {

@@ -3,8 +3,8 @@
  * Testa getModulePath y las nuevas capacidades de transforms.ts
  */
 
-import { estandarizaCode } from '../dist/compiler/transforms';
-import { getModulePath } from '../dist/utils/module-resolver';
+import { estandarizaCode } from '../src/compiler/transforms';
+import { getModulePath } from '../src/utils/module-resolver';
 
 // Configurar variables de entorno para las pruebas
 const setupEnv = () => {

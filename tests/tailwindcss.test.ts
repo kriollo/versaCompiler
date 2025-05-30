@@ -3,7 +3,7 @@
  * Verifica la generación de CSS usando TailwindCSS
  */
 
-import { generateTailwindCSS } from '../dist/compiler/tailwindcss';
+import { generateTailwindCSS } from '../src/compiler/tailwindcss';
 
 describe('TailwindCSS Compiler', () => {
     let originalEnv: NodeJS.ProcessEnv;
