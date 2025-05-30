@@ -179,11 +179,12 @@ function simpleESMResolver(moduleName: string): string | null {
 
         packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
         const moduleDir = dirname(packagePath);
+        const isESM = packageJson.type === 'module';
 
-        // Determinar el entry point ESM con detección dinámica de versiones browser
+        // Determinar el entry point ESM
         let entryPoint: string | null = null;
 
-        // 1. Revisar exports field con prioridad para condiciones browser
+        // 1. Revisar exports field
         if (packageJson.exports) {
             if (typeof packageJson.exports === 'string') {
                 entryPoint = packageJson.exports;
@@ -192,45 +193,32 @@ function simpleESMResolver(moduleName: string): string | null {
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    // PRIORIZAR browser > import > module > default
+                    // Priorizar browser > import > default para compatibilidad web
                     entryPoint =
-                        dotExport.browser || // ← Prioridad para browser
-                        dotExport.import ||
-                        dotExport.module ||
-                        dotExport.default ||
-                        dotExport.main;
-
-                    if (typeof entryPoint === 'object' && entryPoint !== null) {
-                        const entryObj = entryPoint as any;
-                        entryPoint =
-                            entryObj.browser || // ← Prioridad para browser
-                            entryObj.import ||
-                            entryObj.default ||
-                            null;
-                    }
+                        dotExport.browser ||
+                        (typeof dotExport.import === 'string'
+                            ? dotExport.import
+                            : null) ||
+                        (typeof dotExport.default === 'string'
+                            ? dotExport.default
+                            : null);
                 }
-            } else if (packageJson.exports.browser) {
-                entryPoint = packageJson.exports.browser;
-            } else if (packageJson.exports.import) {
-                entryPoint = packageJson.exports.import;
-            } else if (packageJson.exports.default) {
-                entryPoint = packageJson.exports.default;
             }
         }
 
-        // 2. Fallback a campo 'browser' específico del package.json
+        // 2. Revisar browser field específico
         if (!entryPoint && packageJson.browser) {
             if (typeof packageJson.browser === 'string') {
                 entryPoint = packageJson.browser;
-            } else if (
-                typeof packageJson.browser === 'object' &&
-                packageJson.browser['.']
-            ) {
-                entryPoint = packageJson.browser['.'];
+            } else if (typeof packageJson.browser === 'object') {
+                // Si browser es un objeto de mapeo, buscar la entrada principal
+                entryPoint =
+                    packageJson.browser['.'] ||
+                    packageJson.browser[packageJson.main];
             }
         }
 
-        // 3. Fallback a module field
+        // 3. Fallback a module field para ESM
         if (!entryPoint && packageJson.module) {
             entryPoint = packageJson.module;
         }
@@ -240,34 +228,92 @@ function simpleESMResolver(moduleName: string): string | null {
             entryPoint = packageJson.main;
         }
 
-        // 5. Fallback por defecto
+        // 5. Fallback por defecto según el tipo de módulo
         if (!entryPoint) {
-            entryPoint = 'index.js';
+            entryPoint = isESM ? 'index.js' : 'index.cjs';
         }
 
+        // Asegurarse de que el entry point es una cadena
         if (typeof entryPoint !== 'string') {
             logger.warn(
                 `Entry point no es string para ${moduleName}:`,
                 entryPoint,
             );
-            entryPoint = 'index.js';
+            entryPoint = isESM ? 'index.js' : 'index.cjs';
         }
 
-        // 🔍 DETECCIÓN DINÁMICA: Buscar versión browser-compatible
-        const browserCompatibleEntry = findBrowserCompatibleVersion(
-            moduleDir,
-            entryPoint,
-        );
-        const finalEntry = browserCompatibleEntry || entryPoint;
+        // Resolver la ruta final
+        let finalPath = join(moduleDir, entryPoint);
 
-        const finalPath = join(moduleDir, finalEntry);
+        // Si es ESM, verificar si hay imports privados que necesiten ser resueltos
+        if (isESM && packageJson.imports) {
+            const importMap = new Map();
+            for (const [key, value] of Object.entries(packageJson.imports)) {
+                if (typeof value === 'string') {
+                    importMap.set(key, join(moduleDir, value));
+                } else if (typeof value === 'object' && value !== null) {
+                    // Priorizar la versión browser
+                    const valueObj = value as {
+                        browser?: string;
+                        default?: string;
+                        node?: string;
+                    };
+                    const browserPath =
+                        valueObj.browser || valueObj.default || valueObj.node;
+                    if (browserPath) {
+                        importMap.set(key, join(moduleDir, browserPath));
+                    }
+                }
+            }
+
+            // Si el archivo existe, leer su contenido y verificar imports privados
+            if (fs.existsSync(finalPath)) {
+                const content = readFileSync(finalPath, 'utf-8');
+                const privateImports = Array.from(
+                    content.matchAll(/from\s+['"]([#@][^'"]+)['"]/g),
+                );
+
+                if (privateImports.length > 0) {
+                    logger.info(
+                        `Módulo ${moduleName} usa imports privados:`,
+                        privateImports.map(m => m[1]),
+                    );
+                    // Si usa imports privados, asegurarnos de que estén disponibles
+                    for (const [, importPath] of privateImports) {
+                        if (!importMap.has(importPath)) {
+                            logger.warn(
+                                `Import privado no resuelto: ${importPath} en ${moduleName}`,
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         // Verificar que el archivo existe
         if (!fs.existsSync(finalPath)) {
             logger.warn(
-                `⚠️  Archivo no existe: ${finalPath}, usando original: ${entryPoint}`,
+                `⚠️ Archivo no existe: ${finalPath}, buscando alternativas...`,
             );
-            return join(moduleDir, entryPoint);
+
+            // Intentar alternativas comunes
+            const alternatives = [
+                entryPoint,
+                entryPoint.replace('.js', '.mjs'),
+                entryPoint.replace('.mjs', '.js'),
+                entryPoint.replace('.js', '.cjs'),
+                'index.mjs',
+                'index.js',
+                'index.cjs',
+            ];
+
+            for (const alt of alternatives) {
+                const altPath = join(moduleDir, alt);
+                if (fs.existsSync(altPath)) {
+                    finalPath = altPath;
+                    break;
+                }
+            }
         }
 
         return finalPath;

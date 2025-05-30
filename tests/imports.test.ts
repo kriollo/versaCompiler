@@ -89,15 +89,62 @@ import { config } from '@/config/app.js';
                 `import { helper } from '/public/utils/helper.js';`,
             );
         });
-
-        test('no debe transformar imports relativos', async () => {
+        test('debe transformar imports relativos agregando extensión .js', async () => {
             const inputCode = `import { helper } from './utils/helper.ts';`;
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
             expect(result.code).toBe(
-                `import { helper } from './utils/helper.ts';`,
+                `import { helper } from './utils/helper.js';`,
             );
+        });
+
+        test('debe transformar imports relativos con ../  agregando extensión .js', async () => {
+            const inputCode = `import { config } from '../config/app.ts';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `import { config } from '../config/app.js';`,
+            );
+        });
+
+        test('debe transformar imports relativos de archivos .vue a .js', async () => {
+            const inputCode = `import Modal from './components/Modal.vue';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `import Modal from './components/Modal.js';`,
+            );
+        });
+
+        test('debe agregar .js a imports relativos sin extensión', async () => {
+            const inputCode = `import { utils } from './utils/helper';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `import { utils } from './utils/helper.js';`,
+            );
+        });
+
+        test('debe mantener extensiones .js existentes en imports relativos', async () => {
+            const inputCode = `import { utils } from './utils/helper.js';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `import { utils } from './utils/helper.js';`,
+            );
+        });
+
+        test('debe mantener extensiones .css en imports relativos', async () => {
+            const inputCode = `import './styles/main.css';`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(`import './styles/main.css';`);
         });
         test('debe transformar imports externos (node_modules) a rutas relativas', async () => {
             const inputCode = `import { ref } from 'vue';`;
@@ -165,7 +212,6 @@ import '@/styles/global.css';
                 `const component = import('/public/components/modal.js');`,
             );
         });
-
         test('debe transformar múltiples imports dinámicos', async () => {
             const inputCode = `
 const modal = await import('@/components/modal.vue');
@@ -178,6 +224,26 @@ const config = import('@/config/app.js');
             expect(result.code).toContain('/public/components/modal.js');
             expect(result.code).toContain('/public/utils/helper.js');
             expect(result.code).toContain('/public/config/app.js');
+        });
+
+        test('debe transformar imports dinámicos relativos', async () => {
+            const inputCode = `const component = await import('./components/modal.vue');`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `const component = await import('./components/modal.js');`,
+            );
+        });
+
+        test('debe transformar imports dinámicos relativos con ../)', async () => {
+            const inputCode = `const utils = import('../utils/helper.ts');`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(
+                `const utils = import('../utils/helper.js');`,
+            );
         });
     });
 
@@ -229,15 +295,22 @@ const config = import(\`@/config/\${env}.js?v=\${version}\`);
                 `/public/config/\${env}.js?v=\${version}`,
             );
         });
-
-        test('no debe transformar template literals que no empiecen con alias', async () => {
+        test('debe transformar template literals relativos agregando extensión .js', async () => {
             const inputCode = `await import(\`./components/\${name}.vue\`);`;
             const result = await estandarizaCode(inputCode, 'test.ts');
 
             expect(result.error).toBeNull();
             expect(result.code).toBe(
-                `await import(\`./components/\${name}.vue\`);`,
+                `await import(\`./components/\${name}.js\`);`,
             );
+        });
+
+        test('debe transformar template literals relativos con ../', async () => {
+            const inputCode = `await import(\`../utils/\${name}.ts\`);`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toBe(`await import(\`../utils/\${name}.js\`);`);
         });
 
         test('debe manejar template literals con expresiones complejas', async () => {
@@ -396,7 +469,6 @@ if (isDev) {
             expect(result.code).toContain('/public/utils/dev.js');
             expect(result.code).toContain('/public/utils/prod.js');
         });
-
         test('debe manejar imports en funciones async', async () => {
             const inputCode = `
 async function loadModule(name) {
@@ -414,6 +486,54 @@ async function loadModule(name) {
             expect(result.error).toBeNull();
             expect(result.code).toContain(`/public/modules/\${name}.vue`);
             expect(result.code).toContain('/public/components/fallback.js');
+        });
+    });
+
+    describe('Importaciones relativas (nuevas funcionalidades)', () => {
+        test('debe manejar imports relativos mixtos con alias', async () => {
+            const inputCode = `
+import { aliasComponent } from '@/components/modal.vue';
+import { relativeHelper } from './utils/helper.ts';
+import { parentConfig } from '../config/app.ts';
+const dynamicAlias = await import('@/utils/runtime.js');
+const dynamicRelative = await import('./modules/loader.vue');
+`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toContain('/public/components/modal.js'); // alias
+            expect(result.code).toContain("'./utils/helper.js'"); // relativo
+            expect(result.code).toContain("'../config/app.js'"); // relativo parent
+            expect(result.code).toContain("'/public/utils/runtime.js'"); // dinámico alias
+            expect(result.code).toContain("'./modules/loader.js'"); // dinámico relativo
+        });
+
+        test('debe manejar casos del mundo real como main.ts', async () => {
+            const inputCode = `
+import { browserSyncServer } from './servicios/browserSync';
+import { initChokidar } from './servicios/chokidar';
+import { logger } from './servicios/logger';
+`;
+            const result = await estandarizaCode(inputCode, 'main.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toContain("'./servicios/browserSync.js'");
+            expect(result.code).toContain("'./servicios/chokidar.js'");
+            expect(result.code).toContain("'./servicios/logger.js'");
+        });
+
+        test('debe preservar imports relativos que ya tienen extensión correcta', async () => {
+            const inputCode = `
+import { helper } from './utils/helper.js';
+import './styles/main.css';
+import data from './data/config.json';
+`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            expect(result.code).toContain("'./utils/helper.js'");
+            expect(result.code).toContain("'./styles/main.css'");
+            expect(result.code).toContain("'./data/config.json'");
         });
     });
 });

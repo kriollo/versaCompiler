@@ -11,8 +11,8 @@ import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
 import { emitirCambios } from './browserSync';
 import { logger } from './logger';
 
-const cacheImportMap = new Map<string, string[]>();
-const cacheComponentMap = new Map<string, string[]>();
+// const cacheImportMap = new Map<string, string[]>();
+// const cacheComponentMap = new Map<string, string[]>();
 
 async function deleteFile(ruta: string): Promise<boolean> {
     try {

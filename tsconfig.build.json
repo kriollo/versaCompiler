@@ -2,7 +2,7 @@
     "compilerOptions": {
         "incremental": true,
         "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo",
-        "noEmitOnError": true,
+        "noEmitOnError": false,
         //comentario para probar si parsea bien el tsconfig.json
         "strict": true,
         "noImplicitAny": true,
@@ -20,7 +20,7 @@
         "checkJs": true,
         "noEmit": false,
         "module": "ESNext",
-        "target": "ESNext",
+        "target": "ES2022",
         "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./dist/",
         "sourceMap": true,
@@ -35,6 +35,7 @@
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "bundler",
+        "allowImportingTsExtensions": false,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true

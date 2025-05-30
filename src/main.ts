@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
 
@@ -88,12 +89,11 @@ async function main() {
             await initConfig();
             process.exit(0);
         }
+
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
-        env.TAILWIND =
-            argv.tailwind === undefined ? 'true' : String(argv.tailwind);
-        env.ENABLE_LINTER =
-            argv.linter === undefined ? 'true' : String(argv.linter);
+        env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
+        env.ENABLE_LINTER = argv.linter === undefined ? 'true' : argv.linter;
         env.VERBOSE = argv.verbose ? 'true' : 'false';
 
         logger.info(chalk.green('Configuración de VersaCompiler:'));
@@ -107,8 +107,9 @@ async function main() {
             await initCompileAll();
             process.exit(0);
         }
-        let bs: any;
-        let watch: any;
+
+        let bs;
+        let watch;
         if (argv.watch) {
             bs = await browserSyncServer();
             if (!bs) {

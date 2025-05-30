@@ -633,6 +633,8 @@ import _ from 'lodash';
 import { Component } from '@/components/Modal.vue';
 import { icon } from '~/icons/user.svg';
 import { config } from '#/app.json';
+import chalk from 'chalk';
+import yargs from 'yargs';
 
 const dynamicVue = import('vue/dist/vue.esm-bundler');
 const dynamicComponent = import('@/utils/helper.ts');

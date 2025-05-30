@@ -134,6 +134,31 @@ export async function browserSyncServer() {
                         return;
                     }
 
+                    // Si la URL comienza con /node_modules/, sirve los archivos de node_modules
+                    if (req.url.startsWith('/node_modules/')) {
+                        const modulePath = path.join(
+                            process.cwd(),
+                            req.url,
+                        );
+                        res.setHeader('Content-Type', 'application/javascript');
+                        try {
+                            const fileContent = await fs.readFile(
+                                modulePath,
+                                'utf-8',
+                            );
+                            res.end(fileContent);
+                        } catch (error) {
+                            logger.error(
+                                chalk.red(
+                                    `🚩 Error al leer el módulo ${modulePath}: ${error instanceof Error ? error.message : String(error)}`,
+                                ),
+                            );
+                            res.statusCode = 404;
+                            res.end('// Module not found');
+                        }
+                        return;
+                    }
+
                     // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
                     const isAssets = req.url.match(
                         /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,

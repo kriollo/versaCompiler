@@ -110,32 +110,31 @@ export async function replaceAliasImportStatic(
         return code;
     }
     const pathAlias = JSON.parse(env.PATH_ALIAS);
-    let resultCode = code;
-
-    // Usar regex para transformar imports estáticos
+    let resultCode = code; // Usar regex para transformar imports estáticos
     const importRegex =
-        /import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*\s+from\s+)?['"`]([^'"`]+)['"`]/g;
-
-    // Crear un array para procesar transformaciones async
+        /import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*\s+from\s+)?['"`]([^'"`]+)['"`]/g; // Crear un array para procesar transformaciones async
     const matches = Array.from(resultCode.matchAll(importRegex));
     for (const match of matches) {
-        const [fullMatch, moduleRequest] = match;
+        const [, moduleRequest] = match;
         if (!moduleRequest) continue; // Skip if moduleRequest is undefined
 
-        let newMatch = fullMatch;
-        let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
+        let newPath: string | null = null;
+        let transformed = false;
+
+        // 1. Verificar si es un alias conocido (lógica corregida)
         for (const [alias] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Reemplazar el alias con la ruta del target
-                const relativePath = moduleRequest.replace(aliasPattern, '');
-                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                const relativePath = moduleRequest.replace(aliasPattern, '');                // Para alias que apuntan a la raíz (como @/* -> /src/*),
                 // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join(
                     '/',
                     env.PATH_DIST!,
                     relativePath,
-                ); // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                );
+
+                // Normalizar la ruta para eliminar ./ extra y separadores de Windows
                 newImportPath = newImportPath
                     .replace(/\/\.\//g, '/')
                     .replace(/\\/g, '/');
@@ -145,23 +144,20 @@ export async function replaceAliasImportStatic(
                     newImportPath.endsWith('.vue')
                 ) {
                     newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-                } else if (!/\.(js|mjs|css)$/.test(newImportPath)) {
+                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
                     newImportPath += '.js';
                 }
 
-                const finalPath = newImportPath;
-                newMatch = fullMatch.replace(moduleRequest, finalPath);
+                newPath = newImportPath;
                 transformed = true;
                 break;
             }
-        }
-
-        // 2. Si no es alias, verificar si es un módulo externo
+        } // 2. Si no es alias, verificar si es un módulo externo
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
                 const modulePath = getModulePath(moduleRequest);
                 if (modulePath) {
-                    newMatch = fullMatch.replace(moduleRequest, modulePath);
+                    newPath = modulePath;
                     transformed = true;
                 }
             } catch (error) {
@@ -171,8 +167,31 @@ export async function replaceAliasImportStatic(
             }
         }
 
-        if (transformed) {
-            resultCode = resultCode.replace(fullMatch, newMatch);
+        // 3. Si no es alias ni módulo externo, verificar si es ruta relativa que necesita extensión .js
+        if (
+            !transformed &&
+            (moduleRequest.startsWith('./') || moduleRequest.startsWith('../'))
+        ) {
+            let relativePath = moduleRequest;
+
+            if (relativePath.endsWith('.ts') || relativePath.endsWith('.vue')) {
+                relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
+                newPath = relativePath;
+                transformed = true;
+            } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
+                newPath = relativePath + '.js';
+                transformed = true;
+            }
+        }
+
+        // 3. Reemplazar solo el path en las comillas, no toda la línea
+        if (transformed && newPath) {
+            // Buscar y reemplazar solo la parte entre comillas
+            const pathRegex = new RegExp(
+                `(['"\`])${moduleRequest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`,
+                'g',
+            );
+            resultCode = resultCode.replace(pathRegex, `$1${newPath}$1`);
         }
     }
 
@@ -194,22 +213,21 @@ async function replaceAliasImportDynamic(
     // Regex para imports dinámicos normales con string (solo comillas simples y dobles)
     const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
     // Regex para template literals (solo backticks)
-    const templateLiteralRegex = /import\s*\(\s*`([^`]+)`\s*\)/g;
-
-    // Manejar imports dinámicos normales con string
+    const templateLiteralRegex = /import\s*\(\s*`([^`]+)`\s*\)/g; // Manejar imports dinámicos normales con string
     const dynamicMatches = Array.from(resultCode.matchAll(dynamicImportRegex));
     for (const match of dynamicMatches) {
-        const [fullMatch, moduleRequest] = match;
+        const [, moduleRequest] = match;
         if (!moduleRequest) continue; // Skip if moduleRequest is undefined
 
-        let newMatch = fullMatch;
-        let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
+        let newPath: string | null = null;
+        let transformed = false;
+
+        // 1. Verificar si es un alias conocido (lógica corregida)
         for (const [alias] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Reemplazar el alias con la ruta del target
-                const relativePath = moduleRequest.replace(aliasPattern, '');
-                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                const relativePath = moduleRequest.replace(aliasPattern, '');                // Para alias que apuntan a la raíz (como @/* -> /src/*),
                 // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join('/', pathDist, relativePath);
 
@@ -223,23 +241,20 @@ async function replaceAliasImportDynamic(
                     newImportPath.endsWith('.vue')
                 ) {
                     newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-                } else if (!/\.(js|mjs|css)$/.test(newImportPath)) {
+                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
                     newImportPath += '.js';
                 }
 
-                const finalPath = newImportPath;
-                newMatch = fullMatch.replace(moduleRequest, finalPath);
+                newPath = newImportPath;
                 transformed = true;
                 break;
             }
-        }
-
-        // 2. Si no es alias, verificar si es un módulo externo
+        } // 2. Si no es alias, verificar si es un módulo externo
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
                 const modulePath = getModulePath(moduleRequest);
                 if (modulePath) {
-                    newMatch = fullMatch.replace(moduleRequest, modulePath);
+                    newPath = modulePath;
                     transformed = true;
                 }
             } catch (error) {
@@ -249,8 +264,34 @@ async function replaceAliasImportDynamic(
             }
         }
 
-        if (transformed) {
-            resultCode = resultCode.replace(fullMatch, newMatch);
+        // 3. Si no es alias ni módulo externo, verificar si es ruta relativa que necesita extensión .js
+        if (
+            !transformed &&
+            (moduleRequest.startsWith('./') || moduleRequest.startsWith('../'))
+        ) {
+            let relativePath = moduleRequest;
+
+            if (relativePath.endsWith('.ts') || relativePath.endsWith('.vue')) {
+                relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
+                newPath = relativePath;
+                transformed = true;
+            } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
+                newPath = relativePath + '.js';
+                transformed = true;
+            }
+        }
+
+        // 3. Reemplazar solo el path en las comillas, no toda la expresión
+        if (transformed && newPath) {
+            // Buscar y reemplazar solo la parte entre comillas en import()
+            const pathRegex = new RegExp(
+                `import\\s*\\(\\s*(['"])${moduleRequest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1\\s*\\)`,
+                'g',
+            );
+            resultCode = resultCode.replace(
+                pathRegex,
+                `import($1${newPath}$1)`,
+            );
         }
     } // Manejar template literals - versión mejorada
     resultCode = resultCode.replace(
@@ -281,9 +322,7 @@ async function replaceAliasImportDynamic(
                     transformed = true;
                     break;
                 }
-            }
-
-            // 2. Si no es alias y parece ser módulo externo en template literal
+            } // 2. Si no es alias y parece ser módulo externo en template literal
             if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
                 try {
                     const modulePath = getModulePath(moduleRequest);
@@ -294,6 +333,24 @@ async function replaceAliasImportDynamic(
                     logger.warn(
                         `Error resolviendo módulo template literal ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                     );
+                }
+            }
+
+            // 3. Si no es alias ni módulo externo, verificar si necesita transformación de extensión para rutas relativas
+            if (!transformed) {
+                // Para template literals que contienen rutas relativas, solo transformar extensiones
+                let newModuleRequest = moduleRequest;
+                if (
+                    moduleRequest.includes('./') ||
+                    moduleRequest.includes('../')
+                ) {
+                    // Transformar extensiones .ts y .vue a .js en template literals relativos
+                    newModuleRequest = moduleRequest
+                        .replace(/\.ts(\b|`)/g, '.js$1')
+                        .replace(/\.vue(\b|`)/g, '.js$1');
+                    if (newModuleRequest !== moduleRequest) {
+                        result = match.replace(moduleRequest, newModuleRequest);
+                    }
                 }
             }
 
