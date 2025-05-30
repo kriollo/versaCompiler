@@ -1,6 +1,7 @@
 import { normalize, relative, resolve } from 'node:path';
 import { env } from 'node:process';
 import { pathToFileURL } from 'node:url';
+
 import { logger } from './logger';
 
 export type typeLinter = {
@@ -330,7 +331,7 @@ export function withTimeout<T>(
     timeoutMs: number,
     errorMessage: string,
 ): Promise<T> {
-    // eslint-disable-next-line promise/avoid-new
+     
     const timeoutPromise = new Promise<T>((resolve, reject) =>
         setTimeout(() => reject(new Error(errorMessage)), timeoutMs),
     );

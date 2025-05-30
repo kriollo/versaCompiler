@@ -1,4 +1,5 @@
 import { execa } from 'execa';
+
 import { resolveBin } from '../utils/resolve-bin';
 
 // Tipos basados en el código de referencia y tu implementación actual

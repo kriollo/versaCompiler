@@ -1,7 +1,10 @@
-import chalk from 'chalk';
 import path from 'node:path';
+
+import chalk from 'chalk';
 import * as vCompiler from 'vue/compiler-sfc';
+
 import { logger } from '../servicios/logger';
+
 import { parser } from './parser';
 
 const getComponentsVueMap = async (ast: any): Promise<string[]> => {

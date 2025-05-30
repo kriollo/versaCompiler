@@ -1,7 +1,8 @@
+import { createRequire } from 'node:module';
+import path from 'node:path';
+
 import findRoot from 'find-root';
 import fs from 'fs-extra';
-import { createRequire } from 'node:module';
-import path from 'path';
 
 export function resolveBin(
     moduleName: string,

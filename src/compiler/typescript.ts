@@ -1,4 +1,5 @@
 import path from 'node:path';
+
 import * as ts from 'typescript';
 
 interface CompileResult {

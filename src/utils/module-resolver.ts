@@ -1,7 +1,10 @@
 // Opción con librería 'resolve' (npm install resolve)
-import fs, { readdir, readFile, readFileSync, readlink, stat } from 'fs';
-import { dirname, join, relative } from 'path';
+import fs, { readdir, readFile, readFileSync, readlink, stat } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+
+import pkg from 'enhanced-resolve';
 import resolve from 'resolve';
+
 import { logger } from '../servicios/logger';
 
 function resolveESMWithLibrary(moduleName: string): string | null {
@@ -30,7 +33,7 @@ function resolveESMWithLibrary(moduleName: string): string | null {
 
 // Opción con 'enhanced-resolve' (webpack's resolver)
 // npm install enhanced-resolve
-import pkg from 'enhanced-resolve';
+
 const { ResolverFactory } = pkg;
 
 const resolver = ResolverFactory.createResolver({

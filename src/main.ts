@@ -1,13 +1,14 @@
-import chalk from 'chalk';
 import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
+
+import chalk from 'chalk';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+
+import { initCompileAll, runLinter } from './compiler/compile';
 import { browserSyncServer } from './servicios/browserSync';
 import { initChokidar } from './servicios/chokidar';
 import { logger } from './servicios/logger';
-
-import { initCompileAll, runLinter } from './compiler/compile';
 import { initConfig, readConfig } from './servicios/readConfig';
 
 // Obtener el directorio del archivo actual (dist/)

@@ -1,6 +1,8 @@
-import { execa } from 'execa';
 import path from 'node:path'; // Añadir importación de path
 import { cwd } from 'node:process'; // Añadir importación de cwd
+
+import { execa } from 'execa';
+
 import { resolveBin } from '../utils/resolve-bin';
 
 // Tipos para ESLint

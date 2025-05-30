@@ -20,7 +20,8 @@
         "start": "node --watch src/main.ts --watch",
         "test": "jest --config jest.config.cjs",
         "build": "tsc --project tsconfig.build.json",
-        "lint": "oxlint --fix --config .oxlint.json"
+        "lint": "oxlint --fix --config .oxlint.json",
+        "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix"
     },
     "keywords": [
         "vue",

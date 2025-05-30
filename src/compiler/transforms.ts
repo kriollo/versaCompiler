@@ -1,7 +1,9 @@
 import path from 'node:path';
 import { env } from 'node:process';
+
 import { logger } from '../servicios/logger';
 import { getModulePath } from '../utils/module-resolver';
+
 import { parser } from './parser';
 
 // Módulos built-in de Node.js que no deben ser resueltos

@@ -1,10 +1,12 @@
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { env } from 'node:process';
+
 import browserSync from 'browser-sync';
 import chalk from 'chalk';
 import { html } from 'code-tag';
 import getPort from 'get-port';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import { env } from 'node:process';
+
 import { logger } from './logger';
 
 export async function browserSyncServer() {

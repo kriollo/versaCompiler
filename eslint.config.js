@@ -131,7 +131,7 @@ export default [
                 ecmaVersion: 2020,
                 sourceType: 'module',
                 project: './tsconfig.build.json',
-                tsconfigRootDir: './src',
+                tsconfigRootDir: '.',
             },
         },
         plugins: {

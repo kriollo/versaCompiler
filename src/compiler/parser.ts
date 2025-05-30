@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+
 import oxc from 'oxc-parser';
 
 // import { simple as walk } from 'acorn-walk';

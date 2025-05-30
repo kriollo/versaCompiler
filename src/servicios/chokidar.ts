@@ -1,12 +1,15 @@
-import chalk from 'chalk';
-import chokidar from 'chokidar';
-import { env } from 'node:process';
-import { logger } from './logger';
 
 import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { env } from 'node:process';
+
+import chalk from 'chalk';
+import chokidar from 'chokidar';
+
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
+
 import { emitirCambios } from './browserSync';
+import { logger } from './logger';
 
 const cacheImportMap = new Map<string, string[]>();
 const cacheComponentMap = new Map<string, string[]>();

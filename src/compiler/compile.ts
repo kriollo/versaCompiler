@@ -1,10 +1,13 @@
-import chalk from 'chalk';
 import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { env, stdin as input, stdout as output } from 'node:process';
 import * as readline from 'node:readline/promises';
+
+import chalk from 'chalk';
+
 import { logger } from '../servicios/logger';
 import { showTimingForHumans } from '../utils/utils';
+
 import { ESLint, OxLint } from './linter';
 import { minifyJS } from './minify';
 import { getCodeFile } from './parser';
