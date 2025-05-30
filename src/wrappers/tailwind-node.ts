@@ -1,5 +1,5 @@
 import { execa, ExecaError } from 'execa';
-import { resolveBin } from '../utils/resolve-bin.ts';
+import { resolveBin } from '../utils/resolve-bin';
 
 /**
  * Opciones para la compilación de Tailwind CSS.
@@ -133,3 +133,4 @@ export class TailwindNode {
         return args;
     }
 }
+

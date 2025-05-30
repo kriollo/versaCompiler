@@ -4,7 +4,7 @@
  * @param {number} timing - The value of the timing en miliseconds.
  * @returns {string} the timing in ms, seconds, minutes or hours.
  */
-export const showTimingForHumans = timing => {
+export const showTimingForHumans = (timing: any): string => {
     if (timing < 1000) {
         return `${timing} ms`;
     } else if (timing < 60000) {

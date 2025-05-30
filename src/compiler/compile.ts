@@ -3,15 +3,15 @@ import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { env, stdin as input, stdout as output } from 'node:process';
 import * as readline from 'node:readline/promises';
-import { logger } from '../servicios/logger.ts';
-import { showTimingForHumans } from '../utils/utils.ts';
-import { ESLint, OxLint } from './linter.ts';
-import { minifyJS } from './minify.ts';
-import { getCodeFile } from './parser.ts';
-import { generateTailwindCSS } from './tailwindcss.ts';
-import { estandarizaCode } from './transforms.ts';
-import { preCompileTS } from './typescript.ts';
-import { preCompileVue } from './vuejs.ts';
+import { logger } from '../servicios/logger';
+import { showTimingForHumans } from '../utils/utils';
+import { ESLint, OxLint } from './linter';
+import { minifyJS } from './minify';
+import { getCodeFile } from './parser';
+import { generateTailwindCSS } from './tailwindcss';
+import { estandarizaCode } from './transforms';
+import { preCompileTS } from './typescript';
+import { preCompileVue } from './vuejs';
 
 type InventoryError = {
     file: string;
@@ -139,8 +139,12 @@ async function compileJS(inPath: string, outPath: string) {
     let { code, error } = await getCodeFile(inPath);
     if (error) {
         registerInventoryResume('getCodeFile', 1, 0);
-        registerInventoryError(inPath, error.message, 'error');
-        throw new Error(error.message);
+        registerInventoryError(
+            inPath,
+            error instanceof Error ? error.message : String(error),
+            'error',
+        );
+        throw new Error(error instanceof Error ? error.message : String(error));
     }
 
     if (
@@ -166,8 +170,18 @@ async function compileJS(inPath: string, outPath: string) {
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
-            registerInventoryError(inPath, vueResult.message, 'error');
-            throw new Error(vueResult.error);
+            registerInventoryError(
+                inPath,
+                vueResult.error instanceof Error
+                    ? vueResult.error.message
+                    : String(vueResult.error),
+                'error',
+            );
+            throw new Error(
+                vueResult.error instanceof Error
+                    ? vueResult.error.message
+                    : String(vueResult.error),
+            );
         }
         registerInventoryResume('preCompileVue', 0, 1);
         code = vueResult.data;
@@ -195,8 +209,18 @@ async function compileJS(inPath: string, outPath: string) {
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
             registerInventoryResume('preCompileTS', 1, 0);
-            registerInventoryError(inPath, tsResult.error, 'error');
-            throw new Error(tsResult.error);
+            registerInventoryError(
+                inPath,
+                tsResult.error instanceof Error
+                    ? tsResult.error.message
+                    : String(tsResult.error),
+                'error',
+            );
+            throw new Error(
+                tsResult.error instanceof Error
+                    ? tsResult.error.message
+                    : String(tsResult.error),
+            );
         }
         registerInventoryResume('preCompileTS', 0, 1);
         code = tsResult.data;
@@ -248,8 +272,18 @@ async function compileJS(inPath: string, outPath: string) {
         const resultMinify = await minifyJS(code, inPath, true);
         if (resultMinify.error) {
             registerInventoryResume('minifyJS', 1, 0);
-            registerInventoryError(inPath, resultMinify.error, 'error');
-            throw new Error(resultMinify.error);
+            registerInventoryError(
+                inPath,
+                resultMinify.error instanceof Error
+                    ? resultMinify.error.message
+                    : String(resultMinify.error),
+                'error',
+            );
+            throw new Error(
+                resultMinify.error instanceof Error
+                    ? resultMinify.error.message
+                    : String(resultMinify.error),
+            );
         }
         registerInventoryResume('minifyJS', 0, 1);
         code = resultMinify.code;
@@ -304,8 +338,11 @@ export async function initCompile(ruta: string, compileTailwind = true) {
             action: result.action,
         };
     } catch (error) {
+        const errorMessage =
+            error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '';
         logger.error(
-            `🚩 :Error al compilar ${ruta}: ${error.message}\n${error.stack}\n`,
+            `🚩 :Error al compilar ${ruta}: ${errorMessage}\n${errorStack}\n`,
         );
         return {
             success: false,
@@ -531,8 +568,11 @@ export async function initCompileAll() {
             inventoryResume,
         );
     } catch (error) {
+        const errorMessage =
+            error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '';
         logger.error(
-            `🚩 :Error al compilar todos los archivos: ${error.message}\n${error.stack}\n`,
+            `🚩 :Error al compilar todos los archivos: ${errorMessage}\n${errorStack}\n`,
         );
     }
 }
@@ -541,3 +581,4 @@ export async function initCompileAll() {
 export async function compileFile(filePath: string) {
     return await initCompile(filePath, true);
 }
+

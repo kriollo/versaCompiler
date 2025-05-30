@@ -2,7 +2,7 @@
 import fs, { readdir, readFile, readFileSync, readlink, stat } from 'fs';
 import { dirname, join, relative } from 'path';
 import resolve from 'resolve';
-import { logger } from '../servicios/logger.ts';
+import { logger } from '../servicios/logger';
 
 function resolveESMWithLibrary(moduleName: string): string | null {
     try {
@@ -18,10 +18,12 @@ function resolveESMWithLibrary(moduleName: string): string | null {
                 return pkg;
             },
         });
-
         return resolved;
     } catch (error) {
-        logger.error(`Error resolviendo ${moduleName}:`, error.message);
+        logger.error(
+            `Error resolviendo ${moduleName}:`,
+            error instanceof Error ? error.message : String(error),
+        );
         return null;
     }
 }
@@ -133,19 +135,19 @@ function findBrowserCompatibleVersion(
 
                             return browserPath;
                         }
+                    } // Si no hay coincidencia exacta, usar el primero encontrado
+                    if (browserFiles[0]) {
+                        const browserPath = join(dir, browserFiles[0]).replace(
+                            /\\/g,
+                            '/',
+                        );
+                        return browserPath;
                     }
-
-                    // Si no hay coincidencia exacta, usar el primero encontrado
-                    const browserPath = join(dir, browserFiles[0]).replace(
-                        /\\/g,
-                        '/',
-                    );
-                    return browserPath;
                 }
             } catch (error) {
                 logger.warn(
                     `No se pudo leer directorio ${searchDir}:`,
-                    error.message,
+                    error instanceof Error ? error.message : String(error),
                 );
             }
         }
@@ -267,7 +269,9 @@ function simpleESMResolver(moduleName: string): string | null {
 
         return finalPath;
     } catch (error) {
-        logger.error(`Error resolviendo ${moduleName}: ${error.message}`);
+        logger.error(
+            `Error resolviendo ${moduleName}: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return null;
     }
 }

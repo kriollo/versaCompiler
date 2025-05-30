@@ -44,13 +44,8 @@
         "target": 3.5,
         "strictTemplates": true
     },
-    "exclude": ["./public/**/*", "coverage/**/*"],
-    "include": [
-        "examples/**/*",
-        "examples/**/*.vue",
-        "examples/**/*.ts",
-        "examples/**/*.js"
-    ],
+    "exclude": ["./public/**/*", "coverage/**/*", "examples/**/*"],
+    "include": ["src/**/*", "src/**/*.ts", "tests/**/*.ts"],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]

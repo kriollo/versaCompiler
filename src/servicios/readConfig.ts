@@ -1,7 +1,7 @@
 import { normalize, relative, resolve } from 'node:path';
 import { env } from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { logger } from './logger.ts';
+import { logger } from './logger';
 
 export type typeLinter = {
     name: string;
@@ -388,14 +388,17 @@ export async function readConfig(): Promise<boolean> {
         }
 
         // Procesar pathsAlias de forma segura
-        const pathAlias = { ...tsConfig.compilerOptions.pathsAlias };
-
-        // Eliminar /* de las rutas de alias
+        const pathAlias = { ...tsConfig.compilerOptions.pathsAlias }; // Eliminar /* de las rutas de alias
         for (const key in pathAlias) {
             const values = pathAlias[key];
-            for (let i = 0; i < values.length; i++) {
-                if (typeof values[i] === 'string') {
-                    values[i] = values[i].replace('/*', '');
+            if (values && Array.isArray(values)) {
+                for (let i = 0; i < values.length; i++) {
+                    if (
+                        typeof values[i] === 'string' &&
+                        values[i] !== undefined
+                    ) {
+                        values[i] = values[i]!.replace('/*', '');
+                    }
                 }
             }
         }

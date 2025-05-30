@@ -1,21 +1,17 @@
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 import { env } from 'node:process';
-import { logger } from './logger.ts';
+import { logger } from './logger';
 
 import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import {
-    getOutputPath,
-    initCompile,
-    normalizeRuta,
-} from '../compiler/compile.ts';
-import { emitirCambios } from './browserSync.ts';
+import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
+import { emitirCambios } from './browserSync';
 
 const cacheImportMap = new Map<string, string[]>();
 const cacheComponentMap = new Map<string, string[]>();
 
-async function deleteFile(ruta) {
+async function deleteFile(ruta: string): Promise<boolean> {
     try {
         const stats = await stat(ruta).catch(() => null);
         if (!stats) {
@@ -33,10 +29,11 @@ async function deleteFile(ruta) {
         if (files.length === 0) {
             await rmdir(dir);
         }
-
         return true;
     } catch (error) {
-        logger.error(`🚩 ${error.message}\n`);
+        logger.error(
+            `🚩 ${error instanceof Error ? error.message : String(error)}\n`,
+        );
         return false;
     }
 }
@@ -170,7 +167,9 @@ export async function initChokidar(bs: any) {
         });
         return watcher;
     } catch (error) {
-        logger.error(`🚩 :Error al iniciar watch: ${error.message}`);
+        logger.error(
+            `🚩 :Error al iniciar watch: ${error instanceof Error ? error.message : String(error)}`,
+        );
         process.exit(1);
     }
 }

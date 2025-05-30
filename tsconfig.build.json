@@ -18,8 +18,7 @@
         "moduleDetection": "force",
         "allowJs": true,
         "checkJs": true,
-        "allowImportingTsExtensions": true,
-        "noEmit": true,
+        "noEmit": false,
         "module": "ESNext",
         "target": "ESNext",
         "lib": ["es2022", "dom", "dom.iterable"],
@@ -29,10 +28,10 @@
         "inlineSources": false,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["examples/*"],
+            "@/*": ["src/*"],
             "P@/*": ["public/*"]
         },
-        "typeRoots": ["./node_modules/@types", "./examples/types"],
+        "typeRoots": ["./node_modules/@types", "./src/types"],
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "bundler",
@@ -44,13 +43,13 @@
         "target": 3.5,
         "strictTemplates": true
     },
-    "exclude": ["./public/**/*", "coverage/**/*"],
-    "include": [
-        "examples/**/*",
-        "examples/**/*.vue",
-        "examples/**/*.ts",
-        "examples/**/*.js"
+    "exclude": [
+        "./public/**/*",
+        "coverage/**/*",
+        "./examples/**/*",
+        "./src/hrm/**/*"
     ],
+    "include": ["src/**/*", "src/**/*.vue", "src/**/*.ts", "src/**/*.js"],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]

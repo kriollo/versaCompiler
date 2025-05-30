@@ -3,12 +3,12 @@ import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { browserSyncServer } from './servicios/browserSync.ts';
-import { initChokidar } from './servicios/chokidar.ts';
-import { logger } from './servicios/logger.ts';
+import { browserSyncServer } from './servicios/browserSync';
+import { initChokidar } from './servicios/chokidar';
+import { logger } from './servicios/logger';
 
-import { initCompileAll, runLinter } from './compiler/compile.ts';
-import { initConfig, readConfig } from './servicios/readConfig.ts';
+import { initCompileAll, runLinter } from './compiler/compile';
+import { initConfig, readConfig } from './servicios/readConfig';
 
 // Obtener el directorio del archivo actual (dist/)
 env.PATH_PROY = process.cwd();
@@ -87,11 +87,12 @@ async function main() {
             await initConfig();
             process.exit(0);
         }
-
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
-        env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
-        env.ENABLE_LINTER = argv.linter === undefined ? 'true' : argv.linter;
+        env.TAILWIND =
+            argv.tailwind === undefined ? 'true' : String(argv.tailwind);
+        env.ENABLE_LINTER =
+            argv.linter === undefined ? 'true' : String(argv.linter);
         env.VERBOSE = argv.verbose ? 'true' : 'false';
 
         logger.info(chalk.green('Configuración de VersaCompiler:'));
@@ -105,9 +106,8 @@ async function main() {
             await initCompileAll();
             process.exit(0);
         }
-
-        let bs;
-        let watch;
+        let bs: any;
+        let watch: any;
         if (argv.watch) {
             bs = await browserSyncServer();
             if (!bs) {

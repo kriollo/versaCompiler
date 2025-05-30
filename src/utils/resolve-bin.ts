@@ -37,3 +37,4 @@ export function resolveBin(
     const binPath = path.join(rootDir, binProp);
     return binPath;
 }
+

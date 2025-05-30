@@ -1,18 +1,18 @@
 import chalk from 'chalk';
 import path from 'node:path';
 import * as vCompiler from 'vue/compiler-sfc';
-import { logger } from '../servicios/logger.ts';
-import { parser } from './parser.ts';
+import { logger } from '../servicios/logger';
+import { parser } from './parser';
 
-const getComponentsVueMap = async ast => {
+const getComponentsVueMap = async (ast: any): Promise<string[]> => {
     let components: string[] = [];
     const importsStatic = ast?.module?.staticImports;
     if (importsStatic) {
-        const vueImports = importsStatic.filter(item =>
+        const vueImports = importsStatic.filter((item: any) =>
             item.moduleRequest.value.endsWith('.vue'),
         );
-        components = vueImports.map(item => {
-            return item.entries.map(entry => entry.localName.value);
+        components = vueImports.map((item: any) => {
+            return item.entries.map((entry: any) => entry.localName.value);
         });
         components = components.flat();
     }
@@ -24,7 +24,10 @@ const getComponentsVueMap = async ast => {
  * @param {Object} block - El bloque personalizado a compilar.
  * @param {string} source - La fuente del bloque.
  */
-const _compileCustomBlock = async (_block, _source) => {};
+const _compileCustomBlock = async (
+    _block: any,
+    _source: any,
+): Promise<void> => {};
 
 /**
  * Precompila un componente Vue.
@@ -228,11 +231,10 @@ export const preCompileVue = async (
         const finalCompiledTemplate = {
             code: templateCode,
         };
-
         let customBlocks = '';
         if (descriptor.customBlocks.length > 0) {
             customBlocks =
-                descriptor?.customBlocks[0].content.slice(0, -1) ?? '';
+                descriptor.customBlocks[0]?.content.slice(0, -1) ?? '';
         }
 
         // Compile styles
@@ -365,6 +367,10 @@ export const preCompileVue = async (
         };
     } catch (error) {
         logger.error('Vue compilation error:', error);
-        return { lang: null, error, data: null };
+        return {
+            lang: null,
+            error: error instanceof Error ? error : new Error(String(error)),
+            data: null,
+        };
     }
 };

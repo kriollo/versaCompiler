@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { resolveBin } from '../utils/resolve-bin.ts';
+import { resolveBin } from '../utils/resolve-bin';
 
 // Tipos basados en el código de referencia y tu implementación actual
 export type OxlintFormat =
@@ -188,3 +188,4 @@ export class OxlintNode {
         return new OxlintNode(options);
     }
 }
+

@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { env } from 'node:process';
-import { logger } from '../servicios/logger.ts';
-import { getModulePath } from '../utils/module-resolver.ts';
-import { parser } from './parser.ts';
+import { logger } from '../servicios/logger';
+import { getModulePath } from '../utils/module-resolver';
+import { parser } from './parser';
 
 // Módulos built-in de Node.js que no deben ser resueltos
 const NODE_BUILTIN_MODULES = new Set([
@@ -116,9 +116,10 @@ export async function replaceAliasImportStatic(
 
     // Crear un array para procesar transformaciones async
     const matches = Array.from(resultCode.matchAll(importRegex));
-
     for (const match of matches) {
         const [fullMatch, moduleRequest] = match;
+        if (!moduleRequest) continue; // Skip if moduleRequest is undefined
+
         let newMatch = fullMatch;
         let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
         for (const [alias] of Object.entries(pathAlias)) {
@@ -163,7 +164,7 @@ export async function replaceAliasImportStatic(
                 }
             } catch (error) {
                 logger.warn(
-                    `Error resolviendo módulo ${moduleRequest}: ${error.message}`,
+                    `Error resolviendo módulo ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
@@ -178,7 +179,7 @@ export async function replaceAliasImportStatic(
 
 async function replaceAliasImportDynamic(
     code: string,
-    _imports,
+    _imports: any,
 ): Promise<string> {
     if (!env.PATH_ALIAS || !env.PATH_DIST) {
         return code;
@@ -197,6 +198,8 @@ async function replaceAliasImportDynamic(
     const dynamicMatches = Array.from(resultCode.matchAll(dynamicImportRegex));
     for (const match of dynamicMatches) {
         const [fullMatch, moduleRequest] = match;
+        if (!moduleRequest) continue; // Skip if moduleRequest is undefined
+
         let newMatch = fullMatch;
         let transformed = false; // 1. Verificar si es un alias conocido (lógica corregida)
         for (const [alias] of Object.entries(pathAlias)) {
@@ -239,7 +242,7 @@ async function replaceAliasImportDynamic(
                 }
             } catch (error) {
                 logger.warn(
-                    `Error resolviendo módulo dinámico ${moduleRequest}: ${error.message}`,
+                    `Error resolviendo módulo dinámico ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                 );
             }
         }
@@ -287,7 +290,7 @@ async function replaceAliasImportDynamic(
                     }
                 } catch (error) {
                     logger.warn(
-                        `Error resolviendo módulo template literal ${moduleRequest}: ${error.message}`,
+                        `Error resolviendo módulo template literal ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                     );
                 }
             }
@@ -304,7 +307,7 @@ async function replaceAliasImportDynamic(
  * @param {string} data - La cadena de plantilla de la cual eliminar la etiqueta "html".
  * @returns {Promise<string>} - La cadena de plantilla modificada sin la etiqueta "html".
  */
-const removehtmlOfTemplateString = async data => {
+const removehtmlOfTemplateString = async (data: string): Promise<string> => {
     const htmlRegExp = /html\s*`/g;
 
     data = data.replace(htmlRegExp, '`');
@@ -321,10 +324,10 @@ const removehtmlOfTemplateString = async data => {
  * @param {string} data - La cadena de entrada que contiene el código JavaScript.
  * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada sin los comentarios @preserve.
  */
-const removePreserverComent = async data => {
+const removePreserverComent = async (data: string): Promise<string> => {
     const preserverRegExp =
         /\/\*[\s\S]*?@preserve[\s\S]*?\*\/|\/\/.*?@preserve.*?(?=\n|$)/g;
-    data = data.replace(preserverRegExp, match =>
+    data = data.replace(preserverRegExp, (match: string) =>
         match.replace(/@preserve/g, ''),
     );
     return data;
@@ -335,7 +338,7 @@ const removePreserverComent = async data => {
  * @param {string} data - La cadena de entrada que contiene el código JavaScript.
  * @returns {Promise<string>} - Una promesa que se resuelve con la cadena modificada sin la importación de 'code-tag'.
  */
-const removeCodeTagImport = async data => {
+const removeCodeTagImport = async (data: string): Promise<string> => {
     // remove import if exist code-tag
     const codeTagRegExp = /import\s+{.*}\s+from\s+['"].*code-tag.*['"];/g;
     data = data.replace(codeTagRegExp, '');
@@ -349,8 +352,8 @@ export async function estandarizaCode(
     try {
         const ast = await parser(file, code);
         if (ast && ast.errors && ast.errors.length > 0) {
-            logger.warn(ast.errors[0].codeframe || 'Error sin codeframe');
-            throw new Error(ast.errors[0].message || 'Error sin mensaje');
+            logger.warn(ast.errors[0]?.codeframe || 'Error sin codeframe');
+            throw new Error(ast.errors[0]?.message || 'Error sin mensaje');
         }
         code = await replaceAliasImportStatic(file, code);
         code = await replaceAliasImportDynamic(
@@ -366,6 +369,9 @@ export async function estandarizaCode(
 
         return { code, error: null };
     } catch (error) {
-        return { code: '', error: error?.message || 'Unknown error' };
+        return {
+            code: '',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
     }
 }

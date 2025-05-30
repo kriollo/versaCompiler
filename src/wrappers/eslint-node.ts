@@ -1,7 +1,7 @@
 import { execa } from 'execa';
 import path from 'node:path'; // Añadir importación de path
 import { cwd } from 'node:process'; // Añadir importación de cwd
-import { resolveBin } from '../utils/resolve-bin.ts';
+import { resolveBin } from '../utils/resolve-bin';
 
 // Tipos para ESLint
 export type ESLintFormat =
@@ -216,3 +216,4 @@ export class ESLintNode {
         return new ESLintNode(options);
     }
 }
+

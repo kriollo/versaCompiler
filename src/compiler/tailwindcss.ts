@@ -1,6 +1,6 @@
 import { env } from 'node:process';
-import { logger } from '../servicios/logger.ts';
-import { TailwindNode } from '../wrappers/tailwind-node.ts';
+import { logger } from '../servicios/logger';
+import { TailwindNode } from '../wrappers/tailwind-node';
 export async function generateTailwindCSS() {
     if (
         env.tailwindcss === 'false' ||
@@ -29,7 +29,11 @@ export async function generateTailwindCSS() {
         return await tnode.run();
     } catch (err) {
         // Si es un error de JSON parse, devolver false en lugar de lanzar error
-        logger.error('❌ :Error al compilar Tailwind:', err.stderr || err);
+        const errorMessage =
+            err instanceof Error
+                ? (err as any).stderr || err.message
+                : String(err);
+        logger.error('❌ :Error al compilar Tailwind:', errorMessage);
         if (err instanceof SyntaxError && err.message.includes('JSON')) {
             return false;
         }
@@ -37,3 +41,4 @@ export async function generateTailwindCSS() {
         throw err;
     }
 }
+

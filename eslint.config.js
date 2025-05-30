@@ -109,7 +109,7 @@ export default [
         settings: {
             'import/resolver': {
                 typescript: {
-                    project: './tsconfig.json',
+                    project: './tsconfig.build.json',
                     extensions: ['.ts', '.vue', '.js'],
                 },
                 alias: {
@@ -130,8 +130,8 @@ export default [
             parserOptions: {
                 ecmaVersion: 2020,
                 sourceType: 'module',
-                project: './tsconfig.json',
-                tsconfigRootDir: '.',
+                project: './tsconfig.build.json',
+                tsconfigRootDir: './src',
             },
         },
         plugins: {
@@ -178,7 +178,7 @@ export default [
         settings: {
             'import/resolver': {
                 typescript: {
-                    project: './tsconfig.json',
+                    project: './tsconfig.build.json',
                 },
             },
         },

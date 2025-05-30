@@ -1,10 +1,10 @@
 import { env } from 'node:process';
-import { logger } from '../servicios/logger.ts';
+import { logger } from '../servicios/logger';
 import {
     ESLintNode,
     type ESLintMultiFormatResult,
-} from './../wrappers/eslint-node.ts';
-import { OxlintNode } from './../wrappers/oxlint-node.ts';
+} from './../wrappers/eslint-node';
+import { OxlintNode } from './../wrappers/oxlint-node';
 
 // Tipos para el servicio de linting
 export interface LinterResult {
@@ -103,3 +103,4 @@ export async function ESLint(
         throw err;
     }
 }
+

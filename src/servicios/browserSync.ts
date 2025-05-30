@@ -5,7 +5,7 @@ import getPort from 'get-port';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { env } from 'node:process';
-import { logger } from './logger.ts';
+import { logger } from './logger';
 
 export async function browserSyncServer() {
     try {
@@ -41,7 +41,7 @@ export async function browserSyncServer() {
             snippetOptions: {
                 rule: {
                     match: /<\/body>/i,
-                    fn: (snippet, match) => {
+                    fn: (snippet: any, match: any) => {
                         return html`
                             ${snippet}${match}
                             <script
@@ -65,7 +65,7 @@ export async function browserSyncServer() {
                 ignored: ['node_modules', '.git'],
             },
             middleware: [
-                async function (req, res, next) {
+                async function (req: any, res: any, next: any) {
                     //para evitar el error de CORS
                     res.setHeader('Access-Control-Allow-Origin', '*');
                     res.setHeader('Access-Control-Allow-Methods', '*');
@@ -96,7 +96,7 @@ export async function browserSyncServer() {
                         } catch (error) {
                             logger.error(
                                 chalk.red(
-                                    `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error.message}/n ${error.stack}`,
+                                    `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error instanceof Error ? error.message : String(error)}/n ${error instanceof Error ? error.stack : ''}`,
                                 ),
                             );
                             res.statusCode = 404;
@@ -123,7 +123,7 @@ export async function browserSyncServer() {
                         } catch (error) {
                             logger.error(
                                 chalk.red(
-                                    `🚩 :Error al leer el archivo ${filePath}: ${error.message}`,
+                                    `🚩 :Error al leer el archivo ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
                                 ),
                             );
                             res.statusCode = 404;
@@ -162,7 +162,9 @@ export async function browserSyncServer() {
 
         return bs;
     } catch (error) {
-        logger.error(`🚩 :Error al iniciar BrowserSync: ${error.message}`);
+        logger.error(
+            `🚩 :Error al iniciar BrowserSync: ${error instanceof Error ? error.message : String(error)}`,
+        );
         process.exit(1);
     }
 }
