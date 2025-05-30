@@ -1,11 +1,32 @@
 // Opción con librería 'resolve' (npm install resolve)
 import fs, { readdir, readFile, readFileSync, readlink, stat } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { env } from 'node:process';
 
 import pkg from 'enhanced-resolve';
 import resolve from 'resolve';
 
 import { logger } from '../servicios/logger';
+
+// Lista de módulos que deben ser excluidos de la resolución automática de rutas
+// Estos módulos se mantienen con su importación original sin transformar
+const EXCLUDED_MODULES = new Set([
+    'vue/compiler-sfc',
+    'vue/dist/vue.runtime.esm-bundler',
+    '@vue/compiler-sfc',
+    '@vue/compiler-dom',
+    '@vue/runtime-core',
+    '@vue/runtime-dom', // Módulos de oxc-parser que tienen dependencias específicas de WASM
+    'oxc-parser',
+    'oxc-parser/wasm',
+    'oxc-minify',
+    'oxc-minify/browser',
+    '@oxc-parser/binding-wasm32-wasi',
+    '@oxc-minify/binding-wasm32-wasi',
+    // Módulos de TypeScript que pueden tener resoluciones complejas
+    'typescript/lib/typescript',
+    // Agregar más módulos problemáticos aquí según sea necesario
+]);
 
 function resolveESMWithLibrary(moduleName: string): string | null {
     try {
@@ -326,25 +347,150 @@ function simpleESMResolver(moduleName: string): string | null {
 }
 
 // Función utilitaria para obtener solo la parte relativa de node_modules
-function getNodeModulesRelativePath(fullPath: string | null): string | null {
+function getNodeModulesRelativePath(
+    fullPath: string | null,
+    fromFile?: string,
+): string | null {
     if (!fullPath) return null;
     const idx = fullPath.indexOf('node_modules');
     if (idx !== -1) {
         let relativePath = fullPath.substring(idx).replace(/\\/g, '/');
-        // Agrega / al inicio si no existe
-        if (!relativePath.startsWith('/')) {
-            relativePath = '/' + relativePath;
+        // Si se proporciona fromFile, calcular la ruta relativa correcta
+        if (fromFile) {
+            const fromDir = dirname(fromFile);
+            const distDir = env.PATH_DIST || 'dist'; // Debug logs temporales
+            // console.log('DEBUG - fromFile:', fromFile);
+            // console.log('DEBUG - fromDir:', fromDir);
+            // console.log('DEBUG - distDir:', distDir);
+
+            // Calcular niveles de profundidad desde el archivo de destino en dist
+            // Transformar la ruta del archivo fuente al archivo de destino
+            const relativeToSrc = relative('./src', fromDir).replace(
+                /\\/g,
+                '/',
+            );
+            const targetPath = join(distDir, relativeToSrc).replace(/\\/g, '/');
+            // console.log('DEBUG - relativeToSrc:', relativeToSrc);
+            // console.log('DEBUG - targetPath:', targetPath);
+
+            // Contar los directorios en el path de destino
+            const pathParts = targetPath
+                .split('/')
+                .filter(part => part && part !== '.');
+            const levels = pathParts.length - 1; // -1 porque el último es el archivo
+            // console.log('DEBUG - pathParts:', pathParts);
+            // console.log('DEBUG - levels:', levels);
+            const upLevels = '../'.repeat(levels + 1); // +1 para salir del directorio de compilación
+            // console.log('DEBUG - upLevels:', upLevels);
+
+            relativePath = upLevels + relativePath;
+            // console.log('DEBUG - final relativePath:', relativePath);
+        } else {
+            // Fallback: usar ../ para archivos compilados en dist
+            relativePath = '../' + relativePath;
         }
         return relativePath;
     }
     // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
     let rel = relative(process.cwd(), fullPath).replace(/\\/g, '/');
     if (!rel) rel = '.';
-    // Agrega / al inicio si no existe
-    if (!rel.startsWith('/')) rel = '/' + rel;
+    // Para rutas relativas, usar ../ para ir desde dist a la raíz
+    if (!rel.startsWith('./') && !rel.startsWith('../')) {
+        rel = '../' + rel;
+    }
     return rel;
 }
 
-export function getModulePath(moduleName: string): string | null {
-    return getNodeModulesRelativePath(simpleESMResolver(moduleName));
+export function getModulePath(
+    moduleName: string,
+    fromFile?: string,
+): string | null {
+    return getNodeModulesRelativePath(simpleESMResolver(moduleName), fromFile);
+}
+
+// Nueva función para resolver subpaths de módulos (ej: 'yargs/helpers')
+export function getModuleSubPath(
+    moduleName: string,
+    fromFile?: string,
+): string | null {
+    // Verificar si el módulo está en la lista de excluidos
+    if (EXCLUDED_MODULES.has(moduleName)) {
+        logger.info(
+            `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
+        );
+        return null; // Retornar null para mantener la importación original
+    }
+
+    // Si contiene '/', es un subpath
+    if (moduleName.includes('/')) {
+        const [packageName, ...subPathParts] = moduleName.split('/');
+        const subPath = subPathParts.join('/');
+
+        try {
+            const nodeModulesPath = join(
+                process.cwd(),
+                'node_modules',
+                packageName,
+            );
+            const packagePath = join(nodeModulesPath, 'package.json');
+
+            if (!fs.existsSync(packagePath)) {
+                return null;
+            }
+
+            const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+            const moduleDir = dirname(packagePath);
+
+            // Revisar exports field para subpaths
+            if (
+                packageJson.exports &&
+                typeof packageJson.exports === 'object'
+            ) {
+                const exportKey = `./${subPath}`;
+                let exportPath = packageJson.exports[exportKey];
+
+                if (exportPath) {
+                    if (typeof exportPath === 'string') {
+                        return getNodeModulesRelativePath(
+                            join(moduleDir, exportPath),
+                            fromFile,
+                        );
+                    } else if (typeof exportPath === 'object') {
+                        // Priorizar import > default para ESM
+                        const importPath =
+                            exportPath.import || exportPath.default;
+                        if (typeof importPath === 'string') {
+                            return getNodeModulesRelativePath(
+                                join(moduleDir, importPath),
+                                fromFile,
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Fallback: intentar resolver directamente el subpath
+            const directPath = join(moduleDir, subPath);
+            if (fs.existsSync(directPath)) {
+                return getNodeModulesRelativePath(directPath, fromFile);
+            }
+
+            // Intentar con extensiones comunes
+            const extensions = ['.mjs', '.js', '.cjs'];
+            for (const ext of extensions) {
+                const pathWithExt = directPath + ext;
+                if (fs.existsSync(pathWithExt)) {
+                    return getNodeModulesRelativePath(pathWithExt, fromFile);
+                }
+            }
+        } catch (error) {
+            logger.error(
+                `Error resolviendo subpath ${moduleName}:`,
+                error instanceof Error ? error.message : String(error),
+            );
+        }
+    }
+
+    // Si no es un subpath, usar el resolver normal
+    return getModulePath(moduleName, fromFile);
 }

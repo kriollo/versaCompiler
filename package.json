@@ -20,7 +20,7 @@
         "start": "tsx --watch src/main.ts --watch",
         "compile": "tsx src/main.ts --all",
         "test": "jest --config jest.config.cjs",
-        "build": "tsc --project tsconfig.build.json && echo {\"type\": \"module\"} > dist/package.json && node fix-imports.cjs",
+        "build": "tsx src/main.ts --all",
         "build:full": "rimraf dist && npm run build && cp -r src/hrm dist/",
         "start:compiled": "node dist/main.js",
         "lint": "oxlint --fix --config .oxlint.json",

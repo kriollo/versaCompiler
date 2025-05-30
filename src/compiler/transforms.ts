@@ -2,7 +2,7 @@ import path from 'node:path';
 import { env } from 'node:process';
 
 import { logger } from '../servicios/logger';
-import { getModulePath } from '../utils/module-resolver';
+import { getModuleSubPath } from '../utils/module-resolver';
 
 import { parser } from './parser';
 
@@ -126,7 +126,7 @@ export async function replaceAliasImportStatic(
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Reemplazar el alias con la ruta del target
-                const relativePath = moduleRequest.replace(aliasPattern, '');                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                const relativePath = moduleRequest.replace(aliasPattern, ''); // Para alias que apuntan a la raíz (como @/* -> /src/*),
                 // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join(
                     '/',
@@ -155,7 +155,7 @@ export async function replaceAliasImportStatic(
         } // 2. Si no es alias, verificar si es un módulo externo
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
-                const modulePath = getModulePath(moduleRequest);
+                const modulePath = getModuleSubPath(moduleRequest, file);
                 if (modulePath) {
                     newPath = modulePath;
                     transformed = true;
@@ -201,6 +201,7 @@ export async function replaceAliasImportStatic(
 async function replaceAliasImportDynamic(
     code: string,
     _imports: any,
+    file?: string,
 ): Promise<string> {
     if (!env.PATH_ALIAS || !env.PATH_DIST) {
         return code;
@@ -227,7 +228,7 @@ async function replaceAliasImportDynamic(
             const aliasPattern = alias.replace('/*', '');
             if (moduleRequest.startsWith(aliasPattern)) {
                 // Reemplazar el alias con la ruta del target
-                const relativePath = moduleRequest.replace(aliasPattern, '');                // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                const relativePath = moduleRequest.replace(aliasPattern, ''); // Para alias que apuntan a la raíz (como @/* -> /src/*),
                 // solo usamos PATH_DIST + relativePath
                 let newImportPath = path.join('/', pathDist, relativePath);
 
@@ -252,7 +253,7 @@ async function replaceAliasImportDynamic(
         } // 2. Si no es alias, verificar si es un módulo externo
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
-                const modulePath = getModulePath(moduleRequest);
+                const modulePath = getModuleSubPath(moduleRequest, file);
                 if (modulePath) {
                     newPath = modulePath;
                     transformed = true;
@@ -325,7 +326,7 @@ async function replaceAliasImportDynamic(
             } // 2. Si no es alias y parece ser módulo externo en template literal
             if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
                 try {
-                    const modulePath = getModulePath(moduleRequest);
+                    const modulePath = getModuleSubPath(moduleRequest, file);
                     if (modulePath) {
                         result = match.replace(moduleRequest, modulePath);
                     }
@@ -418,6 +419,7 @@ export async function estandarizaCode(
         code = await replaceAliasImportDynamic(
             code,
             ast?.module.dynamicImports,
+            file,
         );
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
