@@ -131,11 +131,13 @@ describe('Simulación de replaceAliasImportStatic', () => {
 
         for (const [alias, target] of Object.entries(pathAlias)) {
             const aliasPattern = alias.replace('/*', '');
-
             if (importPath.startsWith(aliasPattern)) {
+                const targetArray = target as string[];
                 const relativePath = importPath.replace(
                     aliasPattern,
-                    (target as string[])[0].replace('/*', ''),
+                    targetArray && targetArray[0]
+                        ? targetArray[0].replace('/*', '')
+                        : '',
                 );
 
                 let newImportPath =

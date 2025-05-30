@@ -41,7 +41,7 @@ describe('readConfig', () => {
         it('debe fallar cuando PATH_CONFIG_FILE no está definido', async () => {
             // Importamos la función aquí para asegurar que los mocks estén configurados
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -54,7 +54,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = './versacompile.config.ts';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             // En este caso el archivo podría no existir, pero al menos no debería fallar por env no definido
@@ -70,7 +70,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = '../../../etc/passwd';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -82,7 +82,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = './config/../../../sensitive/file.ts';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -96,7 +96,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = './config.ts; rm -rf /';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -108,7 +108,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = './config.ts`whoami`';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -124,7 +124,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = longPath;
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();
@@ -143,7 +143,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = tempConfigFile;
 
             const { initConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             try {
@@ -181,7 +181,7 @@ describe('readConfig', () => {
             env.PATH_CONFIG_FILE = './versacompile.config.ts';
 
             const { readConfig } = await import(
-                '../src/servicios/readConfig.ts'
+                '../src/servicios/readConfig'
             );
 
             const result = await readConfig();

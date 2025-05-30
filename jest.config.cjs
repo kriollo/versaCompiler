@@ -7,8 +7,7 @@ module.exports = {
             'ts-jest',
             {
                 useESM: true,
-                isolatedModules: true,
-                tsconfig: 'tsconfig.json',
+                tsconfig: 'tsconfig.test.json',
             },
         ],
     },
@@ -24,10 +23,9 @@ module.exports = {
     coverageReporters: ['text', 'html', 'json-summary'],
     // Configuración para manejar módulos ESM
     transformIgnorePatterns: ['node_modules/(?!(chalk|execa)/)'],
-    extensionsToTreatAsEsm: ['.ts'],
-    // Mock para módulos ESM problemáticos
+    extensionsToTreatAsEsm: ['.ts'], // Mock para módulos ESM problemáticos
     moduleNameMapper: {
-        '^chalk$': '<rootDir>/tests/__mocks__/chalk.js',
-        '^execa$': '<rootDir>/tests/__mocks__/execa.js',
+        '^chalk$': '<rootDir>/tests/__mocks__/chalk.ts',
+        '^execa$': '<rootDir>/tests/__mocks__/execa.ts',
     },
 };

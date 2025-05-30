@@ -8,10 +8,13 @@ describe('Parser básico', () => {
     it('debería parsear código JavaScript simple', () => {
         const code = "import test from 'test';";
         const result = oxc.parseSync('test.js', code, { sourceType: 'module' });
-
         expect(result.program).toBeDefined();
         expect(result.program.body).toHaveLength(1);
-        expect(result.program.body[0].type).toBe('ImportDeclaration');
+        expect(
+            result.program && result.program.body && result.program.body[0]
+                ? result.program.body[0].type
+                : undefined,
+        ).toBe('ImportDeclaration');
     });
 
     it('debería parsear múltiples imports', () => {

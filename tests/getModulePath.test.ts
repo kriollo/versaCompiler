@@ -5,7 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getModulePath } from '../src/utils/module-resolver.ts';
+import { getModulePath } from '../src/utils/module-resolver';
 
 describe('getModulePath - Tests básicos', () => {
     test('debe funcionar con módulos existentes', () => {
