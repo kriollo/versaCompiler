@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { initCompileAll, runLinter } from './compiler/compile';
+import { initCompileAll, runLinter, compileFile } from './compiler/compile';
 import { browserSyncServer } from './servicios/browserSync';
 import { cleanOutputDir, initChokidar } from './servicios/chokidar';
 import { logger } from './servicios/logger';
@@ -40,10 +40,14 @@ async function main() {
             description: 'Habilitar el modo de observación (watch)',
             default: false, // Por defecto, el modo watch está habilitado
         })
-        .alias('w', 'watch')
-        .option('all', {
+        .alias('w', 'watch')        .option('all', {
             type: 'boolean',
             description: 'Compilar todos los archivos',
+        })
+        .option('file', {
+            type: 'string',
+            description: 'Compilar un archivo específico',
+            alias: 'f',
         })
         .option('prod', {
             type: 'boolean',
@@ -85,9 +89,21 @@ async function main() {
                 'Habilitar/Deshabilitar el linter. Por defecto --linter=true',
             default: false,
         });
-    }
-
-    const argv = await yargInstance.help().alias('h', 'help').parse();
+    }    const argv = await yargInstance
+        .help()
+        .alias('h', 'help')
+        .command(
+            '* [files...]',
+            'Compilar archivos específicos',
+            (yargs) => {
+                return yargs.positional('files', {
+                    describe: 'Archivos para compilar',
+                    type: 'string',
+                    array: true,
+                });
+            }
+        )
+        .parse() as any; // Usar any temporalmente para evitar problemas de tipos
 
     try {
         console.log(
@@ -108,11 +124,10 @@ async function main() {
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
         env.ENABLE_LINTER =
             argv.linter === undefined ? 'true' : String(argv.linter);
-        env.VERBOSE = argv.verbose ? 'true' : 'false';
-
-        logger.info(chalk.green('Configuración de VersaCompiler:'));
+        env.VERBOSE = argv.verbose ? 'true' : 'false';        logger.info(chalk.green('Configuración de VersaCompiler:'));
         logger.info(chalk.green(`Watch: ${argv.watch}`));
         logger.info(chalk.green(`All: ${env.isALL}`));
+        logger.info(chalk.green(`File: ${argv.file || 'N/A'}`));
         logger.info(chalk.green(`Lint-only: ${argv['lint-only']}`));
         logger.info(chalk.green(`Prod: ${env.isPROD}`));
         logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
@@ -135,6 +150,59 @@ async function main() {
                 process.exit(0);
             } else {
                 logger.error(chalk.red('❌ Linting falló o fue cancelado.'));
+                process.exit(1);
+            }
+        }        // Manejar archivos pasados como argumentos posicionales
+        if (argv.files && argv.files.length > 0) {
+            logger.info(chalk.yellow(`📄 Compilando ${argv.files.length} archivo(s)...`));
+            
+            const fs = await import('node:fs/promises');
+            let hasErrors = false;
+
+            for (const file of argv.files) {
+                try {
+                    // Verificar si el archivo existe
+                    await fs.access(file);
+                    
+                    logger.info(chalk.blue(`🔄 Compilando: ${file}`));
+                    const result = await compileFile(file);
+                    
+                    if (result.success) {
+                        logger.info(chalk.green(`✅ ${file} → ${result.output}`));
+                    } else {
+                        logger.error(chalk.red(`❌ Error al compilar: ${file}`));
+                        hasErrors = true;
+                    }
+                } catch {
+                    logger.error(chalk.red(`❌ El archivo '${file}' no existe.`));
+                    hasErrors = true;
+                }
+            }
+
+            process.exit(hasErrors ? 1 : 0);
+        }
+
+        if (argv.file) {
+            // Compilar archivo individual
+            logger.info(chalk.yellow(`📄 Compilando archivo: ${argv.file}`));
+            
+            // Verificar si el archivo existe
+            const fs = await import('node:fs/promises');
+            try {
+                await fs.access(argv.file);
+            } catch {
+                logger.error(chalk.red(`❌ Error: El archivo '${argv.file}' no existe.`));
+                process.exit(1);
+            }
+
+            // Compilar el archivo
+            const result = await compileFile(argv.file);
+            
+            if (result.success) {
+                logger.info(chalk.green(`✅ Archivo compilado exitosamente: ${result.output}`));
+                process.exit(0);
+            } else {
+                logger.error(chalk.red(`❌ Error al compilar el archivo: ${argv.file}`));
                 process.exit(1);
             }
         }

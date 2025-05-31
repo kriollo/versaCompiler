@@ -2,8 +2,8 @@
 export default {
     tsconfig: './tsconfig.json',
     compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
+        sourceRoot: './examples',
+        outDir: './public',
         pathsAlias: {
             '@/*': ['examples/*'],
             'P@/*': ['public/*'],
@@ -26,14 +26,14 @@ export default {
             bin: './node_modules/.bin/eslint',
             configFile: './eslint.config.js',
             fix: false,
-            paths: ['src/'],
+            paths: ['examples/'],
         },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
             fix: false,
-            paths: ['src/'],
+            paths: ['examples/'],
         },
     ],
     bundlers: [
