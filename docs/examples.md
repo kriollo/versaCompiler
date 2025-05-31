@@ -2,626 +2,436 @@
 
 ## Introducción
 
-Esta guía contiene ejemplos prácticos y recetas para casos de uso comunes con VersaCompiler. Cada ejemplo incluye la configuración completa y explicaciones detalladas.
+Esta guía contiene ejemplos prácticos para casos de uso comunes con VersaCompiler. Cada ejemplo incluye la configuración completa y explicaciones.
 
 ## 🚀 Configuraciones por Tipo de Proyecto
 
-### Aplicación Vue 3 + TypeScript
+### Proyecto Vue 3 Básico
 
 ```typescript
 // versacompile.config.ts
-import { defineConfig } from 'versacompiler';
-
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-  
-  alias: {
-    '@': './src',
-    '@components': './src/components',
-    '@views': './src/views',
-    '@assets': './src/assets',
-    '@utils': './src/utils'
-  },
-  
-  vue: {
-    version: 3,
-    template: {
-      compilerOptions: {
-        isCustomElement: (tag) => tag.startsWith('ion-')
-      }
-    },
-    script: {
-      defineModel: true,
-      propsDestructure: true
-    }
-  },
-  
-  typescript: {
-    strict: true,
-    sourceMap: true,
-    target: 'ES2020'
-  },
-  
-  server: {
-    port: 3000,
-    hmr: { enabled: true }
-  },
-  
-  linter: {
-    eslint: { enabled: true, fix: true },
-    oxlint: { enabled: true }
-  }
-});
-```
-
-### Biblioteca de Componentes
-
-```typescript
-// versacompile.config.ts para biblioteca
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './lib',
-  
-  build: {
-    // Configuración para biblioteca
-    target: ['es2018', 'chrome80'],
-    minify: false, // Deja la minificación al consumidor
-    sourceMaps: true,
-    
-    // Generar múltiples formatos
-    formats: ['es', 'cjs', 'umd'],
-    
-    // Externals para dependencias
-    external: ['vue', 'vue-router'],
-    
-    // Configuración UMD
-    umd: {
-      name: 'MiLibreria',
-      globals: {
-        vue: 'Vue'
-      }
-    }
-  },
-  
-  vue: {
-    template: {
-      compilerOptions: {
-        hoistStatic: true,
-        cacheHandlers: true
-      }
-    }
-  }
-});
-```
-
-### Proyecto Monorepo
-
-```typescript
-// packages/app/versacompile.config.ts
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-  
-  alias: {
-    '@shared': '../../packages/shared/src',
-    '@ui': '../../packages/ui/src'
-  },
-  
-  // Configuración específica para workspace
-  workspace: {
-    root: '../../',
-    packages: [
-      'packages/*'
-    ]
-  }
-});
-```
-
-## 🛠️ Casos de Uso Específicos
-
-### Integración con API Backend
-
-```typescript
-export default defineConfig({
-  server: {
-    port: 3000,
-    proxy: {
-      // Proxy simple
-      '/api': 'http://localhost:8080',
-      
-      // Proxy con configuración avanzada
-      '/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        pathRewrite: {
-          '^/auth': '/authentication'
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+            '@components/*': ['src/components/*'],
         },
-        onProxyReq: (proxyReq, req, res) => {
-          // Agregar headers personalizados
-          proxyReq.setHeader('X-Forwarded-Proto', 'https');
-        }
-      },
-      
-      // WebSocket proxy
-      '/socket.io': {
-        target: 'http://localhost:8080',
-        ws: true
-      }
-    }
-  }
-});
-```
-
-### Optimización para Producción
-
-```typescript
-export default defineConfig(({ mode }) => ({
-  build: {
-    minify: mode === 'production',
-    sourceMaps: mode === 'development',
-    
-    optimization: {
-      treeShaking: true,
-      deadCodeElimination: true,
-      constantFolding: true,
-      
-      // Splitting de chunks
-      splitChunks: {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all'
-          }
-        }
-      }
     },
-    
-    // Compresión
-    compression: {
-      gzip: true,
-      brotli: true
-    }
-  }
-}));
-```
-
-### TailwindCSS Avanzado
-
-```typescript
-export default defineConfig({
-  tailwind: {
-    enabled: true,
-    inputCSS: './src/assets/css/tailwind.css',
-    outputCSS: './dist/css/style.css',
-    
-    // Configuración JIT
-    mode: 'jit',
-    
-    // Purge personalizado
-    purge: {
-      enabled: true,
-      content: [
-        './src/**/*.vue',
-        './src/**/*.js',
-        './src/**/*.ts',
-        './public/index.html'
-      ],
-      options: {
-        safelist: [
-          'bg-red-500',
-          'text-center',
-          /^bg-/,
-          /^text-/
-        ]
-      }
+    proxyConfig: {
+        proxyUrl: '',
+        assetsOmit: true,
     },
-    
-    // Plugins adicionales
-    plugins: [
-      require('@tailwindcss/forms'),
-      require('@tailwindcss/typography')
-    ]
-  }
-});
-```
-
-## 🔧 Workflows de Desarrollo
-
-### Desarrollo Local con HMR
-
-```bash
-# Terminal 1: Servidor de desarrollo
-versacompiler --watch --verbose
-
-# Terminal 2: Tests en modo watch
-npm run test:watch
-
-# Terminal 3: Linting automático
-versacompiler --lint-only --watch
-```
-
-### Pipeline CI/CD
-
-```yaml
-# .github/workflows/ci.yml
-name: CI/CD Pipeline
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Lint code
-        run: versacompiler --lint-only
-      
-      - name: Run tests
-        run: npm test
-      
-      - name: Build for production
-        run: versacompiler --all --prod
-      
-      - name: Deploy
-        if: github.ref == 'refs/heads/main'
-        run: npm run deploy
-```
-
-### Pre-commit Hooks
-
-```json
-// package.json
-{
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
-  "lint-staged": {
-    "*.{vue,ts,js}": [
-      "versacompiler --lint-only --fix",
-      "git add"
-    ]
-  }
-}
-```
-
-## 🎨 Configuraciones de UI Frameworks
-
-### Vuetify Integration
-
-```typescript
-export default defineConfig({
-  vue: {
-    template: {
-      transformAssetUrls: {
-        'v-img': ['src', 'lazy-src'],
-        'v-card-media': 'src',
-        'v-responsive': 'src'
-      }
-    }
-  },
-  
-  build: {
-    optimization: {
-      splitChunks: {
-        cacheGroups: {
-          vuetify: {
-            test: /[\\/]node_modules[\\/]vuetify[\\/]/,
-            name: 'vuetify',
-            chunks: 'all'
-          }
-        }
-      }
-    }
-  }
-});
-```
-
-### Quasar Framework
-
-```typescript
-export default defineConfig({
-  vue: {
-    template: {
-      compilerOptions: {
-        isCustomElement: (tag) => tag.startsWith('q-')
-      }
-    }
-  },
-  
-  alias: {
-    'quasar': 'quasar/dist/quasar.esm.js'
-  }
-});
-```
-
-### Element Plus
-
-```typescript
-export default defineConfig({
-  build: {
-    optimization: {
-      splitChunks: {
-        cacheGroups: {
-          elementPlus: {
-            test: /[\\/]node_modules[\\/]element-plus[\\/]/,
-            name: 'element-plus',
-            chunks: 'all'
-          }
-        }
-      }
-    }
-  }
-});
-```
-
-## 📱 Configuraciones Mobile
-
-### Capacitor (Ionic)
-
-```typescript
-export default defineConfig({
-  outDir: './dist',
-  
-  vue: {
-    template: {
-      compilerOptions: {
-        isCustomElement: (tag) => tag.startsWith('ion-')
-      }
-    }
-  },
-  
-  build: {
-    target: ['es2018', 'chrome70', 'safari12'],
-    
-    // Optimización para mobile
-    optimization: {
-      splitChunks: {
-        maxSize: 200000, // 200KB chunks máximo
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-            maxSize: 500000
-          }
-        }
-      }
-    }
-  }
-});
-```
-
-### Cordova
-
-```typescript
-export default defineConfig({
-  outDir: './www',
-  
-  build: {
-    target: ['es2017', 'android5', 'ios10'],
-    
-    // CSP compliance
-    inlineCSS: false,
-    inlineJS: false
-  }
-});
-```
-
-## 🔧 Configuraciones de Testing
-
-### Vitest Integration
-
-```typescript
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    
-    // Coverage
-    coverage: {
-      provider: 'c8',
-      reporter: ['text', 'html', 'lcov']
-    }
-  }
-});
-```
-
-### Jest Integration
-
-```javascript
-// jest.config.js
-module.exports = {
-  preset: '@versacompiler/jest-preset',
-  testEnvironment: 'jsdom',
-  transform: {
-    '^.+\\.vue$': '@versacompiler/jest-transformer',
-    '^.+\\.(ts|tsx)$': '@versacompiler/jest-transformer'
-  }
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
 };
 ```
 
-## 🌐 Configuraciones de Deployment
-
-### Netlify
+### Proyecto con TailwindCSS
 
 ```typescript
-export default defineConfig({
-  outDir: './dist',
-  
-  build: {
-    // Optimización para Netlify
-    optimization: {
-      splitChunks: {
-        chunks: 'all',
-        maxSize: 1000000 // 1MB
-      }
-    }
-  }
-});
-```
-
-### Vercel
-
-```typescript
-export default defineConfig({
-  outDir: './dist',
-  
-  build: {
-    target: ['es2020', 'chrome80', 'firefox78', 'safari13']
-  }
-});
-```
-
-### GitHub Pages
-
-```typescript
-export default defineConfig({
-  outDir: './docs', // GitHub Pages usa /docs
-  
-  build: {
-    assetsDir: 'assets',
-    
-    // Base URL para GitHub Pages
-    base: '/mi-repositorio/'
-  }
-});
-```
-
-## 🚀 Performance Optimization
-
-### Large Codebase
-
-```typescript
-export default defineConfig({
-  build: {
-    parallel: true,
-    workers: 8, // Ajustar según CPU
-    
-    cache: {
-      enabled: true,
-      type: 'filesystem',
-      compression: true
+// versacompile.config.ts
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
     },
-    
-    optimization: {
-      // Lazy loading de rutas
-      splitChunks: {
-        chunks: 'async',
-        cacheGroups: {
-          default: false,
-          vendors: false,
-          
-          // Chunk por página/ruta
-          pages: {
-            name: 'pages',
-            chunks: 'async',
-            test: /[\\/]src[\\/]views[\\/]/
-          }
-        }
-      }
-    }
-  }
-});
+    tailwindConfig: {
+        bin: './node_modules/.bin/tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
+    linter: [
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+};
 ```
 
-### Memory Optimization
+### Proyecto con Proxy para API Backend
 
 ```typescript
-export default defineConfig({
-  build: {
-    // Limitar uso de memoria
-    memoryLimit: 4096, // 4GB
-    
-    // Garbage collection agresivo
-    nodeOptions: [
-      '--max-old-space-size=4096',
-      '--optimize-for-size'
-    ]
-  }
-});
+// versacompile.config.ts
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+            '@api/*': ['src/api/*'],
+        },
+    },
+    proxyConfig: {
+        proxyUrl: 'http://localhost:8080',
+        assetsOmit: true,
+    },
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: true,
+            paths: ['src/'],
+        },
+    ],
+};
 ```
 
-## 🔍 Debugging
-
-### Source Maps Avanzados
+### Proyecto con Bundling
 
 ```typescript
-export default defineConfig({
-  build: {
-    sourceMaps: true,
-    
-    // Configuración detallada de source maps
-    sourceMapOptions: {
-      includeContent: true,
-      exclude: ['node_modules/**'],
-      
-      // Source map para CSS
-      css: true,
-      
-      // Source map inline para desarrollo
-      inline: process.env.NODE_ENV === 'development'
-    }
-  }
-});
+// versacompile.config.ts
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
+    },
+    bundlers: [
+        {
+            name: 'appLoader',
+            fileInput: './dist/module/appLoader.js',
+            fileOutput: './dist/module/appLoader.prod.js',
+        },
+        {
+            name: 'components',
+            fileInput: './dist/components/index.js',
+            fileOutput: './dist/components.bundle.js',
+        },
+    ],
+};
 ```
 
-### Error Handling
+## 📁 Estructuras de Proyecto
 
-```typescript
-export default defineConfig({
-  build: {
-    // Mostrar errores detallados
-    errorOverlay: true,
-    
-    // No fallar en warnings
-    failOnWarnings: false,
-    
-    // Log detallado de errores
-    logLevel: 'verbose'
-  }
-});
+### Proyecto Básico Vue + TypeScript
+
+```
+mi-app/
+├── src/
+│   ├── components/
+│   │   ├── HelloWorld.vue
+│   │   └── Header.vue
+│   ├── views/
+│   │   ├── Home.vue
+│   │   └── About.vue
+│   ├── css/
+│   │   └── input.css
+│   └── main.ts
+├── dist/                    # Archivos compilados
+├── public/
+│   └── index.html
+├── versacompile.config.ts
+├── tsconfig.json
+├── eslint.config.js
+└── package.json
 ```
 
-## 📊 Análisis y Monitoring
+### Proyecto con TailwindCSS
 
-### Bundle Analysis
+```
+mi-app-tailwind/
+├── src/
+│   ├── components/
+│   │   └── Button.vue
+│   ├── css/
+│   │   └── input.css        # @tailwind base; @tailwind components; @tailwind utilities;
+│   └── main.ts
+├── dist/
+├── public/
+│   ├── css/
+│   │   └── output.css       # CSS compilado por Tailwind
+│   └── index.html
+├── versacompile.config.ts
+├── tailwind.config.js
+└── package.json
+```
+
+## 🎮 Comandos para Diferentes Flujos
+
+### Desarrollo Local
 
 ```bash
-# Generar reporte de bundle
-versacompiler --all --prod --analyze
+# Desarrollo con auto-recompilación
+versacompiler --watch
 
-# Servidor para visualizar el análisis
-versacompiler --serve-analysis
+# Solo verificar errores sin compilar
+versacompiler --lint-only
+
+# Compilar una vez para verificar
+versacompiler --all
 ```
 
-### Performance Monitoring
+### Producción
+
+```bash
+# Build para producción con minificación
+versacompiler --all --prod
+
+# Limpiar y build completo
+versacompiler --clean --all --prod
+
+# Con salida detallada para debugging
+versacompiler --all --prod --verbose
+```
+
+### CI/CD Pipeline
+
+```bash
+# Script para CI
+#!/bin/bash
+echo "Verificando código..."
+versacompiler --lint-only
+
+echo "Compilando para producción..."
+versacompiler --clean --all --prod
+
+echo "Build completado!"
+```
+
+## 🔧 Configuraciones Avanzadas
+
+### Linting Dual (ESLint + OxLint)
 
 ```typescript
-export default defineConfig({
-  build: {
-    // Métricas de compilación
-    metrics: {
-      enabled: true,
-      output: './build-metrics.json'
-    },
-    
-    // Timing detallado
-    timing: true
-  }
-});
+export default {
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false,
+            paths: ['src/'],
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+};
 ```
 
-Esta documentación cubre los casos de uso más comunes. Para necesidades específicas, consulta la [API Reference](./api.md) o abre un [issue](https://github.com/kriollo/versaCompiler/issues) en GitHub.
+### Múltiples Aliases
+
+```typescript
+export default {
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+            '@components/*': ['src/components/*'],
+            '@views/*': ['src/views/*'],
+            '@utils/*': ['src/utils/*'],
+            '@assets/*': ['src/assets/*'],
+            'P@/*': ['public/*'],
+        },
+    },
+};
+```
+
+### Observación de Archivos Adicionales
+
+```typescript
+export default {
+    aditionalWatch: [
+        './app/templates/**/*.twig',
+        './config/**/*.json',
+        './data/**/*.yaml',
+    ],
+};
+```
+
+## 📝 Archivos de Configuración Relacionados
+
+### tsconfig.json
+
+```json
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+        "moduleResolution": "node",
+        "strict": true,
+        "jsx": "preserve",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["src/*"]
+        }
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist"]
+}
+```
+
+### eslint.config.js
+
+```javascript
+export default [
+    {
+        files: ['src/**/*.{js,ts,vue}'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+        },
+        rules: {
+            'no-console': 'warn',
+            'no-unused-vars': 'error',
+            '@typescript-eslint/no-unused-vars': 'error',
+        },
+    },
+];
+```
+
+### .oxlintrc.json
+
+```json
+{
+    "rules": {
+        "no-unused-vars": "error",
+        "no-console": "warn"
+    },
+    "env": {
+        "browser": true,
+        "es2022": true
+    }
+}
+```
+
+### tailwind.config.js
+
+```javascript
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+    content: ['./src/**/*.{vue,js,ts,jsx,tsx}', './public/**/*.html'],
+    theme: {
+        extend: {},
+    },
+    plugins: [],
+};
+```
+
+## 🚀 Scripts NPM Recomendados
+
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --clean --all --prod",
+        "lint": "versacompiler --lint-only",
+        "compile": "versacompiler --all",
+        "clean": "versacompiler --clean"
+    }
+}
+```
+
+## ❗ Troubleshooting Common
+
+### Error: Cannot find tsconfig.json
+
+```bash
+# Verificar que existe el archivo
+ls tsconfig.json
+
+# Crear si no existe
+tsc --init
+```
+
+### Error: Linter binary not found
+
+```bash
+# Instalar dependencias de linting
+npm install --save-dev eslint oxlint
+
+# Verificar instalación
+npx eslint --version
+npx oxlint --version
+```
+
+### Error: TailwindCSS compilation failed
+
+```bash
+# Instalar TailwindCSS
+npm install --save-dev tailwindcss
+
+# Inicializar configuración
+npx tailwindcss init
+```
+
+### HMR no funciona
+
+1. Verificar que `proxyConfig.proxyUrl` esté configurado correctamente
+2. Asegurar que el puerto no esté ocupado
+3. Verificar que los archivos estén en el directorio `sourceRoot`
+
+## 📚 Ejemplos Completos
+
+Puedes encontrar proyectos de ejemplo completos en:
+
+- `examples/` - Ejemplos incluidos en el repositorio
+- [GitHub Discussions](https://github.com/kriollo/versaCompiler/discussions) - Ejemplos de la comunidad
+
+## 🔄 Migración desde Otras Herramientas
+
+### Desde Vite
+
+Si vienes de Vite, la configuración es similar pero más simple:
+
+```typescript
+// De vite.config.js a versacompile.config.ts
+export default {
+    compilerOptions: {
+        sourceRoot: './src', // = root en Vite
+        outDir: './dist', // = build.outDir en Vite
+        pathsAlias: {
+            '@/*': ['src/*'], // = resolve.alias en Vite
+        },
+    },
+};
+```
+
+### Desde Webpack
+
+```typescript
+// De webpack.config.js a versacompile.config.ts
+export default {
+    compilerOptions: {
+        sourceRoot: './src', // = entry path
+        outDir: './dist', // = output.path
+        pathsAlias: {
+            '@/*': ['src/*'], // = resolve.alias
+        },
+    },
+};
+```
+
+Para casos más complejos, consulta la [guía de migración](./migration.md).

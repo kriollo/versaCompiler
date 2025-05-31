@@ -129,7 +129,9 @@ async function main() {
             logger.info(chalk.yellow('🔍 Ejecutando solo linting...'));
             const lintResult = await runLinter(true);
             if (lintResult) {
-                logger.info(chalk.green('✅ Linting completado sin errores críticos.'));
+                logger.info(
+                    chalk.green('✅ Linting completado sin errores críticos.'),
+                );
                 process.exit(0);
             } else {
                 logger.error(chalk.red('❌ Linting falló o fue cancelado.'));

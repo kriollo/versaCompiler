@@ -2,544 +2,426 @@
 
 ## Introducción
 
-Esta guía te ayudará a migrar tu proyecto existente a VersaCompiler desde otras herramientas de build populares como Webpack, Vite, Rollup, o configuraciones personalizadas.
+Esta guía te ayudará a migrar tu proyecto existente a VersaCompiler desde otras herramientas. **Importante**: VersaCompiler está en desarrollo y tiene limitaciones comparado con herramientas maduras.
 
-## 🔄 Migración desde Webpack
-
-### Configuración Básica
-
-**Antes (webpack.config.js):**
-```javascript
-const path = require('path');
-const { VueLoaderPlugin } = require('vue-loader');
-
-module.exports = {
-  entry: './src/main.ts',
-  output: {
-    path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js'
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src')
-    },
-    extensions: ['.ts', '.js', '.vue']
-  },
-  module: {
-    rules: [
-      {
-        test: /\.vue$/,
-        loader: 'vue-loader'
-      },
-      {
-        test: /\.ts$/,
-        loader: 'ts-loader',
-        options: {
-          appendTsSuffixTo: [/\.vue$/]
-        }
-      }
-    ]
-  },
-  plugins: [
-    new VueLoaderPlugin()
-  ]
-};
-```
-
-**Después (versacompile.config.ts):**
-```typescript
-import { defineConfig } from 'versacompiler';
-
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-
-  alias: {
-    '@': './src'
-  },
-
-  vue: {
-    version: 3
-  },
-
-  typescript: {
-    strict: true,
-    sourceMap: true
-  }
-});
-```
-
-### Dev Server
-
-**Antes (webpack-dev-server):**
-```javascript
-module.exports = {
-  devServer: {
-    port: 3000,
-    hot: true,
-    proxy: {
-      '/api': 'http://localhost:8080'
-    }
-  }
-};
-```
-
-**Después:**
-```typescript
-export default defineConfig({
-  server: {
-    port: 3000,
-    hmr: { enabled: true },
-    proxy: {
-      '/api': 'http://localhost:8080'
-    }
-  }
-});
-```
-
-### Loaders → Configuración Nativa
-
-| Webpack Loader | VersaCompiler |
-|----------------|---------------|
-| `vue-loader` | Soporte nativo Vue SFC |
-| `ts-loader` | Soporte nativo TypeScript |
-| `babel-loader` | Transformaciones integradas |
-| `css-loader` | Procesamiento de CSS automático |
-| `postcss-loader` | TailwindCSS integrado |
+⚠️ **Advertencia**: Para proyectos en producción, considera si VersaCompiler cubre todas tus necesidades antes de migrar.
 
 ## 🔄 Migración desde Vite
 
-VersaCompiler tiene muchas similitudes con Vite, facilitando la migración.
-
-### Configuración
+### Configuración Básica
 
 **Antes (vite.config.ts):**
+
 ```typescript
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src')
-    }
-  },
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': 'http://localhost:8080'
-    }
-  },
-  build: {
-    minify: 'terser',
-    sourcemap: true
-  }
+    plugins: [vue()],
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, 'src'),
+        },
+    },
+    build: {
+        outDir: 'dist',
+    },
 });
 ```
 
-**Después:**
+**Después (versacompile.config.ts):**
+
 ```typescript
-import { defineConfig } from 'versacompiler';
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
+    },
+};
+```
 
+### Dev Server
+
+**Antes (Vite):**
+
+```typescript
 export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-
-  alias: {
-    '@': './src'
-  },
-
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': 'http://localhost:8080'
-    }
-  },
-
-  build: {
-    minify: true,
-    sourceMaps: true
-  }
+    server: {
+        port: 3000,
+        proxy: {
+            '/api': 'http://localhost:8080',
+        },
+    },
 });
 ```
 
-### Diferencias Principales
+**Después (VersaCompiler):**
 
-| Vite | VersaCompiler |
-|------|---------------|
-| `plugins: [vue()]` | Soporte Vue nativo |
-| `build.minify: 'terser'` | `build.minify: true` (usa OxcMinify) |
-| `resolve.alias` | `alias` |
-| `server.proxy` | `server.proxy` (compatible) |
+```typescript
+export default {
+    proxyConfig: {
+        proxyUrl: 'http://localhost:8080', // Solo un proxy simple
+        assetsOmit: true,
+    },
+};
+```
 
-## 🔄 Migración desde Vue CLI
+**⚠️ Limitaciones:**
 
-### Configuración
+- VersaCompiler solo soporta un proxy simple
+- No hay configuración avanzada de servidor
+- HMR básico, no tan robusto como Vite
 
-**Antes (vue.config.js):**
+## 🔧 Migración desde Webpack
+
+### Configuración Básica
+
+**Antes (webpack.config.js):**
+
 ```javascript
 module.exports = {
-  outputDir: 'dist',
-  assetsDir: 'assets',
-  configureWebpack: {
+    entry: './src/main.ts',
+    output: {
+        path: path.resolve(__dirname, 'dist'),
+        filename: 'bundle.js',
+    },
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, 'src')
-      }
-    }
-  },
-  devServer: {
-    port: 3000,
-    proxy: 'http://localhost:8080'
-  },
-  css: {
-    sourceMap: true
-  }
+        alias: {
+            '@': path.resolve(__dirname, 'src'),
+        },
+    },
 };
 ```
 
 **Después:**
-```typescript
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-
-  alias: {
-    '@': './src'
-  },
-
-  server: {
-    port: 3000,
-    proxy: 'http://localhost:8080'
-  },
-
-  build: {
-    sourceMaps: true
-  }
-});
-```
-
-## 🔄 Migración desde Create React App (para proyectos Vue)
-
-Si estás migrando un proyecto que usa CRA pero quieres cambiar a Vue:
-
-### Package.json Scripts
-
-**Antes:**
-```json
-{
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test"
-  }
-}
-```
-
-**Después:**
-```json
-{
-  "scripts": {
-    "dev": "versacompiler --watch",
-    "build": "versacompiler --all --prod",
-    "test": "jest",
-    "lint": "versacompiler --lint-only"
-  }
-}
-```
-
-## 📝 Scripts de Migración Automática
-
-### Script para Webpack
-
-```bash
-#!/bin/bash
-# migrate-from-webpack.sh
-
-echo "🔄 Migrando desde Webpack a VersaCompiler..."
-
-# Backup configuración existente
-cp webpack.config.js webpack.config.js.backup
-
-# Crear configuración básica de VersaCompiler
-cat > versacompile.config.ts << 'EOF'
-import { defineConfig } from 'versacompiler';
-
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-
-  alias: {
-    '@': './src'
-  },
-
-  vue: {
-    version: 3
-  },
-
-  typescript: {
-    strict: true,
-    sourceMap: true
-  },
-
-  server: {
-    port: 3000,
-    hmr: { enabled: true }
-  }
-});
-EOF
-
-# Actualizar package.json scripts
-npm pkg set scripts.dev="versacompiler --watch"
-npm pkg set scripts.build="versacompiler --all --prod"
-npm pkg set scripts.lint="versacompiler --lint-only"
-
-echo "✅ Migración completada!"
-echo "📝 Revisa versacompile.config.ts y ajústalo según tus necesidades"
-```
-
-### Script para Vite
-
-```bash
-#!/bin/bash
-# migrate-from-vite.sh
-
-echo "🔄 Migrando desde Vite a VersaCompiler..."
-
-# Backup
-cp vite.config.ts vite.config.ts.backup
-
-# Convertir configuración básica
-cat > versacompile.config.ts << 'EOF'
-import { defineConfig } from 'versacompiler';
-
-export default defineConfig({
-  sourceRoot: './src',
-  outDir: './dist',
-
-  alias: {
-    '@': './src'
-  }
-});
-EOF
-
-echo "✅ Migración completada!"
-```
-
-## 🛠️ Herramientas de Migración
-
-### CLI Helper
-
-```bash
-# Instalar herramienta de migración (futuro)
-npm install -g @versacompiler/migrate
-
-# Migrar automáticamente
-versacompiler migrate --from webpack
-versacompiler migrate --from vite
-versacompiler migrate --from vue-cli
-```
-
-### Config Converter (ejemplo)
 
 ```typescript
-// migrate.ts - Script de migración personalizado
-import { readFileSync, writeFileSync } from 'fs';
+export default {
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
+    },
+};
+```
 
-function migrateWebpackConfig(webpackConfigPath: string) {
-  const webpackConfig = require(webpackConfigPath);
+**⚠️ Limitaciones importantes:**
 
-  const versaConfig = {
-    sourceRoot: './src',
-    outDir: webpackConfig.output?.path?.replace(process.cwd(), '.') || './dist',
+- **No hay sistema de plugins**
+- **No hay loaders personalizados**
+- **No hay code splitting**
+- **No hay optimizaciones avanzadas**
 
-    alias: webpackConfig.resolve?.alias || {},
+## 📝 Scripts NPM
 
-    server: {
-      port: webpackConfig.devServer?.port || 3000,
-      proxy: webpackConfig.devServer?.proxy
+### Actualización de package.json
+
+**Antes (cualquier herramienta):**
+
+```json
+{
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
     }
-  };
-
-  writeFileSync(
-    'versacompile.config.ts',
-    `import { defineConfig } from 'versacompiler';
-
-export default defineConfig(${JSON.stringify(versaConfig, null, 2)});`
-  );
 }
-
-// Uso
-migrateWebpackConfig('./webpack.config.js');
 ```
 
-## 📋 Checklist de Migración
+**Después (VersaCompiler):**
 
-### Preparación
-- [ ] Backup de configuración existente
-- [ ] Documentar configuraciones personalizadas
-- [ ] Listar plugins/loaders especiales
-- [ ] Verificar dependencias específicas
-
-### Durante la Migración
-- [ ] Instalar VersaCompiler
-- [ ] Crear versacompile.config.ts
-- [ ] Actualizar scripts de package.json
-- [ ] Migrar configuración de desarrollo
-- [ ] Migrar configuración de producción
-
-### Verificación
-- [ ] Desarrollo funciona (`versacompiler --watch`)
-- [ ] Build funciona (`versacompiler --all --prod`)
-- [ ] Tests pasan
-- [ ] Linting funciona
-- [ ] HMR funciona correctamente
-- [ ] Performance es comparable o mejor
-
-### Cleanup
-- [ ] Remover dependencias viejas
-- [ ] Limpiar configuraciones obsoletas
-- [ ] Actualizar documentación
-- [ ] Entrenar al equipo
-
-## 🚨 Problemas Comunes y Soluciones
-
-### Problema: Module Resolution
-
-**Error:**
-```
-Cannot resolve module '@/components/MyComponent.vue'
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --all --prod",
+        "lint": "versacompiler --lint-only",
+        "clean": "versacompiler --clean"
+    }
+}
 ```
 
-**Solución:**
+## 🔍 Migración de Linting
+
+### ESLint
+
+**Antes (configuración en vite.config.ts):**
+
 ```typescript
+import eslint from 'vite-plugin-eslint';
+
 export default defineConfig({
-  alias: {
-    '@': './src',
-    '@components': './src/components'
-  }
+    plugins: [vue(), eslint()],
 });
 ```
 
-### Problema: CSS Processing
+**Después (VersaCompiler):**
 
-**Error:**
-```
-Cannot process CSS imports
-```
-
-**Solución:**
 ```typescript
-export default defineConfig({
-  tailwind: {
-    enabled: true,
-    inputCSS: './src/assets/css/main.css',
-    outputCSS: './dist/css/style.css'
-  }
-});
+export default {
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+};
 ```
 
-### Problema: TypeScript Paths
+### Configuración Dual (ESLint + OxLint)
 
-**Error:**
-```
-TypeScript path mapping not working
+```typescript
+export default {
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false,
+            paths: ['src/'],
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+};
 ```
 
-**Solución:**
+## 🎨 TailwindCSS
+
+### Migración de TailwindCSS
+
+**Antes (PostCSS/Vite automático):**
+
+```css
+/* src/style.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+**Después (configuración manual):**
+
 ```typescript
 // versacompile.config.ts
-export default defineConfig({
-  typescript: {
-    paths: {
-      '@/*': ['src/*'],
-      '@components/*': ['src/components/*']
-    }
-  }
-});
-
-// tsconfig.json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@components/*": ["src/components/*"]
-    }
-  }
-}
-```
-
-### Problema: Environment Variables
-
-**Antes (Webpack):**
-```javascript
-new webpack.DefinePlugin({
-  'process.env.VUE_APP_API_URL': JSON.stringify(process.env.VUE_APP_API_URL)
-});
-```
-
-**Después:**
-```typescript
-// En tu código Vue
-const apiUrl = import.meta.env.VITE_API_URL;
-
-// O usar variables de entorno normales
-const apiUrl = process.env.API_URL;
-```
-
-## 📊 Comparación de Performance
-
-### Benchmarks de Migración
-
-| Proyecto | Webpack | Vite | VersaCompiler | Mejora |
-|----------|---------|------|---------------|--------|
-| Pequeño (10 componentes) | 2.1s | 0.8s | 0.6s | 25% |
-| Mediano (50 componentes) | 8.3s | 2.1s | 1.5s | 28% |
-| Grande (200 componentes) | 32s | 6.8s | 4.2s | 38% |
-
-### Optimizaciones Post-Migración
-
-```typescript
-export default defineConfig({
-  build: {
-    // Máximo paralelismo
-    parallel: true,
-    workers: 8,
-
-    // Cache agresivo
-    cache: {
-      enabled: true,
-      type: 'filesystem'
+export default {
+    tailwindConfig: {
+        bin: './node_modules/.bin/tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
     },
-
-    // Optimizaciones
-    optimization: {
-      treeShaking: true,
-      deadCodeElimination: true
-    }
-  }
-});
+};
 ```
 
-## 🎯 Próximos Pasos
+```css
+/* src/css/input.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
 
-Después de migrar:
+## 📂 Estructura de Archivos
 
-1. **Optimizar Configuración**
-   - Ajustar configuración específica
-   - Habilitar optimizaciones avanzadas
-   - Configurar CI/CD
+### Cambios Necesarios
 
-2. **Entrenar al Equipo**
-   - Documentar cambios de workflow
-   - Actualizar guías de desarrollo
-   - Compartir nuevos comandos
+**Estructura recomendada para VersaCompiler:**
 
-3. **Monitorear Performance**
-   - Comparar tiempos de build
-   - Verificar tamaño de bundles
-   - Optimizar según métricas
+```
+mi-proyecto/
+├── src/                       # Código fuente
+│   ├── components/            # Componentes Vue
+│   ├── css/                   # Estilos (si usas Tailwind)
+│   └── main.ts               # Punto de entrada
+├── public/                   # Archivos estáticos
+├── dist/                     # Build output (auto-generado)
+├── versacompile.config.ts    # Configuración
+├── tsconfig.json             # TypeScript config
+└── package.json
+```
 
-¿Necesitas ayuda con tu migración? [Abre un issue](https://github.com/kriollo/versaCompiler/issues) o consulta nuestra [documentación completa](./README.md).
+## ❌ Características No Disponibles
+
+### Desde Vite
+
+❌ **Plugin system extensible**
+❌ **Pre-bundling automático**
+❌ **Optimización de dependencias**
+❌ **CSS modules automáticos**
+❌ **Asset handling avanzado**
+❌ **Environment variables automáticas**
+
+### Desde Webpack
+
+❌ **Sistema de loaders**
+❌ **Code splitting**
+❌ **Dynamic imports**
+❌ **Multiple entry points**
+❌ **Asset optimization**
+❌ **Bundle analysis**
+
+### Desde Rollup
+
+❌ **Tree shaking avanzado**
+❌ **Plugin ecosystem**
+❌ **Multiple output formats**
+❌ **Configuración fine-tuned**
+
+## 🔄 Proceso de Migración Paso a Paso
+
+### 1. Backup del Proyecto
+
+```bash
+git commit -m "Backup before VersaCompiler migration"
+```
+
+### 2. Instalar VersaCompiler
+
+```bash
+git clone https://github.com/kriollo/versaCompiler.git
+cd versaCompiler
+npm install
+npm run build
+# Copiar a tu proyecto...
+```
+
+### 3. Crear Configuración
+
+```typescript
+// versacompile.config.ts
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
+    },
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+};
+```
+
+### 4. Probar Compilación
+
+```bash
+versacompiler --all --verbose
+```
+
+### 5. Probar Desarrollo
+
+```bash
+versacompiler --watch
+```
+
+### 6. Ajustar según Errores
+
+- Verificar que todos los archivos se compilan
+- Ajustar paths si es necesario
+- Configurar proxy si usas API backend
+
+## ⚠️ Consideraciones Importantes
+
+### Limitaciones Actuales
+
+1. **HMR básico** - No tan robusto como Vite/Webpack
+2. **Sin code splitting** - Todo se compila en archivos separados
+3. **Sin optimizaciones avanzadas** - Solo minificación básica
+4. **Proxy simple** - Solo un endpoint
+5. **Sin source maps** - Debugging limitado
+
+### Casos No Recomendados
+
+**NO uses VersaCompiler si necesitas:**
+
+- 🚫 Aplicaciones enterprise complejas
+- 🚫 Multiple entrypoints
+- 🚫 Optimizaciones avanzadas
+- 🚫 Plugin ecosystem rico
+- 🚫 Configuración muy específica
+
+### Casos Recomendados
+
+**SÍ usa VersaCompiler si:**
+
+- ✅ Proyecto experimental/pequeño
+- ✅ Configuración simple
+- ✅ Solo Vue + TypeScript básico
+- ✅ Quieres herramienta minimalista
+
+## 🆘 Troubleshooting de Migración
+
+### Errores Comunes
+
+#### "Module not found"
+
+```typescript
+// Verificar pathsAlias
+export default {
+    compilerOptions: {
+        pathsAlias: {
+            '@/*': ['src/*'],
+            // Agregar otros aliases que usabas
+        },
+    },
+};
+```
+
+#### "TypeScript compilation failed"
+
+```bash
+# Verificar tsconfig.json
+npx tsc --noEmit
+```
+
+#### "Linter not working"
+
+```bash
+# Verificar que están instalados
+npm list eslint oxlint
+```
+
+### Rollback Plan
+
+Si la migración no funciona:
+
+```bash
+# Volver a la configuración anterior
+git reset --hard HEAD~1
+
+# O mantener ambas configuraciones
+mv versacompile.config.ts versacompile.config.ts.bak
+```
+
+## 📚 Recursos de Ayuda
+
+- 📖 [FAQ](./faq.md) - Preguntas frecuentes
+- 🔧 [API Reference](./api.md) - Documentación técnica
+- 🎯 [Ejemplos](./examples.md) - Casos de uso
+- 💬 [GitHub Issues](https://github.com/kriollo/versaCompiler/issues) - Reportar problemas
+
+## 💡 Recomendación Final
+
+**Para proyectos nuevos**: Considera empezar con Vite, es más maduro.
+**Para experimentar**: VersaCompiler puede ser interesante para aprender.
+**Para producción**: Evalúa cuidadosamente si VersaCompiler cubre todas tus necesidades.

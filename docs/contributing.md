@@ -14,30 +14,33 @@
 ### Configuración del Entorno de Desarrollo
 
 1. **Fork del repositorio**
-   ```bash
-   # En GitHub, haz click en "Fork"
-   # Luego clona tu fork
-   git clone https://github.com/TU_USUARIO/versaCompiler.git
-   cd versaCompiler
-   ```
+
+    ```bash
+    # En GitHub, haz click en "Fork"
+    # Luego clona tu fork
+    git clone https://github.com/TU_USUARIO/versaCompiler.git
+    cd versaCompiler
+    ```
 
 2. **Instalación de dependencias**
-   ```bash
-   npm install
-   # o
-   pnpm install
-   ```
+
+    ```bash
+    npm install
+    # o
+    pnpm install
+    ```
 
 3. **Configurar upstream**
-   ```bash
-   git remote add upstream https://github.com/kriollo/versaCompiler.git
-   ```
+
+    ```bash
+    git remote add upstream https://github.com/kriollo/versaCompiler.git
+    ```
 
 4. **Verificar instalación**
-   ```bash
-   npm test
-   npm run build
-   ```
+    ```bash
+    npm test
+    npm run build
+    ```
 
 ## 🏗️ Estructura del Proyecto
 
@@ -68,53 +71,67 @@ versaCompiler/
 ### 🐛 Reportar Bugs
 
 Antes de reportar un bug:
+
 1. Busca en [issues existentes](https://github.com/kriollo/versaCompiler/issues)
 2. Verifica que uses la última versión
 3. Crea un ejemplo mínimo reproducible
 
 **Template para reportar bugs:**
+
 ```markdown
 ## Descripción del Bug
+
 [Descripción clara y concisa del problema]
 
 ## Pasos para Reproducir
+
 1. Configuración: ...
 2. Ejecuta: ...
 3. Observa: ...
 
 ## Comportamiento Esperado
+
 [Qué esperabas que sucediera]
 
 ## Comportamiento Actual
+
 [Qué sucedió realmente]
 
 ## Entorno
+
 - OS: [Windows/macOS/Linux]
 - Node.js: [versión]
 - VersaCompiler: [versión]
 - Browser: [si aplica]
 
 ## Ejemplo Mínimo
+
 [Código o configuración mínima que reproduce el problema]
 ```
 
 ### ✨ Solicitar Features
 
 **Template para features:**
+
 ```markdown
 ## Descripción del Feature
+
 [Descripción clara de la funcionalidad propuesta]
 
 ## Motivación
+
 [¿Por qué es necesario? ¿Qué problema resuelve?]
 
 ## Solución Propuesta
+
 [Cómo debería funcionar]
 
 ## Alternativas Consideradas
+
 [Otras opciones que consideraste]
 
 ## Implementación
+
 [Ideas sobre cómo implementarlo]
 ```
 
@@ -123,35 +140,40 @@ Antes de reportar un bug:
 #### Workflow de Desarrollo
 
 1. **Crear rama feature**
-   ```bash
-   git checkout -b feature/nombre-descriptivo
-   ```
+
+    ```bash
+    git checkout -b feature/nombre-descriptivo
+    ```
 
 2. **Hacer cambios**
-   - Escribe código
-   - Agrega tests
-   - Actualiza documentación
+
+    - Escribe código
+    - Agrega tests
+    - Actualiza documentación
 
 3. **Verificar cambios**
-   ```bash
-   npm run lint
-   npm test
-   npm run build
-   ```
+
+    ```bash
+    npm run lint
+    npm test
+    npm run build
+    ```
 
 4. **Commit con mensaje descriptivo**
-   ```bash
-   git commit -m "feat: agregar soporte para source maps en Vue SFC"
-   ```
+
+    ```bash
+    git commit -m "feat: agregar soporte para source maps en Vue SFC"
+    ```
 
 5. **Push y crear PR**
-   ```bash
-   git push origin feature/nombre-descriptivo
-   ```
+    ```bash
+    git push origin feature/nombre-descriptivo
+    ```
 
 #### Convenciones de Código
 
 **Naming Conventions:**
+
 ```typescript
 // Variables y funciones: camelCase
 const fileName = 'example.vue';
@@ -169,21 +191,22 @@ interface IUserSettings {} // Solo si es necesario distinguir
 ```
 
 **Estilo de Código:**
+
 ```typescript
 // Usar TypeScript estricto
 function processFile(filePath: string): Promise<CompileResult> {
-  // Preferir async/await sobre Promises
-  const result = await compileAsync(filePath);
-  
-  // Usar destructuring cuando sea apropiado
-  const { code, sourceMap, errors } = result;
-  
-  // Early returns para reducir nesting
-  if (errors.length > 0) {
-    return { success: false, errors };
-  }
-  
-  return { success: true, code, sourceMap };
+    // Preferir async/await sobre Promises
+    const result = await compileAsync(filePath);
+
+    // Usar destructuring cuando sea apropiado
+    const { code, sourceMap, errors } = result;
+
+    // Early returns para reducir nesting
+    if (errors.length > 0) {
+        return { success: false, errors };
+    }
+
+    return { success: true, code, sourceMap };
 }
 
 // Documentar funciones públicas
@@ -194,10 +217,10 @@ function processFile(filePath: string): Promise<CompileResult> {
  * @returns Resultado de la compilación
  */
 export async function compileVue(
-  filePath: string, 
-  options: CompileOptions = {}
+    filePath: string,
+    options: CompileOptions = {},
 ): Promise<CompileResult> {
-  // Implementación...
+    // Implementación...
 }
 ```
 
@@ -206,13 +229,14 @@ export async function compileVue(
 ### Escribir Tests
 
 **Test Structure:**
+
 ```typescript
 // tests/compiler.test.ts
 describe('Compiler', () => {
-  describe('compileVue', () => {
-    it('should compile basic Vue SFC', async () => {
-      // Arrange
-      const input = `
+    describe('compileVue', () => {
+        it('should compile basic Vue SFC', async () => {
+            // Arrange
+            const input = `
         <template>
           <div>{{ message }}</div>
         </template>
@@ -224,28 +248,29 @@ describe('Compiler', () => {
         };
         </script>
       `;
-      
-      // Act
-      const result = await compileVue(input, 'test.vue');
-      
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.code).toContain('Hello');
+
+            // Act
+            const result = await compileVue(input, 'test.vue');
+
+            // Assert
+            expect(result.success).toBe(true);
+            expect(result.code).toContain('Hello');
+        });
+
+        it('should handle compilation errors', async () => {
+            const invalidInput = '<template><div></template>'; // Invalid
+
+            const result = await compileVue(invalidInput, 'invalid.vue');
+
+            expect(result.success).toBe(false);
+            expect(result.errors).toHaveLength(1);
+        });
     });
-    
-    it('should handle compilation errors', async () => {
-      const invalidInput = '<template><div></template>'; // Invalid
-      
-      const result = await compileVue(invalidInput, 'invalid.vue');
-      
-      expect(result.success).toBe(false);
-      expect(result.errors).toHaveLength(1);
-    });
-  });
 });
 ```
 
 **Test Categories:**
+
 - **Unit Tests**: Funciones individuales
 - **Integration Tests**: Flujos completos
 - **E2E Tests**: Casos de uso reales
@@ -271,15 +296,16 @@ npm run test:coverage
 ### Actualizar Documentación
 
 **JSDoc para APIs:**
-```typescript
+
+````typescript
 /**
  * Configura el compilador con las opciones especificadas
- * 
+ *
  * @param config - Configuración del compilador
  * @param config.sourceRoot - Directorio de archivos fuente
  * @param config.outDir - Directorio de salida
  * @returns Instancia del compilador configurado
- * 
+ *
  * @example
  * ```typescript
  * const compiler = await configureCompiler({
@@ -289,13 +315,14 @@ npm run test:coverage
  * ```
  */
 export async function configureCompiler(
-  config: CompilerConfig
+    config: CompilerConfig,
 ): Promise<Compiler> {
-  // ...
+    // ...
 }
-```
+````
 
 **Markdown para guías:**
+
 - Usa headers claros (`##`, `###`)
 - Incluye ejemplos de código
 - Agrega enlaces a referencias relacionadas
@@ -306,6 +333,7 @@ export async function configureCompiler(
 ### Versionado
 
 Seguimos [Semantic Versioning](https://semver.org/):
+
 - **MAJOR**: Cambios breaking
 - **MINOR**: Nuevas features (backward compatible)
 - **PATCH**: Bug fixes
@@ -340,6 +368,7 @@ git commit -m "chore: actualizar dependencias"
 ### Para Reviewers
 
 **Checklist de Review:**
+
 - [ ] ¿El código sigue las convenciones del proyecto?
 - [ ] ¿Están incluidos los tests apropiados?
 - [ ] ¿La documentación está actualizada?
@@ -348,37 +377,46 @@ git commit -m "chore: actualizar dependencias"
 - [ ] ¿El performance se mantiene o mejora?
 
 **Feedback Constructivo:**
+
 ```markdown
 # ✅ Bueno
+
 "Considera usar `Promise.all()` aquí para mejorar el performance"
 
 # ❌ Evitar
+
 "Este código está mal"
 ```
 
 ### Para Contributors
 
 **Preparar PR para Review:**
+
 1. Descripción clara del cambio
 2. Tests que demuestren funcionalidad
 3. Documentación actualizada
 4. Commits limpios y descriptivos
 
 **Template de PR:**
+
 ```markdown
 ## Descripción
+
 [Resumen de los cambios realizados]
 
 ## Tipo de Cambio
+
 - [ ] Bug fix (cambio que no rompe funcionalidad existente)
 - [ ] Nueva feature (cambio que agrega funcionalidad)
 - [ ] Breaking change (fix o feature que causa que funcionalidad existente no funcione como se esperaba)
 - [ ] Actualización de documentación
 
 ## ¿Cómo se ha probado?
+
 [Describe las pruebas que ejecutaste para verificar tus cambios]
 
 ## Checklist
+
 - [ ] Mi código sigue las convenciones del proyecto
 - [ ] He realizado una auto-revisión de mi código
 - [ ] He comentado mi código, especialmente en áreas difíciles de entender
@@ -393,17 +431,18 @@ git commit -m "chore: actualizar dependencias"
 ### Setup de Debug
 
 **VS Code Launch Config:**
+
 ```json
 {
-  "type": "node",
-  "request": "launch",
-  "name": "Debug VersaCompiler",
-  "program": "${workspaceFolder}/src/main.ts",
-  "args": ["--all", "--verbose"],
-  "runtimeArgs": ["-r", "tsx/cjs"],
-  "env": {
-    "NODE_ENV": "development"
-  }
+    "type": "node",
+    "request": "launch",
+    "name": "Debug VersaCompiler",
+    "program": "${workspaceFolder}/src/main.ts",
+    "args": ["--all", "--verbose"],
+    "runtimeArgs": ["-r", "tsx/cjs"],
+    "env": {
+        "NODE_ENV": "development"
+    }
 }
 ```
 
@@ -420,7 +459,7 @@ logger.error('Error', error);
 
 // Logging condicional
 if (env.VERBOSE === 'true') {
-  logger.debug(`Procesando archivo: ${filePath}`);
+    logger.debug(`Procesando archivo: ${filePath}`);
 }
 ```
 
@@ -441,14 +480,14 @@ node --prof-process isolate-*.log > profile.txt
 ```typescript
 // Ejemplo de benchmark en tests
 describe('Performance', () => {
-  it('should compile 100 files under 5 seconds', async () => {
-    const start = Date.now();
-    
-    await compileAll(testFiles);
-    
-    const duration = Date.now() - start;
-    expect(duration).toBeLessThan(5000);
-  });
+    it('should compile 100 files under 5 seconds', async () => {
+        const start = Date.now();
+
+        await compileAll(testFiles);
+
+        const duration = Date.now() - start;
+        expect(duration).toBeLessThan(5000);
+    });
 });
 ```
 
@@ -474,6 +513,7 @@ Nos comprometemos a mantener un ambiente acogedor y libre de acoso. Por favor:
 ### Contributors
 
 Agradecemos a todos los contributors:
+
 - Apareces automáticamente en GitHub contributors
 - Contributors destacados se mencionan en releases
 - Reconocimiento especial en el README
@@ -481,6 +521,7 @@ Agradecemos a todos los contributors:
 ### Primeros Contributors
 
 Para hacer tu primera contribución más fácil:
+
 - Busca issues etiquetados como `good first issue`
 - Pregunta en issues si necesitas orientación
 - No tengas miedo de hacer preguntas
