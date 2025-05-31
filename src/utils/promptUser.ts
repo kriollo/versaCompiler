@@ -1,5 +1,7 @@
 import { stdin as input, stdout as output } from 'node:process';
 import * as readline from 'node:readline/promises';
+
+import { logger } from '../servicios/logger';
 export async function promptUser(
     question: string,
     timeout: number = 30000,
