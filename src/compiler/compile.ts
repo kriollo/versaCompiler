@@ -122,8 +122,54 @@ function displayLintErrors(errors: InventoryError[]): void {
     if (errors.length === 0) {
         return;
     }
-    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
-    logger.table(errors, ['file', 'message', 'severity', 'help']);
+
+    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---\n'));
+
+    // Agrupar errores por archivo
+    const errorsByFile = new Map<string, InventoryError[]>();
+    errors.forEach(error => {
+        if (!errorsByFile.has(error.file)) {
+            errorsByFile.set(error.file, []);
+        }
+        errorsByFile.get(error.file)!.push(error);
+    });
+
+    // Mostrar errores agrupados por archivo
+    errorsByFile.forEach((fileErrors, filePath) => {
+        // Mostrar nombre del archivo
+        logger.info(chalk.cyan(`📁 ${filePath}`));
+
+        fileErrors.forEach((error, index) => {
+            // Determinar el icono según la severidad
+            const icon =
+                error.severity === 'error'
+                    ? '❌'
+                    : error.severity === 'warning'
+                      ? '⚠️'
+                      : 'ℹ️';
+
+            // Si el mensaje ya está formateado (como los de TypeScript), mostrarlo tal como está
+            if (error.message.includes('\n') && error.message.includes('└─')) {
+                // Es un mensaje ya formateado (TypeScript)
+                logger.info(`${error.message}`);
+            } else {
+                // Es un mensaje simple (linting normal)
+                logger.info(`${icon} ${error.message}`);
+                if (error.help) {
+                    logger.info(`   └─ ${error.help}`);
+                }
+            }
+
+            // Agregar línea en blanco entre errores (excepto el último)
+            if (index < fileErrors.length - 1) {
+                logger.info('');
+            }
+        });
+
+        // Línea en blanco entre archivos
+        logger.info('');
+    });
+
     logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
 }
 
@@ -219,7 +265,40 @@ function registerInventoryError(
         help,
     });
 }
-async function compileJS(inPath: string, outPath: string) {
+
+/**
+ * Registra errores de TypeScript usando el parser limpio para obtener mensajes más legibles
+ */
+function registerTypeScriptError(error: Error, fileName: string) {
+    // Intentar extraer diagnósticos de TypeScript si están disponibles
+    const errorMessage = error.message;
+
+    // Si el error contiene información estructurada de TypeScript, usarla
+    if (error.stack && error.stack.includes('TypeScript')) {
+        // Para errores ya procesados por nuestro parser, simplemente registrar
+        registerInventoryError(
+            fileName,
+            errorMessage,
+            'error',
+            'Error de compilación TypeScript',
+        );
+    } else {
+        // Para otros errores de TypeScript, registrar normalmente
+        registerInventoryError(
+            fileName,
+            errorMessage,
+            'error',
+            'Error de compilación TypeScript',
+        );
+    }
+}
+type CompilationMode = 'all' | 'individual' | 'watch';
+
+async function compileJS(
+    inPath: string,
+    outPath: string,
+    mode: CompilationMode = 'individual',
+) {
     const extension = path.extname(inPath);
     let { code, error } = await getCodeFile(inPath);
     if (error) {
@@ -229,9 +308,18 @@ async function compileJS(inPath: string, outPath: string) {
             error instanceof Error ? error.message : String(error),
             'error',
         );
+
+        // Solo mostrar errores inmediatamente en modo individual y watch
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                chalk.red(
+                    `❌ Error al leer archivo ${inPath}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+        }
+
         throw new Error(error instanceof Error ? error.message : String(error));
     }
-
     if (
         !code ||
         code.trim().length === 0 ||
@@ -244,6 +332,16 @@ async function compileJS(inPath: string, outPath: string) {
             'El archivo está vacío o no se pudo leer.',
             'error',
         );
+
+        // Solo mostrar errores inmediatamente en modo individual y watch
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                chalk.red(
+                    `❌ El archivo ${inPath} está vacío o no se pudo leer.`,
+                ),
+            );
+        }
+
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
@@ -262,6 +360,16 @@ async function compileJS(inPath: string, outPath: string) {
                     : String(vueResult.error),
                 'error',
             );
+
+            // Solo mostrar errores inmediatamente en modo individual y watch
+            if (mode === 'individual' || mode === 'watch') {
+                logger.error(
+                    chalk.red(
+                        `❌ Error al compilar Vue ${inPath}: ${vueResult.error instanceof Error ? vueResult.error.message : String(vueResult.error)}`,
+                    ),
+                );
+            }
+
             throw new Error(
                 vueResult.error instanceof Error
                     ? vueResult.error.message
@@ -294,13 +402,17 @@ async function compileJS(inPath: string, outPath: string) {
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
             registerInventoryResume('preCompileTS', 1, 0);
-            registerInventoryError(
-                inPath,
-                tsResult.error instanceof Error
-                    ? tsResult.error.message
-                    : String(tsResult.error),
-                'error',
-            );
+            registerTypeScriptError(tsResult.error, inPath);
+
+            // Solo mostrar errores inmediatamente en modo individual y watch
+            if (mode === 'individual' || mode === 'watch') {
+                logger.error(
+                    chalk.red(
+                        `❌ Error al compilar TypeScript ${inPath}: ${tsResult.error instanceof Error ? tsResult.error.message : String(tsResult.error)}`,
+                    ),
+                );
+            }
+
             throw new Error(
                 tsResult.error instanceof Error
                     ? tsResult.error.message
@@ -332,6 +444,16 @@ async function compileJS(inPath: string, outPath: string) {
     if (resultSTD.error) {
         registerInventoryResume('estandarizaCode', 1, 0);
         registerInventoryError(inPath, resultSTD.error, 'error');
+
+        // Solo mostrar errores inmediatamente en modo individual y watch
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                chalk.red(
+                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
+                ),
+            );
+        }
+
         throw new Error(resultSTD.error);
     }
     registerInventoryResume('estandarizaCode', 0, 1);
@@ -364,6 +486,16 @@ async function compileJS(inPath: string, outPath: string) {
                     : String(resultMinify.error),
                 'error',
             );
+
+            // Solo mostrar errores inmediatamente en modo individual y watch
+            if (mode === 'individual' || mode === 'watch') {
+                logger.error(
+                    chalk.red(
+                        `❌ Error al minificar ${inPath}: ${resultMinify.error instanceof Error ? resultMinify.error.message : String(resultMinify.error)}`,
+                    ),
+                );
+            }
+
             throw new Error(
                 resultMinify.error instanceof Error
                     ? resultMinify.error.message
@@ -384,7 +516,11 @@ async function compileJS(inPath: string, outPath: string) {
     };
 }
 
-export async function initCompile(ruta: string, compileTailwind = true) {
+export async function initCompile(
+    ruta: string,
+    compileTailwind = true,
+    mode: CompilationMode = 'individual',
+) {
     try {
         if (compileTailwind && Boolean(env.TAILWIND)) {
             const resultTW = await generateTailwindCSS();
@@ -405,7 +541,7 @@ export async function initCompile(ruta: string, compileTailwind = true) {
         if (env.VERBOSE === 'true' && env.isAll === 'true')
             logger.info(`🔜 :Fuente para compilar: ${file}`);
 
-        const result = await compileJS(file, outFile);
+        const result = await compileJS(file, outFile, mode);
         if (result.error) {
             throw new Error(result.error);
         }
@@ -426,9 +562,14 @@ export async function initCompile(ruta: string, compileTailwind = true) {
         const errorMessage =
             error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : '';
-        logger.error(
-            `🚩 :Error al compilar ${ruta}: ${errorMessage}\n${errorStack}\n`,
-        );
+
+        // En modo individual y watch, mostrar errores inmediatamente
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                `🚩 :Error al compilar ${ruta}: ${errorMessage}\n${errorStack}\n`,
+            );
+        }
+
         return {
             success: false,
             output: '',
@@ -643,7 +784,7 @@ async function compileWithConcurrencyLimit(
                 return { success: true, cached: true, output: outFile };
             }
 
-            const result = await initCompile(file, false);
+            const result = await initCompile(file, false, 'all'); // Pasar modo 'all' para compilación masiva
             if (result.success) {
                 // Actualizar cache
                 await updateCache(file, result.output);
@@ -786,5 +927,5 @@ export async function initCompileAll() {
 
 // Función wrapper para compatibilidad con tests
 export async function compileFile(filePath: string) {
-    return await initCompile(filePath, true);
+    return await initCompile(filePath, true, 'individual');
 }

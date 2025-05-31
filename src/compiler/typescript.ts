@@ -3,6 +3,11 @@ import path from 'node:path';
 
 import * as ts from 'typescript';
 
+import {
+    createUnifiedErrorMessage,
+    parseTypeScriptErrors,
+} from './typescript-error-parser';
+
 interface CompileResult {
     error: Error | null;
     data: string | null;
@@ -18,7 +23,8 @@ interface TypeCheckResult {
  * Crea un Language Service Host para validación de tipos eficiente.
  */
 class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
-    private files: Map<string, { version: number; content: string }> = new Map();
+    private files: Map<string, { version: number; content: string }> =
+        new Map();
     private compilerOptions: ts.CompilerOptions;
 
     constructor(compilerOptions: ts.CompilerOptions) {
@@ -29,7 +35,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
         const existing = this.files.get(fileName);
         this.files.set(fileName, {
             version: existing ? existing.version + 1 : 1,
-            content
+            content,
         });
     }
 
@@ -109,7 +115,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
 const validateTypesWithLanguageService = (
     fileName: string,
     content: string,
-    compilerOptions: ts.CompilerOptions
+    compilerOptions: ts.CompilerOptions,
 ): TypeCheckResult => {
     try {
         // Crear Language Service Host
@@ -120,15 +126,23 @@ const validateTypesWithLanguageService = (
         const languageService = ts.createLanguageService(host);
 
         // Obtener diagnósticos de tipos
-        const syntacticDiagnostics = languageService.getSyntacticDiagnostics(fileName);
-        const semanticDiagnostics = languageService.getSemanticDiagnostics(fileName);
-        
+        const syntacticDiagnostics =
+            languageService.getSyntacticDiagnostics(fileName);
+        const semanticDiagnostics =
+            languageService.getSemanticDiagnostics(fileName);
+
         // Combinar todos los diagnósticos
-        const allDiagnostics = [...syntacticDiagnostics, ...semanticDiagnostics];
+        const allDiagnostics = [
+            ...syntacticDiagnostics,
+            ...semanticDiagnostics,
+        ];
 
         // Filtrar diagnósticos relevantes
         const filteredDiagnostics = allDiagnostics.filter(diag => {
-            const messageText = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
+            const messageText = ts.flattenDiagnosticMessageText(
+                diag.messageText,
+                '\n',
+            );
             // Ignorar algunos errores comunes que no son críticos para transpilación
             return (
                 !messageText.includes('Cannot find module') &&
@@ -139,7 +153,7 @@ const validateTypesWithLanguageService = (
 
         return {
             diagnostics: filteredDiagnostics,
-            hasErrors: filteredDiagnostics.length > 0
+            hasErrors: filteredDiagnostics.length > 0,
         };
     } catch (error) {
         // En caso de error, devolver diagnóstico de error
@@ -149,12 +163,12 @@ const validateTypesWithLanguageService = (
             length: undefined,
             messageText: `Error en validación de tipos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
             category: ts.DiagnosticCategory.Error,
-            code: 0
+            code: 0,
         };
 
         return {
             diagnostics: [errorDiagnostic],
-            hasErrors: true
+            hasErrors: true,
         };
     }
 };
@@ -203,7 +217,7 @@ export const preCompileTS = async (
             ts.sys,
             path.dirname(configPath),
         );
-        
+
         // Configurar opciones del compilador
         const compilerOptions: ts.CompilerOptions = {
             ...parsedConfig.options,
@@ -219,17 +233,18 @@ export const preCompileTS = async (
         };
 
         // 1. Primero, validar tipos usando Language Service para validación completa
-        const typeCheckResult = validateTypesWithLanguageService(fileName, data, compilerOptions);
-        
+        const typeCheckResult = validateTypesWithLanguageService(
+            fileName,
+            data,
+            compilerOptions,
+        );
         if (typeCheckResult.hasErrors) {
-            const errorMessage = ts.formatDiagnosticsWithColorAndContext(
+            // Usar el parser limpio para generar mensajes de error más legibles
+            const cleanErrors = parseTypeScriptErrors(
                 typeCheckResult.diagnostics,
-                {
-                    getCurrentDirectory: () => process.cwd(),
-                    getCanonicalFileName: fileName => fileName,
-                    getNewLine: () => ts.sys.newLine,
-                },
+                fileName,
             );
+            const errorMessage = createUnifiedErrorMessage(cleanErrors);
             return { error: new Error(errorMessage), data: null, lang: 'ts' };
         }
 
@@ -259,4 +274,3 @@ export const preCompileTS = async (
         };
     }
 };
-

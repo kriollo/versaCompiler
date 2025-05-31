@@ -5,11 +5,15 @@ import { env } from 'node:process';
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 
-import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
-import { promptUser } from '../utils/promptUser';
+import {
+    getOutputPath,
+    initCompile,
+    normalizeRuta,
+} from '../compiler/compile.js';
+import { promptUser } from '../utils/promptUser.js';
 
-import { emitirCambios } from './browserSync';
-import { logger } from './logger';
+import { emitirCambios } from './browserSync.js';
+import { logger } from './logger.js';
 
 // const cacheImportMap = new Map<string, string[]>();
 // const cacheComponentMap = new Map<string, string[]>();
@@ -49,49 +53,35 @@ export async function cleanOutputDir(
         }
 
         logger.info(
-            `Limpiando el directorio de salida: ${chalk.yellow(outputDir)}\n\n`,
+            `🗑️ Limpiando directorio de salida: ${chalk.yellow(outputDir)}`,
         );
-        const files = await readdir(outputDir);
-        if (files.length > 0) {
-            for (const file of files) {
-                const filePath = path.join(outputDir, file);
-                const stats = await stat(filePath);
-                if (stats.isDirectory()) {
-                    await cleanOutputDir(filePath, false);
-                    await rmdir(filePath);
+        const items = await readdir(outputDir);
+        await Promise.all(
+            items.map(async item => {
+                const itemPath = path.join(outputDir, item);
+                const itemStat = await stat(itemPath);
+                if (itemStat.isDirectory()) {
+                    await rmdir(itemPath, { recursive: true });
                 } else {
-                    await unlink(filePath);
+                    await unlink(itemPath);
                 }
-            }
-        }
+            }),
+        );
+        logger.info(`✅ Directorio limpiado: ${outputDir}`);
     } catch (error) {
-        logger.error(`Error al limpiar el directorio de salida: ${error}`);
-        throw error;
+        logger.error(
+            `🚩 Error al limpiar directorio de salida: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 }
 
-async function deleteFile(ruta: string): Promise<boolean> {
+async function deleteFile(filePath: string): Promise<boolean> {
     try {
-        const stats = await stat(ruta).catch(() => null);
-        if (!stats) {
-            throw new Error(`El archivo o directorio no existe: ${ruta}`);
-        }
-
-        if (stats.isDirectory()) {
-            await rmdir(ruta, { recursive: true });
-        } else if (stats.isFile()) {
-            await unlink(ruta);
-        }
-
-        const dir = path.dirname(ruta);
-        const files = await readdir(dir);
-        if (files.length === 0) {
-            await rmdir(dir);
-        }
+        await unlink(filePath);
         return true;
     } catch (error) {
         logger.error(
-            `🚩 ${error instanceof Error ? error.message : String(error)}\n`,
+            `🚩 Error eliminando archivo ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
         );
         return false;
     }
@@ -190,7 +180,7 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
-            const result = await initCompile(ruta);
+            const result = await initCompile(ruta, true, 'watch');
             if (result.success) {
                 let accion = result.action || action;
                 accion = accion == 'extension' ? action : accion;
@@ -207,7 +197,7 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
-            const result = await initCompile(ruta);
+            const result = await initCompile(ruta, true, 'watch');
             if (result.success) {
                 let accion = result.action || action;
                 accion = accion == 'extension' ? action : accion;
