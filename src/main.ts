@@ -60,6 +60,11 @@ async function main() {
             type: 'boolean',
             description: 'Limpiar la salida antes de compilar',
             default: false, // Por defecto, clean está deshabilitado
+        })
+        .option('lint-only', {
+            type: 'boolean',
+            description: 'Ejecutar solo el linter, sin compilar',
+            default: false,
         });
 
     // Definir la opción tailwind dinámicamente
@@ -108,6 +113,7 @@ async function main() {
         logger.info(chalk.green('Configuración de VersaCompiler:'));
         logger.info(chalk.green(`Watch: ${argv.watch}`));
         logger.info(chalk.green(`All: ${env.isALL}`));
+        logger.info(chalk.green(`Lint-only: ${argv['lint-only']}`));
         logger.info(chalk.green(`Prod: ${env.isPROD}`));
         logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
         logger.info(chalk.green(`Minification: ${env.isPROD}`));
@@ -117,6 +123,18 @@ async function main() {
 
         if (argv.clean) {
             await cleanOutputDir(env.PATH_OUTPUT || './dist');
+        }
+
+        if (argv['lint-only']) {
+            logger.info(chalk.yellow('🔍 Ejecutando solo linting...'));
+            const lintResult = await runLinter(true);
+            if (lintResult) {
+                logger.info(chalk.green('✅ Linting completado sin errores críticos.'));
+                process.exit(0);
+            } else {
+                logger.error(chalk.red('❌ Linting falló o fue cancelado.'));
+                process.exit(1);
+            }
         }
 
         if (argv.all) {
