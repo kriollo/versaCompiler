@@ -1,4 +1,6 @@
-import { glob, mkdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { glob, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { env } from 'node:process';
 
@@ -35,6 +37,84 @@ type InventoryResume = {
 
 const inventoryResume: InventoryResume[] = [];
 const inventoryError: InventoryError[] = [];
+
+// 🚀 Sistema de Cache para Compilación
+interface CacheEntry {
+    hash: string;
+    mtime: number;
+    outputPath: string;
+}
+
+const compilationCache = new Map<string, CacheEntry>();
+const CACHE_DIR = path.join(__dirname, '.cache');
+const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
+
+async function loadCache() {
+    try {
+        const cacheData = await readFile(CACHE_FILE, 'utf-8');
+        const parsed = JSON.parse(cacheData);
+        for (const [key, value] of Object.entries(parsed)) {
+            compilationCache.set(key, value as CacheEntry);
+        }
+    } catch {
+        // Cache file doesn't exist or is invalid, start fresh
+    }
+}
+
+async function saveCache() {
+    try {
+        // Crear directorio cache si no existe
+        await mkdir(CACHE_DIR, { recursive: true });
+        const cacheData = Object.fromEntries(compilationCache);
+        await writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
+    } catch {
+        // Ignore save errors
+    }
+}
+
+async function shouldRecompile(
+    filePath: string,
+    outputPath: string,
+): Promise<boolean> {
+    try {
+        const stats = await stat(filePath);
+        const cached = compilationCache.get(filePath);
+
+        if (!cached) return true;
+
+        // Si el archivo cambió, recompilar
+        if (stats.mtimeMs > cached.mtime) {
+            return true;
+        }
+
+        // Verificar si el archivo de salida existe
+        try {
+            await stat(outputPath);
+        } catch {
+            return true; // Archivo de salida no existe, recompilar
+        }
+
+        return false;
+    } catch {
+        return true; // Si hay error, recompilar
+    }
+}
+
+async function updateCache(filePath: string, outputPath: string) {
+    try {
+        const stats = await stat(filePath);
+        const hash = createHash('md5')
+            .update(filePath + stats.mtimeMs)
+            .digest('hex');
+        compilationCache.set(filePath, {
+            hash,
+            mtime: stats.mtimeMs,
+            outputPath,
+        });
+    } catch {
+        // Ignorar errores de cache
+    }
+}
 
 function displayLintErrors(errors: InventoryError[]): void {
     if (errors.length === 0) {
@@ -514,11 +594,115 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
     return proceedWithCompilation;
 }
 
+// Función para generar barra de progreso
+function createProgressBar(
+    current: number,
+    total: number,
+    barLength: number = 30,
+): string {
+    const percentage = Math.round((current / total) * 100);
+    const filledLength = Math.round((current / total) * barLength);
+    const emptyLength = barLength - filledLength;
+
+    const filled = '█'.repeat(filledLength);
+    const empty = '░'.repeat(emptyLength);
+
+    return `[${filled}${empty}] ${percentage}% (${current}/${total})`;
+}
+
+// Variable para el último progreso mostrado (evitar spam)
+let lastProgressUpdate = 0;
+
+async function compileWithConcurrencyLimit(
+    files: string[],
+    maxConcurrency: number = 8,
+) {
+    const results: any[] = [];
+    const executing: Promise<any>[] = [];
+    let completed = 0;
+    let skipped = 0;
+    const total = files.length;
+
+    logger.info(`📊 Iniciando compilación de ${total} archivos...`);
+
+    // Mostrar barra inicial
+    const initialBar = createProgressBar(0, total);
+    process.stdout.write(`\r🚀 ${initialBar}`);
+
+    for (const file of files) {
+        const promise = (async () => {
+            const outFile = getOutputPath(normalizeRuta(file));
+
+            // Verificar cache
+            const needsRecompile = await shouldRecompile(file, outFile);
+            if (!needsRecompile) {
+                skipped++;
+                updateProgressBar();
+                return { success: true, cached: true, output: outFile };
+            }
+
+            const result = await initCompile(file, false);
+            if (result.success) {
+                // Actualizar cache
+                await updateCache(file, result.output);
+            }
+
+            completed++;
+            updateProgressBar();
+            return result;
+        })().then(result => {
+            executing.splice(executing.indexOf(promise), 1);
+            return result;
+        });
+
+        results.push(promise);
+        executing.push(promise);
+
+        if (executing.length >= maxConcurrency) {
+            await Promise.race(executing);
+        }
+    }
+
+    function updateProgressBar() {
+        const currentTotal = completed + skipped;
+        const progressBar = createProgressBar(currentTotal, total);
+
+        // Actualizar solo cada 2% o cuando hay cambios significativos
+        const progressPercent = Math.round((currentTotal / total) * 100);
+        if (
+            progressPercent > lastProgressUpdate + 1 ||
+            currentTotal === total
+        ) {
+            process.stdout.write(
+                `\r🚀 ${progressBar} [📁 ${completed} | ⚡ ${skipped}]`,
+            );
+            lastProgressUpdate = progressPercent;
+        }
+    }
+
+    const finalResults = await Promise.all(results);
+
+    // Limpiar línea de progreso y mostrar resumen final
+    process.stdout.write('\n');
+    logger.info(
+        chalk.green(
+            `✅ Compilación completada: ${completed} archivos compilados, ${skipped} desde cache`,
+        ),
+    );
+
+    return finalResults;
+}
+
 export async function initCompileAll() {
     try {
+        // 🚀 Cargar cache al inicio
+        await loadCache();
+
+        // Reset progress tracker
+        lastProgressUpdate = 0;
+
         const shouldContinue = await runLinter();
         if (!shouldContinue) {
-            // Mostrar errores que llevaron a la detención, sin resumen de compilación.
             await displayLintingAndCompilationSummary(inventoryError, []);
             return;
         }
@@ -548,15 +732,36 @@ export async function initCompileAll() {
             }
         }
 
+        // Recopilar todos los archivos
+        const filesToCompile: string[] = [];
         for await (const file of glob(patterns)) {
             if (file.endsWith('.d.ts')) {
                 continue;
             }
-            await initCompile(
-                file.startsWith('./') ? file : `./${file}`,
-                false,
-            );
+            filesToCompile.push(file.startsWith('./') ? file : `./${file}`);
+        } // Determinar concurrencia óptima basada en cantidad de archivos y CPUs
+        const cpuCount = os.cpus().length;
+        const fileCount = filesToCompile.length;
+
+        // Ajuste dinámico de concurrencia
+        let maxConcurrency: number;
+        if (fileCount < 10) {
+            maxConcurrency = Math.min(fileCount, cpuCount);
+        } else if (fileCount < 50) {
+            maxConcurrency = Math.min(cpuCount * 2, 12);
+        } else {
+            maxConcurrency = Math.min(cpuCount * 2, 16);
         }
+
+        logger.info(
+            `🚀 :Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
+        );
+
+        await compileWithConcurrencyLimit(filesToCompile, maxConcurrency);
+
+        // 💾 Guardar cache al final
+        await saveCache();
+
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
         logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}\n`);
