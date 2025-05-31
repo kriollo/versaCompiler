@@ -26,14 +26,21 @@ export default {
             bin: './node_modules/.bin/eslint',
             configFile: './eslint.config.js',
             fix: false,
-            paths: ['examples/'],
+            paths: ['src/'],
         },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
             fix: false,
-            paths: ['examples/'],
+            paths: ['src/'],
+        },
+    ],
+    bundlers: [
+        {
+            name: 'appLoader',
+            fileInput: './public/module/appLoader.js',
+            fileOutput: './public/module/appLoader.prod.js',
         },
     ],
 };

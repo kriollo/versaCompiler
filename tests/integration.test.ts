@@ -6,6 +6,8 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { compileFile } from '../src/compiler/compile';
+import * as tsCompiler from '../src/compiler/typescript';
+import * as vueCompiler from '../src/compiler/vuejs';
 
 // Mock environment variables for testing
 beforeEach(() => {
@@ -170,17 +172,9 @@ button:hover {
 }
 </style>
 `;
-            await fs.writeFile(componentVuePath, componentVueContent);
-
-            // Set up spies BEFORE running compilation
-            const preCompileVueSpy = jest.spyOn(
-                require('../src/compiler/vuejs'),
-                'preCompileVue',
-            );
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
+            await fs.writeFile(componentVuePath, componentVueContent); // Set up spies BEFORE running compilation
+            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
 
             // First compile the utility
             const utilityCompileResult = await compileFile(utilityTsPath);
@@ -436,10 +430,7 @@ button[type="button"] {
 </style>
 `;
             await fs.writeFile(complexComponentPath, complexComponentContent); // Create spy for this test
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
 
             // Compile the files
             const tsCompileResult = await compileFile(complexTsPath);
@@ -530,13 +521,8 @@ const testData: LargeModule.Model1 = {
 const result = LargeModule.processData1(testData);
 console.log(result);
 `;
-            await fs.writeFile(largeTsPath, largeFileContent);
-
-            // Create a performance spy on the preCompileTS function
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
+            await fs.writeFile(largeTsPath, largeFileContent); // Create a performance spy on the preCompileTS function
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
             const startTime = Date.now();
 
             // Compile the large file
@@ -683,17 +669,9 @@ export default defineComponent({
 `;
             const largeComponentContent =
                 tableTemplate + componentScript + componentStyle;
-            await fs.writeFile(largeComponentPath, largeComponentContent);
-
-            // Create performance spies
-            const preCompileVueSpy = jest.spyOn(
-                require('../src/compiler/vuejs'),
-                'preCompileVue',
-            );
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
+            await fs.writeFile(largeComponentPath, largeComponentContent); // Create performance spies
+            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
 
             const startTime = Date.now();
 
@@ -788,17 +766,9 @@ export function utility3() {
                 filePaths.push(filePath);
             }
             // Reset all mocks
-            jest.clearAllMocks();
-
-            // Set up spies BEFORE compilation
-            const preCompileVueSpy = jest.spyOn(
-                require('../src/compiler/vuejs'),
-                'preCompileVue',
-            );
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
+            jest.clearAllMocks(); // Set up spies BEFORE compilation
+            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
 
             // Compile all files concurrently
             const startTime = Date.now();
@@ -1282,17 +1252,9 @@ app.mount('#app');
 `;
             await fs.writeFile(mainTsPath, mainTsContent);
             // Mock the TypeScript and Vue compilers to avoid actual compilation in tests
-            jest.clearAllMocks();
-
-            // Set up spies BEFORE compilation
-            const preCompileTSSpy = jest.spyOn(
-                require('../src/compiler/typescript'),
-                'preCompileTS',
-            );
-            const preCompileVueSpy = jest.spyOn(
-                require('../src/compiler/vuejs'),
-                'preCompileVue',
-            );
+            jest.clearAllMocks(); // Set up spies BEFORE compilation
+            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
+            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
 
             // Compile all files
             const apiResult = await compileFile(apiClientPath);
