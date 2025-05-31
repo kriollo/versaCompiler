@@ -1,11 +1,11 @@
 import { glob, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { env, stdin as input, stdout as output } from 'node:process';
-import * as readline from 'node:readline/promises';
+import { env } from 'node:process';
 
 import chalk from 'chalk';
 
 import { logger } from '../servicios/logger';
+import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
 import { ESLint, OxLint } from './linter';
@@ -500,17 +500,14 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
 
-            const rl = readline.createInterface({ input, output });
-            try {
-                const answer = await rl.question(
-                    '\n\n¿Deseas continuar con la compilación? (s/N): ',
-                );
-                if (answer.toLowerCase() !== 's') {
-                    logger.info('🛑 Compilación cancelada por el usuario.');
-                    proceedWithCompilation = false;
-                }
-            } finally {
-                rl.close();
+            const result = await promptUser(
+                '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
+            );
+            if (result.toLowerCase() !== 's') {
+                logger.info('🛑 Compilación cancelada por el usuario.');
+                proceedWithCompilation = false;
+                // Mostrar errores que llevaron a la detención, sin resumen de compilación.
+                displayLintErrors(inventoryError);
             }
         }
     }
@@ -584,4 +581,3 @@ export async function initCompileAll() {
 export async function compileFile(filePath: string) {
     return await initCompile(filePath, true);
 }
-

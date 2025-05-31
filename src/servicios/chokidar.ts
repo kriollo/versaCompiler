@@ -1,4 +1,3 @@
-
 import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
@@ -7,12 +6,69 @@ import chalk from 'chalk';
 import chokidar from 'chokidar';
 
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
+import { promptUser } from '../utils/promptUser';
 
 import { emitirCambios } from './browserSync';
 import { logger } from './logger';
 
 // const cacheImportMap = new Map<string, string[]>();
 // const cacheComponentMap = new Map<string, string[]>();
+
+export async function cleanOutputDir(
+    outputDir: string,
+    primerInteraccion: boolean = true,
+): Promise<void> {
+    try {
+        if (!outputDir) {
+            throw new Error('El directorio de salida no está definido');
+        }
+
+        if (primerInteraccion) {
+            const stats = await stat(outputDir).catch(() => null);
+            if (!stats || !stats.isDirectory()) {
+                logger.error(
+                    `🚩 El directorio de salida no existe o no es un directorio: ${outputDir}`,
+                );
+                return;
+            }
+
+            try {
+                const answer = await promptUser(
+                    '\n\n¿Estás seguro deseas limpiar la carpeta ' +
+                        chalk.yellow(outputDir) +
+                        '? (s / N) : ',
+                );
+                if (answer.toLowerCase() !== 's') {
+                    logger.info('🛑 Compilación cancelada por el usuario.');
+                    process.exit(0);
+                }
+            } catch (error) {
+                logger.error(`Error en la entrada del usuario: ${error}`);
+                process.exit(1);
+            }
+        }
+
+        logger.info(
+            `Limpiando el directorio de salida: ${chalk.yellow(outputDir)}\n\n`,
+        );
+        const files = await readdir(outputDir);
+        if (files.length > 0) {
+            for (const file of files) {
+                const filePath = path.join(outputDir, file);
+                const stats = await stat(filePath);
+                if (stats.isDirectory()) {
+                    await cleanOutputDir(filePath, false);
+                    await rmdir(filePath);
+                } else {
+                    await unlink(filePath);
+                }
+            }
+        }
+    } catch (error) {
+        logger.error(`Error al limpiar el directorio de salida: ${error}`);
+        throw error;
+    }
+}
 
 async function deleteFile(ruta: string): Promise<boolean> {
     try {

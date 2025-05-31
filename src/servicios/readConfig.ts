@@ -12,6 +12,12 @@ export type typeLinter = {
     paths?: string[];
 };
 
+export type BundlerEntry = {
+    name: string;
+    fileInput: string;
+    fileOutput: string;
+};
+
 export type typeConfig = {
     tsconfig?: string;
     compilerOptions: {
@@ -32,6 +38,7 @@ export type typeConfig = {
           }
         | false;
     linter?: typeLinter[] | false;
+    bundlers?: BundlerEntry[] | false;
 };
 
 /**
@@ -127,6 +134,56 @@ class SecurityValidators {
         if (!hasAllowedExtension) {
             logger.error(`Comando no permitido: ${command}`);
             return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Valida configuración de bundlers
+     */
+    static validateBundlers(bundlers: any): bundlers is BundlerEntry[] {
+        if (!Array.isArray(bundlers)) {
+            logger.error('bundlers debe ser un array');
+            return false;
+        }
+
+        for (const entry of bundlers) {
+            if (!entry || typeof entry !== 'object') {
+                logger.error('Cada entrada de bundler debe ser un objeto');
+                return false;
+            }
+
+            if (!entry.name || typeof entry.name !== 'string') {
+                logger.error(
+                    'Cada entrada de bundler debe tener un nombre válido',
+                );
+                return false;
+            }
+
+            if (!entry.fileInput || typeof entry.fileInput !== 'string') {
+                logger.error(
+                    'Cada entrada de bundler debe tener un fileInput válido',
+                );
+                return false;
+            }
+
+            if (!this.validatePath(entry.fileInput)) {
+                logger.error(`Ruta de entrada no válida: ${entry.fileInput}`);
+                return false;
+            }
+
+            if (!entry.fileOutput || typeof entry.fileOutput !== 'string') {
+                logger.error(
+                    'Cada entrada de bundler debe tener un fileOutput válido',
+                );
+                return false;
+            }
+
+            if (!this.validatePath(entry.fileOutput)) {
+                logger.error(`Ruta de salida no válida: ${entry.fileOutput}`);
+                return false;
+            }
         }
 
         return true;
@@ -261,7 +318,10 @@ class SecurityValidators {
                 }
             }
         }
-
+        if (linter.fix !== undefined && typeof linter.fix !== 'boolean') {
+            logger.error('Linter fix debe ser un booleano');
+            return false;
+        }
         return true;
     }
 
@@ -331,7 +391,6 @@ export function withTimeout<T>(
     timeoutMs: number,
     errorMessage: string,
 ): Promise<T> {
-     
     const timeoutPromise = new Promise<T>((resolve, reject) =>
         setTimeout(() => reject(new Error(errorMessage)), timeoutMs),
     );
@@ -430,6 +489,7 @@ export async function readConfig(): Promise<boolean> {
         env.PATH_SOURCE = sourceRoot;
         env.PATH_DIST = outDir;
         env.aditionalWatch = safeJsonStringify(tsConfig?.aditionalWatch, '[]');
+        env.bundlers = safeJsonStringify(tsConfig?.bundlers, 'false');
 
         // Configuración adicional para compatibilidad
         if (!tsConfig.compilerOptions.sourceRoot) {
@@ -509,6 +569,19 @@ export default {
             fix: false,
             paths: ['src/']
         },
+    ],
+    // Configuración de bundlers
+    bundlers: [
+        {
+            name: 'appLoader',
+            fileInput: './public/module/appLoader.js',
+            fileOutput: './public/module/appLoader.prod.js',
+        },
+        {
+            name: 'mainApp',
+            fileInput: './src/main.ts',
+            fileOutput: './dist/main.bundle.js',
+        }
     ],
 };
 `;

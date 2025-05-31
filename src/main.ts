@@ -8,7 +8,7 @@ import { hideBin } from 'yargs/helpers';
 
 import { initCompileAll, runLinter } from './compiler/compile';
 import { browserSyncServer } from './servicios/browserSync';
-import { initChokidar } from './servicios/chokidar';
+import { cleanOutputDir, initChokidar } from './servicios/chokidar';
 import { logger } from './servicios/logger';
 import { initConfig, readConfig } from './servicios/readConfig';
 
@@ -40,6 +40,7 @@ async function main() {
             description: 'Habilitar el modo de observación (watch)',
             default: false, // Por defecto, el modo watch está habilitado
         })
+        .alias('w', 'watch')
         .option('all', {
             type: 'boolean',
             description: 'Compilar todos los archivos',
@@ -48,12 +49,18 @@ async function main() {
             type: 'boolean',
             description: 'Modo producción',
         })
+        .alias('p', 'prod')
         .option('verbose', {
             type: 'boolean',
             description: 'Habilitar salida detallada (verbose)',
             default: false, // Por defecto, verbose está deshabilitado
         })
-        .alias('v', 'verbose');
+        .alias('v', 'verbose')
+        .option('clean', {
+            type: 'boolean',
+            description: 'Limpiar la salida antes de compilar',
+            default: false, // Por defecto, clean está deshabilitado
+        });
 
     // Definir la opción tailwind dinámicamente
     // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
@@ -75,7 +82,7 @@ async function main() {
         });
     }
 
-    const argv = await yargInstance.help().parse();
+    const argv = await yargInstance.help().alias('h', 'help').parse();
 
     try {
         console.log(
@@ -92,24 +99,33 @@ async function main() {
 
         env.isPROD = argv.prod ? 'true' : 'false';
         env.isALL = argv.all ? 'true' : 'false';
-        env.TAILWIND = argv.tailwind === undefined ? 'true' : argv.tailwind;
-        env.ENABLE_LINTER = argv.linter === undefined ? 'true' : argv.linter;
+        env.TAILWIND =
+            argv.tailwind === undefined ? 'true' : String(argv.tailwind);
+        env.ENABLE_LINTER =
+            argv.linter === undefined ? 'true' : String(argv.linter);
         env.VERBOSE = argv.verbose ? 'true' : 'false';
 
         logger.info(chalk.green('Configuración de VersaCompiler:'));
-        logger.info(chalk.green(`isWatch: ${argv.watch}`));
-        logger.info(chalk.green(`isAll: ${env.isALL}`));
-        logger.info(chalk.green(`isProd: ${env.isPROD}`));
-        logger.info(chalk.green(`isTailwind: ${env.TAILWIND}`));
-        logger.info(chalk.green(`isLinter: ${env.ENABLE_LINTER}\n`));
+        logger.info(chalk.green(`Watch: ${argv.watch}`));
+        logger.info(chalk.green(`All: ${env.isALL}`));
+        logger.info(chalk.green(`Prod: ${env.isPROD}`));
+        logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
+        logger.info(chalk.green(`Minification: ${env.isPROD}`));
+        logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}\n`));
+        logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
+        logger.info(chalk.green(`Clean: ${argv.clean}`));
+
+        if (argv.clean) {
+            await cleanOutputDir(env.PATH_OUTPUT || './dist');
+        }
 
         if (argv.all) {
             await initCompileAll();
             process.exit(0);
         }
 
-        let bs;
-        let watch;
+        let bs: any;
+        let watch: any;
         if (argv.watch) {
             bs = await browserSyncServer();
             if (!bs) {
@@ -121,8 +137,13 @@ async function main() {
             }
         }
         process.on('SIGINT', async () => {
-            bs.exit();
-            watch.close();
+            if (bs) {
+                bs.exit();
+            }
+
+            if (watch) {
+                watch.close();
+            }
             stopCompile();
             process.exit(0);
         });
