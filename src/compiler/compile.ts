@@ -445,42 +445,6 @@ async function compileJS(
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
-    //aca se debe pasar de js a js
-    if (env.VERBOSE === 'true' && env.isAll === 'true')
-        logger.info(chalk.yellow(`💛 :Estandarizando`));
-    const resultSTD = await estandarizaCode(code, inPath);
-    if (resultSTD.error) {
-        registerInventoryResume('estandarizaCode', 1, 0);
-        registerInventoryError(inPath, resultSTD.error, 'error');
-
-        // Solo mostrar errores inmediatamente en modo individual y watch
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                chalk.red(
-                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
-                ),
-            );
-        }
-
-        throw new Error(resultSTD.error);
-    }
-    registerInventoryResume('estandarizaCode', 0, 1);
-    code = resultSTD.code;
-    if (
-        !code ||
-        code.trim().length === 0 ||
-        code === 'undefined' ||
-        code === 'null'
-    ) {
-        registerInventoryResume('estandarizaCode', -1, 1);
-        registerInventoryError(
-            inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
-        );
-        throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
     //aca se debe pasar de ts a js
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
@@ -516,6 +480,42 @@ async function compileJS(
         code === 'null'
     ) {
         registerInventoryResume('preCompileTS', -1, 1);
+        registerInventoryError(
+            inPath,
+            'El archivo está vacío o no se pudo leer.',
+            'error',
+        );
+        throw new Error('El archivo está vacío o no se pudo leer.');
+    }
+
+    //aca se debe pasar de js a js
+    if (env.VERBOSE === 'true' && env.isAll === 'true')
+        logger.info(chalk.yellow(`💛 :Estandarizando`));
+    const resultSTD = await estandarizaCode(code, inPath);
+    if (resultSTD.error) {
+        registerInventoryResume('estandarizaCode', 1, 0);
+        registerInventoryError(inPath, resultSTD.error, 'error');
+
+        // Solo mostrar errores inmediatamente en modo individual y watch
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                chalk.red(
+                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
+                ),
+            );
+        }
+
+        throw new Error(resultSTD.error);
+    }
+    registerInventoryResume('estandarizaCode', 0, 1);
+    code = resultSTD.code;
+    if (
+        !code ||
+        code.trim().length === 0 ||
+        code === 'undefined' ||
+        code === 'null'
+    ) {
+        registerInventoryResume('estandarizaCode', -1, 1);
         registerInventoryError(
             inPath,
             'El archivo está vacío o no se pudo leer.',

@@ -7,6 +7,61 @@ import { logger } from '../servicios/logger';
 
 import { parser } from './parser';
 
+/**
+ * Formatea líneas largas del código JavaScript para evitar errores de parsing
+ * @param code - El código JavaScript a formatear
+ * @returns El código con líneas largas formateadas
+ */
+const formatLongLines = (code: string): string => {
+    // Formatear el objeto __returned__
+    code = code.replace(
+        /const __returned__ = \{([^}]+)\}/g,
+        (match, content) => {
+            // Dividir el contenido por comas y formatear cada elemento en su propia línea
+            const items = content
+                .split(',')
+                .map((item: string) => item.trim())
+                .filter((item: string) => item.length > 0);
+            const formattedItems = items
+                .map((item: string) => `    ${item}`)
+                .join(',\n');
+            return `const __returned__ = {\n${formattedItems}\n}`;
+        },
+    ); // Formatear imports largos de Vue que se han cortado y manejar importaciones de tipos TypeScript
+    code = code.replace(
+        /import \{([^}]+)\} from ['"]vue['"]/g,
+        (match, content) => {
+            // Limpiar el contenido y eliminar saltos de línea problemáticos
+            const cleanContent = content
+                .replace(/\n\s*,/g, ',') // Eliminar saltos de línea antes de comas
+                .replace(/\n\s*/g, ' ') // Reemplazar saltos de línea por espacios
+                .replace(/\s+/g, ' ') // Normalizar espacios múltiples
+                .trim();
+
+            // Dividir por comas y limpiar cada elemento, manteniendo la sintaxis de tipos TypeScript
+            const items = cleanContent
+                .split(',')
+                .map((item: string) => item.trim())
+                .filter(
+                    (item: string) =>
+                        item.length > 0 && !item.startsWith('as _'),
+                );
+
+            // Si hay muchos items, formatear en múltiples líneas
+            if (items.length > 5) {
+                const formattedItems = items
+                    .map((item: string) => `    ${item}`)
+                    .join(',\n');
+                return `import {\n${formattedItems}\n} from "vue"`;
+            } else {
+                return `import { ${items.join(', ')} } from "vue"`;
+            }
+        },
+    );
+
+    return code;
+};
+
 const getComponentsVueMap = async (ast: any): Promise<string[]> => {
     let components: string[] = [];
     const importsStatic = ast?.module?.staticImports;
@@ -50,16 +105,14 @@ export const preCompileVue = async (
     try {
         const fileName = path.basename(source).replace('.vue', '');
         if (!isProd) {
-            // Verificar si ya existe una importación de ref desde vue
-            const hasRefImport =
-                (data.includes('import {') &&
-                    data.includes('ref') &&
-                    data.includes("from 'vue'")) ||
-                data.includes('from "vue"');
+            // Verificar si ya existe una importación de ref desde vue de manera más precisa
+            const vueImportPattern =
+                /import\s*\{[^}]*\bref\b[^}]*\}\s*from\s*['"]vue['"]/;
+            const hasRefImport = vueImportPattern.test(data);
 
             // esto es para HMR re re forzado
             const varContent = `
-            ${hasRefImport ? '' : 'import { ref } from "vue";'};
+            ${hasRefImport ? '' : 'import { ref } from "vue";'}
             const versaComponentKey = ref(0);
             `;
             const ifExistScript = data.includes('<script');
@@ -290,13 +343,12 @@ export const preCompileVue = async (
             fileName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') ||
             'component';
         const componentName = `${sanitizedFileName}_component`;
-
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
                 name: '${fileName}',
                 components: {
-                    ${components}
+                    ${components.map(comp => `${comp}`).join(',\n                    ')}
                 },
             `;
 
@@ -359,11 +411,7 @@ export const preCompileVue = async (
 
             export default ${componentName};
         `;
-
         output = `${output}\n${finishComponent}`;
-
-        // DEBUGGING FINAL
-        // console.log('Final compiled output:', output);
 
         return {
             lang: finalCompiledScript.lang,

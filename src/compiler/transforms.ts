@@ -4,6 +4,7 @@ import { env } from 'node:process';
 import { logger } from '../servicios/logger';
 import { getModuleSubPath } from '../utils/module-resolver';
 
+import { analyzeAndFormatMultipleErrors } from './error-reporter';
 import { parser } from './parser';
 
 // Módulos built-in de Node.js que no deben ser resueltos
@@ -483,9 +484,28 @@ export async function estandarizaCode(
     try {
         const ast = await parser(file, code);
         if (ast && ast.errors && ast.errors.length > 0) {
-            if (env.VERBOSE === 'true')
-                logger.warn(ast.errors[0]?.codeframe || 'Error sin codeframe');
-            throw new Error(ast.errors[0]?.message || 'Error sin mensaje');
+            // Debug: mostrar la estructura del error para entender mejor qué información tenemos
+            if (env.VERBOSE === 'true') {
+                console.log(
+                    'DEBUG - Estructura del error:',
+                    JSON.stringify(ast.errors[0], null, 2),
+                );
+            }
+
+            // Usar el nuevo sistema de reporte de errores
+            const detailedErrorReport = analyzeAndFormatMultipleErrors(
+                ast.errors,
+                code,
+                file,
+            );
+
+            if (env.VERBOSE === 'true') {
+                logger.error(detailedErrorReport);
+            }
+
+            // También mantener el mensaje simple para el sistema existente
+            const firstError = ast.errors[0];
+            throw new Error(firstError?.message || 'Error sin mensaje');
         }
         code = await replaceAliasImportStatic(file, code);
         code = await replaceAliasImportDynamic(

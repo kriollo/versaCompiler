@@ -37,6 +37,10 @@
     "author": "Jorge Jara H (kriollone@gmail.com)",
     "license": "MIT",
     "dependencies": {
+        "@vue/compiler-dom": "^3.5.16",
+        "@vue/reactivity": "^3.5.16",
+        "@vue/runtime-core": "^3.5.16",
+        "@vue/runtime-dom": "^3.5.16",
         "browser-sync": "^3.0.4",
         "chalk": "5.4.1",
         "chokidar": "^4.0.3",
