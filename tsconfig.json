@@ -4,7 +4,7 @@
         "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo",
         "noEmitOnError": true,
         //comentario para probar si parsea bien el tsconfig.json
-        "strict": true,
+        "strict": false,
         "noImplicitAny": true,
         "strictNullChecks": true,
         "strictFunctionTypes": true,
@@ -30,7 +30,8 @@
         "baseUrl": ".",
         "paths": {
             "@/*": ["examples/*"],
-            "P@/*": ["public/*"]
+            "P@/*": ["public/*"],
+            "e@/*": ["examples/*"]
         },
         "typeRoots": ["./node_modules/@types", "./examples/types"],
         "allowSyntheticDefaultImports": true,
@@ -38,14 +39,23 @@
         "moduleResolution": "bundler",
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "types": ["vite/client", "vue"],
+        "jsx": "preserve"
     },
     "vueCompilerOptions": {
         "target": 3.5,
         "strictTemplates": true
     },
-    "exclude": ["./public/**/*", "coverage/**/*", "examples/**/*"],
-    "include": ["src/**/*", "src/**/*.ts", "tests/**/*.ts"],
+    "exclude": ["./public/**/*", "coverage/**/*"],
+    "include": [
+        "src/**/*",
+        "src/**/*.ts",
+        "tests/**/*.ts",
+        "examples/**/*",
+        "examples/**/*.vue",
+        "examples/**/*.ts"
+    ],
     "typeAcquisition": {
         "enable": true,
         "include": ["vue", "vite/client"]

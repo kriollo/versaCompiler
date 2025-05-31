@@ -16,7 +16,7 @@ import { minifyJS } from './minify';
 import { getCodeFile } from './parser';
 import { generateTailwindCSS } from './tailwindcss';
 import { estandarizaCode } from './transforms';
-import { preCompileTS } from './typescript';
+import { preCompileTS, validateVueTypes } from './typescript';
 import { preCompileVue } from './vuejs';
 
 type InventoryError = {
@@ -343,13 +343,63 @@ async function compileJS(
         }
 
         throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
-    //aca se debe pasar de vue a js
+    } //aca se debe pasar de vue a js
     let vueResult;
     if (extension === '.vue') {
         if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(chalk.green(`💚 :Precompilando VUE`));
+            logger.info(chalk.green(`💚 :Precompilando VUE`)); // Validar tipos TypeScript en el archivo Vue ANTES de compilar
+        // Buscar tsconfig.json para obtener opciones del compilador
+        const fileDir = path.dirname(inPath);
+        const ts = await import('typescript');
+        const configPath =
+            ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
+            path.resolve(process.cwd(), 'tsconfig.json');
+
+        if (configPath) {
+            const { config, error: configError } = ts.readConfigFile(
+                configPath,
+                ts.sys.readFile,
+            );
+
+            if (!configError) {
+                const parsedConfig = ts.parseJsonConfigFileContent(
+                    config,
+                    ts.sys,
+                    path.dirname(configPath),
+                );
+
+                // Validar tipos del archivo Vue antes de compilar
+                const typeCheckResult = validateVueTypes(
+                    code,
+                    inPath,
+                    parsedConfig.options,
+                );
+
+                if (typeCheckResult.hasErrors) {
+                    const { parseTypeScriptErrors, createUnifiedErrorMessage } =
+                        await import('./typescript-error-parser');
+                    const cleanErrors = parseTypeScriptErrors(
+                        typeCheckResult.diagnostics,
+                        inPath,
+                    );
+                    const errorMessage = createUnifiedErrorMessage(cleanErrors);
+
+                    registerInventoryResume('validateVueTypes', 1, 0);
+                    registerTypeScriptError(new Error(errorMessage), inPath);
+
+                    if (mode === 'individual' || mode === 'watch') {
+                        logger.error(
+                            chalk.red(
+                                `❌ Error al validar tipos TypeScript en Vue ${inPath}: ${errorMessage}`,
+                            ),
+                        );
+                    }
+
+                    throw new Error(errorMessage);
+                }
+            }
+        }
+
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
@@ -394,6 +444,43 @@ async function compileJS(
         );
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
+
+    //aca se debe pasar de js a js
+    if (env.VERBOSE === 'true' && env.isAll === 'true')
+        logger.info(chalk.yellow(`💛 :Estandarizando`));
+    const resultSTD = await estandarizaCode(code, inPath);
+    if (resultSTD.error) {
+        registerInventoryResume('estandarizaCode', 1, 0);
+        registerInventoryError(inPath, resultSTD.error, 'error');
+
+        // Solo mostrar errores inmediatamente en modo individual y watch
+        if (mode === 'individual' || mode === 'watch') {
+            logger.error(
+                chalk.red(
+                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
+                ),
+            );
+        }
+
+        throw new Error(resultSTD.error);
+    }
+    registerInventoryResume('estandarizaCode', 0, 1);
+    code = resultSTD.code;
+    if (
+        !code ||
+        code.trim().length === 0 ||
+        code === 'undefined' ||
+        code === 'null'
+    ) {
+        registerInventoryResume('estandarizaCode', -1, 1);
+        registerInventoryError(
+            inPath,
+            'El archivo está vacío o no se pudo leer.',
+            'error',
+        );
+        throw new Error('El archivo está vacío o no se pudo leer.');
+    }
+
     //aca se debe pasar de ts a js
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
@@ -429,42 +516,6 @@ async function compileJS(
         code === 'null'
     ) {
         registerInventoryResume('preCompileTS', -1, 1);
-        registerInventoryError(
-            inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
-        );
-        throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
-    //aca se debe pasar de js a js
-    if (env.VERBOSE === 'true' && env.isAll === 'true')
-        logger.info(chalk.yellow(`💛 :Estandarizando`));
-    const resultSTD = await estandarizaCode(code, inPath);
-    if (resultSTD.error) {
-        registerInventoryResume('estandarizaCode', 1, 0);
-        registerInventoryError(inPath, resultSTD.error, 'error');
-
-        // Solo mostrar errores inmediatamente en modo individual y watch
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                chalk.red(
-                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
-                ),
-            );
-        }
-
-        throw new Error(resultSTD.error);
-    }
-    registerInventoryResume('estandarizaCode', 0, 1);
-    code = resultSTD.code;
-    if (
-        !code ||
-        code.trim().length === 0 ||
-        code === 'undefined' ||
-        code === 'null'
-    ) {
-        registerInventoryResume('estandarizaCode', -1, 1);
         registerInventoryError(
             inPath,
             'El archivo está vacío o no se pudo leer.',
