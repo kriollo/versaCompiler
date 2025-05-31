@@ -5,3 +5,4 @@ pnpm-lock.yaml
 public
 coverage
 dist
+src/compiler/.cache
