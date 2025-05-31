@@ -44,10 +44,11 @@ function resolveESMWithLibrary(moduleName: string): string | null {
         });
         return resolved;
     } catch (error) {
-        logger.error(
-            `Error resolviendo ${moduleName}:`,
-            error instanceof Error ? error.message : String(error),
-        );
+        if (env.VERBOSE === 'true')
+            logger.error(
+                `Error resolviendo ${moduleName}:`,
+                error instanceof Error ? error.message : String(error),
+            );
         return null;
     }
 }
@@ -169,10 +170,11 @@ function findBrowserCompatibleVersion(
                     }
                 }
             } catch (error) {
-                logger.warn(
-                    `No se pudo leer directorio ${searchDir}:`,
-                    error instanceof Error ? error.message : String(error),
-                );
+                if (env.VERBOSE === 'true')
+                    logger.warn(
+                        `No se pudo leer directorio ${searchDir}:`,
+                        error instanceof Error ? error.message : String(error),
+                    );
             }
         }
     }
@@ -256,10 +258,11 @@ function simpleESMResolver(moduleName: string): string | null {
 
         // Asegurarse de que el entry point es una cadena
         if (typeof entryPoint !== 'string') {
-            logger.warn(
-                `Entry point no es string para ${moduleName}:`,
-                entryPoint,
-            );
+            if (env.VERBOSE === 'true')
+                logger.warn(
+                    `Entry point no es string para ${moduleName}:`,
+                    entryPoint,
+                );
             entryPoint = isESM ? 'index.js' : 'index.cjs';
         }
 
@@ -295,16 +298,18 @@ function simpleESMResolver(moduleName: string): string | null {
                 );
 
                 if (privateImports.length > 0) {
-                    logger.info(
-                        `Módulo ${moduleName} usa imports privados:`,
-                        privateImports.map(m => m[1]),
-                    );
+                    if (env.VERBOSE === 'true')
+                        logger.info(
+                            `Módulo ${moduleName} usa imports privados:`,
+                            privateImports.map(m => m[1]),
+                        );
                     // Si usa imports privados, asegurarnos de que estén disponibles
                     for (const [, importPath] of privateImports) {
                         if (!importMap.has(importPath)) {
-                            logger.warn(
-                                `Import privado no resuelto: ${importPath} en ${moduleName}`,
-                            );
+                            if (env.VERBOSE === 'true')
+                                logger.warn(
+                                    `Import privado no resuelto: ${importPath} en ${moduleName}`,
+                                );
                         }
                     }
                 }
@@ -313,9 +318,10 @@ function simpleESMResolver(moduleName: string): string | null {
 
         // Verificar que el archivo existe
         if (!fs.existsSync(finalPath)) {
-            logger.warn(
-                `⚠️ Archivo no existe: ${finalPath}, buscando alternativas...`,
-            );
+            if (env.VERBOSE === 'true')
+                logger.warn(
+                    `⚠️ Archivo no existe: ${finalPath}, buscando alternativas...`,
+                );
 
             // Intentar alternativas comunes
             const alternatives = [
@@ -339,9 +345,10 @@ function simpleESMResolver(moduleName: string): string | null {
 
         return finalPath;
     } catch (error) {
-        logger.error(
-            `Error resolviendo ${moduleName}: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        if (env.VERBOSE === 'true')
+            logger.error(
+                `Error resolviendo ${moduleName}: ${error instanceof Error ? error.message : String(error)}`,
+            );
         return null;
     }
 }
@@ -358,10 +365,7 @@ function getNodeModulesRelativePath(
         // Si se proporciona fromFile, calcular la ruta relativa correcta
         if (fromFile) {
             const fromDir = dirname(fromFile);
-            const distDir = env.PATH_DIST || 'dist'; // Debug logs temporales
-            // console.log('DEBUG - fromFile:', fromFile);
-            // console.log('DEBUG - fromDir:', fromDir);
-            // console.log('DEBUG - distDir:', distDir);
+            const distDir = env.PATH_DIST || 'dist';
 
             // Calcular niveles de profundidad desde el archivo de destino en dist
             // Transformar la ruta del archivo fuente al archivo de destino
@@ -370,21 +374,15 @@ function getNodeModulesRelativePath(
                 '/',
             );
             const targetPath = join(distDir, relativeToSrc).replace(/\\/g, '/');
-            // console.log('DEBUG - relativeToSrc:', relativeToSrc);
-            // console.log('DEBUG - targetPath:', targetPath);
 
             // Contar los directorios en el path de destino
             const pathParts = targetPath
                 .split('/')
                 .filter(part => part && part !== '.');
             const levels = pathParts.length - 1; // -1 porque el último es el archivo
-            // console.log('DEBUG - pathParts:', pathParts);
-            // console.log('DEBUG - levels:', levels);
             const upLevels = '../'.repeat(levels + 1); // +1 para salir del directorio de compilación
-            // console.log('DEBUG - upLevels:', upLevels);
 
             relativePath = upLevels + relativePath;
-            // console.log('DEBUG - final relativePath:', relativePath);
         } else {
             // Fallback: usar ../ para archivos compilados en dist
             relativePath = '../' + relativePath;
@@ -405,6 +403,15 @@ export function getModulePath(
     moduleName: string,
     fromFile?: string,
 ): string | null {
+    // Verificar si el módulo está en la lista de excluidos
+    if (EXCLUDED_MODULES.has(moduleName)) {
+        if (env.VERBOSE === 'true')
+            logger.info(
+                `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
+            );
+        return null; // Retornar null para mantener la importación original
+    }
+
     return getNodeModulesRelativePath(simpleESMResolver(moduleName), fromFile);
 }
 
@@ -415,16 +422,20 @@ export function getModuleSubPath(
 ): string | null {
     // Verificar si el módulo está en la lista de excluidos
     if (EXCLUDED_MODULES.has(moduleName)) {
-        logger.info(
-            `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
-        );
+        if (env.VERBOSE === 'true')
+            logger.info(
+                `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
+            );
         return null; // Retornar null para mantener la importación original
-    }
-
-    // Si contiene '/', es un subpath
+    } // Si contiene '/', es un subpath
     if (moduleName.includes('/')) {
         const [packageName, ...subPathParts] = moduleName.split('/');
         const subPath = subPathParts.join('/');
+
+        // Verificar que packageName no esté vacío
+        if (!packageName) {
+            return null;
+        }
 
         try {
             const nodeModulesPath = join(
@@ -484,10 +495,11 @@ export function getModuleSubPath(
                 }
             }
         } catch (error) {
-            logger.error(
-                `Error resolviendo subpath ${moduleName}:`,
-                error instanceof Error ? error.message : String(error),
-            );
+            if (env.VERBOSE === 'true')
+                logger.error(
+                    `Error resolviendo subpath ${moduleName}:`,
+                    error instanceof Error ? error.message : String(error),
+                );
         }
     }
 

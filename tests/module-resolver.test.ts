@@ -134,8 +134,8 @@ import { readFile } from 'node:fs/promises';
 
     describe('Casos edge y manejo de errores', () => {
         test('debe manejar módulos con exports complejos', async () => {
-            // Buscar algún paquete que tengamos instalado
-            const packages = ['resolve', 'enhanced-resolve', 'oxc-parser'];
+            // Buscar algún paquete que tengamos instalado (excluimos oxc-parser ya que ahora está excluido)
+            const packages = ['resolve', 'enhanced-resolve'];
             let foundPackage = null;
 
             for (const pkg of packages) {
@@ -167,6 +167,55 @@ const moduleImport = import(\`some-package/\${subPath}\`);
             expect(result.error).toBeNull();
             // Debe transformar alias pero no módulos en template literals complejos
             expect(result.code).toContain('/public/components/');
+        });
+    });
+
+    describe('Módulos excluidos', () => {
+        test('debe retornar null para oxc-parser (módulo excluido)', () => {
+            const result = getModulePath('oxc-parser');
+            expect(result).toBeNull();
+            console.log('oxc-parser correctamente excluido:', result);
+        });
+
+        test('debe retornar null para oxc-minify (módulo excluido)', () => {
+            const result = getModulePath('oxc-minify');
+            expect(result).toBeNull();
+            console.log('oxc-minify correctamente excluido:', result);
+        });
+
+        test('debe retornar null para @oxc-minify/binding-wasm32-wasi (módulo excluido)', () => {
+            const result = getModulePath('@oxc-minify/binding-wasm32-wasi');
+            expect(result).toBeNull();
+            console.log(
+                '@oxc-minify/binding-wasm32-wasi correctamente excluido:',
+                result,
+            );
+        });
+
+        test('debe retornar null para vue/compiler-sfc (módulo excluido)', () => {
+            const result = getModulePath('vue/compiler-sfc');
+            expect(result).toBeNull();
+            console.log('vue/compiler-sfc correctamente excluido:', result);
+        });
+
+        test('debe mantener imports originales para módulos excluidos en transformaciones', async () => {
+            const inputCode = `
+import parser from 'oxc-parser';
+import { minify } from 'oxc-minify';
+import { compile } from 'vue/compiler-sfc';
+import { ref } from 'vue'; // Este SÍ debe transformarse
+`;
+            const result = await estandarizaCode(inputCode, 'test.ts');
+
+            expect(result.error).toBeNull();
+            // Los módulos excluidos deben mantener su import original
+            expect(result.code).toContain(`'oxc-parser'`);
+            expect(result.code).toContain(`'oxc-minify'`);
+            expect(result.code).toContain(`'vue/compiler-sfc'`);
+            // Vue normal SÍ debe transformarse
+            expect(result.code).toContain('node_modules');
+            expect(result.code).toContain('vue');
+            console.log('Resultado transformación mixta:', result.code);
         });
     });
 });
