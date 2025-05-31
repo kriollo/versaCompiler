@@ -3,6 +3,7 @@ import { glob, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { env } from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import chalk from 'chalk';
 
@@ -45,6 +46,7 @@ interface CacheEntry {
     outputPath: string;
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const compilationCache = new Map<string, CacheEntry>();
 const CACHE_DIR = path.join(__dirname, '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
