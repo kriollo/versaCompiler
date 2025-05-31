@@ -209,32 +209,23 @@ export {};`;
         try {
             // Verificar que el archivo existe en el host antes de solicitar diagnósticos
             if (!host.fileExists(actualFileName)) {
-                console.log(
-                    `Debug: Archivo ${actualFileName} no existe en el host`,
-                );
                 return { diagnostics: [], hasErrors: false };
             }
 
             // Obtener diagnósticos de tipos con manejo de errores
             let syntacticDiagnostics: ts.Diagnostic[] = [];
             let semanticDiagnostics: ts.Diagnostic[] = [];
-
             try {
                 syntacticDiagnostics =
                     languageService.getSyntacticDiagnostics(actualFileName);
-            } catch (syntaxError) {
-                console.log(
-                    `Debug: Error en getSyntacticDiagnostics: ${syntaxError}`,
-                );
+            } catch {
+                // Ignorar errores de diagnósticos sintácticos
             }
-
             try {
                 semanticDiagnostics =
                     languageService.getSemanticDiagnostics(actualFileName);
-            } catch (semanticError) {
-                console.log(
-                    `Debug: Error en getSemanticDiagnostics: ${semanticError}`,
-                );
+            } catch {
+                // Ignorar errores de diagnósticos semánticos
             } // Combinar todos los diagnósticos
             const allDiagnostics = [
                 ...syntacticDiagnostics,
@@ -284,21 +275,10 @@ export {};`;
                 diagnostics: filteredDiagnostics,
                 hasErrors: filteredDiagnostics.length > 0,
             };
-        } catch (languageServiceError) {
-            console.log(
-                `Debug: Error creando Language Service: ${languageServiceError}`,
-            );
+        } catch {
             return { diagnostics: [], hasErrors: false };
         }
     } catch (error) {
-        console.log(
-            `Debug: Error en validateTypesWithLanguageService para ${fileName}:`,
-        );
-        console.log(
-            `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`,
-        );
-        console.log(`FileName: ${fileName}, ActualFileName: ${actualFileName}`);
-
         // En caso de error, devolver diagnóstico de error
         const errorDiagnostic: ts.Diagnostic = {
             file: undefined,
@@ -394,19 +374,18 @@ export const preCompileTS = async (
             // // Opciones para transpilación
             // noEmit: false,
             // noEmitOnError: false,
-        };
-
-        // 1. Primero, validar tipos usando Language Service para validación completa
+        }; // 1. Primero, validar tipos usando Language Service para validación completa
         const typeCheckResult = validateTypesWithLanguageService(
             fileName,
             data,
             compilerOptions,
         );
         if (typeCheckResult.hasErrors) {
-            // Usar el parser limpio para generar mensajes de error más legibles
+            // Usar el parser limpio para generar mensajes de error más legibles con código fuente
             const cleanErrors = parseTypeScriptErrors(
                 typeCheckResult.diagnostics,
                 fileName,
+                data, // Pasar el código fuente para contexto visual
             );
             const errorMessage = createUnifiedErrorMessage(cleanErrors);
             return { error: new Error(errorMessage), data: null, lang: 'ts' };

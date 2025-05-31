@@ -17,13 +17,15 @@ export interface CleanTypeScriptError {
 export function parseTypeScriptErrors(
     diagnostics: ts.Diagnostic[],
     fileName: string,
+    sourceCode?: string,
 ): CleanTypeScriptError[] {
     return diagnostics.map(diagnostic => {
-        // Extraer el mensaje del error (sin contexto adicional)
-        const message =
-            typeof diagnostic.messageText === 'string'
-                ? diagnostic.messageText
-                : ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+        // Usar el mejorador de errores para obtener mensaje detallado
+        const enhancedMessage = enhanceErrorMessage(
+            diagnostic,
+            fileName,
+            sourceCode,
+        );
 
         // Determinar la severidad
         let severity: 'error' | 'warning' | 'info';
@@ -49,10 +51,9 @@ export function parseTypeScriptErrors(
             );
             help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;
         }
-
         return {
             file: fileName,
-            message: cleanErrorMessage(message),
+            message: enhancedMessage,
             severity,
             help,
         };
@@ -76,6 +77,146 @@ function cleanErrorMessage(message: string): string {
 }
 
 /**
+ * Mejora significativamente el mensaje de error TypeScript con contexto visual
+ */
+function enhanceErrorMessage(
+    diagnostic: ts.Diagnostic,
+    fileName: string,
+    sourceCode?: string,
+): string {
+    // Extraer el mensaje del error
+    const message =
+        typeof diagnostic.messageText === 'string'
+            ? diagnostic.messageText
+            : ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+
+    let enhancedMessage = cleanErrorMessage(message);
+
+    // Información de ubicación
+    let location = `Código TS${diagnostic.code}`;
+    let codeContext = '';
+
+    if (diagnostic.file && diagnostic.start !== undefined) {
+        const sourceFile = diagnostic.file;
+        const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
+            diagnostic.start,
+        );
+        const line = lineAndChar.line + 1;
+        const column = lineAndChar.character + 1;
+
+        location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;
+
+        // Agregar contexto del código si está disponible
+        if (sourceCode || sourceFile.text) {
+            const text = sourceCode || sourceFile.text;
+            const lines = text.split('\n');
+            const errorLine = lines[lineAndChar.line];
+
+            if (errorLine) {
+                // Mostrar hasta 2 líneas antes y después para contexto
+                const startLine = Math.max(0, lineAndChar.line - 2);
+                const endLine = Math.min(
+                    lines.length - 1,
+                    lineAndChar.line + 2,
+                );
+
+                codeContext = '\n\n📝 Contexto del código:\n';
+
+                for (let i = startLine; i <= endLine; i++) {
+                    const currentLine = i + 1;
+                    const lineContent = lines[i] || '';
+                    const isErrorLine = i === lineAndChar.line;
+
+                    if (isErrorLine) {
+                        codeContext += `  ${currentLine.toString().padStart(3, ' ')} ❌ ${lineContent}\n`;
+                        // Agregar flecha apuntando al error
+                        const arrow = ' '.repeat(6 + column) + '^^^';
+                        codeContext += `       ${arrow}\n`;
+                    } else {
+                        codeContext += `  ${currentLine.toString().padStart(3, ' ')}    ${lineContent}\n`;
+                    }
+                }
+            }
+        }
+    }
+
+    // Agregar sugerencias basadas en el tipo de error
+    const suggestions = getErrorSuggestions(diagnostic.code, enhancedMessage);
+    const suggestionsText =
+        suggestions.length > 0
+            ? `\n\n💡 Sugerencias:\n${suggestions.map(s => `   • ${s}`).join('\n')}`
+            : '';
+
+    return `${enhancedMessage}\n   📍 ${location}${codeContext}${suggestionsText}`;
+}
+
+/**
+ * Proporciona sugerencias específicas basadas en el código de error TypeScript
+ */
+function getErrorSuggestions(errorCode: number, message: string): string[] {
+    const suggestions: string[] = [];
+
+    switch (errorCode) {
+        case 2304: // Cannot find name
+            suggestions.push('Verifica que la variable esté declarada');
+            suggestions.push('Asegúrate de importar el módulo correspondiente');
+            suggestions.push('Revisa la ortografía del nombre');
+            break;
+        case 2322: // Type assignment error
+            suggestions.push('Verifica que los tipos sean compatibles');
+            suggestions.push(
+                'Considera usar type assertion: valor as TipoEsperado',
+            );
+            break;
+        case 2307: // Cannot find module
+            suggestions.push(
+                'Verifica que el archivo exista en la ruta especificada',
+            );
+            suggestions.push('Revisa las rutas en tsconfig.json');
+            suggestions.push('Asegúrate de que el paquete esté instalado');
+            break;
+        case 2451: // Cannot redeclare block-scoped variable
+            suggestions.push('Cambia el nombre de la variable');
+            suggestions.push('Usa un scope diferente (function, block)');
+            break;
+        case 7006: // Parameter implicitly has 'any' type
+            suggestions.push('Agrega tipos explícitos a los parámetros');
+            suggestions.push(
+                'Considera habilitar "noImplicitAny": false en tsconfig.json',
+            );
+            break;
+        case 1155: // 'const' declarations must be initialized
+            suggestions.push(
+                'Agrega un valor inicial: const variable = valor;',
+            );
+            suggestions.push('O cambia a "let" si quieres asignar después');
+            break;
+        case 2339: // Property does not exist
+            suggestions.push('Verifica que la propiedad exista en el tipo');
+            suggestions.push(
+                'Considera usar optional chaining: objeto?.propiedad',
+            );
+            break;
+        default:
+            // Sugerencias genéricas basadas en el mensaje
+            if (message.includes('Cannot find')) {
+                suggestions.push(
+                    'Verifica que el elemento exista y esté importado',
+                );
+            }
+            if (message.includes('Type')) {
+                suggestions.push('Revisa la compatibilidad de tipos');
+            }
+            if (message.includes('missing')) {
+                suggestions.push('Agrega el elemento faltante');
+            }
+            break;
+    }
+
+    return suggestions;
+}
+
+/**
  * Crea un mensaje de error unificado para errores múltiples
  */
 export function createUnifiedErrorMessage(
@@ -84,10 +225,12 @@ export function createUnifiedErrorMessage(
     if (errors.length === 0) {
         return 'Error de TypeScript desconocido';
     }
-
     if (errors.length === 1) {
         const error = errors[0];
-        return `${error.message}\n  └─ ${error.help}`;
+        if (error) {
+            return `${error.message}\n  └─ ${error.help}`;
+        }
+        return 'Error de TypeScript desconocido';
     }
 
     const errorCount = errors.filter(e => e.severity === 'error').length;

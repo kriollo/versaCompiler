@@ -285,9 +285,11 @@ export const preCompileVue = async (
             ${insertStyles}
             ${finalCompiledScript.content}
             ${finalCompiledTemplate.code}
-        `;
-
-        const componentName = `${fileName}_component`;
+        `; // Sanitizar el nombre del archivo para crear un nombre de variable JavaScript válido
+        const sanitizedFileName =
+            fileName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') ||
+            'component';
+        const componentName = `${sanitizedFileName}_component`;
 
         const exportComponent = `
                 __file: '${source}',

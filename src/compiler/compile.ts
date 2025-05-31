@@ -374,13 +374,13 @@ async function compileJS(
                     inPath,
                     parsedConfig.options,
                 );
-
                 if (typeCheckResult.hasErrors) {
                     const { parseTypeScriptErrors, createUnifiedErrorMessage } =
                         await import('./typescript-error-parser');
                     const cleanErrors = parseTypeScriptErrors(
                         typeCheckResult.diagnostics,
                         inPath,
+                        code, // Pasar el código fuente para contexto visual
                     );
                     const errorMessage = createUnifiedErrorMessage(cleanErrors);
 
@@ -390,7 +390,7 @@ async function compileJS(
                     if (mode === 'individual' || mode === 'watch') {
                         logger.error(
                             chalk.red(
-                                `❌ Error al validar tipos TypeScript en Vue ${inPath}: ${errorMessage}`,
+                                `❌ Error de validación TypeScript en Vue ${inPath}:\n${errorMessage}`,
                             ),
                         );
                     }
