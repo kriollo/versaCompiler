@@ -177,15 +177,61 @@ async function displayLintingAndCompilationSummary(
     errors: InventoryError[],
     resume: InventoryResume[],
 ): Promise<void> {
+    logger.info(''); // Línea en blanco para separación
+
+    // 🔍 Mostrar errores del linter y compilación si existen
     if (errors.length > 0) {
         displayLintErrors(errors);
+    } else {
+        logger.info(
+            chalk.green(
+                '✅ No se encontraron errores durante linting y compilación.\n',
+            ),
+        );
     }
 
+    // 📊 Mostrar resumen de compilación si existe
     if (resume.length > 0) {
         logger.info(chalk.bold('--- Resumen de Compilación ---'));
         await logger.table(resume, ['tipo', 'result']);
         logger.info(chalk.bold('--- Fin del Resumen de Compilación ---\n'));
+    } else {
+        logger.info(
+            chalk.yellow(
+                '⚠️ No hay datos de resumen de compilación disponibles.\n',
+            ),
+        );
     }
+
+    // 📈 Mostrar estadísticas generales
+    const errorCount = errors.filter(e => e.severity === 'error').length;
+    const warningCount = errors.filter(e => e.severity === 'warning').length;
+    const totalFiles = resume.reduce((total, item) => {
+        if (item.result && typeof item.result === 'object') {
+            return total + (item.result.success || 0);
+        }
+        return total;
+    }, 0);
+
+    logger.info(chalk.bold('--- Estadísticas Finales ---'));
+    logger.info(`📁 Archivos procesados: ${totalFiles}`);
+    logger.info(`❌ Errores encontrados: ${errorCount}`);
+    logger.info(`⚠️ Advertencias encontradas: ${warningCount}`);
+
+    if (errorCount === 0 && warningCount === 0) {
+        logger.info(chalk.green('🎉 ¡Compilación exitosa sin errores!'));
+    } else if (errorCount === 0) {
+        logger.info(
+            chalk.yellow('✅ Compilación completada con advertencias.'),
+        );
+    } else {
+        logger.info(
+            chalk.red(
+                '🚨 Compilación completada con errores que requieren atención.',
+            ),
+        );
+    }
+    logger.info(chalk.bold('--- Fin de Estadísticas ---\n'));
 }
 
 export function normalizeRuta(ruta: string) {
@@ -343,11 +389,17 @@ async function compileJS(
         }
 
         throw new Error('El archivo está vacío o no se pudo leer.');
-    } //aca se debe pasar de vue a js
+    } // Mostrar logs organizados solo en modo verbose
+    const shouldShowDetailedLogs =
+        env.VERBOSE === 'true' && env.isAll === 'true' && mode === 'all';
+
+    //aca se debe pasar de vue a js
     let vueResult;
     if (extension === '.vue') {
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(chalk.green(`💚 :Precompilando VUE`)); // Validar tipos TypeScript en el archivo Vue ANTES de compilar
+        if (shouldShowDetailedLogs)
+            logger.info(chalk.green(`💚 :Precompilando VUE\n${inPath}`));
+
+        // Validar tipos TypeScript en el archivo Vue ANTES de compilar
         // Buscar tsconfig.json para obtener opciones del compilador
         const fileDir = path.dirname(inPath);
         const ts = await import('typescript');
@@ -443,13 +495,11 @@ async function compileJS(
             'error',
         );
         throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
-    //aca se debe pasar de ts a js
+    } //aca se debe pasar de ts a js
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(chalk.blue(`🔄️ :Precompilando TS`));
+        if (shouldShowDetailedLogs)
+            logger.info(chalk.blue(`🔄️ :Precompilando TS\n${inPath}`));
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
             registerInventoryResume('preCompileTS', 1, 0);
@@ -488,9 +538,8 @@ async function compileJS(
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
-    //aca se debe pasar de js a js
-    if (env.VERBOSE === 'true' && env.isAll === 'true')
-        logger.info(chalk.yellow(`💛 :Estandarizando`));
+    //aca se debe pasar de js a js    if (env.VERBOSE === 'true' && env.isAll === 'true')
+    logger.info(chalk.yellow(`💛 :Estandarizando\n${inPath}`));
     const resultSTD = await estandarizaCode(code, inPath);
     if (resultSTD.error) {
         registerInventoryResume('estandarizaCode', 1, 0);
@@ -526,7 +575,7 @@ async function compileJS(
 
     if (env.isPROD === 'true') {
         if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(chalk.red(`🤖 :Minificando`));
+            logger.info(chalk.red(`🤖 :Minificando\n${inPath}`));
         const resultMinify = await minifyJS(code, inPath, true);
         if (resultMinify.error) {
             registerInventoryResume('minifyJS', 1, 0);
@@ -755,7 +804,6 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         } else {
             logger.warn('⚠️ La configuración de linter no es un array válido.');
         }
-
         await Promise.all(linterPromises);
         if (showResult) {
             if (inventoryError.length > 0) {
@@ -767,9 +815,10 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                     ),
                 );
             }
-        }
+        } // Preguntar al usuario si desea continuar cuando se encuentren errores
         if (!showResult && inventoryError.length > 0) {
-            displayLintErrors(inventoryError); // Mostrar errores antes de preguntar
+            // Mostrar errores antes de preguntar
+            displayLintErrors(inventoryError);
             logger.warn(
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
@@ -780,8 +829,6 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             if (result.toLowerCase() !== 's') {
                 logger.info('🛑 Compilación cancelada por el usuario.');
                 proceedWithCompilation = false;
-                // Mostrar errores que llevaron a la detención, sin resumen de compilación.
-                displayLintErrors(inventoryError);
             }
         }
     }

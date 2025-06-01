@@ -184,7 +184,12 @@ export default [
         },
     }, // Configuración para archivos JavaScript
     {
-        files: ['src/**/*.js', 'src/**/*.jsx', 'tests/**/*.js'],
+        files: [
+            'src/**/*.js',
+            'src/**/*.jsx',
+            'tests/**/*.js',
+            'examples/**/*.js',
+        ],
         languageOptions: {
             ecmaVersion: 2020,
             sourceType: 'module',
