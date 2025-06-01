@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { ref } from 'vue';
 
-    import operacionesMatematicas from '@/js/module/operacionesMatematicas.vue';
+    import operacionesMatematicas from 'e@/js/module/operacionesMatematicas.vue';
 
     const message = ref('Hola desde versaCompiler!');
 
