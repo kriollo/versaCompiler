@@ -538,8 +538,9 @@ async function compileJS(
         throw new Error('El archivo está vacío o no se pudo leer.');
     }
 
-    //aca se debe pasar de js a js    if (env.VERBOSE === 'true' && env.isAll === 'true')
-    logger.info(chalk.yellow(`💛 :Estandarizando\n${inPath}`));
+    //aca se debe pasar de js a js
+    if (env.VERBOSE === 'true' && env.isAll === 'true')
+        logger.info(chalk.yellow(`💛 :Estandarizando\n${inPath}`));
     const resultSTD = await estandarizaCode(code, inPath);
     if (resultSTD.error) {
         registerInventoryResume('estandarizaCode', 1, 0);
@@ -864,7 +865,7 @@ async function compileWithConcurrencyLimit(
     let skipped = 0;
     const total = files.length;
 
-    logger.info(`📊 Iniciando compilación de ${total} archivos...`);
+    logger.info(`📊 Iniciando compilación de ${total} archivos...\n`);
 
     // Mostrar barra inicial
     const initialBar = createProgressBar(0, total);
@@ -925,6 +926,7 @@ async function compileWithConcurrencyLimit(
 
     // Limpiar línea de progreso y mostrar resumen final
     process.stdout.write('\n');
+    logger.log(`\n`);
     logger.info(
         chalk.green(
             `✅ Compilación completada: ${completed} archivos compilados, ${skipped} desde cache`,

@@ -3,6 +3,10 @@ class Logger {
         console.log('Logger initialized');
     }
 
+    log(...args: any[]): void {
+        console.log(...args);
+    }
+
     info(...args: any[]): void {
         console.log('INFO:', ...args);
     }
@@ -29,4 +33,3 @@ class Logger {
 }
 
 export const logger = new Logger();
-

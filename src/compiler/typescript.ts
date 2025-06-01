@@ -332,8 +332,6 @@ export const preCompileTS = async (
             return { error: null, data: '', lang: 'ts' };
         }
 
-        console.log(fileName);
-
         // Buscar tsconfig.json en el directorio del archivo o sus padres
         const fileDir = path.dirname(fileName);
         const configPath =
