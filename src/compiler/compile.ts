@@ -16,7 +16,7 @@ import { minifyJS } from './minify';
 import { getCodeFile } from './parser';
 import { generateTailwindCSS } from './tailwindcss';
 import { estandarizaCode } from './transforms';
-import { preCompileTS, validateVueTypes } from './typescript';
+import { preCompileTS } from './typescript';
 import { preCompileVue } from './vuejs';
 
 type InventoryError = {
@@ -398,60 +398,6 @@ async function compileJS(
     if (extension === '.vue') {
         if (shouldShowDetailedLogs)
             logger.info(chalk.green(`💚 :Precompilando VUE\n${inPath}`));
-
-        // Validar tipos TypeScript en el archivo Vue ANTES de compilar
-        // Buscar tsconfig.json para obtener opciones del compilador
-        const fileDir = path.dirname(inPath);
-        const ts = await import('typescript');
-        const configPath =
-            ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
-            path.resolve(process.cwd(), 'tsconfig.json');
-
-        if (configPath) {
-            const { config, error: configError } = ts.readConfigFile(
-                configPath,
-                ts.sys.readFile,
-            );
-
-            if (!configError) {
-                const parsedConfig = ts.parseJsonConfigFileContent(
-                    config,
-                    ts.sys,
-                    path.dirname(configPath),
-                );
-
-                // Validar tipos del archivo Vue antes de compilar
-                const typeCheckResult = validateVueTypes(
-                    code,
-                    inPath,
-                    parsedConfig.options,
-                );
-                if (typeCheckResult.hasErrors) {
-                    const { parseTypeScriptErrors, createUnifiedErrorMessage } =
-                        await import('./typescript-error-parser');
-                    const cleanErrors = parseTypeScriptErrors(
-                        typeCheckResult.diagnostics,
-                        inPath,
-                        code, // Pasar el código fuente para contexto visual
-                    );
-                    const errorMessage = createUnifiedErrorMessage(cleanErrors);
-
-                    registerInventoryResume('validateVueTypes', 1, 0);
-                    registerTypeScriptError(new Error(errorMessage), inPath);
-
-                    if (mode === 'individual' || mode === 'watch') {
-                        logger.error(
-                            chalk.red(
-                                `❌ Error de validación TypeScript en Vue ${inPath}:\n${errorMessage}`,
-                            ),
-                        );
-                    }
-
-                    throw new Error(errorMessage);
-                }
-            }
-        }
-
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
@@ -462,8 +408,6 @@ async function compileJS(
                     : String(vueResult.error),
                 'error',
             );
-
-            // Solo mostrar errores inmediatamente en modo individual y watch
             if (mode === 'individual' || mode === 'watch') {
                 logger.error(
                     chalk.red(
@@ -471,7 +415,6 @@ async function compileJS(
                     ),
                 );
             }
-
             throw new Error(
                 vueResult.error instanceof Error
                     ? vueResult.error.message
