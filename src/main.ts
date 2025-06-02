@@ -66,6 +66,11 @@ async function main() {
             description: 'Limpiar la salida antes de compilar',
             default: false, // Por defecto, clean está deshabilitado
         })
+        .option('y', {
+            type: 'boolean',
+            description: 'Usar Yarn en lugar de npm',
+            default: false,
+        })
         .option('lint-only', {
             type: 'boolean',
             description: 'Ejecutar solo el linter, sin compilar',
@@ -135,7 +140,10 @@ async function main() {
         logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
         logger.info(chalk.green(`Clean: ${argv.clean}`));
 
+        env.clean = 'false';
+        env.yes = argv.y ? 'true' : 'false';
         if (argv.clean) {
+            env.clean = 'true';
             await cleanOutputDir(env.PATH_OUTPUT || './dist');
         }
 

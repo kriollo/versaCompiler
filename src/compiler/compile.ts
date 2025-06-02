@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { glob, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import {
+    glob,
+    mkdir,
+    readFile,
+    stat,
+    unlink,
+    writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { env } from 'node:process';
@@ -53,6 +60,16 @@ const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {
     try {
+        if (env.clean === 'true') {
+            compilationCache.clear();
+            // Eliminar el archivo de caché si existe
+            try {
+                await unlink(CACHE_FILE);
+            } catch {
+                // Ignorar errores al eliminar el archivo
+            }
+        }
+
         const cacheData = await readFile(CACHE_FILE, 'utf-8');
         const parsed = JSON.parse(cacheData);
         for (const [key, value] of Object.entries(parsed)) {
@@ -866,12 +883,14 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
 
-            const result = await promptUser(
-                '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
-            );
-            if (result.toLowerCase() !== 's') {
-                logger.info('🛑 Compilación cancelada por el usuario.');
-                proceedWithCompilation = false;
+            if (env.yes === 'false') {
+                const result = await promptUser(
+                    '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
+                );
+                if (result.toLowerCase() !== 's') {
+                    logger.info('🛑 Compilación cancelada por el usuario.');
+                    proceedWithCompilation = false;
+                }
             }
         }
     }

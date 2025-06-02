@@ -37,14 +37,16 @@ export async function cleanOutputDir(
             }
 
             try {
-                const answer = await promptUser(
-                    '\n\n¿Estás seguro deseas limpiar la carpeta ' +
-                        chalk.yellow(outputDir) +
-                        '? (s / N) : ',
-                );
-                if (answer.toLowerCase() !== 's') {
-                    logger.info('🛑 Compilación cancelada por el usuario.');
-                    process.exit(0);
+                if (env.yes === 'false') {
+                    const answer = await promptUser(
+                        '\n\n¿Estás seguro deseas limpiar la carpeta ' +
+                            chalk.yellow(outputDir) +
+                            '? (s / N) : ',
+                    );
+                    if (answer.toLowerCase() !== 's') {
+                        logger.info('🛑 Compilación cancelada por el usuario.');
+                        process.exit(0);
+                    }
                 }
             } catch (error) {
                 logger.error(`Error en la entrada del usuario: ${error}`);
