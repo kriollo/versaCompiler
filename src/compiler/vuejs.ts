@@ -283,15 +283,19 @@ export const preCompileVue = async (
             ${insertStyles}
             ${finalCompiledScript.content}
             ${finalCompiledTemplate.code}
-        `; // Sanitizar el nombre del archivo para crear un nombre de variable JavaScript válido
+        `;        // Sanitizar el nombre del archivo para crear un nombre de variable JavaScript válido
         const sanitizedFileName =
             fileName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') ||
             'component';
         const componentName = `${sanitizedFileName}_component`;
+        
+        // Verificar si ya existe una propiedad 'name' en el output
+        const hasNameProperty = /name\s*:\s*['"`]/.test(output);
+        
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
-                name: '${fileName}',
+                ${hasNameProperty ? '' : `name: '${fileName}',`}
                 components: {
                     ${components.map(comp => `${comp}`).join(',\n                    ')}
                 },
