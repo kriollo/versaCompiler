@@ -26,25 +26,29 @@ import { estandarizaCode } from './transforms';
 import { preCompileTS } from './typescript';
 import { preCompileVue } from './vuejs';
 
-type InventoryError = {
+// 🎯 Sistema Unificado de Manejo de Errores
+type CompilationMode = 'all' | 'individual' | 'watch';
+
+type CompilationError = {
     file: string;
+    stage: string;
     message: string;
-    severity: string;
+    severity: 'error' | 'warning';
+    details?: string;
     help?: string;
+    timestamp: number;
 };
 
-type Result = {
-    error: number;
+type CompilationResult = {
+    stage: string;
+    errors: number;
     success: number;
+    files: string[];
 };
 
-type InventoryResume = {
-    tipo: string;
-    result: Result;
-};
-
-const inventoryResume: InventoryResume[] = [];
-const inventoryError: InventoryError[] = [];
+// Almacenamiento global de errores y resultados
+const compilationErrors: CompilationError[] = [];
+const compilationResults: CompilationResult[] = [];
 
 // 🚀 Sistema de Cache para Compilación
 interface CacheEntry {
@@ -62,7 +66,6 @@ async function loadCache() {
     try {
         if (env.clean === 'true') {
             compilationCache.clear();
-            // Eliminar el archivo de caché si existe
             try {
                 await unlink(CACHE_FILE);
             } catch {
@@ -82,7 +85,6 @@ async function loadCache() {
 
 async function saveCache() {
     try {
-        // Crear directorio cache si no existe
         await mkdir(CACHE_DIR, { recursive: true });
         const cacheData = Object.fromEntries(compilationCache);
         await writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
@@ -101,21 +103,19 @@ async function shouldRecompile(
 
         if (!cached) return true;
 
-        // Si el archivo cambió, recompilar
         if (stats.mtimeMs > cached.mtime) {
             return true;
         }
 
-        // Verificar si el archivo de salida existe
         try {
             await stat(outputPath);
         } catch {
-            return true; // Archivo de salida no existe, recompilar
+            return true;
         }
 
         return false;
     } catch {
-        return true; // Si hay error, recompilar
+        return true;
     }
 }
 
@@ -135,172 +135,281 @@ async function updateCache(filePath: string, outputPath: string) {
     }
 }
 
-function displayLintErrors(errors: InventoryError[]): void {
-    logger.info(chalk.bold('--- Errores y Advertencias de Compilación ---'));
+// 🎯 Funciones del Sistema Unificado de Manejo de Errores
 
-    // Agrupar errores por archivo para mejor organización
-    const errorsByFile = new Map<string, InventoryError[]>();
-
-    errors.forEach(error => {
-        if (!errorsByFile.has(error.file)) {
-            errorsByFile.set(error.file, []);
-        }
-        errorsByFile.get(error.file)!.push(error);
+/**
+ * Registra un error de compilación en el sistema unificado
+ */
+function registerCompilationError(
+    file: string,
+    stage: string,
+    message: string,
+    severity: 'error' | 'warning' = 'error',
+    details?: string,
+    help?: string,
+): void {
+    compilationErrors.push({
+        file,
+        stage,
+        message,
+        severity,
+        details,
+        help,
+        timestamp: Date.now(),
     });
+}
 
-    // Mostrar estadísticas generales
-    const totalErrors = errors.filter(e => e.severity === 'error').length;
-    const totalWarnings = errors.filter(e => e.severity === 'warning').length;
-    const totalFiles = errorsByFile.size;
+/**
+ * Registra un resultado de compilación (éxitos/errores por etapa)
+ */
+function registerCompilationResult(
+    stage: string,
+    errors: number,
+    success: number,
+    files: string[] = [],
+): void {
+    const existingResult = compilationResults.find(r => r.stage === stage);
+    if (existingResult) {
+        existingResult.errors += errors;
+        existingResult.success += success;
+        existingResult.files.push(...files);
+    } else {
+        compilationResults.push({
+            stage,
+            errors,
+            success,
+            files: [...files],
+        });
+    }
+}
 
-    logger.info(
-        chalk.yellow(
-            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
-        ),
+/**
+ * Maneja errores según el modo de compilación
+ */
+function handleCompilationError(
+    error: Error | string,
+    fileName: string,
+    stage: string,
+    mode: CompilationMode,
+    isVerbose: boolean = false,
+): void {
+    const errorMessage = error instanceof Error ? error.message : error;
+    const errorDetails = error instanceof Error ? error.stack : undefined;
+
+    // Registrar el error en el sistema unificado
+    registerCompilationError(
+        fileName,
+        stage,
+        errorMessage,
+        'error',
+        errorDetails,
     );
+    registerCompilationResult(stage, 1, 0, [fileName]);
 
-    // Si hay muchos archivos con errores (más de 10), mostrar solo un resumen compacto
-    if (totalFiles > 10) {
-        logger.info(chalk.blue('🔍 Archivos con errores (resumen compacto):'));
+    // Mostrar error inmediatamente solo en modo individual y watch
+    if (mode === 'individual' || mode === 'watch') {
+        const baseName = path.basename(fileName);
+        const stageColor = getStageColor(stage);
 
+        if (isVerbose) {
+            // Modo verbose: Mostrar error completo con contexto
+            logger.error(
+                chalk.red(
+                    `❌ Error en etapa ${stageColor(stage)} - ${baseName}:`,
+                ),
+            );
+            logger.error(chalk.red(errorMessage));
+            if (errorDetails && (stage === 'typescript' || stage === 'vue')) {
+                // Mostrar stack trace limitado para TypeScript y Vue
+                const stackLines = errorDetails.split('\n').slice(0, 5);
+                stackLines.forEach(line => {
+                    if (line.trim()) {
+                        logger.error(chalk.gray(`  ${line.trim()}`));
+                    }
+                });
+            }
+        } else {
+            // Modo normal: Mostrar error simplificado
+            const firstLine = errorMessage.split('\n')[0];
+            logger.error(
+                chalk.red(`❌ Error en ${stageColor(stage)}: ${baseName}`),
+            );
+            logger.error(chalk.red(`   ${firstLine}`));
+            logger.info(
+                chalk.yellow(`💡 Usa --verbose para ver detalles completos`),
+            );
+        }
+    }
+    // En modo 'all', los errores se acumulan silenciosamente para el resumen final
+}
+
+/**
+ * Registra un éxito de compilación
+ */
+function registerCompilationSuccess(fileName: string, stage: string): void {
+    registerCompilationResult(stage, 0, 1, [fileName]);
+}
+
+/**
+ * Limpia todos los errores y resultados acumulados
+ */
+function clearCompilationState(): void {
+    compilationErrors.length = 0;
+    compilationResults.length = 0;
+}
+
+/**
+ * Muestra un resumen detallado de todos los errores de compilación
+ */
+function displayCompilationSummary(isVerbose: boolean = false): void {
+    if (compilationErrors.length === 0 && compilationResults.length === 0) {
+        logger.info(
+            chalk.green('✅ No hay errores de compilación para mostrar.'),
+        );
+        return;
+    }
+
+    logger.info(chalk.bold('\n--- 📊 RESUMEN DE COMPILACIÓN ---'));
+
+    // Mostrar estadísticas por etapa
+    if (compilationResults.length > 0) {
+        logger.info(chalk.blue('\n🔍 Estadísticas por etapa:'));
+
+        compilationResults.forEach(result => {
+            const totalFiles = result.success + result.errors;
+            const successRate =
+                totalFiles > 0
+                    ? Math.round((result.success / totalFiles) * 100)
+                    : 0;
+
+            const statusIcon = result.errors === 0 ? '✅' : '❌';
+            const statusColor = result.errors === 0 ? chalk.green : chalk.red;
+            const stageColor = getStageColor(result.stage);
+
+            logger.info(
+                `${statusIcon} ${stageColor(result.stage)}: ${statusColor(`${result.success} éxitos, ${result.errors} errores`)} (${successRate}% éxito)`,
+            );
+        });
+    }
+
+    // Mostrar errores detallados
+    if (compilationErrors.length > 0) {
+        logger.info(
+            chalk.red(
+                `\n❌ Se encontraron ${compilationErrors.length} errores:`,
+            ),
+        );
+
+        // Agrupar errores por archivo para mejor organización
+        const errorsByFile = new Map<string, CompilationError[]>();
+        compilationErrors.forEach(error => {
+            if (!errorsByFile.has(error.file)) {
+                errorsByFile.set(error.file, []);
+            }
+            errorsByFile.get(error.file)!.push(error);
+        });
+
+        // Mostrar errores por archivo
         let fileIndex = 1;
         errorsByFile.forEach((fileErrors, filePath) => {
-            const fileErrorCount = fileErrors.filter(
+            const baseName = path.basename(filePath);
+            const errorCount = fileErrors.filter(
                 e => e.severity === 'error',
             ).length;
-            const fileWarningCount = fileErrors.filter(
+            const warningCount = fileErrors.filter(
                 e => e.severity === 'warning',
             ).length;
-            const baseName = path.basename(filePath);
 
-            const statusIcon = fileErrorCount > 0 ? '❌' : '⚠️';
+            logger.info(chalk.cyan(`\n📄 ${fileIndex}. ${baseName}`));
+            logger.info(chalk.gray(`   Ruta: ${filePath}`));
             logger.info(
-                `${statusIcon} ${fileIndex}. ${baseName}: ${fileErrorCount} errores, ${fileWarningCount} advertencias`,
+                chalk.yellow(
+                    `   ${errorCount} errores, ${warningCount} advertencias`,
+                ),
             );
-            // Mostrar solo el primer error de cada archivo para no saturar la salida
-            if (fileErrors.length > 0) {
-                const firstError = fileErrors[0];
-                if (firstError) {
-                    logger.info(`   └─ ${firstError.message}`);
-                    if (fileErrors.length > 1) {
-                        logger.info(
-                            `   └─ ... y ${fileErrors.length - 1} error(es) más`,
-                        );
-                    }
+            fileErrors.forEach(error => {
+                const icon = error.severity === 'error' ? '❌' : '⚠️';
+                const stageColor = getStageColor(error.stage);
+
+                logger.info(
+                    `   ${icon} [${stageColor(error.stage)}] ${error.message}`,
+                );
+
+                if (isVerbose && error.details) {
+                    // En modo verbose, mostrar detalles adicionales
+                    const detailLines = error.details.split('\n').slice(0, 5);
+                    detailLines.forEach(line => {
+                        if (line.trim()) {
+                            logger.info(chalk.gray(`      ${line.trim()}`));
+                        }
+                    });
                 }
-            }
+
+                if (error.help) {
+                    logger.info(chalk.blue(`      💡 ${error.help}`));
+                }
+            });
 
             fileIndex++;
         });
 
-        logger.info(
-            chalk.yellow(
-                '\n💡 Tip: Usa modo individual (sin --all) para ver detalles completos de cada error',
-            ),
-        );
+        // Mostrar totales finales
+        const totalErrors = compilationErrors.filter(
+            e => e.severity === 'error',
+        ).length;
+        const totalWarnings = compilationErrors.filter(
+            e => e.severity === 'warning',
+        ).length;
+        const totalFiles = errorsByFile.size;
+
+        logger.info(chalk.bold('\n--- 📈 ESTADÍSTICAS FINALES ---'));
+        logger.info(`📁 Archivos con errores: ${totalFiles}`);
+        logger.info(`❌ Total de errores: ${totalErrors}`);
+        logger.info(`⚠️ Total de advertencias: ${totalWarnings}`);
+
+        if (totalErrors > 0) {
+            logger.info(
+                chalk.red(
+                    '🚨 Compilación completada con errores que requieren atención.',
+                ),
+            );
+        } else {
+            logger.info(
+                chalk.yellow(
+                    '✅ Compilación completada con solo advertencias.',
+                ),
+            );
+        }
     } else {
-        // Para pocos archivos, mostrar el formato detallado original
-        logger.info(chalk.blue('🔍 Detalles de errores y advertencias:'));
-
-        errorsByFile.forEach((fileErrors, filePath) => {
-            const baseName = path.basename(filePath);
-            logger.info(chalk.cyan(`\n📄 ${baseName}`));
-
-            fileErrors.forEach((error, index) => {
-                const icon = error.severity === 'error' ? '❌' : '⚠️';
-
-                // Si el mensaje ya está formateado (como los de TypeScript), mostrarlo tal como está
-                if (
-                    error.message.includes('\n') &&
-                    error.message.includes('└─')
-                ) {
-                    // Es un mensaje ya formateado (TypeScript)
-                    logger.info(`${error.message}`);
-                } else {
-                    // Es un mensaje simple (linting normal)
-                    logger.info(`${icon} ${error.message}`);
-                    if (error.help) {
-                        logger.info(`   └─ ${error.help}`);
-                    }
-                }
-
-                // Agregar línea en blanco entre errores (excepto el último)
-                if (index < fileErrors.length - 1) {
-                    logger.info('');
-                }
-            });
-
-            // Línea en blanco entre archivos
-            logger.info('');
-        });
+        logger.info(chalk.green('✅ ¡Compilación exitosa sin errores!'));
     }
 
-    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
+    logger.info(chalk.bold('--- FIN DEL RESUMEN ---\n'));
 }
 
-async function displayLintingAndCompilationSummary(
-    errors: InventoryError[],
-    resume: InventoryResume[],
-): Promise<void> {
-    logger.info(''); // Línea en blanco para separación
-
-    // 🔍 Mostrar errores del linter y compilación si existen
-    if (errors.length > 0) {
-        displayLintErrors(errors);
-    } else {
-        logger.info(
-            chalk.green(
-                '✅ No se encontraron errores durante linting y compilación.\n',
-            ),
-        );
+/**
+ * Obtiene el color apropiado para cada etapa de compilación
+ */
+function getStageColor(stage: string): (text: string) => string {
+    switch (stage) {
+        case 'vue':
+            return chalk.green;
+        case 'typescript':
+            return chalk.blue;
+        case 'standardization':
+            return chalk.yellow;
+        case 'minification':
+            return chalk.red;
+        case 'tailwind':
+            return chalk.magenta;
+        case 'file-read':
+            return chalk.gray;
+        default:
+            return chalk.white;
     }
-
-    // 📊 Mostrar resumen de compilación si existe
-    if (resume.length > 0) {
-        logger.info(chalk.bold('--- Resumen de Compilación ---'));
-        await logger.table(resume, ['tipo', 'result']);
-        logger.info(chalk.bold('--- Fin del Resumen de Compilación ---\n'));
-    } else {
-        logger.info(
-            chalk.yellow(
-                '⚠️ No hay datos de resumen de compilación disponibles.\n',
-            ),
-        );
-    }
-
-    // 📈 Mostrar estadísticas generales
-    const errorCount = errors.filter(e => e.severity === 'error').length;
-    const warningCount = errors.filter(e => e.severity === 'warning').length;
-    const totalFiles = resume.reduce((total, item) => {
-        if (item.result && typeof item.result === 'object') {
-            return total + (item.result.success || 0);
-        }
-        return total;
-    }, 0);
-
-    logger.info(chalk.bold('--- Estadísticas Finales ---'));
-    logger.info(`📁 Archivos procesados: ${totalFiles}`);
-    logger.info(`❌ Errores encontrados: ${errorCount}`);
-    logger.info(`⚠️ Advertencias encontradas: ${warningCount}`);
-
-    if (errorCount === 0 && warningCount === 0) {
-        logger.info(chalk.green('🎉 ¡Compilación exitosa sin errores!'));
-    } else if (errorCount === 0) {
-        logger.info(
-            chalk.yellow('✅ Compilación completada con advertencias.'),
-        );
-    } else {
-        logger.info(
-            chalk.red(
-                '🚨 Compilación completada con errores que requieren atención.',
-            ),
-        );
-    }
-    logger.info(chalk.bold('--- Fin de Estadísticas ---\n'));
 }
 
 export function normalizeRuta(ruta: string) {
-    // Si la ruta es absoluta, no agregar el prefijo './'
     if (path.isAbsolute(ruta)) {
         return path.normalize(ruta).replace(/\\/g, '/');
     }
@@ -319,26 +428,25 @@ export function getOutputPath(ruta: string) {
 
     if (!pathSource || !pathDist) {
         return ruta.replace(/\.(vue|ts)$/, '.js');
-    } // Normalizar las rutas para trabajar con barras forward
+    }
+
     const normalizedRuta = path.normalize(ruta).replace(/\\/g, '/');
     const normalizedSource = path.normalize(pathSource).replace(/\\/g, '/');
     const normalizedDist = path.normalize(pathDist).replace(/\\/g, '/');
 
-    // Si la ruta ya es relativa a pathSource, calcular la ruta de salida
     if (normalizedRuta.includes(normalizedSource)) {
-        // Extraer la parte relativa después de pathSource
         const relativePath = normalizedRuta
             .substring(
                 normalizedRuta.indexOf(normalizedSource) +
                     normalizedSource.length,
             )
-            .replace(/^[/\\]/, ''); // Remover barra inicial si existe        // Construir la ruta de salida
+            .replace(/^[/\\]/, '');
+
         const outputPath = path
             .join(normalizedDist, relativePath)
             .replace(/\\/g, '/');
         return outputPath.replace(/\.(vue|ts)$/, '.js');
     } else {
-        // Si no está en pathSource, usar solo el nombre del archivo
         const fileName = path.basename(normalizedRuta);
         const outputPath = path
             .join(normalizedDist, fileName)
@@ -347,324 +455,193 @@ export function getOutputPath(ruta: string) {
     }
 }
 
-function registerInventoryResume(tipo: string, error: number, success: number) {
-    const invRes = inventoryResume.find(res => res.tipo === tipo);
-    if (!invRes) {
-        inventoryResume.push({
-            tipo,
-            result: {
-                error,
-                success,
-            },
-        });
-        return;
-    } else {
-        invRes.result.error += error;
-        invRes.result.success += success;
-    }
-}
-function registerInventoryError(
-    file: string,
-    message: string,
-    severity: string,
-    help?: string,
-) {
-    inventoryError.push({
-        file,
-        message,
-        severity,
-        help,
-    });
-}
-
-/**
- * Registra errores de TypeScript usando el parser limpio para obtener mensajes más legibles
- */
-function registerTypeScriptError(error: Error, fileName: string) {
-    const errorMessage = error.message;
-
-    // Si el error ya contiene información estructurada de TypeScript (con formato mejorado),
-    // extraer solo la parte principal del mensaje para el inventory
-    let cleanMessage = errorMessage;
-    let helpInfo = 'Error de compilación TypeScript';
-
-    // Si el mensaje contiene múltiples líneas con formato especial, usar solo la primera línea limpia
-    if (errorMessage.includes('\n') && errorMessage.includes('└─')) {
-        // Es un mensaje ya formateado por nuestro parser de TypeScript
-        const lines = errorMessage.split('\n');
-        const mainLine = lines.find(
-            line =>
-                line.trim() &&
-                !line.includes('└─') &&
-                !line.includes('├─') &&
-                !line.includes('│') &&
-                !line.startsWith('   '),
-        );
-        if (mainLine) {
-            cleanMessage = mainLine.trim();
-        }
-
-        // Extraer información de ayuda si está disponible
-        const helpLine = lines.find(line => line.includes('└─'));
-        if (helpLine) {
-            helpInfo = helpLine.replace('└─', '').trim();
-        }
-    } else {
-        // Para errores simples, usar la primera línea
-        const firstLine = errorMessage.split('\n')[0];
-        cleanMessage = firstLine || errorMessage;
-    }
-
-    registerInventoryError(fileName, cleanMessage, 'error', helpInfo);
-}
-
-/**
- * Maneja y muestra errores de TypeScript con diferentes niveles de verbosidad
- */
-function handleTypeScriptError(
-    error: Error,
-    fileName: string,
-    mode: CompilationMode,
-    isVerbose: boolean = false,
-): void {
-    // Registrar el error para el resumen final
-    registerInventoryResume('preCompileTS', 1, 0);
-
-    // En modo individual y watch, mostrar inmediatamente
-    if (mode === 'individual' || mode === 'watch') {
-        if (isVerbose) {
-            // Modo verbose: Mostrar error completo con contexto
-            logger.error(
-                chalk.red(`❌ Error al compilar TypeScript ${fileName}:`),
-            );
-            logger.error(chalk.red(error.message));
-        } else {
-            // Modo normal: Mostrar error simplificado
-            const errorMessage = error.message;
-            const firstLine = errorMessage.split('\n')[0];
-            const baseName = path.basename(fileName);
-
-            logger.error(
-                chalk.red(`❌ Error de tipos en ${baseName}: ${firstLine}`),
-            );
-            logger.info(
-                chalk.yellow(`💡 Usa --verbose para ver detalles completos`),
-            );
-        }
-        // Registrar el error en el inventory para modo individual y watch
-        registerTypeScriptError(error, fileName);
-    } else if (mode === 'all') {
-        // En modo 'all', solo registrar en el inventory para el resumen final
-        // No mostrar errores inmediatamente para evitar spam cuando se procesan muchos archivos
-        registerTypeScriptError(error, fileName);
-    }
-}
-
-type CompilationMode = 'all' | 'individual' | 'watch';
-
 async function compileJS(
     inPath: string,
     outPath: string,
     mode: CompilationMode = 'individual',
 ) {
+    inPath = normalizeRuta(path.resolve(inPath));
+
     const extension = path.extname(inPath);
     let { code, error } = await getCodeFile(inPath);
+
     if (error) {
-        registerInventoryResume('getCodeFile', 1, 0);
-        registerInventoryError(
+        handleCompilationError(
+            error instanceof Error ? error : new Error(String(error)),
             inPath,
-            error instanceof Error ? error.message : String(error),
-            'error',
+            'file-read',
+            mode,
+            env.VERBOSE === 'true',
         );
-
-        // Solo mostrar errores inmediatamente en modo individual y watch
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                chalk.red(
-                    `❌ Error al leer archivo ${inPath}: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-            );
-        }
-
         throw new Error(error instanceof Error ? error.message : String(error));
     }
+
     if (
         !code ||
         code.trim().length === 0 ||
         code === 'undefined' ||
         code === 'null'
     ) {
-        registerInventoryResume('getCodeFile', 1, 0);
-        registerInventoryError(
+        handleCompilationError(
+            new Error('El archivo está vacío o no se pudo leer.'),
             inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
+            'file-read',
+            mode,
+            env.VERBOSE === 'true',
         );
-
-        // Solo mostrar errores inmediatamente en modo individual y watch
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                chalk.red(
-                    `❌ El archivo ${inPath} está vacío o no se pudo leer.`,
-                ),
-            );
-        }
-
         throw new Error('El archivo está vacío o no se pudo leer.');
-    } // Mostrar logs organizados solo en modo verbose
-    const shouldShowDetailedLogs =
-        env.VERBOSE === 'true' && env.isAll === 'true' && mode === 'all'; //aca se debe pasar de vue a js
+    }
+
+    // Logs detallados solo en modo verbose + all
+    const shouldShowDetailedLogs = env.VERBOSE === 'true' && mode === 'all'; // Compilación de Vue
     let vueResult;
     if (extension === '.vue') {
-        if (shouldShowDetailedLogs)
-            logger.info(chalk.green(`💚 :Precompilando VUE\n${inPath}`));
+        if (shouldShowDetailedLogs) {
+            logger.info(chalk.green(`💚 Precompilando VUE: ${inPath}`));
+        }
 
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
-            registerInventoryResume('preCompileVue', 1, 0);
-            registerInventoryError(
-                inPath,
+            handleCompilationError(
                 vueResult.error instanceof Error
-                    ? vueResult.error.message
-                    : String(vueResult.error),
-                'error',
-            );
-            if (mode === 'individual' || mode === 'watch') {
-                logger.error(
-                    chalk.red(
-                        `❌ Error al compilar Vue ${inPath}: ${vueResult.error instanceof Error ? vueResult.error.message : String(vueResult.error)}`,
-                    ),
-                );
-            }
-            throw new Error(
-                vueResult.error instanceof Error
-                    ? vueResult.error.message
-                    : String(vueResult.error),
-            );
-        }
-        registerInventoryResume('preCompileVue', 0, 1);
-        code = vueResult.data;
-    }
-
-    if (
-        !code ||
-        code.trim().length === 0 ||
-        code === 'undefined' ||
-        code === 'null'
-    ) {
-        registerInventoryResume('preCompileVue', 1, -1);
-        registerInventoryError(
-            inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
-        );
-        throw new Error('El archivo está vacío o no se pudo leer.');
-    } //aca se debe pasar de ts a js
-    let tsResult;
-    if (extension === '.ts' || vueResult?.lang === 'ts') {
-        if (shouldShowDetailedLogs)
-            logger.info(chalk.blue(`🔄️ :Precompilando TS\n${inPath}`));
-        tsResult = await preCompileTS(code, inPath);
-        if (tsResult.error) {
-            handleTypeScriptError(
-                tsResult.error,
+                    ? vueResult.error
+                    : new Error(String(vueResult.error)),
                 inPath,
+                'vue',
                 mode,
                 env.VERBOSE === 'true',
             );
             throw new Error(
-                tsResult.error instanceof Error
-                    ? tsResult.error.message
-                    : String(tsResult.error),
+                vueResult.error instanceof Error
+                    ? vueResult.error.message
+                    : String(vueResult.error),
             );
         }
-        registerInventoryResume('preCompileTS', 0, 1);
-        code = tsResult.data;
+        registerCompilationSuccess(inPath, 'vue');
+        code = vueResult.data;
     }
-    if (
-        !code ||
-        code.trim().length === 0 ||
-        code === 'undefined' ||
-        code === 'null'
-    ) {
-        registerInventoryResume('preCompileTS', -1, 1);
-        registerInventoryError(
+
+    if (!code || code.trim().length === 0) {
+        handleCompilationError(
+            new Error('El código Vue compilado está vacío.'),
             inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
+            'vue',
+            mode,
+            env.VERBOSE === 'true',
         );
-        throw new Error('El archivo está vacío o no se pudo leer.');
+        throw new Error('El código Vue compilado está vacío.');
     }
 
-    //aca se debe pasar de js a js
-    if (env.VERBOSE === 'true' && env.isAll === 'true')
-        logger.info(chalk.yellow(`💛 :Estandarizando\n${inPath}`));
-    const resultSTD = await estandarizaCode(code, inPath);
-    if (resultSTD.error) {
-        registerInventoryResume('estandarizaCode', 1, 0);
-        registerInventoryError(inPath, resultSTD.error, 'error');
-
-        // Solo mostrar errores inmediatamente en modo individual y watch
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                chalk.red(
-                    `❌ Error al estandarizar código ${inPath}: ${resultSTD.error}`,
-                ),
-            );
+    // Compilación de TypeScript
+    let tsResult;
+    if (extension === '.ts' || vueResult?.lang === 'ts') {
+        if (shouldShowDetailedLogs) {
+            logger.info(chalk.blue(`🔄️ Precompilando TS: ${inPath}`));
         }
-
-        throw new Error(resultSTD.error);
-    }
-    registerInventoryResume('estandarizaCode', 0, 1);
-    code = resultSTD.code;
-    if (
-        !code ||
-        code.trim().length === 0 ||
-        code === 'undefined' ||
-        code === 'null'
-    ) {
-        registerInventoryResume('estandarizaCode', -1, 1);
-        registerInventoryError(
-            inPath,
-            'El archivo está vacío o no se pudo leer.',
-            'error',
-        );
-        throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
-    if (env.isPROD === 'true') {
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(chalk.red(`🤖 :Minificando\n${inPath}`));
-        const resultMinify = await minifyJS(code, inPath, true);
-        if (resultMinify.error) {
-            registerInventoryResume('minifyJS', 1, 0);
-            registerInventoryError(
-                inPath,
-                resultMinify.error instanceof Error
-                    ? resultMinify.error.message
-                    : String(resultMinify.error),
-                'error',
-            );
-
-            // Solo mostrar errores inmediatamente en modo individual y watch
-            if (mode === 'individual' || mode === 'watch') {
-                logger.error(
-                    chalk.red(
-                        `❌ Error al minificar ${inPath}: ${resultMinify.error instanceof Error ? resultMinify.error.message : String(resultMinify.error)}`,
-                    ),
+        tsResult = await preCompileTS(code, inPath);
+        if (tsResult.error) {
+            if (mode === 'all') {
+                // En modo --all, registrar el error pero continuar la compilación
+                registerCompilationError(
+                    inPath,
+                    'typescript',
+                    tsResult.error instanceof Error
+                        ? tsResult.error.message
+                        : String(tsResult.error),
+                    'error',
+                );
+                // Usar el código original si la compilación de TypeScript falla
+                // code permanece sin cambios
+            } else {
+                // En modo individual, mantener el comportamiento original (detener compilación)
+                handleCompilationError(
+                    tsResult.error,
+                    inPath,
+                    'typescript',
+                    mode,
+                    env.VERBOSE === 'true',
+                );
+                throw new Error(
+                    tsResult.error instanceof Error
+                        ? tsResult.error.message
+                        : String(tsResult.error),
                 );
             }
+        } else {
+            registerCompilationSuccess(inPath, 'typescript');
+            code = tsResult.data;
+        }
+    }
 
+    if (!code || code.trim().length === 0) {
+        handleCompilationError(
+            new Error('El código TypeScript compilado está vacío.'),
+            inPath,
+            'typescript',
+            mode,
+            env.VERBOSE === 'true',
+        );
+        throw new Error('El código TypeScript compilado está vacío.');
+    }
+
+    // Estandarización
+    if (shouldShowDetailedLogs) {
+        logger.info(chalk.yellow(`💛 Estandarizando: ${inPath}`));
+    }
+
+    const resultSTD = await estandarizaCode(code, inPath);
+    if (resultSTD.error) {
+        handleCompilationError(
+            new Error(resultSTD.error),
+            inPath,
+            'standardization',
+            mode,
+            env.VERBOSE === 'true',
+        );
+        throw new Error(resultSTD.error);
+    }
+    registerCompilationSuccess(inPath, 'standardization');
+    code = resultSTD.code;
+
+    if (!code || code.trim().length === 0) {
+        handleCompilationError(
+            new Error('El código estandarizado está vacío.'),
+            inPath,
+            'standardization',
+            mode,
+            env.VERBOSE === 'true',
+        );
+        throw new Error('El código estandarizado está vacío.');
+    }
+
+    // Minificación (solo en producción)
+    if (env.isPROD === 'true') {
+        if (shouldShowDetailedLogs) {
+            logger.info(chalk.red(`🤖 Minificando: ${inPath}`));
+        }
+
+        const resultMinify = await minifyJS(code, inPath, true);
+        if (resultMinify.error) {
+            handleCompilationError(
+                resultMinify.error instanceof Error
+                    ? resultMinify.error
+                    : new Error(String(resultMinify.error)),
+                inPath,
+                'minification',
+                mode,
+                env.VERBOSE === 'true',
+            );
             throw new Error(
                 resultMinify.error instanceof Error
                     ? resultMinify.error.message
                     : String(resultMinify.error),
             );
         }
-        registerInventoryResume('minifyJS', 0, 1);
+        registerCompilationSuccess(inPath, 'minification');
         code = resultMinify.code;
     }
 
+    // Escribir archivo final
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
     await writeFile(outPath, code, 'utf-8');
@@ -681,24 +658,35 @@ export async function initCompile(
     mode: CompilationMode = 'individual',
 ) {
     try {
+        // Generar TailwindCSS si está habilitado
         if (compileTailwind && Boolean(env.TAILWIND)) {
             const resultTW = await generateTailwindCSS();
             if (typeof resultTW !== 'boolean') {
                 if (resultTW?.success) {
-                    logger.info(`🎨 :${resultTW.message}\n`);
+                    if (mode === 'individual') {
+                        logger.info(`🎨 ${resultTW.message}`);
+                    }
                 } else {
-                    logger.error(
-                        `❌ :${resultTW.message}\n${resultTW.details}\n`,
+                    const errorMsg = `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`;
+                    handleCompilationError(
+                        new Error(errorMsg),
+                        'tailwind.config.js',
+                        'tailwind',
+                        mode,
+                        env.VERBOSE === 'true',
                     );
+                    // No hacer throw aquí, permitir que la compilación continúe
                 }
             }
         }
+
         const startTime = Date.now();
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
 
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(`🔜 :Fuente para compilar: ${file}`);
+        if (mode === 'individual' && env.VERBOSE === 'true') {
+            logger.info(`🔜 Fuente: ${file}`);
+        }
 
         const result = await compileJS(file, outFile, mode);
         if (result.error) {
@@ -707,29 +695,24 @@ export async function initCompile(
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(`🔚 :Destino para publicar: ${outFile}`);
-        if (env.VERBOSE === 'true' && env.isAll === 'true')
-            logger.info(`⏱️ :Tiempo de compilación: ${elapsedTime}\n\n`);
+
+        if (mode === 'individual') {
+            if (env.VERBOSE === 'true') {
+                logger.info(`🔚 Destino: ${outFile}`);
+                logger.info(`⏱️ Tiempo: ${elapsedTime}`);
+            }
+            logger.info(
+                chalk.green(`✅ Compilación exitosa: ${path.basename(file)}`),
+            );
+        }
 
         return {
             success: true,
             output: outFile,
             action: result.action,
         };
-    } catch (error) {
-        const errorMessage =
-            error instanceof Error ? error.message : String(error); // No mostrar errores duplicados - ya se manejan en handleTypeScriptError y otras funciones específicas
-        // En modo 'all', no mostrar errores de TypeScript durante la compilación (se muestran en el resumen)
-        // En otros modos, mostrar errores que no sean de TypeScript
-        if (
-            mode !== 'all' &&
-            !errorMessage.includes('Type ') &&
-            !errorMessage.includes('TS2')
-        ) {
-            logger.error(`🚩 Error al compilar ${ruta}: ${errorMessage}`);
-        }
-
+    } catch {
+        // Los errores ya se manejan en handleCompilationError
         return {
             success: false,
             output: '',
@@ -740,7 +723,6 @@ export async function initCompile(
 export async function runLinter(showResult: boolean = false): Promise<boolean> {
     const linterENV = env.linter;
     let proceedWithCompilation = true;
-    inventoryError.length = 0; // Limpiar errores de ejecuciones anteriores de linter
 
     if (
         typeof linterENV === 'string' &&
@@ -749,8 +731,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
     ) {
         logger.info('🔍 Ejecutando linting...');
         const linterPromises: Promise<void>[] = [];
-
-        inventoryError.length = 0;
+        const linterErrors: any[] = [];
 
         const parsedLinterEnv = JSON.parse(linterENV);
         if (Array.isArray(parsedLinterEnv)) {
@@ -762,19 +743,22 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                     const eslintPromise = ESLint(item)
                         .then(eslintResult => {
                             if (eslintResult && eslintResult.json) {
+                                // Procesar resultados de ESLint
                                 if (Array.isArray(eslintResult.json)) {
                                     eslintResult.json.forEach((result: any) => {
-                                        registerInventoryError(
-                                            result.filePath ||
+                                        linterErrors.push({
+                                            file:
+                                                result.filePath ||
                                                 'archivo no especificado',
-                                            result.message,
-                                            result.severity === 2
-                                                ? 'error'
-                                                : 'warning',
-                                            result.ruleId
+                                            message: result.message,
+                                            severity:
+                                                result.severity === 2
+                                                    ? 'error'
+                                                    : 'warning',
+                                            help: result.ruleId
                                                 ? `Regla ESLint: ${result.ruleId}`
                                                 : undefined,
-                                        );
+                                        });
                                     });
                                 } else if (
                                     eslintResult.json.results &&
@@ -790,17 +774,21 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                             ) {
                                                 fileResult.messages.forEach(
                                                     (msg: any) => {
-                                                        registerInventoryError(
-                                                            fileResult.filePath ||
+                                                        linterErrors.push({
+                                                            file:
+                                                                fileResult.filePath ||
                                                                 'archivo no especificado',
-                                                            msg.message,
-                                                            msg.severity === 2
-                                                                ? 'error'
-                                                                : 'warning',
-                                                            msg.ruleId
+                                                            message:
+                                                                msg.message,
+                                                            severity:
+                                                                msg.severity ===
+                                                                2
+                                                                    ? 'error'
+                                                                    : 'warning',
+                                                            help: msg.ruleId
                                                                 ? `Regla ESLint: ${msg.ruleId}`
                                                                 : undefined,
-                                                        );
+                                                        });
                                                     },
                                                 );
                                             }
@@ -813,11 +801,11 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                             logger.error(
                                 `❌ Error durante la ejecución de ESLint: ${err.message}`,
                             );
-                            registerInventoryError(
-                                item.configFile || 'ESLint Config',
-                                `Fallo al ejecutar ESLint: ${err.message}`,
-                                'error',
-                            );
+                            linterErrors.push({
+                                file: item.configFile || 'ESLint Config',
+                                message: `Fallo al ejecutar ESLint: ${err.message}`,
+                                severity: 'error',
+                            });
                         });
                     linterPromises.push(eslintPromise);
                 } else if (item.name.toLowerCase() === 'oxlint') {
@@ -832,19 +820,22 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                 Array.isArray(oxlintResult['json'])
                             ) {
                                 oxlintResult['json'].forEach((result: any) => {
-                                    registerInventoryError(
-                                        result.filename ||
+                                    linterErrors.push({
+                                        file:
+                                            result.filename ||
                                             result.file ||
                                             'archivo no especificado',
-                                        result.message,
-                                        typeof result.severity === 'string'
-                                            ? result.severity.toLowerCase()
-                                            : 'error',
-                                        result.help ||
+                                        message: result.message,
+                                        severity:
+                                            typeof result.severity === 'string'
+                                                ? result.severity.toLowerCase()
+                                                : 'error',
+                                        help:
+                                            result.help ||
                                             (result.rule_id
                                                 ? `Regla Oxlint: ${result.rule_id}`
                                                 : undefined),
-                                    );
+                                    });
                                 });
                             }
                         })
@@ -852,11 +843,11 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                             logger.error(
                                 `❌ Error durante la ejecución de OxLint: ${err.message}`,
                             );
-                            registerInventoryError(
-                                item.configFile || 'Oxlint Config',
-                                `Fallo al ejecutar Oxlint: ${err.message}`,
-                                'error',
-                            );
+                            linterErrors.push({
+                                file: item.configFile || 'Oxlint Config',
+                                message: `Fallo al ejecutar Oxlint: ${err.message}`,
+                                severity: 'error',
+                            });
                         });
                     linterPromises.push(oxlintPromise);
                 }
@@ -864,10 +855,12 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         } else {
             logger.warn('⚠️ La configuración de linter no es un array válido.');
         }
+
         await Promise.all(linterPromises);
+
         if (showResult) {
-            if (inventoryError.length > 0) {
-                displayLintErrors(inventoryError);
+            if (linterErrors.length > 0) {
+                displayLinterErrors(linterErrors);
             } else {
                 logger.info(
                     chalk.green(
@@ -875,10 +868,10 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                     ),
                 );
             }
-        } // Preguntar al usuario si desea continuar cuando se encuentren errores
-        if (!showResult && inventoryError.length > 0) {
-            // Mostrar errores antes de preguntar
-            displayLintErrors(inventoryError);
+        }
+
+        if (!showResult && linterErrors.length > 0) {
+            displayLinterErrors(linterErrors);
             logger.warn(
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
@@ -895,6 +888,43 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         }
     }
     return proceedWithCompilation;
+}
+
+function displayLinterErrors(errors: any[]): void {
+    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
+
+    const errorsByFile = new Map<string, any[]>();
+    errors.forEach(error => {
+        if (!errorsByFile.has(error.file)) {
+            errorsByFile.set(error.file, []);
+        }
+        errorsByFile.get(error.file)!.push(error);
+    });
+
+    const totalErrors = errors.filter(e => e.severity === 'error').length;
+    const totalWarnings = errors.filter(e => e.severity === 'warning').length;
+    const totalFiles = errorsByFile.size;
+
+    logger.info(
+        chalk.yellow(
+            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
+        ),
+    );
+
+    errorsByFile.forEach((fileErrors, filePath) => {
+        const baseName = path.basename(filePath);
+        logger.info(chalk.cyan(`\n📄 ${baseName}`));
+
+        fileErrors.forEach(error => {
+            const icon = error.severity === 'error' ? '❌' : '⚠️';
+            logger.info(`${icon} ${error.message}`);
+            if (error.help) {
+                logger.info(`   └─ ${error.help}`);
+            }
+        });
+    });
+
+    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
 }
 
 // Función para generar barra de progreso
@@ -928,9 +958,24 @@ async function compileWithConcurrencyLimit(
 
     logger.info(`📊 Iniciando compilación de ${total} archivos...\n`);
 
-    // Mostrar barra inicial
     const initialBar = createProgressBar(0, total);
     process.stdout.write(`\r🚀 ${initialBar}`);
+
+    function updateProgressBar() {
+        const currentTotal = completed + skipped;
+        const progressBar = createProgressBar(currentTotal, total);
+
+        const progressPercent = Math.round((currentTotal / total) * 100);
+        if (
+            progressPercent > lastProgressUpdate + 1 ||
+            currentTotal === total
+        ) {
+            process.stdout.write(
+                `\r🚀 ${progressBar} [📁 ${completed} | ⚡ ${skipped}]`,
+            );
+            lastProgressUpdate = progressPercent;
+        }
+    }
 
     for (const file of files) {
         const promise = (async () => {
@@ -944,9 +989,8 @@ async function compileWithConcurrencyLimit(
                 return { success: true, cached: true, output: outFile };
             }
 
-            const result = await initCompile(file, false, 'all'); // Pasar modo 'all' para compilación masiva
+            const result = await initCompile(file, false, 'all');
             if (result.success) {
-                // Actualizar cache
                 await updateCache(file, result.output);
             }
 
@@ -966,28 +1010,9 @@ async function compileWithConcurrencyLimit(
         }
     }
 
-    function updateProgressBar() {
-        const currentTotal = completed + skipped;
-        const progressBar = createProgressBar(currentTotal, total);
-
-        // Actualizar solo cada 2% o cuando hay cambios significativos
-        const progressPercent = Math.round((currentTotal / total) * 100);
-        if (
-            progressPercent > lastProgressUpdate + 1 ||
-            currentTotal === total
-        ) {
-            process.stdout.write(
-                `\r🚀 ${progressBar} [📁 ${completed} | ⚡ ${skipped}]`,
-            );
-            lastProgressUpdate = progressPercent;
-        }
-    }
-
     const finalResults = await Promise.all(results);
 
-    // Limpiar línea de progreso y mostrar resumen final
     process.stdout.write('\n');
-    logger.log(`\n`);
     logger.info(
         chalk.green(
             `✅ Compilación completada: ${completed} archivos compilados, ${skipped} desde cache`,
@@ -999,15 +1024,16 @@ async function compileWithConcurrencyLimit(
 
 export async function initCompileAll() {
     try {
-        // 🚀 Cargar cache al inicio
-        await loadCache();
+        // Limpiar estado de compilación anterior
+        clearCompilationState();
 
-        // Reset progress tracker
+        // Cargar cache al inicio
+        await loadCache();
         lastProgressUpdate = 0;
 
         const shouldContinue = await runLinter();
         if (!shouldContinue) {
-            await displayLintingAndCompilationSummary(inventoryError, []);
+            displayCompilationSummary(env.VERBOSE === 'true');
             return;
         }
 
@@ -1023,16 +1049,25 @@ export async function initCompileAll() {
             `${normalizedGlobPathSource}/**/*.ts`,
         ];
 
-        logger.info(`📝 :Compilando todos los archivos...`);
-        logger.info(`🔜 :Fuente para compilar (original): ${rawPathSource}`);
-        logger.info(`🔚 :Destino para compilar: ${pathDist}\n`);
+        logger.info(`📝 Compilando todos los archivos...`);
+        logger.info(`🔜 Fuente: ${rawPathSource}`);
+        logger.info(`🔚 Destino: ${pathDist}\n`);
 
+        // Generar TailwindCSS
         const resultTW = await generateTailwindCSS();
         if (typeof resultTW !== 'boolean') {
             if (resultTW?.success) {
-                logger.info(`🎨 :${resultTW.message}\n`);
+                logger.info(`🎨 ${resultTW.message}\n`);
             } else {
-                logger.error(`❌ :${resultTW.message}\n${resultTW.details}\n`);
+                handleCompilationError(
+                    new Error(
+                        `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`,
+                    ),
+                    'tailwind.config.js',
+                    'tailwind',
+                    'all',
+                    env.VERBOSE === 'true',
+                );
             }
         }
 
@@ -1043,11 +1078,12 @@ export async function initCompileAll() {
                 continue;
             }
             filesToCompile.push(file.startsWith('./') ? file : `./${file}`);
-        } // Determinar concurrencia óptima basada en cantidad de archivos y CPUs
+        }
+
+        // Determinar concurrencia óptima
         const cpuCount = os.cpus().length;
         const fileCount = filesToCompile.length;
 
-        // Ajuste dinámico de concurrencia
         let maxConcurrency: number;
         if (fileCount < 10) {
             maxConcurrency = Math.min(fileCount, cpuCount);
@@ -1058,31 +1094,38 @@ export async function initCompileAll() {
         }
 
         logger.info(
-            `🚀 :Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
+            `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
         );
 
         await compileWithConcurrencyLimit(filesToCompile, maxConcurrency);
 
-        // 💾 Guardar cache al final
+        // Guardar cache al final
         await saveCache();
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`⏱️ :Tiempo de compilación TOTAL: ${elapsedTime}\n`);
+        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`);
 
-        logger.info(`🚀 :Compilación de todos los archivos finalizada.\n`);
-
-        await displayLintingAndCompilationSummary(
-            inventoryError,
-            inventoryResume,
-        );
+        // Mostrar resumen de compilación
+        displayCompilationSummary(env.VERBOSE === 'true');
     } catch (error) {
         const errorMessage =
             error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : '';
         logger.error(
-            `🚩 :Error al compilar todos los archivos: ${errorMessage}\n${errorStack}\n`,
+            `🚩 Error al compilar todos los archivos: ${errorMessage}`,
         );
+
+        // Registrar el error en el sistema unificado
+        handleCompilationError(
+            error instanceof Error ? error : new Error(String(error)),
+            'compilación general',
+            'all',
+            'all',
+            env.VERBOSE === 'true',
+        );
+
+        // Mostrar resumen incluso si hay errores generales
+        displayCompilationSummary(env.VERBOSE === 'true');
     }
 }
 

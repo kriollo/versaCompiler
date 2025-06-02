@@ -5,11 +5,7 @@ import { env } from 'node:process';
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 
-import {
-    getOutputPath,
-    initCompile,
-    normalizeRuta,
-} from '../compiler/compile.js';
+import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser.js';
 
 import { emitirCambios } from './browserSync.js';

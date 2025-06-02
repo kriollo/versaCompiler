@@ -40,7 +40,7 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
-        "types": ["vite/client", "vue"],
+        "types": ["vue"],
         "jsx": "preserve"
     },
     "vueCompilerOptions": {
@@ -54,10 +54,11 @@
         "tests/**/*.ts",
         "examples/**/*",
         "examples/**/*.vue",
-        "examples/**/*.ts"
+        "examples/**/*.ts",
+        "examples/test-typescript-validation.ts"
     ],
     "typeAcquisition": {
         "enable": true,
-        "include": ["vue", "vite/client"]
+        "include": ["vue"]
     }
 }

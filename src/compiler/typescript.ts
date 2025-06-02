@@ -119,21 +119,20 @@ const validateTypesWithLanguageService = (
 ): TypeCheckResult => {
     let actualFileName = fileName; // Declarar aquí para acceso en catch
     try {
-        let scriptContent = content;
-
-        // Si el script está vacío o es solo espacios en blanco, no validar
+        let scriptContent = content; // Si el script está vacío o es solo espacios en blanco, no validar
         if (!scriptContent.trim()) {
             return { diagnostics: [], hasErrors: false };
-        } // Crear Language Service Host
-        const host = new TypeScriptLanguageServiceHost(compilerOptions);
+        }
 
-        // Para archivos Vue, crear un archivo virtual .ts
+        // Crear Language Service Host
+        const host = new TypeScriptLanguageServiceHost(compilerOptions); // Para archivos Vue, crear un archivo virtual .ts
         if (fileName.endsWith('.vue')) {
             // Usar ruta absoluta para el archivo virtual
             const absolutePath = path.isAbsolute(fileName)
                 ? fileName
                 : path.resolve(fileName);
-            const virtualFileName = absolutePath.replace('.vue', '.ts');
+            // Crear un nombre de archivo virtual único que no colisione
+            const virtualFileName = absolutePath.replace('.vue', '.vue.ts');
             host.addFile(virtualFileName, scriptContent);
             actualFileName = virtualFileName;
         } else {
@@ -145,11 +144,9 @@ const validateTypesWithLanguageService = (
             actualFileName = absolutePath;
         } // Agregar declaraciones básicas de tipos para Vue si es necesario
         if (fileName.endsWith('.vue')) {
-            // Usar el directorio del proyecto como base para las declaraciones
-            const vueTypesPath = path.join(
-                path.dirname(actualFileName),
-                'vue-types.d.ts',
-            );
+            // Usar el directorio del archivo actual para las declaraciones
+            const projectDir = path.dirname(actualFileName);
+            const vueTypesPath = path.join(projectDir, 'vue-types.d.ts');
             const vueTypesDeclaration = `// Declaraciones de tipos Vue para validación
                 declare global {
                     function ref<T>(value: T): { value: T };
@@ -162,19 +159,18 @@ const validateTypesWithLanguageService = (
                     function onUnmounted(fn: () => void): void;
                     function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
                 }
-                export {};
-            `;
+                export {};            `;
             host.addFile(vueTypesPath, vueTypesDeclaration);
-        } // Crear Language Service
+        }
+
+        // Crear Language Service
         const languageService = ts.createLanguageService(host);
 
         try {
             // Verificar que el archivo existe en el host antes de solicitar diagnósticos
             if (!host.fileExists(actualFileName)) {
                 return { diagnostics: [], hasErrors: false };
-            }
-
-            // Obtener diagnósticos de tipos con manejo de errores
+            } // Obtener diagnósticos de tipos con manejo de errores
             let syntacticDiagnostics: ts.Diagnostic[] = [];
             let semanticDiagnostics: ts.Diagnostic[] = [];
             try {
@@ -201,10 +197,15 @@ const validateTypesWithLanguageService = (
                         diag.messageText,
                         '\n',
                     );
-                    // Ignorar errores específicos de funciones render Vue y parámetros generados
+
+                    // Solo errores de categoría Error
+                    if (diag.category !== ts.DiagnosticCategory.Error) {
+                        return false;
+                    }
+
+                    // Ignorar SOLO errores específicos de infraestructura Vue y rutas de módulos
                     return (
                         !messageText.includes('Cannot find module') &&
-                        !messageText.includes('Cannot find name') &&
                         !messageText.includes('Could not find source file') &&
                         !messageText.includes(
                             "Parameter '$props' implicitly has an 'any' type",
@@ -227,8 +228,17 @@ const validateTypesWithLanguageService = (
                         !messageText.includes(
                             "Parameter '_cache' implicitly has an 'any' type",
                         ) &&
-                        !messageText.includes("implicitly has an 'any' type") &&
-                        diag.category === ts.DiagnosticCategory.Error
+                        // Permitir errores de "Cannot find name" ya que son errores de código real
+                        // Solo filtrar parámetros implícitos de Vue generados automáticamente
+                        !(
+                            messageText.includes(
+                                "implicitly has an 'any' type",
+                            ) &&
+                            (messageText.includes('_ctx') ||
+                                messageText.includes('_cache') ||
+                                messageText.includes('$props') ||
+                                messageText.includes('$setup'))
+                        )
                     );
                 },
             );
