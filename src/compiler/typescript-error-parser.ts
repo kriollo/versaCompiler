@@ -11,6 +11,15 @@ export interface CleanTypeScriptError {
 }
 
 /**
+ * Configuración para el formato de mensajes de error
+ */
+export interface ErrorDisplayConfig {
+    verbose: boolean;
+    showContext: boolean;
+    showSuggestions: boolean;
+}
+
+/**
  * Parsea errores de TypeScript y los convierte a un formato limpio
  * que incluye solo: archivo, mensaje, severidad y ubicación como ayuda
  */
@@ -275,6 +284,57 @@ export function createUnifiedErrorMessage(
     }
 
     return result;
+}
+
+/**
+ * Crea un mensaje de error simplificado para modo normal
+ */
+export function createSimpleErrorMessage(
+    diagnostics: ts.Diagnostic[],
+    _fileName: string,
+): string {
+    if (diagnostics.length === 0) return '';
+
+    const firstDiagnostic = diagnostics[0];
+    if (!firstDiagnostic) return '';
+
+    const message = ts.flattenDiagnosticMessageText(
+        firstDiagnostic.messageText,
+        '\n',
+    );
+
+    // Extraer solo la primera línea del mensaje para simplicidad
+    const simplifiedMessage = message.split('\n')[0];
+
+    let location = '';
+    if (firstDiagnostic.file && firstDiagnostic.start !== undefined) {
+        const sourceFile = firstDiagnostic.file;
+        const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
+            firstDiagnostic.start,
+        );
+        location = ` (línea ${lineAndChar.line + 1})`;
+    }
+
+    const errorCount = diagnostics.length;
+    const countText = errorCount > 1 ? ` (+${errorCount - 1} más)` : '';
+
+    return `${simplifiedMessage}${location}${countText}`;
+}
+
+/**
+ * Crea un mensaje de error detallado para modo verbose
+ */
+export function createDetailedErrorMessage(
+    diagnostics: ts.Diagnostic[],
+    fileName: string,
+    sourceCode?: string,
+): string {
+    const cleanErrors = parseTypeScriptErrors(
+        diagnostics,
+        fileName,
+        sourceCode,
+    );
+    return createUnifiedErrorMessage(cleanErrors);
 }
 
 /**

@@ -106,35 +106,6 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
 }
 
 /**
- * Extrae el contenido del script de un archivo Vue
- */
-const extractScriptFromVue = (
-    vueContent: string,
-): { script: string; isTS: boolean } => {
-    // Buscar el bloque <script setup lang="ts">
-    const scriptSetupMatch = vueContent.match(
-        /<script\s+setup(?:\s+lang=["'](ts|typescript)["'])?[^>]*>([\s\S]*?)<\/script>/i,
-    );
-    if (scriptSetupMatch) {
-        const isTS =
-            scriptSetupMatch[1] === 'ts' ||
-            scriptSetupMatch[1] === 'typescript';
-        return { script: scriptSetupMatch[2] || '', isTS };
-    }
-
-    // Buscar el bloque <script> normal con lang="ts"
-    const scriptMatch = vueContent.match(
-        /<script(?:\s+lang=["'](ts|typescript)["'])?[^>]*>([\s\S]*?)<\/script>/i,
-    );
-    if (scriptMatch) {
-        const isTS = scriptMatch[1] === 'ts' || scriptMatch[1] === 'typescript';
-        return { script: scriptMatch[2] || '', isTS };
-    }
-
-    return { script: '', isTS: false };
-};
-
-/**
  * Realiza validación de tipos usando TypeScript Language Service.
  * @param fileName - Nombre del archivo
  * @param content - Contenido del archivo
@@ -148,17 +119,7 @@ const validateTypesWithLanguageService = (
 ): TypeCheckResult => {
     let actualFileName = fileName; // Declarar aquí para acceso en catch
     try {
-        let scriptContent = content; // Si es un archivo .vue, extraer solo el script
-        if (fileName.endsWith('.vue')) {
-            const { script, isTS } = extractScriptFromVue(content);
-            if (!isTS) {
-                // Si no es TypeScript, no validar tipos
-                return { diagnostics: [], hasErrors: false };
-            }
-            scriptContent = script;
-            // Mantener el nombre original para archivos Vue
-            actualFileName = fileName;
-        }
+        let scriptContent = content;
 
         // Si el script está vacío o es solo espacios en blanco, no validar
         if (!scriptContent.trim()) {
@@ -190,18 +151,19 @@ const validateTypesWithLanguageService = (
                 'vue-types.d.ts',
             );
             const vueTypesDeclaration = `// Declaraciones de tipos Vue para validación
-declare global {
-    function ref<T>(value: T): { value: T };
-    function reactive<T extends object>(target: T): T;
-    function computed<T>(getter: () => T): { value: T };
-    function defineComponent<T>(options: T): T;
-    function defineProps<T = {}>(): T;
-    function defineEmits<T = {}>(): T;
-    function onMounted(fn: () => void): void;
-    function onUnmounted(fn: () => void): void;
-    function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
-}
-export {};`;
+                declare global {
+                    function ref<T>(value: T): { value: T };
+                    function reactive<T extends object>(target: T): T;
+                    function computed<T>(getter: () => T): { value: T };
+                    function defineComponent<T>(options: T): T;
+                    function defineProps<T = {}>(): T;
+                    function defineEmits<T = {}>(): T;
+                    function onMounted(fn: () => void): void;
+                    function onUnmounted(fn: () => void): void;
+                    function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
+                }
+                export {};
+            `;
             host.addFile(vueTypesPath, vueTypesDeclaration);
         } // Crear Language Service
         const languageService = ts.createLanguageService(host);
@@ -363,15 +325,6 @@ export const preCompileTS = async (
         // Configurar opciones del compilador
         const compilerOptions: ts.CompilerOptions = {
             ...parsedConfig.options,
-            // Opciones para validación de tipos mejorada
-            // strict: true,
-            // noImplicitAny: true,
-            // noImplicitReturns: true,
-            // noUnusedLocals: false, // Evitar errores por variables no usadas en snippets
-            // noUnusedParameters: false, // Evitar errores por parámetros no usados en snippets
-            // // Opciones para transpilación
-            // noEmit: false,
-            // noEmitOnError: false,
         }; // 1. Primero, validar tipos usando Language Service para validación completa
         const typeCheckResult = validateTypesWithLanguageService(
             fileName,
@@ -379,13 +332,14 @@ export const preCompileTS = async (
             compilerOptions,
         );
         if (typeCheckResult.hasErrors) {
-            // Usar el parser limpio para generar mensajes de error más legibles con código fuente
-            const cleanErrors = parseTypeScriptErrors(
-                typeCheckResult.diagnostics,
-                fileName,
-                data, // Pasar el código fuente para contexto visual
+            // Crear un mensaje de error más limpio y estructurado
+            const errorMessage = createUnifiedErrorMessage(
+                parseTypeScriptErrors(
+                    typeCheckResult.diagnostics,
+                    fileName,
+                    data,
+                ),
             );
-            const errorMessage = createUnifiedErrorMessage(cleanErrors);
             return { error: new Error(errorMessage), data: null, lang: 'ts' };
         }
 
@@ -393,10 +347,33 @@ export const preCompileTS = async (
         const transpileResult = ts.transpileModule(data, {
             compilerOptions,
             fileName,
-            reportDiagnostics: false, // Ya validamos con Language Service
+            reportDiagnostics: true, // Importante: ahora sí queremos los diagnostics
             transformers: undefined,
             moduleName: path.basename(fileName, path.extname(fileName)),
         });
+
+        // Si transpileModule retorna diagnostics de error, reportar como error
+        if (
+            transpileResult.diagnostics &&
+            transpileResult.diagnostics.length > 0
+        ) {
+            const errorDiagnostics = transpileResult.diagnostics.filter(
+                d => d.category === ts.DiagnosticCategory.Error,
+            );
+            if (errorDiagnostics.length > 0) {
+                const cleanErrors = parseTypeScriptErrors(
+                    errorDiagnostics,
+                    fileName,
+                    data,
+                );
+                const errorMessage = createUnifiedErrorMessage(cleanErrors);
+                return {
+                    error: new Error(errorMessage),
+                    data: null,
+                    lang: 'ts',
+                };
+            }
+        }
 
         const output = transpileResult.outputText;
 

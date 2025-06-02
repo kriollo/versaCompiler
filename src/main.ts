@@ -197,8 +197,10 @@ async function main() {
 
             // Verificar si el archivo existe
             const fs = await import('node:fs/promises');
+            let absolutePathFile: string;
             try {
                 await fs.access(argv.file);
+                absolutePathFile = path.resolve(argv.file);
             } catch {
                 logger.error(
                     chalk.red(`❌ Error: El archivo '${argv.file}' no existe.`),
@@ -207,7 +209,7 @@ async function main() {
             }
 
             // Compilar el archivo
-            const result = await compileFile(argv.file);
+            const result = await compileFile(absolutePathFile);
 
             if (result.success) {
                 logger.info(

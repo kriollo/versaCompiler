@@ -316,12 +316,13 @@ function registerInventoryError(
  * Registra errores de TypeScript usando el parser limpio para obtener mensajes más legibles
  */
 function registerTypeScriptError(error: Error, fileName: string) {
-    // Intentar extraer diagnósticos de TypeScript si están disponibles
+    // Para evitar duplicación, no registrar el error aquí ya que se muestra inmediatamente
+    // Solo registrar si hay un sistema de recolección de errores diferido
     const errorMessage = error.message;
 
     // Si el error contiene información estructurada de TypeScript, usarla
     if (error.stack && error.stack.includes('TypeScript')) {
-        // Para errores ya procesados por nuestro parser, simplemente registrar
+        // Para errores ya procesados por nuestro parser, simplemente registrar sin duplicar
         registerInventoryError(
             fileName,
             errorMessage,
@@ -338,6 +339,48 @@ function registerTypeScriptError(error: Error, fileName: string) {
         );
     }
 }
+
+/**
+ * Maneja y muestra errores de TypeScript con diferentes niveles de verbosidad
+ */
+function handleTypeScriptError(
+    error: Error,
+    fileName: string,
+    mode: CompilationMode,
+    isVerbose: boolean = false,
+): void {
+    // Registrar el error para el resumen final
+    registerInventoryResume('preCompileTS', 1, 0);
+
+    // En modo individual y watch, mostrar inmediatamente
+    if (mode === 'individual' || mode === 'watch') {
+        if (isVerbose) {
+            // Modo verbose: Mostrar error completo con contexto
+            logger.error(
+                chalk.red(`❌ Error al compilar TypeScript ${fileName}:`),
+            );
+            logger.error(chalk.red(error.message));
+        } else {
+            // Modo normal: Mostrar error simplificado
+            const errorMessage = error.message;
+            const firstLine = errorMessage.split('\n')[0];
+            const baseName = path.basename(fileName);
+
+            logger.error(
+                chalk.red(`❌ Error de tipos en ${baseName}: ${firstLine}`),
+            );
+            logger.info(
+                chalk.yellow(`💡 Usa --verbose para ver detalles completos`),
+            );
+        }
+    }
+
+    // No duplicar en el inventory si ya se mostró inmediatamente
+    if (mode !== 'all') {
+        registerTypeScriptError(error, fileName);
+    }
+}
+
 type CompilationMode = 'all' | 'individual' | 'watch';
 
 async function compileJS(
@@ -391,13 +434,12 @@ async function compileJS(
         throw new Error('El archivo está vacío o no se pudo leer.');
     } // Mostrar logs organizados solo en modo verbose
     const shouldShowDetailedLogs =
-        env.VERBOSE === 'true' && env.isAll === 'true' && mode === 'all';
-
-    //aca se debe pasar de vue a js
+        env.VERBOSE === 'true' && env.isAll === 'true' && mode === 'all'; //aca se debe pasar de vue a js
     let vueResult;
     if (extension === '.vue') {
         if (shouldShowDetailedLogs)
             logger.info(chalk.green(`💚 :Precompilando VUE\n${inPath}`));
+
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
         if (vueResult.error) {
             registerInventoryResume('preCompileVue', 1, 0);
@@ -445,18 +487,12 @@ async function compileJS(
             logger.info(chalk.blue(`🔄️ :Precompilando TS\n${inPath}`));
         tsResult = await preCompileTS(code, inPath);
         if (tsResult.error) {
-            registerInventoryResume('preCompileTS', 1, 0);
-            registerTypeScriptError(tsResult.error, inPath);
-
-            // Solo mostrar errores inmediatamente en modo individual y watch
-            if (mode === 'individual' || mode === 'watch') {
-                logger.error(
-                    chalk.red(
-                        `❌ Error al compilar TypeScript ${inPath}: ${tsResult.error instanceof Error ? tsResult.error.message : String(tsResult.error)}`,
-                    ),
-                );
-            }
-
+            handleTypeScriptError(
+                tsResult.error,
+                inPath,
+                mode,
+                env.VERBOSE === 'true',
+            );
             throw new Error(
                 tsResult.error instanceof Error
                     ? tsResult.error.message
@@ -605,13 +641,14 @@ export async function initCompile(
     } catch (error) {
         const errorMessage =
             error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : '';
 
-        // En modo individual y watch, mostrar errores inmediatamente
-        if (mode === 'individual' || mode === 'watch') {
-            logger.error(
-                `🚩 :Error al compilar ${ruta}: ${errorMessage}\n${errorStack}\n`,
-            );
+        // No mostrar errores duplicados - ya se manejan en handleTypeScriptError y otras funciones específicas
+        // Solo para errores que no sean de TypeScript o en modo 'all'
+        if (
+            mode === 'all' ||
+            (!errorMessage.includes('Type ') && !errorMessage.includes('TS2'))
+        ) {
+            logger.error(`🚩 Error al compilar ${ruta}: ${errorMessage}`);
         }
 
         return {

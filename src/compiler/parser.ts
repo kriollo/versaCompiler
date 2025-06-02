@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import fs, { readFile } from 'node:fs/promises';
 
 import oxc from 'oxc-parser';
 
@@ -26,6 +26,10 @@ export const parser = async (
 
 export const getCodeFile = async (filename: string) => {
     try {
+        // validar si existe el archivo
+
+        await fs.access(filename);
+
         const code = await readFile(filename, 'utf-8');
         return { code, error: null };
     } catch (error) {
