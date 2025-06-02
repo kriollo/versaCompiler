@@ -119,14 +119,11 @@ async function updateCache(filePath: string, outputPath: string) {
 }
 
 function displayLintErrors(errors: InventoryError[]): void {
-    if (errors.length === 0) {
-        return;
-    }
+    logger.info(chalk.bold('--- Errores y Advertencias de Compilación ---'));
 
-    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---\n'));
-
-    // Agrupar errores por archivo
+    // Agrupar errores por archivo para mejor organización
     const errorsByFile = new Map<string, InventoryError[]>();
+
     errors.forEach(error => {
         if (!errorsByFile.has(error.file)) {
             errorsByFile.set(error.file, []);
@@ -134,41 +131,92 @@ function displayLintErrors(errors: InventoryError[]): void {
         errorsByFile.get(error.file)!.push(error);
     });
 
-    // Mostrar errores agrupados por archivo
-    errorsByFile.forEach((fileErrors, filePath) => {
-        // Mostrar nombre del archivo
-        logger.info(chalk.cyan(`📁 ${filePath}`));
+    // Mostrar estadísticas generales
+    const totalErrors = errors.filter(e => e.severity === 'error').length;
+    const totalWarnings = errors.filter(e => e.severity === 'warning').length;
+    const totalFiles = errorsByFile.size;
 
-        fileErrors.forEach((error, index) => {
-            // Determinar el icono según la severidad
-            const icon =
-                error.severity === 'error'
-                    ? '❌'
-                    : error.severity === 'warning'
-                      ? '⚠️'
-                      : 'ℹ️';
+    logger.info(
+        chalk.yellow(
+            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
+        ),
+    );
 
-            // Si el mensaje ya está formateado (como los de TypeScript), mostrarlo tal como está
-            if (error.message.includes('\n') && error.message.includes('└─')) {
-                // Es un mensaje ya formateado (TypeScript)
-                logger.info(`${error.message}`);
-            } else {
-                // Es un mensaje simple (linting normal)
-                logger.info(`${icon} ${error.message}`);
-                if (error.help) {
-                    logger.info(`   └─ ${error.help}`);
+    // Si hay muchos archivos con errores (más de 10), mostrar solo un resumen compacto
+    if (totalFiles > 10) {
+        logger.info(chalk.blue('🔍 Archivos con errores (resumen compacto):'));
+
+        let fileIndex = 1;
+        errorsByFile.forEach((fileErrors, filePath) => {
+            const fileErrorCount = fileErrors.filter(
+                e => e.severity === 'error',
+            ).length;
+            const fileWarningCount = fileErrors.filter(
+                e => e.severity === 'warning',
+            ).length;
+            const baseName = path.basename(filePath);
+
+            const statusIcon = fileErrorCount > 0 ? '❌' : '⚠️';
+            logger.info(
+                `${statusIcon} ${fileIndex}. ${baseName}: ${fileErrorCount} errores, ${fileWarningCount} advertencias`,
+            );
+            // Mostrar solo el primer error de cada archivo para no saturar la salida
+            if (fileErrors.length > 0) {
+                const firstError = fileErrors[0];
+                if (firstError) {
+                    logger.info(`   └─ ${firstError.message}`);
+                    if (fileErrors.length > 1) {
+                        logger.info(
+                            `   └─ ... y ${fileErrors.length - 1} error(es) más`,
+                        );
+                    }
                 }
             }
 
-            // Agregar línea en blanco entre errores (excepto el último)
-            if (index < fileErrors.length - 1) {
-                logger.info('');
-            }
+            fileIndex++;
         });
 
-        // Línea en blanco entre archivos
-        logger.info('');
-    });
+        logger.info(
+            chalk.yellow(
+                '\n💡 Tip: Usa modo individual (sin --all) para ver detalles completos de cada error',
+            ),
+        );
+    } else {
+        // Para pocos archivos, mostrar el formato detallado original
+        logger.info(chalk.blue('🔍 Detalles de errores y advertencias:'));
+
+        errorsByFile.forEach((fileErrors, filePath) => {
+            const baseName = path.basename(filePath);
+            logger.info(chalk.cyan(`\n📄 ${baseName}`));
+
+            fileErrors.forEach((error, index) => {
+                const icon = error.severity === 'error' ? '❌' : '⚠️';
+
+                // Si el mensaje ya está formateado (como los de TypeScript), mostrarlo tal como está
+                if (
+                    error.message.includes('\n') &&
+                    error.message.includes('└─')
+                ) {
+                    // Es un mensaje ya formateado (TypeScript)
+                    logger.info(`${error.message}`);
+                } else {
+                    // Es un mensaje simple (linting normal)
+                    logger.info(`${icon} ${error.message}`);
+                    if (error.help) {
+                        logger.info(`   └─ ${error.help}`);
+                    }
+                }
+
+                // Agregar línea en blanco entre errores (excepto el último)
+                if (index < fileErrors.length - 1) {
+                    logger.info('');
+                }
+            });
+
+            // Línea en blanco entre archivos
+            logger.info('');
+        });
+    }
 
     logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
 }
@@ -316,28 +364,41 @@ function registerInventoryError(
  * Registra errores de TypeScript usando el parser limpio para obtener mensajes más legibles
  */
 function registerTypeScriptError(error: Error, fileName: string) {
-    // Para evitar duplicación, no registrar el error aquí ya que se muestra inmediatamente
-    // Solo registrar si hay un sistema de recolección de errores diferido
     const errorMessage = error.message;
 
-    // Si el error contiene información estructurada de TypeScript, usarla
-    if (error.stack && error.stack.includes('TypeScript')) {
-        // Para errores ya procesados por nuestro parser, simplemente registrar sin duplicar
-        registerInventoryError(
-            fileName,
-            errorMessage,
-            'error',
-            'Error de compilación TypeScript',
+    // Si el error ya contiene información estructurada de TypeScript (con formato mejorado),
+    // extraer solo la parte principal del mensaje para el inventory
+    let cleanMessage = errorMessage;
+    let helpInfo = 'Error de compilación TypeScript';
+
+    // Si el mensaje contiene múltiples líneas con formato especial, usar solo la primera línea limpia
+    if (errorMessage.includes('\n') && errorMessage.includes('└─')) {
+        // Es un mensaje ya formateado por nuestro parser de TypeScript
+        const lines = errorMessage.split('\n');
+        const mainLine = lines.find(
+            line =>
+                line.trim() &&
+                !line.includes('└─') &&
+                !line.includes('├─') &&
+                !line.includes('│') &&
+                !line.startsWith('   '),
         );
+        if (mainLine) {
+            cleanMessage = mainLine.trim();
+        }
+
+        // Extraer información de ayuda si está disponible
+        const helpLine = lines.find(line => line.includes('└─'));
+        if (helpLine) {
+            helpInfo = helpLine.replace('└─', '').trim();
+        }
     } else {
-        // Para otros errores de TypeScript, registrar normalmente
-        registerInventoryError(
-            fileName,
-            errorMessage,
-            'error',
-            'Error de compilación TypeScript',
-        );
+        // Para errores simples, usar la primera línea
+        const firstLine = errorMessage.split('\n')[0];
+        cleanMessage = firstLine || errorMessage;
     }
+
+    registerInventoryError(fileName, cleanMessage, 'error', helpInfo);
 }
 
 /**
@@ -373,10 +434,11 @@ function handleTypeScriptError(
                 chalk.yellow(`💡 Usa --verbose para ver detalles completos`),
             );
         }
-    }
-
-    // No duplicar en el inventory si ya se mostró inmediatamente
-    if (mode !== 'all') {
+        // Registrar el error en el inventory para modo individual y watch
+        registerTypeScriptError(error, fileName);
+    } else if (mode === 'all') {
+        // En modo 'all', solo registrar en el inventory para el resumen final
+        // No mostrar errores inmediatamente para evitar spam cuando se procesan muchos archivos
         registerTypeScriptError(error, fileName);
     }
 }
@@ -640,13 +702,13 @@ export async function initCompile(
         };
     } catch (error) {
         const errorMessage =
-            error instanceof Error ? error.message : String(error);
-
-        // No mostrar errores duplicados - ya se manejan en handleTypeScriptError y otras funciones específicas
-        // Solo para errores que no sean de TypeScript o en modo 'all'
+            error instanceof Error ? error.message : String(error); // No mostrar errores duplicados - ya se manejan en handleTypeScriptError y otras funciones específicas
+        // En modo 'all', no mostrar errores de TypeScript durante la compilación (se muestran en el resumen)
+        // En otros modos, mostrar errores que no sean de TypeScript
         if (
-            mode === 'all' ||
-            (!errorMessage.includes('Type ') && !errorMessage.includes('TS2'))
+            mode !== 'all' &&
+            !errorMessage.includes('Type ') &&
+            !errorMessage.includes('TS2')
         ) {
             logger.error(`🚩 Error al compilar ${ruta}: ${errorMessage}`);
         }
