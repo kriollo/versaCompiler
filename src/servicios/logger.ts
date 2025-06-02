@@ -1,34 +1,39 @@
 class Logger {
     constructor() {
-        console.log('Logger initialized');
+        // Bind console methods
+        process.stdout.write = process.stdout.write.bind(process.stdout);
+        process.stderr.write = process.stderr.write.bind(process.stderr);
     }
 
     log(...args: any[]): void {
-        console.log(...args);
+        process.stdout.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
 
     info(...args: any[]): void {
-        console.log('INFO:', ...args);
+        process.stdout.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
 
     error(...args: any[]): void {
-        console.error('ERROR:', ...args);
+        process.stderr.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
+
     warn(...args: any[]): void {
-        console.warn('WARN:', ...args);
+        process.stderr.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
+
     debug(...args: any[]): void {
-        console.debug('DEBUG:', ...args);
+        process.stdout.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
+
     fatal(...args: any[]): void {
-        console.error('FATAL:', ...args);
+        process.stderr.write(args.map(arg => String(arg)).join(' ') + '\n');
     }
+
     table(data: any, title?: string[]): void {
-        if (title) {
-            console.table(data, title);
-        } else {
+        const tableString = title ? 
+            console.table(data, title) : 
             console.table(data);
-        }
+        process.stdout.write(String(tableString) + '\n');
     }
 }
 
