@@ -42,4 +42,3 @@ export async function generateTailwindCSS() {
         throw err;
     }
 }
-

@@ -57,7 +57,24 @@ interface CacheEntry {
     outputPath: string;
 }
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Obtener __dirname de manera compatible con CommonJS y ES modules
+let __dirname: string;
+try {
+    // Intentar primero con ES modules si está disponible
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+        __dirname = path.dirname(fileURLToPath(import.meta.url));
+    } else {
+        throw new Error('import.meta no disponible');
+    }
+} catch {
+    // Fallback para CommonJS o cuando import.meta no está disponible
+    try {
+        __dirname = path.dirname(require.resolve('./compile.ts'));
+    } catch {
+        // Último fallback usando process.cwd()
+        __dirname = process.cwd();
+    }
+}
 const compilationCache = new Map<string, CacheEntry>();
 const CACHE_DIR = path.join(__dirname, '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');

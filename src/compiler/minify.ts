@@ -45,4 +45,3 @@ export const minifyJS = async (
         return { error, code: '' };
     }
 };
-

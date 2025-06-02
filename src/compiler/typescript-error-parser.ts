@@ -48,17 +48,28 @@ export function parseTypeScriptErrors(
             default:
                 severity = 'info';
                 break;
-        }
-
-        // Construir información de ubicación limpia
+        } // Construir información de ubicación limpia
         let help = `Código TS${diagnostic.code}`;
 
         if (diagnostic.file && diagnostic.start !== undefined) {
             const sourceFile = diagnostic.file;
-            const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
-                diagnostic.start,
-            );
-            help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;
+            // Verificar que el método getLineAndCharacterOfPosition existe (para compatibilidad con mocks)
+            if (
+                typeof sourceFile.getLineAndCharacterOfPosition === 'function'
+            ) {
+                try {
+                    const lineAndChar =
+                        sourceFile.getLineAndCharacterOfPosition(
+                            diagnostic.start,
+                        );
+                    help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;                } catch {
+                    // Si falla, solo mostrar la posición de carácter
+                    help += ` | Posición ${diagnostic.start}`;
+                }
+            } else {
+                // Fallback para cuando no está disponible el método (como en tests)
+                help += ` | Posición ${diagnostic.start}`;
+            }
         }
         return {
             file: fileName,
@@ -99,52 +110,65 @@ function enhanceErrorMessage(
             ? diagnostic.messageText
             : ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 
-    let enhancedMessage = cleanErrorMessage(message);
-
-    // Información de ubicación
+    let enhancedMessage = cleanErrorMessage(message);    // Información de ubicación
     let location = `Código TS${diagnostic.code}`;
     let codeContext = '';
 
     if (diagnostic.file && diagnostic.start !== undefined) {
         const sourceFile = diagnostic.file;
-        const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
-            diagnostic.start,
-        );
-        const line = lineAndChar.line + 1;
-        const column = lineAndChar.character + 1;
-
-        location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;
-
-        // Agregar contexto del código si está disponible
-        if (sourceCode || sourceFile.text) {
-            const text = sourceCode || sourceFile.text;
-            const lines = text.split('\n');
-            const errorLine = lines[lineAndChar.line];
-
-            if (errorLine) {
-                // Mostrar hasta 2 líneas antes y después para contexto
-                const startLine = Math.max(0, lineAndChar.line - 2);
-                const endLine = Math.min(
-                    lines.length - 1,
-                    lineAndChar.line + 2,
+        // Verificar que el método getLineAndCharacterOfPosition existe (para compatibilidad con mocks)
+        if (typeof sourceFile.getLineAndCharacterOfPosition === 'function') {
+            try {
+                const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
+                    diagnostic.start,
                 );
+                const line = lineAndChar.line + 1;
+                const column = lineAndChar.character + 1;
 
-                codeContext = '\n\n📝 Contexto del código:\n';
+                location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;            } catch {
+                // Si falla, solo mostrar la posición de carácter
+                location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
+            }
+        } else {
+            // Fallback para cuando no está disponible el método (como en tests)
+            location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
+        }        // Agregar contexto del código si está disponible
+        if ((sourceCode || sourceFile.text) && typeof sourceFile.getLineAndCharacterOfPosition === 'function') {
+            try {
+                const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
+                    diagnostic.start,
+                );
+                const text = sourceCode || sourceFile.text;
+                const lines = text.split('\n');
+                const errorLine = lines[lineAndChar.line];
 
-                for (let i = startLine; i <= endLine; i++) {
-                    const currentLine = i + 1;
-                    const lineContent = lines[i] || '';
-                    const isErrorLine = i === lineAndChar.line;
+                if (errorLine) {
+                    // Mostrar hasta 2 líneas antes y después para contexto
+                    const startLine = Math.max(0, lineAndChar.line - 2);
+                    const endLine = Math.min(
+                        lines.length - 1,
+                        lineAndChar.line + 2,
+                    );
 
-                    if (isErrorLine) {
-                        codeContext += `  ${currentLine.toString().padStart(3, ' ')} ❌ ${lineContent}\n`;
-                        // Agregar flecha apuntando al error
-                        const arrow = ' '.repeat(6 + column) + '^^^';
-                        codeContext += `       ${arrow}\n`;
-                    } else {
-                        codeContext += `  ${currentLine.toString().padStart(3, ' ')}    ${lineContent}\n`;
+                    codeContext = '\n\n📝 Contexto del código:\n';
+
+                    for (let i = startLine; i <= endLine; i++) {
+                        const currentLine = i + 1;
+                        const lineContent = lines[i] || '';
+                        const isErrorLine = i === lineAndChar.line;
+
+                        if (isErrorLine) {
+                            codeContext += `  ${currentLine.toString().padStart(3, ' ')} ❌ ${lineContent}\n`;
+                            // Agregar flecha apuntando al error
+                            const arrow = ' '.repeat(6 + lineAndChar.character + 1) + '^^^';
+                            codeContext += `       ${arrow}\n`;
+                        } else {
+                            codeContext += `  ${currentLine.toString().padStart(3, ' ')}    ${lineContent}\n`;
+                        }
                     }
                 }
+            } catch {
+                // Si falla obtener el contexto, continuar sin él
             }
         }
     }
@@ -304,15 +328,20 @@ export function createSimpleErrorMessage(
     );
 
     // Extraer solo la primera línea del mensaje para simplicidad
-    const simplifiedMessage = message.split('\n')[0];
-
-    let location = '';
+    const simplifiedMessage = message.split('\n')[0];    let location = '';
     if (firstDiagnostic.file && firstDiagnostic.start !== undefined) {
         const sourceFile = firstDiagnostic.file;
-        const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
-            firstDiagnostic.start,
-        );
-        location = ` (línea ${lineAndChar.line + 1})`;
+        // Verificar que el método getLineAndCharacterOfPosition existe (para compatibilidad con mocks)
+        if (typeof sourceFile.getLineAndCharacterOfPosition === 'function') {
+            try {
+                const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
+                    firstDiagnostic.start,
+                );
+                location = ` (línea ${lineAndChar.line + 1})`;
+            } catch {
+                // Si falla, continuar sin información de ubicación
+            }
+        }
     }
 
     const errorCount = diagnostics.length;
