@@ -65,13 +65,6 @@ if (typeof __filename !== 'undefined') {
     pathName = path.dirname(__filename);
 } else {
     pathName = process.cwd();
-
-    // Solo mostrar warning en producción, no en tests
-    if (process.env.NODE_ENV !== 'test') {
-        logger.warn(
-            'Usando process.cwd() como __dirname. El cache se guardará en el directorio de trabajo actual.',
-        );
-    }
 }
 
 const compilationCache = new Map<string, CacheEntry>();
