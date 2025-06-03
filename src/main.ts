@@ -14,7 +14,6 @@ import { initConfig, readConfig } from './servicios/readConfig';
 
 // Obtener el directorio del archivo actual (dist/)
 env.PATH_PROY = process.cwd();
-console.log(env.PATH_PROY);
 
 env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
 
