@@ -288,11 +288,6 @@ function simpleESMResolver(moduleName: string): string | null {
         );
         if (browserCompatibleEntry && browserCompatibleEntry !== entryPoint) {
             finalPath = join(moduleDir, browserCompatibleEntry);
-            if (env.VERBOSE === 'true') {
-                logger.info(
-                    `Usando versión browser-compatible para ${moduleName}: ${browserCompatibleEntry}`,
-                );
-            }
         }
 
         // Si es ESM, verificar si hay imports privados que necesiten ser resueltos
