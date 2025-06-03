@@ -93,12 +93,10 @@ function findBrowserCompatibleVersion(
     const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
 
     // Patrones que indican versiones NO compatibles con browser
-    const bundlerPatterns = ['bundler', 'runtime', 'node', 'cjs', 'commonjs'];
-
-    // Patrones que indican versiones SÍ compatibles con browser
+    const bundlerPatterns = ['bundler', 'runtime', 'node', 'cjs', 'commonjs']; // Patrones que indican versiones SÍ compatibles con browser
     const browserPatterns = [
+        'esm-browser', // Prioridad máxima
         'browser',
-        'esm-browser',
         'es-browser',
         'web',
         'global',
@@ -141,7 +139,7 @@ function findBrowserCompatibleVersion(
                 if (browserFiles.length > 0) {
                     // Priorizar por orden de preferencia
                     const priorityOrder = [
-                        'esm-browser',
+                        'esm-browser', // Máxima prioridad
                         'browser',
                         'web',
                         'global',
@@ -217,14 +215,30 @@ function simpleESMResolver(moduleName: string): string | null {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
                     // Priorizar browser > import > default para compatibilidad web
-                    entryPoint =
-                        dotExport.browser ||
-                        (typeof dotExport.import === 'string'
-                            ? dotExport.import
-                            : null) ||
-                        (typeof dotExport.default === 'string'
-                            ? dotExport.default
-                            : null);
+                    // Buscar específicamente patrones esm-browser primero
+                    const exportKeys = Object.keys(dotExport);
+                    const esmBrowserKey = exportKeys.find(
+                        key =>
+                            key.includes('browser') &&
+                            (key.includes('esm') || key.includes('module')),
+                    );
+
+                    if (
+                        esmBrowserKey &&
+                        typeof dotExport[esmBrowserKey] === 'string'
+                    ) {
+                        entryPoint = dotExport[esmBrowserKey];
+                    } else {
+                        // Fallback a la lógica original
+                        entryPoint =
+                            dotExport.browser ||
+                            (typeof dotExport.import === 'string'
+                                ? dotExport.import
+                                : null) ||
+                            (typeof dotExport.default === 'string'
+                                ? dotExport.default
+                                : null);
+                    }
                 }
             }
         }
@@ -264,10 +278,22 @@ function simpleESMResolver(moduleName: string): string | null {
                     entryPoint,
                 );
             entryPoint = isESM ? 'index.js' : 'index.cjs';
-        }
-
-        // Resolver la ruta final
+        } // Resolver la ruta final
         let finalPath = join(moduleDir, entryPoint);
+
+        // Buscar una versión browser-compatible si está disponible
+        const browserCompatibleEntry = findBrowserCompatibleVersion(
+            moduleDir,
+            entryPoint,
+        );
+        if (browserCompatibleEntry && browserCompatibleEntry !== entryPoint) {
+            finalPath = join(moduleDir, browserCompatibleEntry);
+            if (env.VERBOSE === 'true') {
+                logger.info(
+                    `Usando versión browser-compatible para ${moduleName}: ${browserCompatibleEntry}`,
+                );
+            }
+        }
 
         // Si es ESM, verificar si hay imports privados que necesiten ser resueltos
         if (isESM && packageJson.imports) {
