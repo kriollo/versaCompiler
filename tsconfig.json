@@ -4,7 +4,7 @@
         "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo",
         "noEmitOnError": true,
         //comentario para probar si parsea bien el tsconfig.json
-        "strict": false,
+        "strict": true,
         "noImplicitAny": true,
         "strictNullChecks": true,
         "strictFunctionTypes": true,
@@ -40,7 +40,7 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
-        "types": ["vue", "jest", "node"],
+        "types": ["jest", "node"],
         "jsx": "preserve"
     },
     "vueCompilerOptions": {

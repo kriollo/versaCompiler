@@ -16,7 +16,7 @@
     ],
     "type": "module",
     "scripts": {
-        "dev": "tsx --watch src/main.ts --watch",
+        "dev": "tsx --watch src/main.ts --watch --verbose",
         "start": "tsx --watch src/main.ts --watch",
         "compile": "tsx src/main.ts --all",
         "test": "jest --config jest.config.js",

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { env } from 'node:process';
 
 import * as ts from 'typescript';
 
@@ -333,22 +334,30 @@ export const preCompileTS = async (
         // Configurar opciones del compilador
         const compilerOptions: ts.CompilerOptions = {
             ...parsedConfig.options,
-        }; // 1. Primero, validar tipos usando Language Service para validación completa
-        const typeCheckResult = validateTypesWithLanguageService(
-            fileName,
-            data,
-            compilerOptions,
-        );
-        if (typeCheckResult.hasErrors) {
-            // Crear un mensaje de error más limpio y estructurado
-            const errorMessage = createUnifiedErrorMessage(
-                parseTypeScriptErrors(
-                    typeCheckResult.diagnostics,
-                    fileName,
-                    data,
-                ),
+        };
+
+        if (env.typeCheck === 'true') {
+            // 1. Primero, validar tipos usando Language Service para validación completa
+            const typeCheckResult = validateTypesWithLanguageService(
+                fileName,
+                data,
+                compilerOptions,
             );
-            return { error: new Error(errorMessage), data: null, lang: 'ts' };
+            if (typeCheckResult.hasErrors) {
+                // Crear un mensaje de error más limpio y estructurado
+                const errorMessage = createUnifiedErrorMessage(
+                    parseTypeScriptErrors(
+                        typeCheckResult.diagnostics,
+                        fileName,
+                        data,
+                    ),
+                );
+                return {
+                    error: new Error(errorMessage),
+                    data: null,
+                    lang: 'ts',
+                };
+            }
         }
 
         // 2. Si la validación de tipos pasa, usar transpileModule para generación de código

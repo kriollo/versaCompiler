@@ -75,7 +75,15 @@ async function main() {
             type: 'boolean',
             description: 'Ejecutar solo el linter, sin compilar',
             default: false,
-        });
+        })
+        .alias('l', 'lint-only')
+        .option('typeCheck', {
+            type: 'boolean',
+            description:
+                'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=true',
+            default: false,
+        })
+        .alias('t', 'typeCheck');
 
     // Definir la opción tailwind dinámicamente
     // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
@@ -139,6 +147,8 @@ async function main() {
         logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}\n`));
         logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
         logger.info(chalk.green(`Clean: ${argv.clean}`));
+        logger.info(chalk.green(`Type Check: ${argv.typeCheck}`));
+        env.typeCheck = argv.typeCheck ? 'true' : 'false';
 
         env.clean = 'false';
         env.yes = argv.y ? 'true' : 'false';

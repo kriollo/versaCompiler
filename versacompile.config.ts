@@ -7,6 +7,7 @@ export default {
         pathsAlias: {
             '@/*': ['examples/*'],
             'P@/*': ['public/*'],
+            'e@/*': ['examples/*'],
         },
     },
     proxyConfig: {
