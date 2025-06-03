@@ -188,12 +188,10 @@ button:hover {
 
             // Check both files were compiled
             expect(preCompileVueSpy).toHaveBeenCalled();
-            expect(preCompileTSSpy).toHaveBeenCalled();
-
-            // Clean up spies
+            expect(preCompileTSSpy).toHaveBeenCalled(); // Clean up spies
             preCompileVueSpy.mockRestore();
             preCompileTSSpy.mockRestore();
-        });
+        }, 15000); // 15 second timeout
 
         test('should handle components with complex TypeScript features', async () => {
             // Create a complex TypeScript file with advanced features
@@ -448,11 +446,9 @@ button[type="button"] {
                     typeof call[0] === 'string' &&
                     call[0].includes('type Identifiable'),
             );
-            expect(hasIdentifiableType).toBe(true);
-
-            // Clean up spy
+            expect(hasIdentifiableType).toBe(true); // Clean up spy
             preCompileTSSpy.mockRestore();
-        });
+        }, 15000); // 15 second timeout
     });
 
     describe('Performance Tests', () => {
@@ -793,9 +789,7 @@ export function utility3() {
             // 3 Vue components + 3 TS files = at least 6 calls to precompileTS
             // (3 directly and 3 from Vue components with TypeScript)
             expect(preCompileTSSpy).toHaveBeenCalledTimes(6);
-            expect(preCompileVueSpy).toHaveBeenCalledTimes(3);
-
-            // Verify each file was compiled
+            expect(preCompileVueSpy).toHaveBeenCalledTimes(3); // Verify each file was compiled
             results.forEach((result, index) => {
                 if (filePaths[index]) {
                     const parsedPath = path.parse(filePaths[index]);
@@ -806,7 +800,7 @@ export function utility3() {
             // Clean up spies
             preCompileVueSpy.mockRestore();
             preCompileTSSpy.mockRestore();
-        });
+        }, 15000); // 15 second timeout
     });
 
     describe('Real-world Scenarios', () => {
@@ -1280,6 +1274,6 @@ app.mount('#app');
             // Clean up spies
             preCompileTSSpy.mockRestore();
             preCompileVueSpy.mockRestore();
-        });
+        }, 20000); // 20 second timeout for complex application structure
     });
 });

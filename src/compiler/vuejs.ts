@@ -287,18 +287,19 @@ export const preCompileVue = async (
         const sanitizedFileName =
             fileName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') ||
             'component';
-        const componentName = `${sanitizedFileName}_component`;
-
-        // Verificar si ya existe una propiedad 'name' en el output
+        const componentName = `${sanitizedFileName}_component`;        // Verificar si ya existe una propiedad 'name' en el output
         const hasNameProperty = /name\s*:\s*['"`]/.test(output);
+
+        // Verificar si ya existe una propiedad 'components' en el output
+        const hasComponentsProperty = /components\s*:\s*\{/.test(output);
 
         const exportComponent = `
                 __file: '${source}',
                 __name: '${fileName}',
                 ${hasNameProperty ? '' : `name: '${fileName}',`}
-                components: {
+                ${hasComponentsProperty ? '' : `components: {
                     ${components.map(comp => `${comp}`).join(',\n                    ')}
-                },
+                },`}
             `;
 
         // MEJORAR: Manejo más robusto de export default
