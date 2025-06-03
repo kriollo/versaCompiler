@@ -1,14 +1,25 @@
-import { hideErrorOverlay, showErrorOverlay } from './hrm/errorScreen.js';
-import obtenerInstanciaVue from './hrm/getInstanciaVue.js';
-import { reloadComponent } from './hrm/VueHRM.js';
+/**
+ * @fileoverview Inicialización del sistema Hot Module Replacement (HMR) para VersaCompiler
+ * Este archivo maneja la conexión con BrowserSync y configura los listeners para HMR de Vue
+ */
 
+import { hideErrorOverlay, showErrorOverlay } from './errorScreen.js';
+import obtenerInstanciaVue from './getInstanciaVue.js';
+import { reloadComponent } from './VueHRM.js';
+
+/**
+ * Inicializa la conexión socket con BrowserSync y configura los listeners para HMR
+ * @param {number} [retries=0] - Número de reintentos realizados
+ * @returns {Promise<void>} Promise que se resuelve cuando la conexión está configurada
+ */
 async function initSocket(retries = 0) {
     const maxRetries = 10;
-    const retryDelay = Math.min(2000 * (retries + 1), 10000); // backoff hasta 10s
+    const retryDelay = Math.min(2000 * (retries + 1), 10000); // Backoff exponencial hasta 10s
 
+    // Verificar si BrowserSync está disponible y tiene socket
     if (window.___browserSync___ && window.___browserSync___.socket) {
         const socket = window.___browserSync___.socket;
-        let connected = socket.connected; // Verificar estado inicial
+        let connected = socket.connected; // Verificar estado inicial de conexión
 
         // Limpiar listeners previos para evitar duplicados
         socket.off('connect');
@@ -18,21 +29,20 @@ async function initSocket(retries = 0) {
         socket.off('HRMHelper');
         socket.off('error');
 
-        // Listener para conexión
+        // Configurar listener para eventos de conexión
         socket.on('connect', async () => {
             connected = true;
             hideErrorOverlay();
             console.log('✔️ Versa HMR: Socket conectado');
         });
 
-        // Listener para desconexión
+        // Configurar listener para eventos de desconexión
         socket.on('disconnect', () => {
             connected = false;
             console.log('❌ Versa HMR: Socket desconectado, reintentando...');
-            // La lógica de reintentos original para desconexión
+            // Lógica de reintentos para desconexión
             setTimeout(() => {
                 if (!socket.connected && retries < maxRetries) {
-                    // Usar socket.connected aquí
                     initSocket(retries + 1);
                 } else if (!socket.connected) {
                     console.error(
@@ -46,10 +56,11 @@ async function initSocket(retries = 0) {
             }, retryDelay);
         });
 
-        socket.on('reloadFull', () => window.location.reload());
-
-        // Obtener la instancia de Vue con toda la lógica integrada
+        // Configurar listener para recarga completa
+        socket.on('reloadFull', () => window.location.reload()); // Obtener la instancia de Vue con toda la lógica integrada
         let vueInstance = await obtenerInstanciaVue();
+
+        // Configurar listener para HMR de componentes Vue
         socket.on('HRMVue', async data => {
             vueInstance = window.__VUE_APP__ || vueInstance;
             if (vueInstance) {
@@ -59,19 +70,20 @@ async function initSocket(retries = 0) {
                 console.log('🔄 Usando método fallback:', vueInstance);
             }
         });
+
+        // Configurar listener para datos auxiliares de HMR
         socket.on('HRMHelper', data => {
             console.log('Versa HMR: Recibiendo datos de HMR:', data);
         });
 
+        // Configurar listener para errores de socket
         socket.on('error', err => {
             console.error('❌ Versa HMR: Error en el socket:', err);
             showErrorOverlay(
                 'Error de Socket',
                 'Se produjo un error en la conexión de BrowserSync.',
             );
-        });
-
-        // Watchdog para la conexión inicial si el socket existe pero no está conectado
+        }); // Watchdog para verificar conexión inicial si el socket existe pero no está conectado
         if (!connected) {
             console.log(
                 `Versa HMR: Objeto socket encontrado, intentando conexión (Intento ${
@@ -96,6 +108,7 @@ async function initSocket(retries = 0) {
             }, 5000); // Timeout de 5s para el watchdog inicial
         }
     } else {
+        // BrowserSync no está disponible, intentar reinicializar
         console.warn(
             `[HMR] Socket de BrowserSync no encontrado o BrowserSync no completamente inicializado. Reintentando initSocket... (${
                 retries + 1
@@ -114,4 +127,6 @@ async function initSocket(retries = 0) {
         }
     }
 }
+
+// Inicializar el sistema HMR al cargar el script
 initSocket();
