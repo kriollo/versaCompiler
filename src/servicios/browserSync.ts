@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { env } from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import browserSync from 'browser-sync';
 import chalk from 'chalk';
@@ -24,6 +25,18 @@ export async function browserSyncServer() {
                 proxy: env.proxyUrl,
             };
         }
+
+        //obtener información de rutas del proyecto
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        // Ir un nivel atrás desde src/servicios/ para llegar a src/
+        const srcDir = path.dirname(__dirname);
+
+        // Ahora llegar a la carpeta hrm que está en src/hrm
+        const hrmDir = path.join(srcDir, 'hrm');
+        // Si necesitas la ruta relativa desde la raíz del proyecto
+        const projectRoot = process.cwd();
+        const relativeHrmPath = path.relative(projectRoot, hrmDir);
 
         bs = browserSync.create();
         const port = await getPort({ port: 3000 });
@@ -85,8 +98,8 @@ export async function browserSyncServer() {
                     if (req.url === '/__versa/initHRM.js') {
                         // Busca vueLoader.js en la carpeta de salida configurada
                         const vueLoaderPath = path.join(
-                            env.PATH_PROY || '',
-                            'dist/hrm/initHRM.js',
+                            relativeHrmPath,
+                            '/initHRM.js',
                         );
                         res.setHeader('Content-Type', 'application/javascript');
                         try {
@@ -108,11 +121,10 @@ export async function browserSyncServer() {
                     }
 
                     // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
-                    if (req.url.startsWith('/__versa/hrm/')) {
+                    if (req.url.startsWith('/__versa/')) {
                         // Sirve archivos de dist/hrm como /__versa/hrm/*
                         const filePath = path.join(
-                            env.PATH_PROY || '',
-                            'dist',
+                            relativeHrmPath,
                             req.url.replace('/__versa/', ''),
                         );
                         res.setHeader('Content-Type', 'application/javascript');
@@ -136,10 +148,7 @@ export async function browserSyncServer() {
 
                     // Si la URL comienza con /node_modules/, sirve los archivos de node_modules
                     if (req.url.startsWith('/node_modules/')) {
-                        const modulePath = path.join(
-                            process.cwd(),
-                            req.url,
-                        );
+                        const modulePath = path.join(process.cwd(), req.url);
                         res.setHeader('Content-Type', 'application/javascript');
                         try {
                             const fileContent = await fs.readFile(
