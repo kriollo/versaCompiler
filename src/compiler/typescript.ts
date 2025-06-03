@@ -295,7 +295,8 @@ export const validateVueTypes = (
 export const preCompileTS = async (
     data: string,
     fileName: string,
-): Promise<CompileResult> => {    try {
+): Promise<CompileResult> => {
+    try {
         // Si el código está vacío (sin contenido), devolver cadena vacía
         if (!data.trim()) {
             return { error: null, data: data, lang: 'ts' };
@@ -357,7 +358,7 @@ export const preCompileTS = async (
             reportDiagnostics: true, // Importante: ahora sí queremos los diagnostics
             transformers: undefined,
             moduleName: path.basename(fileName, path.extname(fileName)),
-        });        // Si transpileModule retorna diagnostics de error, reportar como error
+        }); // Si transpileModule retorna diagnostics de error, reportar como error
         if (
             transpileResult.diagnostics &&
             transpileResult.diagnostics.length > 0
