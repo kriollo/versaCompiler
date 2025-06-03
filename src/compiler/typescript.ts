@@ -188,9 +188,7 @@ const validateTypesWithLanguageService = (
             const allDiagnostics = [
                 ...syntacticDiagnostics,
                 ...semanticDiagnostics,
-            ];
-
-            // Filtrar diagnósticos relevantes
+            ]; // Filtrar diagnósticos relevantes
             const filteredDiagnostics = allDiagnostics.filter(
                 (diag: ts.Diagnostic) => {
                     const messageText = ts.flattenDiagnosticMessageText(
@@ -297,11 +295,10 @@ export const validateVueTypes = (
 export const preCompileTS = async (
     data: string,
     fileName: string,
-): Promise<CompileResult> => {
-    try {
-        // Si el código está vacío, devolver cadena vacía
+): Promise<CompileResult> => {    try {
+        // Si el código está vacío (sin contenido), devolver cadena vacía
         if (!data.trim()) {
-            return { error: null, data: '', lang: 'ts' };
+            return { error: null, data: data, lang: 'ts' };
         }
 
         // Buscar tsconfig.json en el directorio del archivo o sus padres
@@ -360,15 +357,58 @@ export const preCompileTS = async (
             reportDiagnostics: true, // Importante: ahora sí queremos los diagnostics
             transformers: undefined,
             moduleName: path.basename(fileName, path.extname(fileName)),
-        });
-
-        // Si transpileModule retorna diagnostics de error, reportar como error
+        });        // Si transpileModule retorna diagnostics de error, reportar como error
         if (
             transpileResult.diagnostics &&
             transpileResult.diagnostics.length > 0
         ) {
             const errorDiagnostics = transpileResult.diagnostics.filter(
-                d => d.category === ts.DiagnosticCategory.Error,
+                (d: ts.Diagnostic) => {
+                    if (d.category !== ts.DiagnosticCategory.Error) {
+                        return false;
+                    }
+
+                    const messageText = ts.flattenDiagnosticMessageText(
+                        d.messageText,
+                        '\n',
+                    );
+
+                    // Aplicar el mismo filtro que en Language Service
+                    return (
+                        !messageText.includes('Cannot find module') &&
+                        !messageText.includes('Could not find source file') &&
+                        !messageText.includes(
+                            "Parameter '$props' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '$setup' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '$data' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '$options' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '$event' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '_ctx' implicitly has an 'any' type",
+                        ) &&
+                        !messageText.includes(
+                            "Parameter '_cache' implicitly has an 'any' type",
+                        ) &&
+                        !(
+                            messageText.includes(
+                                "implicitly has an 'any' type",
+                            ) &&
+                            (messageText.includes('_ctx') ||
+                                messageText.includes('_cache') ||
+                                messageText.includes('$props') ||
+                                messageText.includes('$setup'))
+                        )
+                    );
+                },
             );
             if (errorDiagnostics.length > 0) {
                 const cleanErrors = parseTypeScriptErrors(

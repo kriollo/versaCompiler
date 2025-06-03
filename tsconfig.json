@@ -20,8 +20,8 @@
         "checkJs": true,
         "allowImportingTsExtensions": true,
         "noEmit": true,
-        "module": "ESNext",
-        "target": "ESNext",
+        "module": "esnext",
+        "target": "es2022",
         "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
         "sourceMap": true,
@@ -40,7 +40,7 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
-        "types": ["vue"],
+        "types": ["vue", "jest", "node"],
         "jsx": "preserve"
     },
     "vueCompilerOptions": {

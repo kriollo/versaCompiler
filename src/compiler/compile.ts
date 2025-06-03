@@ -10,7 +10,6 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { env } from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import chalk from 'chalk';
 
@@ -58,25 +57,25 @@ interface CacheEntry {
 }
 
 // Obtener __dirname de manera compatible con CommonJS y ES modules
-let __dirname: string;
-try {
-    // Intentar primero con ES modules si está disponible
-    if (typeof import.meta !== 'undefined' && import.meta.url) {
-        __dirname = path.dirname(fileURLToPath(import.meta.url));
-    } else {
-        throw new Error('import.meta no disponible');
-    }
-} catch {
-    // Fallback para CommonJS o cuando import.meta no está disponible
-    try {
-        __dirname = path.dirname(require.resolve('./compile.ts'));
-    } catch {
-        // Último fallback usando process.cwd()
-        __dirname = process.cwd();
+let pathName: string;
+
+// Estrategia 1: Intentar con __filename (disponible en CommonJS y en ts-jest)
+// @ts-ignore - Suprime advertencia de TypeScript sobre __filename en ESM
+if (typeof __filename !== 'undefined') {
+    pathName = path.dirname(__filename);
+} else {
+    pathName = process.cwd();
+
+    // Solo mostrar warning en producción, no en tests
+    if (process.env.NODE_ENV !== 'test') {
+        logger.warn(
+            'Usando process.cwd() como __dirname. El cache se guardará en el directorio de trabajo actual.',
+        );
     }
 }
+
 const compilationCache = new Map<string, CacheEntry>();
-const CACHE_DIR = path.join(__dirname, '.cache');
+const CACHE_DIR = path.join(pathName, '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {

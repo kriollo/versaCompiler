@@ -1,0 +1,82 @@
+{
+  "./examples\\js\\module\\modals\\ModalSobreModal.vue": {
+    "hash": "f6d4e2175ebd03de6a205e5d27ca00c7",
+    "mtime": 1748277303461.7644,
+    "outputPath": "public/js/module/modals/ModalSobreModal.js"
+  },
+  "./examples\\js\\sampleFile.ts": {
+    "hash": "a55b80875fd536577bb5c5538c82a882",
+    "mtime": 1748009400414.519,
+    "outputPath": "public/js/sampleFile.js"
+  },
+  "./examples\\js\\vue-loader.ts": {
+    "hash": "5138a5e7224905d759c5462e63c0caeb",
+    "mtime": 1748721013311.0344,
+    "outputPath": "public/js/vue-loader.js"
+  },
+  "./examples\\js\\module\\simpleComponent.vue": {
+    "hash": "f53497e332b254ec501bef812d11ea70",
+    "mtime": 1748726029789.749,
+    "outputPath": "public/js/module/simpleComponent.js"
+  },
+  "./examples\\js\\devUtils.ts": {
+    "hash": "c7d8f7e5cfd25f5d4cd2708297547d9c",
+    "mtime": 1748714679541.7222,
+    "outputPath": "public/js/devUtils.js"
+  },
+  "./examples\\js\\module\\appLoader.vue": {
+    "hash": "bda9be3c809cfea826a0b30ff1e3a9eb",
+    "mtime": 1748441974291.4866,
+    "outputPath": "public/js/module/appLoader.js"
+  },
+  "./examples\\js\\module\\modals\\primerModal.vue": {
+    "hash": "4a2e61b6d6a98a0bae0dbbf231c968d6",
+    "mtime": 1748277303461.7644,
+    "outputPath": "public/js/module/modals/primerModal.js"
+  },
+  "./examples\\js\\module\\operacionesMatematicas.vue": {
+    "hash": "a6c6c6954db0645acc433d7d3bc2f03a",
+    "mtime": 1748614652392.213,
+    "outputPath": "public/js/module/operacionesMatematicas.js"
+  },
+  "./examples\\js\\examples\\InjectKeys.js": {
+    "hash": "abdf8022ce548b5f8bd71d379c4f0b12",
+    "mtime": 1748713755723.298,
+    "outputPath": "public/js/examples/InjectKeys.js"
+  },
+  "./examples\\js\\examples\\dashboard.js": {
+    "hash": "f49dd638e88e75290e61847232bcf158",
+    "mtime": 1748883172153.255,
+    "outputPath": "public/js/examples/dashboard.js"
+  },
+  "./examples\\js\\examples\\test-errors.js": {
+    "hash": "b9fb0ed54ca5e70fc0f25b27f6eda62e",
+    "mtime": 1748785500327.2188,
+    "outputPath": "public/js/examples/test-errors.js"
+  },
+  "./examples\\js\\examples\\useValidFile.js": {
+    "hash": "b93acc20f12174677f25ceb713da3bbd",
+    "mtime": 1747964795527.1716,
+    "outputPath": "public/js/examples/useValidFile.js"
+  },
+  "./examples\\js\\examples\\useXlsx.js": {
+    "hash": "fac932442bd26e2de6e573cb9df1eca0",
+    "mtime": 1747964800129.8975,
+    "outputPath": "public/js/examples/useXlsx.js"
+  },
+  "./examples\\js\\examples\\simple-test.vue": {
+    "hash": "99182458b4d5188316f9965ce34dabe9",
+    "mtime": 1748883184972.1216,
+    "outputPath": "public/js/examples/simple-test.js"
+  },
+  "./examples\\js\\components\\lineHr.vue": {
+    "hash": "3bb1ce674b9b55d8126b827a02316649",
+    "mtime": 1748374480612.2886,
+    "outputPath": "public/js/components/lineHr.js"
+  },
+  "./examples\\js\\components\\loader.vue": {
+    "hash": "fba01fd4acca22d3f00e91c7b83c3d57",
+    "mtime": 1748010895963.445,
+    "outputPath": "public/js/components/loader.js"
+  }
+}
