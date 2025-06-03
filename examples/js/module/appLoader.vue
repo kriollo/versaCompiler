@@ -1,10 +1,10 @@
 <script setup lang="ts">
     import { nextTick, onMounted, ref } from 'vue';
 
-    import lineHr from '@/js/components/lineHr.vue';
-    import loader from '@/js/components/loader.vue';
-    import primerModal from '@/js/module/modals/primerModal.vue';
-    import simpleComponent from '@/js/module/simpleComponent.vue';
+    import lineHr from 'e@/js/components/lineHr.vue';
+    import loader from 'e@/js/components/loader.vue';
+    import primerModal from 'e@/js/module/modals/primerModal.vue';
+    import simpleComponent from 'e@/js/module/simpleComponent.vue';
 
     const showLocalModal = ref(false);
     const isDark = ref(false);

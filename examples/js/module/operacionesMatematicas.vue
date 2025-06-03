@@ -2,7 +2,7 @@
     import { onMounted, ref, toRefs, type Ref } from 'vue';
 
     import lineHr from '@/js/components/lineHr.vue';
-    import { add, multiply, subtract } from '@/js/sampleFile';
+    import { add, multiply, subtract } from 'e@/js/sampleFile';
 
     type Props = {
         message: string;
