@@ -2,20 +2,53 @@
 import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
 
-import chalk from 'chalk';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-
-import { compileFile, initCompileAll, runLinter } from './compiler/compile';
-import { browserSyncServer } from './servicios/browserSync';
-import { cleanOutputDir, initChokidar } from './servicios/chokidar';
+// Lazy loading optimizations - Only import lightweight modules synchronously
 import { logger } from './servicios/logger';
-import { initConfig, readConfig } from './servicios/readConfig';
+import { readConfig } from './servicios/readConfig';
+
+// Heavy dependencies will be loaded dynamically when needed
+let chalk: any;
+let yargs: any;
+let hideBin: any;
 
 // Obtener el directorio del archivo actual (dist/)
 env.PATH_PROY = process.cwd();
 
 env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
+
+// Lazy loading helper functions
+async function loadChalk() {
+    if (!chalk) {
+        chalk = (await import('chalk')).default;
+    }
+    return chalk;
+}
+
+async function loadYargs() {
+    if (!yargs) {
+        const yargsModule = await import('yargs');
+        const helpersModule = await import('yargs/helpers');
+        yargs = yargsModule.default;
+        hideBin = helpersModule.hideBin;
+    }
+    return { yargs, hideBin };
+}
+
+async function loadCompilerModule() {
+    return await import('./compiler/compile');
+}
+
+async function loadBrowserSyncModule() {
+    return await import('./servicios/browserSync');
+}
+
+async function loadChokidarModule() {
+    return await import('./servicios/chokidar');
+}
+
+async function loadConfigModule() {
+    return await import('./servicios/readConfig');
+}
 
 function stopCompile() {
     logger.info('VersaCompiler cerrado correctamente');
@@ -26,7 +59,11 @@ async function main() {
         process.exit(1);
     }
 
-    let yargInstance = yargs(hideBin(process.argv))
+    // Load yargs dynamically
+    const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
+    const chalk = await loadChalk();
+
+    let yargInstance = yargsInstance(hideBinFn(process.argv))
         .scriptName('versa')
         .usage(
             chalk.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
@@ -122,9 +159,9 @@ async function main() {
                 chalk.blue('VersaCompiler') +
                 ' - Servidor de Desarrollo HRM y compilador de archivos Vue/ts/js\n\n',
         );
-
         if (argv.init) {
             logger.info('Iniciando la configuración...');
+            const { initConfig } = await loadConfigModule();
             await initConfig();
             process.exit(0);
         }
@@ -154,11 +191,13 @@ async function main() {
         env.yes = argv.y ? 'true' : 'false';
         if (argv.clean) {
             env.clean = 'true';
+            const { cleanOutputDir } = await loadChokidarModule();
             await cleanOutputDir(env.PATH_OUTPUT || './dist');
         }
 
         if (argv['lint-only']) {
             logger.info(chalk.yellow('🔍 Ejecutando solo linting...'));
+            const { runLinter } = await loadCompilerModule();
             const lintResult = await runLinter(true);
             if (lintResult) {
                 logger.info(
@@ -178,6 +217,7 @@ async function main() {
             );
 
             const fs = await import('node:fs/promises');
+            const { compileFile } = await loadCompilerModule();
             let hasErrors = false;
 
             for (const file of argv.files) {
@@ -208,13 +248,13 @@ async function main() {
 
             process.exit(hasErrors ? 1 : 0);
         }
-
         if (argv.file) {
             // Compilar archivo individual
             logger.info(chalk.yellow(`📄 Compilando archivo: ${argv.file}`));
 
             // Verificar si el archivo existe
             const fs = await import('node:fs/promises');
+            const { compileFile } = await loadCompilerModule();
             let absolutePathFile: string;
             try {
                 await fs.access(argv.file);
@@ -243,8 +283,8 @@ async function main() {
                 process.exit(1);
             }
         }
-
         if (argv.all) {
+            const { initCompileAll } = await loadCompilerModule();
             await initCompileAll();
             process.exit(0);
         }
@@ -252,6 +292,9 @@ async function main() {
         let bs: any;
         let watch: any;
         if (argv.watch) {
+            const { browserSyncServer } = await loadBrowserSyncModule();
+            const { initChokidar } = await loadChokidarModule();
+
             bs = await browserSyncServer();
             if (!bs) {
                 process.exit(1);
@@ -279,6 +322,7 @@ async function main() {
         });
         if (!argv.watch) {
             if (env.ENABLE_LINTER === 'true') {
+                const { runLinter } = await loadCompilerModule();
                 await runLinter(true);
                 process.exit(1);
             }

@@ -47,9 +47,48 @@ export const preCompileVue = async (
     data: string | null;
     lang: 'ts' | 'js' | null;
 }> => {
+    console.log(
+        `[DEBUG VUE] ENTRY POINT - preCompileVue called for: ${source}`,
+    );
+    console.log(
+        `[DEBUG VUE] ENTRY POINT - data type: ${typeof data}, data length: ${data?.length || 'N/A'}`,
+    );
+    console.log(`[DEBUG VUE] ENTRY POINT - source type: ${typeof source}`);
+    console.log(`[DEBUG VUE] ENTRY POINT - isProd: ${isProd}`);
+
     try {
+        if (process.env.VERBOSE === 'true') {
+            console.log(`[DEBUG VUE] Iniciando preCompileVue para: ${source}`);
+        }
+
         const fileName = path.basename(source).replace('.vue', '');
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(`[DEBUG VUE] Nombre de archivo extraído: ${fileName}`);
+        }
+
+        if (!data || data.trim().length === 0) {
+            if (process.env.VERBOSE === 'true') {
+                console.log(`[DEBUG VUE] Archivo vacío para: ${source}`);
+            }
+            return {
+                error: null,
+                data: 'export default {};',
+                lang: 'js',
+            };
+        }
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Procesando archivo con ${data.length} caracteres`,
+            );
+        }
         if (!isProd) {
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Modo desarrollo - agregando HMR content`,
+                );
+            }
             // Verificar si ya existe una importación de ref desde vue de manera más precisa
             const vueImportPattern =
                 /import\s*\{[^}]*\bref\b[^}]*\}\s*from\s*['"]vue['"]/;
@@ -87,30 +126,51 @@ export const preCompileVue = async (
             );
         }
 
+        if (process.env.VERBOSE === 'true') {
+            console.log(`[DEBUG VUE] Iniciando parsing del componente Vue`);
+        }
+
         const { descriptor, errors } = vCompiler.parse(data, {
             filename: fileName,
             sourceMap: !isProd,
             sourceRoot: path.dirname(source),
         });
 
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Parse completado, errores: ${errors.length}`,
+            );
+        }
         if (errors.length) {
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Error en parsing: ${errors.map(e => e.message).join(', ')}`,
+                );
+            }
             throw new Error(
                 `Error al analizar el componente Vue ${source}:\n${errors.map(e => e.message).join('\n')}`,
             );
         }
-
         const id = Math.random().toString(36).slice(2, 12);
         const scopeId = descriptor.styles.some(s => s.scoped)
             ? `data-v-${id}`
             : null;
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(`[DEBUG VUE] ID generado: ${id}, scopeId: ${scopeId}`);
+        }
 
         // --- 1. Compilación del Script ---
         let scriptContent: string;
         let scriptLang: 'ts' | 'js' = 'js';
         let scriptBindings: vCompiler.BindingMetadata | undefined;
         let scriptType: 'script' | 'scriptSetup' | undefined;
-
         if (descriptor.script || descriptor.scriptSetup) {
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Compilando script - tiene script: ${!!descriptor.script}, tiene scriptSetup: ${!!descriptor.scriptSetup}`,
+                );
+            }
             scriptType = descriptor.script ? 'script' : 'scriptSetup';
             const scriptToCompile =
                 descriptor.script || descriptor.scriptSetup!;
@@ -135,11 +195,16 @@ export const preCompileVue = async (
                 },
                 customElement: false,
             };
-
             const compiledScriptResult = vCompiler.compileScript(
                 descriptor,
                 scriptCompileOptions,
             );
+
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Script compilado exitosamente, content length: ${compiledScriptResult.content.length}`,
+                );
+            }
 
             scriptContent = compiledScriptResult.content;
             scriptLang =
@@ -149,8 +214,17 @@ export const preCompileVue = async (
                     : 'js';
             scriptBindings = compiledScriptResult.bindings;
         } else {
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] No hay script, usando export default vacío`,
+                );
+            }
             scriptContent = 'export default {};';
             scriptLang = 'js';
+        }
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(`[DEBUG VUE] Iniciando parsing del script con parser`);
         }
 
         const ast = await parser(
@@ -158,6 +232,11 @@ export const preCompileVue = async (
             scriptContent,
             scriptLang,
         );
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Parser completado, errores AST: ${ast?.errors?.length || 0}`,
+            );
+        }
         if (ast?.errors.length > 0) {
             throw new Error(
                 `Error al analizar el script del componente Vue ${source}:\n${ast.errors
@@ -167,17 +246,26 @@ export const preCompileVue = async (
         }
         const components = await getComponentsVueMap(ast);
 
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Componentes encontrados: ${components.join(', ')}`,
+            );
+        }
+
         if (scriptBindings) {
             Object.keys(scriptBindings).forEach(key => {
                 if (components.includes(key)) {
                     delete scriptBindings[key];
                 }
             });
-        }
-
-        // --- 2. Compilación de la Plantilla (CORREGIDA) ---
+        } // --- 2. Compilación de la Plantilla (CORREGIDA) ---
         let templateCode = '';
         if (descriptor.template) {
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Compilando template, content length: ${descriptor.template.content.length}`,
+                );
+            }
             const templateCompileOptions: vCompiler.SFCTemplateCompileOptions =
                 {
                     source: descriptor.template.content,
@@ -201,10 +289,15 @@ export const preCompileVue = async (
                         directiveTransforms: {},
                     },
                 };
-
             const compiledTemplateResult = vCompiler.compileTemplate(
                 templateCompileOptions,
             );
+
+            if (process.env.VERBOSE === 'true') {
+                console.log(
+                    `[DEBUG VUE] Template compilado, errores: ${compiledTemplateResult.errors?.length || 0}`,
+                );
+            }
 
             // DEBUGGING: Verificar errores en template
             if (compiledTemplateResult.errors?.length > 0) {
@@ -213,9 +306,11 @@ export const preCompileVue = async (
                     compiledTemplateResult.errors,
                 );
             }
-
             templateCode = compiledTemplateResult.code;
         } else {
+            if (process.env.VERBOSE === 'true') {
+                console.log(`[DEBUG VUE] No hay template en el componente`);
+            }
             logger.warn(
                 chalk.yellow(
                     `Advertencia: El componente Vue ${source} no tiene una sección de plantilla.`,
@@ -287,7 +382,7 @@ export const preCompileVue = async (
         const sanitizedFileName =
             fileName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') ||
             'component';
-        const componentName = `${sanitizedFileName}_component`;        // Verificar si ya existe una propiedad 'name' en el output
+        const componentName = `${sanitizedFileName}_component`; // Verificar si ya existe una propiedad 'name' en el output
         const hasNameProperty = /name\s*:\s*['"`]/.test(output);
 
         // Verificar si ya existe una propiedad 'components' en el output
@@ -297,9 +392,13 @@ export const preCompileVue = async (
                 __file: '${source}',
                 __name: '${fileName}',
                 ${hasNameProperty ? '' : `name: '${fileName}',`}
-                ${hasComponentsProperty ? '' : `components: {
+                ${
+                    hasComponentsProperty
+                        ? ''
+                        : `components: {
                     ${components.map(comp => `${comp}`).join(',\n                    ')}
-                },`}
+                },`
+                }
             `;
 
         // MEJORAR: Manejo más robusto de export default
@@ -359,9 +458,14 @@ export const preCompileVue = async (
             ${scopeId ? `${componentName}.__scopeId = '${scopeId}';` : ''}
             ${customBlocks}
 
-            export default ${componentName};
-        `;
+            export default ${componentName};        `;
         output = `${output}\n${finishComponent}`;
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Finalizando preCompileVue exitosamente para: ${source}, output length: ${output.length}`,
+            );
+        }
 
         return {
             lang: finalCompiledScript.lang,
@@ -369,6 +473,23 @@ export const preCompileVue = async (
             data: output,
         };
     } catch (error) {
+        console.log(
+            `[DEBUG VUE] EXCEPTION CAUGHT in preCompileVue for: ${source}`,
+        );
+        console.log(`[DEBUG VUE] EXCEPTION type: ${typeof error}`);
+        console.log(
+            `[DEBUG VUE] EXCEPTION message: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        console.log(
+            `[DEBUG VUE] EXCEPTION stack: ${error instanceof Error ? error.stack : 'N/A'}`,
+        );
+
+        if (process.env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG VUE] Error en preCompileVue para ${source}:`,
+                error,
+            );
+        }
         logger.error('Vue compilation error:', error);
         return {
             lang: null,

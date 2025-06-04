@@ -297,34 +297,50 @@ export const preCompileTS = async (
     data: string,
     fileName: string,
 ): Promise<CompileResult> => {
+    console.log(
+        `[DEBUG TS] ENTRY POINT - preCompileTS called for: ${fileName}`,
+    );
+    console.log(
+        `[DEBUG TS] ENTRY POINT - data type: ${typeof data}, data length: ${data?.length || 'N/A'}`,
+    );
+    console.log(`[DEBUG TS] ENTRY POINT - fileName type: ${typeof fileName}`);
+
     try {
+        console.log(`[DEBUG TS] Iniciando preCompileTS para: ${fileName}`);
+
         // Si el código está vacío (sin contenido), devolver cadena vacía
         if (!data.trim()) {
+            console.log(`[DEBUG TS] Código vacío para: ${fileName}`);
             return { error: null, data: data, lang: 'ts' };
-        }
-
-        // Buscar tsconfig.json en el directorio del archivo o sus padres
+        } // Buscar tsconfig.json en el directorio del archivo o sus padres
         const fileDir = path.dirname(fileName);
+        console.log(`[DEBUG TS] Buscando tsconfig.json desde: ${fileDir}`);
         const configPath =
             ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
             path.resolve(process.cwd(), 'tsconfig.json');
 
         if (!configPath) {
+            console.log(
+                `[DEBUG TS] No se encontró tsconfig.json para: ${fileName}`,
+            );
             throw new Error('No se pudo encontrar tsconfig.json');
         }
 
-        // Cargar y parsear tsconfig.json
+        console.log(`[DEBUG TS] Usando tsconfig.json: ${configPath}`); // Cargar y parsear tsconfig.json
         const { config, error: configError } = ts.readConfigFile(
             configPath,
             ts.sys.readFile,
         );
         if (configError) {
+            console.log(
+                `[DEBUG TS] Error leyendo tsconfig.json: ${configError.messageText}`,
+            );
             throw new Error(
                 `Error al leer tsconfig.json: ${configError.messageText}`,
             );
         }
 
-        // Parsear la configuración
+        console.log(`[DEBUG TS] tsconfig.json leído correctamente`); // Parsear la configuración
         const parsedConfig = ts.parseJsonConfigFileContent(
             config,
             ts.sys,
@@ -336,7 +352,10 @@ export const preCompileTS = async (
             ...parsedConfig.options,
         };
 
+        console.log(`[DEBUG TS] Opciones del compilador configuradas`);
+
         if (env.typeCheck === 'true') {
+            console.log(`[DEBUG TS] Validando tipos para: ${fileName}`);
             // 1. Primero, validar tipos usando Language Service para validación completa
             const typeCheckResult = validateTypesWithLanguageService(
                 fileName,
@@ -344,6 +363,9 @@ export const preCompileTS = async (
                 compilerOptions,
             );
             if (typeCheckResult.hasErrors) {
+                console.log(
+                    `[DEBUG TS] Errores de tipos encontrados para: ${fileName}`,
+                );
                 // Crear un mensaje de error más limpio y estructurado
                 const errorMessage = createUnifiedErrorMessage(
                     parseTypeScriptErrors(
@@ -358,9 +380,11 @@ export const preCompileTS = async (
                     lang: 'ts',
                 };
             }
-        }
-
-        // 2. Si la validación de tipos pasa, usar transpileModule para generación de código
+            console.log(
+                `[DEBUG TS] Validación de tipos exitosa para: ${fileName}`,
+            );
+        } // 2. Si la validación de tipos pasa, usar transpileModule para generación de código
+        console.log(`[DEBUG TS] Transpilando módulo para: ${fileName}`);
         const transpileResult = ts.transpileModule(data, {
             compilerOptions,
             fileName,
@@ -434,16 +458,34 @@ export const preCompileTS = async (
                 };
             }
         }
-
         const output = transpileResult.outputText;
+        console.log(
+            `[DEBUG TS] Transpilación exitosa para: ${fileName}, output length: ${output.length}`,
+        );
 
         // Remover "export {};" si es la única línea
         if (output.trim() === 'export {};') {
+            console.log(
+                `[DEBUG TS] Resultado solo contiene export {}, devolviendo cadena vacía`,
+            );
             return { error: null, data: '', lang: 'ts' };
         }
-
+        console.log(
+            `[DEBUG TS] Finalizando preCompileTS exitosamente para: ${fileName}`,
+        );
         return { error: null, data: output, lang: 'ts' };
     } catch (error) {
+        console.log(
+            `[DEBUG TS] EXCEPTION CAUGHT in preCompileTS for: ${fileName}`,
+        );
+        console.log(`[DEBUG TS] EXCEPTION type: ${typeof error}`);
+        console.log(
+            `[DEBUG TS] EXCEPTION message: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        console.log(
+            `[DEBUG TS] EXCEPTION stack: ${error instanceof Error ? error.stack : 'N/A'}`,
+        );
+
         return {
             error:
                 error instanceof Error ? error : new Error('Error desconocido'),

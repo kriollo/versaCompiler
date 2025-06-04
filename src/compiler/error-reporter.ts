@@ -1,4 +1,104 @@
-import chalk from 'chalk';
+// Lazy loading optimizations - Only import lightweight modules synchronously
+
+// Heavy dependencies will be loaded dynamically when needed
+let chalk: any;
+
+// Función que proporciona chalk sin color como fallback
+function createChalkFallback() {
+    // Crear una función que siempre retorna el texto sin modificar
+    function createChainableFunction(): any {
+        const fn = (text: any) => String(text);
+
+        // Lista de métodos de chalk que deben ser encadenables
+        const methods = [
+            'reset',
+            'bold',
+            'dim',
+            'italic',
+            'underline',
+            'strikethrough',
+            'inverse',
+            'hidden',
+            'visible',
+            'black',
+            'red',
+            'green',
+            'yellow',
+            'blue',
+            'magenta',
+            'cyan',
+            'white',
+            'gray',
+            'grey',
+            'blackBright',
+            'redBright',
+            'greenBright',
+            'yellowBright',
+            'blueBright',
+            'magentaBright',
+            'cyanBright',
+            'whiteBright',
+            'bgBlack',
+            'bgRed',
+            'bgGreen',
+            'bgYellow',
+            'bgBlue',
+            'bgMagenta',
+            'bgCyan',
+            'bgWhite',
+            'bgGray',
+            'bgGrey',
+            'bgBlackBright',
+            'bgRedBright',
+            'bgGreenBright',
+            'bgYellowBright',
+            'bgBlueBright',
+            'bgMagentaBright',
+            'bgCyanBright',
+            'bgWhiteBright',
+        ];
+
+        // Añadir todos los métodos como propiedades que retornan nuevas funciones encadenables
+        methods.forEach(method => {
+            Object.defineProperty(fn, method, {
+                get() {
+                    return createChainableFunction();
+                },
+                enumerable: true,
+                configurable: true,
+            });
+        });
+        // Hacer que la función misma sea callable
+        return new Proxy(fn, {
+            apply(target, thisArg, argumentsList) {
+                return String(argumentsList[0] || '');
+            },
+            get(target, prop: string | symbol) {
+                // Verificar si es una propiedad de la función
+                if (typeof prop === 'string' || typeof prop === 'symbol') {
+                    // Si es un método de chalk, retorna una nueva función encadenable
+                    if (typeof prop === 'string' && methods.includes(prop)) {
+                        return createChainableFunction();
+                    }
+                    // Retornar propiedades existentes de la función
+                    return (target as any)[prop];
+                }
+                return undefined;
+            },
+        });
+    }
+
+    return createChainableFunction();
+}
+
+// Obtener chalk de forma síncrona con fallback
+function getChalkSync() {
+    if (!chalk) {
+        // Si no tenemos chalk cargado, usar fallback
+        chalk = createChalkFallback();
+    }
+    return chalk;
+}
 
 /**
  * Información detallada sobre un error de parsing
@@ -144,9 +244,7 @@ export class ErrorReporter {
         }
 
         return { line, column };
-    }
-
-    /**
+    } /**
      * Genera contexto del código alrededor del error
      */
     private generateCodeContext(
@@ -161,20 +259,22 @@ export class ErrorReporter {
             errorLine + this.options.contextLines,
         );
 
-        let context = '\n' + chalk.dim('Contexto del código:') + '\n';
+        const chalkSync = getChalkSync();
+        let context = '\n' + chalkSync.dim('Contexto del código:') + '\n';
 
         for (let i = startLine; i <= endLine; i++) {
             const lineContent = lines[i - 1] || '';
             const lineNumber = i.toString().padStart(3, ' ');
             const isErrorLine = i === errorLine;
-
             if (isErrorLine) {
                 if (this.options.colorize) {
-                    context += chalk.red(`${lineNumber} ❌ ${lineContent}\n`);
+                    context += chalkSync.red(
+                        `${lineNumber} ❌ ${lineContent}\n`,
+                    );
                     // Agregar flecha apuntando al error si tenemos la columna
                     if (errorColumn) {
                         const spaces = ' '.repeat(6 + (errorColumn - 1));
-                        const arrow = chalk.red('^');
+                        const arrow = chalkSync.red('^');
                         context += `${spaces}${arrow}\n`;
                     }
                 } else {
@@ -186,7 +286,7 @@ export class ErrorReporter {
                 }
             } else {
                 const prefix = this.options.colorize
-                    ? chalk.dim
+                    ? chalkSync.dim
                     : (s: string) => s;
                 context += prefix(`${lineNumber}    ${lineContent}\n`);
             }
@@ -240,19 +340,16 @@ export class ErrorReporter {
     ): string {
         if (!ourContext) {
             return oxcCodeframe;
-        }
-
-        // Si ya tenemos nuestro contexto, podemos agregar el de oxc como referencia adicional
+        } // Si ya tenemos nuestro contexto, podemos agregar el de oxc como referencia adicional
+        const chalkSync = getChalkSync();
         return (
             ourContext +
             '\n' +
-            chalk.dim('Codeframe de oxc-parser:') +
+            chalkSync.dim('Codeframe de oxc-parser:') +
             '\n' +
             oxcCodeframe
         );
-    }
-
-    /**
+    } /**
      * Formatea un error detallado como texto legible
      */
     formatError(error: DetailedParsingError): string {
@@ -260,17 +357,17 @@ export class ErrorReporter {
 
         // Encabezado del error
         const severity = error.severity.toUpperCase();
+        const chalkSync = getChalkSync();
         const severityColor =
             error.severity === 'error'
-                ? chalk.red
+                ? chalkSync.red
                 : error.severity === 'warning'
-                  ? chalk.yellow
-                  : chalk.blue;
-
+                  ? chalkSync.yellow
+                  : chalkSync.blue;
         if (this.options.colorize) {
             output +=
                 severityColor(`[${severity}]`) +
-                ` en ${chalk.cyan(error.file)}`;
+                ` en ${chalkSync.cyan(error.file)}`;
         } else {
             output += `[${severity}] en ${error.file}`;
         }
@@ -280,27 +377,22 @@ export class ErrorReporter {
             const location = error.column
                 ? `línea ${error.line}, columna ${error.column}`
                 : `línea ${error.line}`;
-
             if (this.options.colorize) {
-                output += ` (${chalk.dim(location)})`;
+                output += ` (${chalkSync.dim(location)})`;
             } else {
                 output += ` (${location})`;
             }
         }
 
-        output += '\n';
-
-        // Mensaje de error
+        output += '\n'; // Mensaje de error
         if (this.options.colorize) {
-            output += `💥 ${chalk.bold(error.message)}\n`;
+            output += `💥 ${chalkSync.bold(error.message)}\n`;
         } else {
             output += `💥 ${error.message}\n`;
-        }
-
-        // Código de error si está disponible
+        } // Código de error si está disponible
         if (error.errorCode) {
             if (this.options.colorize) {
-                output += chalk.dim(`   Código: ${error.errorCode}\n`);
+                output += chalkSync.dim(`   Código: ${error.errorCode}\n`);
             } else {
                 output += `   Código: ${error.errorCode}\n`;
             }
@@ -309,12 +401,10 @@ export class ErrorReporter {
         // Contexto del código
         if (error.codeContext) {
             output += error.codeContext;
-        }
-
-        // Sugerencia
+        } // Sugerencia
         if (error.suggestion) {
             if (this.options.colorize) {
-                output += `\n💡 ${chalk.yellow('Sugerencia:')} ${error.suggestion}\n`;
+                output += `\n💡 ${chalkSync.yellow('Sugerencia:')} ${error.suggestion}\n`;
             } else {
                 output += `\n💡 Sugerencia: ${error.suggestion}\n`;
             }
@@ -334,9 +424,7 @@ export class ErrorReporter {
         return errors.map(error =>
             this.analyzeParsingError(error, sourceCode, fileName),
         );
-    }
-
-    /**
+    } /**
      * Formatea múltiples errores como un reporte completo
      */
     formatMultipleErrors(errors: DetailedParsingError[]): string {
@@ -344,10 +432,11 @@ export class ErrorReporter {
             return 'No se encontraron errores.';
         }
 
+        const chalkSync = getChalkSync();
         let output = '';
 
         if (this.options.colorize) {
-            output += chalk.bold.red(
+            output += chalkSync.bold.red(
                 `\n🚨 Se encontraron ${errors.length} error(es) de parsing:\n\n`,
             );
         } else {
@@ -360,7 +449,7 @@ export class ErrorReporter {
             // Separador entre errores (excepto el último)
             if (index < errors.length - 1) {
                 if (this.options.colorize) {
-                    output += chalk.dim('─'.repeat(60)) + '\n\n';
+                    output += chalkSync.dim('─'.repeat(60)) + '\n\n';
                 } else {
                     output += '─'.repeat(60) + '\n\n';
                 }

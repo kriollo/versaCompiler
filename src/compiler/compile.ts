@@ -11,19 +11,112 @@ import os from 'node:os';
 import path from 'node:path';
 import { env } from 'node:process';
 
-import chalk from 'chalk';
-
+// Lazy loading optimizations - Only import lightweight modules synchronously
 import { logger } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
-import { ESLint, OxLint } from './linter';
-import { minifyJS } from './minify';
-import { getCodeFile } from './parser';
-import { generateTailwindCSS } from './tailwindcss';
-import { estandarizaCode } from './transforms';
-import { preCompileTS } from './typescript';
-import { preCompileVue } from './vuejs';
+// Heavy dependencies will be loaded dynamically when needed
+let chalk: any;
+let ESLint: any;
+let OxLint: any;
+let minifyJS: any;
+let getCodeFile: any;
+let generateTailwindCSS: any;
+let estandarizaCode: any;
+let preCompileTS: any;
+let preCompileVue: any;
+
+// Lazy loading helper functions
+async function loadChalk() {
+    if (!chalk) {
+        chalk = (await import('chalk')).default;
+    }
+    return chalk;
+}
+
+async function loadLinter() {
+    if (!ESLint || !OxLint) {
+        const linterModule = await import('./linter');
+        ESLint = linterModule.ESLint;
+        OxLint = linterModule.OxLint;
+    }
+    return { ESLint, OxLint };
+}
+
+async function loadMinify() {
+    if (!minifyJS) {
+        const minifyModule = await import('./minify');
+        minifyJS = minifyModule.minifyJS;
+    }
+    return minifyJS;
+}
+
+async function loadParser() {
+    if (!getCodeFile) {
+        const parserModule = await import('./parser');
+        getCodeFile = parserModule.getCodeFile;
+    }
+    return getCodeFile;
+}
+
+async function loadTailwind() {
+    if (!generateTailwindCSS) {
+        const tailwindModule = await import('./tailwindcss');
+        generateTailwindCSS = tailwindModule.generateTailwindCSS;
+    }
+    return generateTailwindCSS;
+}
+
+async function loadTransforms() {
+    if (!estandarizaCode) {
+        const transformsModule = await import('./transforms');
+        estandarizaCode = transformsModule.estandarizaCode;
+    }
+    return estandarizaCode;
+}
+
+async function loadTypeScript() {
+    if (!preCompileTS) {
+        if (env.VERBOSE === 'true') {
+            console.log('[DEBUG COMPILE] Cargando módulo TypeScript...');
+        }
+        const typescriptModule = await import('./typescript');
+        preCompileTS = typescriptModule.preCompileTS;
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] Módulo TypeScript cargado, preCompileTS is: ${typeof preCompileTS}`,
+            );
+        }
+    }
+    if (env.VERBOSE === 'true') {
+        console.log(
+            `[DEBUG COMPILE] Devolviendo preCompileTS: ${typeof preCompileTS}`,
+        );
+    }
+    return preCompileTS;
+}
+
+async function loadVue() {
+    if (!preCompileVue) {
+        if (env.VERBOSE === 'true') {
+            console.log('[DEBUG COMPILE] Cargando módulo Vue...');
+        }
+        const vueModule = await import('./vuejs');
+        preCompileVue = vueModule.preCompileVue;
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] Módulo Vue cargado, preCompileVue is: ${typeof preCompileVue}`,
+            );
+        }
+    }
+    if (env.VERBOSE === 'true') {
+        console.log(
+            `[DEBUG COMPILE] Devolviendo preCompileVue: ${typeof preCompileVue}`,
+        );
+    }
+    return preCompileVue;
+}
 
 // 🎯 Sistema Unificado de Manejo de Errores
 type CompilationMode = 'all' | 'individual' | 'watch';
@@ -195,13 +288,13 @@ function registerCompilationResult(
 /**
  * Maneja errores según el modo de compilación
  */
-function handleCompilationError(
+async function handleCompilationError(
     error: Error | string,
     fileName: string,
     stage: string,
     mode: CompilationMode,
     isVerbose: boolean = false,
-): void {
+): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : error;
     const errorDetails = error instanceof Error ? error.stack : undefined;
 
@@ -213,12 +306,11 @@ function handleCompilationError(
         'error',
         errorDetails,
     );
-    registerCompilationResult(stage, 1, 0, [fileName]);
-
-    // Mostrar error inmediatamente solo en modo individual y watch
+    registerCompilationResult(stage, 1, 0, [fileName]); // Mostrar error inmediatamente solo en modo individual y watch
     if (mode === 'individual' || mode === 'watch') {
+        const chalk = await loadChalk();
         const baseName = path.basename(fileName);
-        const stageColor = getStageColor(stage);
+        const stageColor = await getStageColor(stage);
 
         if (isVerbose) {
             // Modo verbose: Mostrar error completo con contexto
@@ -270,7 +362,11 @@ function clearCompilationState(): void {
 /**
  * Muestra un resumen detallado de todos los errores de compilación
  */
-function displayCompilationSummary(isVerbose: boolean = false): void {
+async function displayCompilationSummary(
+    isVerbose: boolean = false,
+): Promise<void> {
+    const chalk = await loadChalk();
+
     if (compilationErrors.length === 0 && compilationResults.length === 0) {
         logger.info(
             chalk.green('✅ No hay errores de compilación para mostrar.'),
@@ -284,7 +380,7 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
     if (compilationResults.length > 0) {
         logger.info(chalk.blue('\n🔍 Estadísticas por etapa:'));
 
-        compilationResults.forEach(result => {
+        for (const result of compilationResults) {
             const totalFiles = result.success + result.errors;
             const successRate =
                 totalFiles > 0
@@ -293,12 +389,12 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
 
             const statusIcon = result.errors === 0 ? '✅' : '❌';
             const statusColor = result.errors === 0 ? chalk.green : chalk.red;
-            const stageColor = getStageColor(result.stage);
+            const stageColor = await getStageColor(result.stage);
 
             logger.info(
                 `${statusIcon} ${stageColor(result.stage)}: ${statusColor(`${result.success} éxitos, ${result.errors} errores`)} (${successRate}% éxito)`,
             );
-        });
+        }
     }
 
     // Mostrar errores detallados
@@ -320,7 +416,7 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
 
         // Mostrar errores por archivo
         let fileIndex = 1;
-        errorsByFile.forEach((fileErrors, filePath) => {
+        for (const [filePath, fileErrors] of errorsByFile) {
             const baseName = path.basename(filePath);
             const errorCount = fileErrors.filter(
                 e => e.severity === 'error',
@@ -336,9 +432,10 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
                     `   ${errorCount} errores, ${warningCount} advertencias`,
                 ),
             );
-            fileErrors.forEach(error => {
+
+            for (const error of fileErrors) {
                 const icon = error.severity === 'error' ? '❌' : '⚠️';
-                const stageColor = getStageColor(error.stage);
+                const stageColor = await getStageColor(error.stage);
 
                 logger.info(
                     `   ${icon} [${stageColor(error.stage)}] ${error.message}`,
@@ -357,10 +454,10 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
                 if (error.help) {
                     logger.info(chalk.blue(`      💡 ${error.help}`));
                 }
-            });
+            }
 
             fileIndex++;
-        });
+        }
 
         // Mostrar totales finales
         const totalErrors = compilationErrors.filter(
@@ -370,7 +467,6 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
             e => e.severity === 'warning',
         ).length;
         const totalFiles = errorsByFile.size;
-
         logger.info(chalk.bold('\n--- 📈 ESTADÍSTICAS FINALES ---'));
         logger.info(`📁 Archivos con errores: ${totalFiles}`);
         logger.info(`❌ Total de errores: ${totalErrors}`);
@@ -399,7 +495,8 @@ function displayCompilationSummary(isVerbose: boolean = false): void {
 /**
  * Obtiene el color apropiado para cada etapa de compilación
  */
-function getStageColor(stage: string): (text: string) => string {
+async function getStageColor(stage: string): Promise<(text: string) => string> {
+    const chalk = await loadChalk();
     switch (stage) {
         case 'vue':
             return chalk.green;
@@ -472,10 +569,11 @@ async function compileJS(
     inPath = normalizeRuta(path.resolve(inPath));
 
     const extension = path.extname(inPath);
+    const getCodeFile = await loadParser();
     let { code, error } = await getCodeFile(inPath);
 
     if (error) {
-        handleCompilationError(
+        await handleCompilationError(
             error instanceof Error ? error : new Error(String(error)),
             inPath,
             'file-read',
@@ -491,7 +589,7 @@ async function compileJS(
         code === 'undefined' ||
         code === 'null'
     ) {
-        handleCompilationError(
+        await handleCompilationError(
             new Error('El archivo está vacío o no se pudo leer.'),
             inPath,
             'file-read',
@@ -502,16 +600,59 @@ async function compileJS(
     }
 
     // Logs detallados solo en modo verbose + all
-    const shouldShowDetailedLogs = env.VERBOSE === 'true' && mode === 'all'; // Compilación de Vue
+    const shouldShowDetailedLogs = env.VERBOSE === 'true' && mode === 'all';
+    const chalk = shouldShowDetailedLogs ? await loadChalk() : null; // Compilación de Vue
     let vueResult;
     if (extension === '.vue') {
         if (shouldShowDetailedLogs) {
-            logger.info(chalk.green(`💚 Precompilando VUE: ${inPath}`));
+            logger.info(chalk!.green(`💚 Precompilando VUE: ${inPath}`));
         }
+        const preCompileVue = await loadVue();
+
+        // DEBUG: Verificar que preCompileVue sea una función válida
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] preCompileVue obtenido: ${typeof preCompileVue} para archivo: ${inPath}`,
+            );
+        }
+        if (typeof preCompileVue !== 'function') {
+            throw new Error(
+                `loadVue devolvió ${typeof preCompileVue} en lugar de una función para archivo: ${inPath}`,
+            );
+        }
+        console.log(
+            `[DEBUG COMPILE] Calling preCompileVue with code length: ${code?.length || 'N/A'}, inPath: ${inPath}`,
+        );
+        console.log(
+            `[DEBUG COMPILE] About to call preCompileVue with typeof: ${typeof preCompileVue}, name: ${preCompileVue.name}`,
+        );
 
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
+
+        console.log(
+            `[DEBUG COMPILE] preCompileVue returned, result type: ${typeof vueResult} para archivo: ${inPath}`,
+        );
+
+        // DEBUG: Verificar que vueResult no sea undefined
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] vueResult después de preCompileVue: ${typeof vueResult} para archivo: ${inPath}`,
+            );
+            if (vueResult) {
+                console.log(
+                    `[DEBUG COMPILE] vueResult.error: ${vueResult.error}, vueResult.data length: ${vueResult.data?.length || 'N/A'}`,
+                );
+            }
+        }
+
+        if (vueResult === undefined || vueResult === null) {
+            throw new Error(
+                `preCompileVue devolvió ${vueResult} para archivo: ${inPath}`,
+            );
+        }
+
         if (vueResult.error) {
-            handleCompilationError(
+            await handleCompilationError(
                 vueResult.error instanceof Error
                     ? vueResult.error
                     : new Error(String(vueResult.error)),
@@ -531,7 +672,7 @@ async function compileJS(
     }
 
     if (!code || code.trim().length === 0) {
-        handleCompilationError(
+        await handleCompilationError(
             new Error('El código Vue compilado está vacío.'),
             inPath,
             'vue',
@@ -539,15 +680,58 @@ async function compileJS(
             env.VERBOSE === 'true',
         );
         throw new Error('El código Vue compilado está vacío.');
-    }
-
-    // Compilación de TypeScript
+    } // Compilación de TypeScript
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
         if (shouldShowDetailedLogs) {
-            logger.info(chalk.blue(`🔄️ Precompilando TS: ${inPath}`));
+            logger.info(chalk!.blue(`🔄️ Precompilando TS: ${inPath}`));
         }
+        const preCompileTS = await loadTypeScript();
+
+        // DEBUG: Verificar que preCompileTS sea una función válida
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] preCompileTS obtenido: ${typeof preCompileTS} para archivo: ${inPath}`,
+            );
+        }
+        if (typeof preCompileTS !== 'function') {
+            throw new Error(
+                `loadTypeScript devolvió ${typeof preCompileTS} en lugar de una función para archivo: ${inPath}`,
+            );
+        }
+        console.log(
+            `[DEBUG COMPILE] Calling preCompileTS with code length: ${code?.length || 'N/A'}, inPath: ${inPath}`,
+        );
+        console.log(
+            `[DEBUG COMPILE] About to call preCompileTS with typeof: ${typeof preCompileTS}, name: ${preCompileTS.name}`,
+        );
+
         tsResult = await preCompileTS(code, inPath);
+
+        console.log(
+            `[DEBUG COMPILE] preCompileTS returned, result type: ${typeof tsResult} para archivo: ${inPath}`,
+        );
+
+        // DEBUG: Verificar que tsResult no sea undefined
+        if (env.VERBOSE === 'true') {
+            console.log(
+                `[DEBUG COMPILE] tsResult después de preCompileTS: ${typeof tsResult} para archivo: ${inPath}`,
+            );
+            if (tsResult) {
+                console.log(
+                    `[DEBUG COMPILE] tsResult.error: ${tsResult.error}, tsResult.data length: ${tsResult.data?.length || 'N/A'}`,
+                );
+            } else {
+                console.log(`[DEBUG COMPILE] tsResult is null/undefined!`);
+            }
+        }
+
+        if (tsResult === undefined || tsResult === null) {
+            throw new Error(
+                `preCompileTS devolvió ${tsResult} para archivo: ${inPath}`,
+            );
+        }
+
         if (tsResult.error) {
             if (mode === 'all') {
                 // En modo --all, registrar el error pero continuar la compilación
@@ -563,7 +747,7 @@ async function compileJS(
                 // code permanece sin cambios
             } else {
                 // En modo individual, mantener el comportamiento original (detener compilación)
-                handleCompilationError(
+                await handleCompilationError(
                     tsResult.error,
                     inPath,
                     'typescript',
@@ -583,7 +767,7 @@ async function compileJS(
     }
 
     if (!code || code.trim().length === 0) {
-        handleCompilationError(
+        await handleCompilationError(
             new Error('El código TypeScript compilado está vacío.'),
             inPath,
             'typescript',
@@ -595,12 +779,20 @@ async function compileJS(
 
     // Estandarización
     if (shouldShowDetailedLogs) {
-        logger.info(chalk.yellow(`💛 Estandarizando: ${inPath}`));
+        logger.info(chalk!.yellow(`💛 Estandarizando: ${inPath}`));
+    }
+    const estandarizaCode = await loadTransforms();
+    const resultSTD = await estandarizaCode(code, inPath);
+
+    // DEBUG: Verificar que resultSTD no sea undefined
+    if (resultSTD === undefined || resultSTD === null) {
+        throw new Error(
+            `estandarizaCode devolvió ${resultSTD} para archivo: ${inPath}`,
+        );
     }
 
-    const resultSTD = await estandarizaCode(code, inPath);
     if (resultSTD.error) {
-        handleCompilationError(
+        await handleCompilationError(
             new Error(resultSTD.error),
             inPath,
             'standardization',
@@ -613,7 +805,7 @@ async function compileJS(
     code = resultSTD.code;
 
     if (!code || code.trim().length === 0) {
-        handleCompilationError(
+        await handleCompilationError(
             new Error('El código estandarizado está vacío.'),
             inPath,
             'standardization',
@@ -626,12 +818,20 @@ async function compileJS(
     // Minificación (solo en producción)
     if (env.isPROD === 'true') {
         if (shouldShowDetailedLogs) {
-            logger.info(chalk.red(`🤖 Minificando: ${inPath}`));
+            logger.info(chalk!.red(`🤖 Minificando: ${inPath}`));
+        }
+        const minifyJS = await loadMinify();
+        const resultMinify = await minifyJS(code, inPath, true);
+
+        // DEBUG: Verificar que resultMinify no sea undefined
+        if (resultMinify === undefined || resultMinify === null) {
+            throw new Error(
+                `minifyJS devolvió ${resultMinify} para archivo: ${inPath}`,
+            );
         }
 
-        const resultMinify = await minifyJS(code, inPath, true);
         if (resultMinify.error) {
-            handleCompilationError(
+            await handleCompilationError(
                 resultMinify.error instanceof Error
                     ? resultMinify.error
                     : new Error(String(resultMinify.error)),
@@ -669,6 +869,7 @@ export async function initCompile(
     try {
         // Generar TailwindCSS si está habilitado
         if (compileTailwind && Boolean(env.TAILWIND)) {
+            const generateTailwindCSS = await loadTailwind();
             const resultTW = await generateTailwindCSS();
             if (typeof resultTW !== 'boolean') {
                 if (resultTW?.success) {
@@ -677,7 +878,7 @@ export async function initCompile(
                     }
                 } else {
                     const errorMsg = `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`;
-                    handleCompilationError(
+                    await handleCompilationError(
                         new Error(errorMsg),
                         'tailwind.config.js',
                         'tailwind',
@@ -704,12 +905,12 @@ export async function initCompile(
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-
         if (mode === 'individual') {
             if (env.VERBOSE === 'true') {
                 logger.info(`🔚 Destino: ${outFile}`);
                 logger.info(`⏱️ Tiempo: ${elapsedTime}`);
             }
+            const chalk = await loadChalk();
             logger.info(
                 chalk.green(`✅ Compilación exitosa: ${path.basename(file)}`),
             );
@@ -720,11 +921,19 @@ export async function initCompile(
             output: outFile,
             action: result.action,
         };
-    } catch {
-        // Los errores ya se manejan en handleCompilationError
+    } catch (error) {
+        // Mostrar el error específico para debugging
+        const errorMessage =
+            error instanceof Error ? error.message : String(error);
+        if (env.VERBOSE === 'true') {
+            logger.error(
+                `❌ Error en compilación de ${path.basename(ruta)}: ${errorMessage}`,
+            );
+        }
         return {
             success: false,
             output: '',
+            error: errorMessage,
         };
     }
 }
@@ -739,6 +948,10 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         env.ENABLE_LINTER !== 'false'
     ) {
         logger.info('🔍 Ejecutando linting...');
+
+        // Cargar dependencias de linting de forma lazy
+        const { ESLint, OxLint } = await loadLinter();
+
         const linterPromises: Promise<void>[] = [];
         const linterErrors: any[] = [];
 
@@ -750,7 +963,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                         `🔧 Ejecutando ESLint con config: ${item.configFile || 'por defecto'}`,
                     );
                     const eslintPromise = ESLint(item)
-                        .then(eslintResult => {
+                        .then((eslintResult: any) => {
                             if (eslintResult && eslintResult.json) {
                                 // Procesar resultados de ESLint
                                 if (Array.isArray(eslintResult.json)) {
@@ -806,7 +1019,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                 }
                             }
                         })
-                        .catch(err => {
+                        .catch((err: any) => {
                             logger.error(
                                 `❌ Error durante la ejecución de ESLint: ${err.message}`,
                             );
@@ -822,7 +1035,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                         `🔧 Ejecutando OxLint con config: ${item.configFile || 'por defecto'}`,
                     );
                     const oxlintPromise = OxLint(item)
-                        .then(oxlintResult => {
+                        .then((oxlintResult: any) => {
                             if (
                                 oxlintResult &&
                                 oxlintResult['json'] &&
@@ -848,7 +1061,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                 });
                             }
                         })
-                        .catch(err => {
+                        .catch((err: any) => {
                             logger.error(
                                 `❌ Error durante la ejecución de OxLint: ${err.message}`,
                             );
@@ -866,11 +1079,11 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         }
 
         await Promise.all(linterPromises);
-
         if (showResult) {
             if (linterErrors.length > 0) {
-                displayLinterErrors(linterErrors);
+                await displayLinterErrors(linterErrors);
             } else {
+                const chalk = await loadChalk();
                 logger.info(
                     chalk.green(
                         '✅ No se encontraron errores ni advertencias de linting.',
@@ -880,7 +1093,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
         }
 
         if (!showResult && linterErrors.length > 0) {
-            displayLinterErrors(linterErrors);
+            await displayLinterErrors(linterErrors);
             logger.warn(
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
@@ -899,7 +1112,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
     return proceedWithCompilation;
 }
 
-function displayLinterErrors(errors: any[]): void {
+async function displayLinterErrors(errors: any[]): Promise<void> {
+    const chalk = await loadChalk();
     logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
 
     const errorsByFile = new Map<string, any[]>();
@@ -1018,10 +1232,10 @@ async function compileWithConcurrencyLimit(
             await Promise.race(executing);
         }
     }
-
     const finalResults = await Promise.all(results);
 
     process.stdout.write('\n');
+    const chalk = await loadChalk();
     logger.info(
         chalk.green(
             `✅ Compilación completada: ${completed} archivos compilados, ${skipped} desde cache`,
@@ -1039,10 +1253,9 @@ export async function initCompileAll() {
         // Cargar cache al inicio
         await loadCache();
         lastProgressUpdate = 0;
-
         const shouldContinue = await runLinter();
         if (!shouldContinue) {
-            displayCompilationSummary(env.VERBOSE === 'true');
+            await displayCompilationSummary(env.VERBOSE === 'true');
             return;
         }
 
@@ -1060,15 +1273,14 @@ export async function initCompileAll() {
 
         logger.info(`📝 Compilando todos los archivos...`);
         logger.info(`🔜 Fuente: ${rawPathSource}`);
-        logger.info(`🔚 Destino: ${pathDist}\n`);
-
-        // Generar TailwindCSS
+        logger.info(`🔚 Destino: ${pathDist}\n`); // Generar TailwindCSS
+        const generateTailwindCSS = await loadTailwind();
         const resultTW = await generateTailwindCSS();
         if (typeof resultTW !== 'boolean') {
             if (resultTW?.success) {
                 logger.info(`🎨 ${resultTW.message}\n`);
             } else {
-                handleCompilationError(
+                await handleCompilationError(
                     new Error(
                         `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`,
                     ),
@@ -1113,10 +1325,8 @@ export async function initCompileAll() {
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`);
-
-        // Mostrar resumen de compilación
-        displayCompilationSummary(env.VERBOSE === 'true');
+        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`); // Mostrar resumen de compilación
+        await displayCompilationSummary(env.VERBOSE === 'true');
     } catch (error) {
         const errorMessage =
             error instanceof Error ? error.message : String(error);
@@ -1125,7 +1335,7 @@ export async function initCompileAll() {
         );
 
         // Registrar el error en el sistema unificado
-        handleCompilationError(
+        await handleCompilationError(
             error instanceof Error ? error : new Error(String(error)),
             'compilación general',
             'all',
@@ -1134,7 +1344,7 @@ export async function initCompileAll() {
         );
 
         // Mostrar resumen incluso si hay errores generales
-        displayCompilationSummary(env.VERBOSE === 'true');
+        await displayCompilationSummary(env.VERBOSE === 'true');
     }
 }
 
