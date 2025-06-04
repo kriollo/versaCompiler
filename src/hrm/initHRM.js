@@ -3,6 +3,12 @@
  * Este archivo maneja la conexión con BrowserSync y configura los listeners para HMR de Vue
  */
 
+/**
+ * @typedef {Object} ComponentInfo
+ * @property {string} normalizedPath - Ruta normalizada del componente
+ * @property {string} nameFile - Nombre del archivo del componente
+ */
+
 import { hideErrorOverlay, showErrorOverlay } from './errorScreen.js';
 import obtenerInstanciaVue from './getInstanciaVue.js';
 import { reloadComponent } from './VueHRM.js';
@@ -61,7 +67,7 @@ async function initSocket(retries = 0) {
         let vueInstance = await obtenerInstanciaVue();
 
         // Configurar listener para HMR de componentes Vue
-        socket.on('HRMVue', async data => {
+        socket.on('HRMVue', async (/** @type {ComponentInfo} */ data) => {
             vueInstance = window.__VUE_APP__ || vueInstance;
             if (vueInstance) {
                 console.log('🔥 Preparando HMR para Vue...');
@@ -73,7 +79,9 @@ async function initSocket(retries = 0) {
 
         // Configurar listener para datos auxiliares de HMR
         socket.on('HRMHelper', data => {
-            console.log('Versa HMR: Recibiendo datos de HMR:', data);
+            //TODO: Implementar lógica de HMRHelper
+            window.location.reload();
+            console.log('🔄 Recargando página por HMRHelper:', data);
         });
 
         // Configurar listener para errores de socket
