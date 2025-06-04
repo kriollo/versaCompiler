@@ -48,7 +48,7 @@ class SecurityValidators {
     private static readonly MAX_PATH_LENGTH = 260; // Windows MAX_PATH limit
     private static readonly MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config size
     private static readonly ALLOWED_PATH_CHARS =
-        /^[a-zA-Z0-9.\-_/\\:@ ()\[\]]+$/;
+        /^[a-zA-Z0-9.\-_/\\:@ ()[\]]+$/;
     private static readonly DANGEROUS_PATTERNS = [
         /\.\./, // Path traversal
         /[;&|`$]/, // Command injection characters

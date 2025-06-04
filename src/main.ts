@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import path from 'node:path'; // Importar el módulo path
 import { env } from 'node:process';
-
 // Lazy loading optimizations - Only import lightweight modules synchronously
+import { fileURLToPath } from 'node:url';
+
 import { logger } from './servicios/logger';
 import { readConfig } from './servicios/readConfig';
 
@@ -11,8 +12,8 @@ let chalk: any;
 let yargs: any;
 let hideBin: any;
 
-// Obtener el directorio del archivo actual (dist/)
-env.PATH_PROY = process.cwd();
+// Obtener el directorio del archivo actual (src/)
+env.PATH_PROY = path.dirname(fileURLToPath(import.meta.url));
 
 env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
 
@@ -180,11 +181,12 @@ async function main() {
         .parse()) as CompileArgs;
 
     try {
-        console.log(
+        logger.log(
             `\n\n` +
                 chalk.blue('VersaCompiler') +
                 ' - Servidor de Desarrollo HRM y compilador de archivos Vue/ts/js\n\n',
         );
+
         if (argv.init) {
             logger.info('Iniciando la configuración...');
             const { initConfig } = await loadConfigModule();
@@ -206,10 +208,11 @@ async function main() {
         logger.info(chalk.green(`Prod: ${env.isPROD}`));
         logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
         logger.info(chalk.green(`Minification: ${env.isPROD}`));
-        logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}\n`));
+        logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}`));
         logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
         logger.info(chalk.green(`Clean: ${argv.clean}`));
         logger.info(chalk.green(`Type Check: ${argv.typeCheck}`));
+        logger.log(`\n`);
         env.typeCheck = argv.typeCheck ? 'true' : 'false';
 
         env.clean = 'false';

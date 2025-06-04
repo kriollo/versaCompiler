@@ -12,7 +12,6 @@ import path from 'node:path';
 import { env } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
-import { fileURLToPath } from 'node:url';
 
 import { logger } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
@@ -126,19 +125,11 @@ interface CacheEntry {
     outputPath: string;
 }
 
-// Obtener __dirname de manera compatible con CommonJS y ES modules
-let pathName: string;
-
-// Estrategia 1: Intentar con __filename (disponible en CommonJS y en ts-jest)
-const __filename = fileURLToPath(import.meta.url);
-if (typeof __filename !== 'undefined' && __filename) {
-    pathName = path.dirname(__filename);
-} else {
-    pathName = process.cwd();
-}
-
 const compilationCache = new Map<string, CacheEntry>();
-const CACHE_DIR = path.join(pathName, '.cache');
+const CACHE_DIR = path.join(
+    path.resolve(env.PATH_PROY || process.cwd(), 'compiler'),
+    '.cache',
+);
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {

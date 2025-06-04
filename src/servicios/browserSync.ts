@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { env } from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import browserSync from 'browser-sync';
 import chalk from 'chalk';
@@ -10,7 +9,7 @@ import getPort from 'get-port';
 
 import { logger } from './logger';
 
-export async function browserSyncServer() {
+export async function browserSyncServer(): Promise<any> {
     try {
         let bs: any = null;
         const AssetsOmit = env.AssetsOmit === 'true' ? true : false;
@@ -26,15 +25,7 @@ export async function browserSyncServer() {
             };
         }
 
-        //obtener información de rutas del proyecto
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
-        // Ir un nivel atrás desde src/servicios/ para llegar a src/
-        const srcDir = path.dirname(__dirname);
-
-        // Ahora llegar a la carpeta hrm que está en src/hrm
-        const hrmDir = path.join(srcDir, 'hrm');
-        // Si necesitas la ruta relativa desde la raíz del proyecto
+        const hrmDir = path.join(env.PATH_PROY || process.cwd(), 'hrm');
         const projectRoot = process.cwd();
         const relativeHrmPath = path.relative(projectRoot, hrmDir);
 
