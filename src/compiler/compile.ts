@@ -536,7 +536,10 @@ async function compileJS(
     outPath: string,
     mode: CompilationMode = 'individual',
 ) {
-    inPath = normalizeRuta(path.resolve(inPath));
+    // Si la ruta ya es absoluta, no la resolvamos de nuevo
+    inPath = path.isAbsolute(inPath)
+        ? normalizeRuta(inPath)
+        : normalizeRuta(path.resolve(inPath));
 
     const extension = path.extname(inPath);
     const getCodeFile = await loadParser();
@@ -1196,15 +1199,14 @@ export async function initCompileAll() {
                     env.VERBOSE === 'true',
                 );
             }
-        }
-
-        // Recopilar todos los archivos
+        } // Recopilar todos los archivos
         const filesToCompile: string[] = [];
         for await (const file of glob(patterns)) {
             if (file.endsWith('.d.ts')) {
                 continue;
             }
-            filesToCompile.push(file.startsWith('./') ? file : `./${file}`);
+            // Usar la ruta tal como viene de glob, sin modificar
+            filesToCompile.push(file);
         }
 
         // Determinar concurrencia óptima

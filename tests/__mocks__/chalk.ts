@@ -20,6 +20,7 @@ interface ChalkMock {
     blue: any;
     yellow: any;
     gray: any;
+    cyan: any;
     bold: any;
     underline: any;
     dim: any;
@@ -42,6 +43,7 @@ const chalk = {
     blue: createChalkFunction('blue'),
     yellow: createChalkFunction('yellow'),
     gray: createChalkFunction('gray'),
+    cyan: createChalkFunction('cyan'),
     bold: createChalkFunction('bold'),
     underline: createChalkFunction('underline'),
     dim: createChalkFunction('dim'),

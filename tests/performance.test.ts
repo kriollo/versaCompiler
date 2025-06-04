@@ -384,6 +384,9 @@ button:hover {
 
     describe('Batch Compilation Tests', () => {
         test('Batch compilation performance', async () => {
+            // Asegurar que el directorio existe
+            await fs.mkdir(env.PATH_SOURCE!, { recursive: true });
+
             // Crear múltiples archivos para compilación en lote
             const files: string[] = [];
             const batchSize = 5; // Reducido para evitar timeouts

@@ -19,6 +19,9 @@
         "dev": "tsx --watch src/main.ts --watch --verbose",
         "compile": "tsx src/main.ts --all",
         "test": "jest --config jest.config.js",
+        "test:performance": "jest tests/performance.test.ts --config jest.config.js --testTimeout=300000",
+        "benchmark": "tsx benchmark.ts",
+        "benchmark:detailed": "tsx benchmark.ts --iterations 10",
         "build": "tsx src/main.ts --all",
         "lint": "oxlint --fix --config .oxlint.json",
         "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix"
