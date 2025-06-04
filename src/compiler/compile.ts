@@ -78,42 +78,17 @@ async function loadTransforms() {
 
 async function loadTypeScript() {
     if (!preCompileTS) {
-        if (env.VERBOSE === 'true') {
-            console.log('[DEBUG COMPILE] Cargando módulo TypeScript...');
-        }
         const typescriptModule = await import('./typescript');
         preCompileTS = typescriptModule.preCompileTS;
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] Módulo TypeScript cargado, preCompileTS is: ${typeof preCompileTS}`,
-            );
-        }
     }
-    if (env.VERBOSE === 'true') {
-        console.log(
-            `[DEBUG COMPILE] Devolviendo preCompileTS: ${typeof preCompileTS}`,
-        );
-    }
+
     return preCompileTS;
 }
 
 async function loadVue() {
     if (!preCompileVue) {
-        if (env.VERBOSE === 'true') {
-            console.log('[DEBUG COMPILE] Cargando módulo Vue...');
-        }
         const vueModule = await import('./vuejs');
         preCompileVue = vueModule.preCompileVue;
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] Módulo Vue cargado, preCompileVue is: ${typeof preCompileVue}`,
-            );
-        }
-    }
-    if (env.VERBOSE === 'true') {
-        console.log(
-            `[DEBUG COMPILE] Devolviendo preCompileVue: ${typeof preCompileVue}`,
-        );
     }
     return preCompileVue;
 }
@@ -609,41 +584,13 @@ async function compileJS(
         }
         const preCompileVue = await loadVue();
 
-        // DEBUG: Verificar que preCompileVue sea una función válida
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] preCompileVue obtenido: ${typeof preCompileVue} para archivo: ${inPath}`,
-            );
-        }
         if (typeof preCompileVue !== 'function') {
             throw new Error(
                 `loadVue devolvió ${typeof preCompileVue} en lugar de una función para archivo: ${inPath}`,
             );
         }
-        console.log(
-            `[DEBUG COMPILE] Calling preCompileVue with code length: ${code?.length || 'N/A'}, inPath: ${inPath}`,
-        );
-        console.log(
-            `[DEBUG COMPILE] About to call preCompileVue with typeof: ${typeof preCompileVue}, name: ${preCompileVue.name}`,
-        );
 
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
-
-        console.log(
-            `[DEBUG COMPILE] preCompileVue returned, result type: ${typeof vueResult} para archivo: ${inPath}`,
-        );
-
-        // DEBUG: Verificar que vueResult no sea undefined
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] vueResult después de preCompileVue: ${typeof vueResult} para archivo: ${inPath}`,
-            );
-            if (vueResult) {
-                console.log(
-                    `[DEBUG COMPILE] vueResult.error: ${vueResult.error}, vueResult.data length: ${vueResult.data?.length || 'N/A'}`,
-                );
-            }
-        }
 
         if (vueResult === undefined || vueResult === null) {
             throw new Error(
@@ -688,43 +635,13 @@ async function compileJS(
         }
         const preCompileTS = await loadTypeScript();
 
-        // DEBUG: Verificar que preCompileTS sea una función válida
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] preCompileTS obtenido: ${typeof preCompileTS} para archivo: ${inPath}`,
-            );
-        }
         if (typeof preCompileTS !== 'function') {
             throw new Error(
                 `loadTypeScript devolvió ${typeof preCompileTS} en lugar de una función para archivo: ${inPath}`,
             );
         }
-        console.log(
-            `[DEBUG COMPILE] Calling preCompileTS with code length: ${code?.length || 'N/A'}, inPath: ${inPath}`,
-        );
-        console.log(
-            `[DEBUG COMPILE] About to call preCompileTS with typeof: ${typeof preCompileTS}, name: ${preCompileTS.name}`,
-        );
 
         tsResult = await preCompileTS(code, inPath);
-
-        console.log(
-            `[DEBUG COMPILE] preCompileTS returned, result type: ${typeof tsResult} para archivo: ${inPath}`,
-        );
-
-        // DEBUG: Verificar que tsResult no sea undefined
-        if (env.VERBOSE === 'true') {
-            console.log(
-                `[DEBUG COMPILE] tsResult después de preCompileTS: ${typeof tsResult} para archivo: ${inPath}`,
-            );
-            if (tsResult) {
-                console.log(
-                    `[DEBUG COMPILE] tsResult.error: ${tsResult.error}, tsResult.data length: ${tsResult.data?.length || 'N/A'}`,
-                );
-            } else {
-                console.log(`[DEBUG COMPILE] tsResult is null/undefined!`);
-            }
-        }
 
         if (tsResult === undefined || tsResult === null) {
             throw new Error(
@@ -743,10 +660,7 @@ async function compileJS(
                         : String(tsResult.error),
                     'error',
                 );
-                // Usar el código original si la compilación de TypeScript falla
-                // code permanece sin cambios
             } else {
-                // En modo individual, mantener el comportamiento original (detener compilación)
                 await handleCompilationError(
                     tsResult.error,
                     inPath,
@@ -784,7 +698,6 @@ async function compileJS(
     const estandarizaCode = await loadTransforms();
     const resultSTD = await estandarizaCode(code, inPath);
 
-    // DEBUG: Verificar que resultSTD no sea undefined
     if (resultSTD === undefined || resultSTD === null) {
         throw new Error(
             `estandarizaCode devolvió ${resultSTD} para archivo: ${inPath}`,
@@ -823,7 +736,6 @@ async function compileJS(
         const minifyJS = await loadMinify();
         const resultMinify = await minifyJS(code, inPath, true);
 
-        // DEBUG: Verificar que resultMinify no sea undefined
         if (resultMinify === undefined || resultMinify === null) {
             throw new Error(
                 `minifyJS devolvió ${resultMinify} para archivo: ${inPath}`,
@@ -922,7 +834,6 @@ export async function initCompile(
             action: result.action,
         };
     } catch (error) {
-        // Mostrar el error específico para debugging
         const errorMessage =
             error instanceof Error ? error.message : String(error);
         if (env.VERBOSE === 'true') {
