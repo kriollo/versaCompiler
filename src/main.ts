@@ -14,7 +14,6 @@ let hideBin: any;
 
 // Obtener el directorio del archivo actual (src/)
 env.PATH_PROY = path.dirname(fileURLToPath(import.meta.url));
-
 env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
 
 // Lazy loading helper functions

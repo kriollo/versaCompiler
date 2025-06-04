@@ -354,13 +354,16 @@ async function displayCompilationSummary(
                 totalFiles > 0
                     ? Math.round((result.success / totalFiles) * 100)
                     : 0;
-
             const statusIcon = result.errors === 0 ? '✅' : '❌';
-            const statusColor = result.errors === 0 ? chalk.green : chalk.red;
             const stageColor = await getStageColor(result.stage);
+            const statusText = `${result.success} éxitos, ${result.errors} errores`;
+            const coloredStatusText =
+                result.errors === 0
+                    ? chalk.green(statusText)
+                    : chalk.red(statusText);
 
             logger.info(
-                `${statusIcon} ${stageColor(result.stage)}: ${statusColor(`${result.success} éxitos, ${result.errors} errores`)} (${successRate}% éxito)`,
+                `${statusIcon} ${stageColor(result.stage)}: ${coloredStatusText} (${successRate}% éxito)`,
             );
         }
     }
@@ -392,7 +395,6 @@ async function displayCompilationSummary(
             const warningCount = fileErrors.filter(
                 e => e.severity === 'warning',
             ).length;
-
             logger.info(chalk.cyan(`\n📄 ${fileIndex}. ${baseName}`));
             logger.info(chalk.gray(`   Ruta: ${filePath}`));
             logger.info(
