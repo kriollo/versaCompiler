@@ -1,16 +1,35 @@
-/**
- * Integration tests for the compiler
- * Focuses on real-world scenarios, performance, and integration between Vue and TypeScript
- */
+import * as fs from 'fs-extra';
+import * as path from 'path';
 
-import fs from 'fs-extra';
-import path from 'path';
-import { compileFile } from '../src/compiler/compile';
-import * as tsCompiler from '../src/compiler/typescript';
-import * as vueCompiler from '../src/compiler/vuejs';
+// Define spies in a scope accessible by tests
+let preCompileVueSpy: jest.SpyInstance;
+let preCompileTSSpy: jest.SpyInstance;
+
+// Mock vueCompiler
+jest.mock('../src/compiler/vuejs', () => {
+    const actualVueCompiler = jest.requireActual('../src/compiler/vuejs');
+    preCompileVueSpy = jest.spyOn(actualVueCompiler, 'preCompileVue');
+    return {
+        __esModule: true,
+        ...actualVueCompiler,
+        preCompileVue: preCompileVueSpy,
+    };
+});
+
+// Mock tsCompiler
+jest.mock('../src/compiler/typescript', () => {
+    const actualTsCompiler = jest.requireActual('../src/compiler/typescript');
+    preCompileTSSpy = jest.spyOn(actualTsCompiler, 'preCompileTS');
+    return {
+        __esModule: true,
+        ...actualTsCompiler,
+        preCompileTS: preCompileTSSpy,
+    };
+});
 
 // Mock environment variables for testing
 beforeEach(() => {
+    jest.resetModules(); // Reset modules before each test
     process.env.PATH_SOURCE = path.resolve(
         process.cwd(),
         'temp-test-integration/src',
@@ -25,7 +44,7 @@ beforeEach(() => {
         '@utils/*': ['/src/utils/*'],
         '@assets/*': ['/src/assets/*'],
     });
-    process.env.VERBOSE = 'false';
+    process.env.VERBOSE = 'true';
     process.env.isAll = 'false';
     process.env.isPROD = 'false';
     process.env.ENABLE_LINTER = 'false';
@@ -39,7 +58,19 @@ describe('Integration Tests', () => {
     const assetsDir = path.join(srcDir, 'assets');
     const distDir = path.join(testDir, 'dist');
 
+    // Declare compileFile here so it's in the describe scope
+    let compileFile: typeof import('../src/compiler/compile').compileFile;
+
     beforeEach(async () => {
+        jest.resetModules(); // Ensures fresh modules and re-run of mock factories
+
+        // Dynamically import compileFile to ensure it gets the fresh mocked versions
+        compileFile = (await import('../src/compiler/compile')).compileFile;
+
+        // Clear call history for spies. The spies themselves are (re)created by the mock factories
+        // which run due to jest.resetModules() and the subsequent dynamic imports.
+        jest.clearAllMocks();
+
         // Create directory structure for tests
         await fs.ensureDir(testDir);
         await fs.ensureDir(srcDir);
@@ -172,9 +203,7 @@ button:hover {
 }
 </style>
 `;
-            await fs.writeFile(componentVuePath, componentVueContent); // Set up spies BEFORE running compilation
-            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
+            await fs.writeFile(componentVuePath, componentVueContent);
 
             // First compile the utility
             const utilityCompileResult = await compileFile(utilityTsPath);
@@ -188,9 +217,7 @@ button:hover {
 
             // Check both files were compiled
             expect(preCompileVueSpy).toHaveBeenCalled();
-            expect(preCompileTSSpy).toHaveBeenCalled(); // Clean up spies
-            preCompileVueSpy.mockRestore();
-            preCompileTSSpy.mockRestore();
+            expect(preCompileTSSpy).toHaveBeenCalled();
         }, 15000); // 15 second timeout
 
         test('should handle components with complex TypeScript features', async () => {
@@ -427,15 +454,16 @@ button[type="button"] {
 }
 </style>
 `;
-            await fs.writeFile(complexComponentPath, complexComponentContent); // Create spy for this test
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
+            await fs.writeFile(complexComponentPath, complexComponentContent);
 
             // Compile the files
             const tsCompileResult = await compileFile(complexTsPath);
             const vueCompileResult = await compileFile(complexComponentPath);
 
             expect(tsCompileResult.success).toBe(true);
-            expect(vueCompileResult.success).toBe(true); // Verify TypeScript compilation was called with complex types
+            expect(vueCompileResult.success).toBe(true);
+
+            expect(preCompileVueSpy).toHaveBeenCalled();
             expect(preCompileTSSpy).toHaveBeenCalled();
 
             // Check that preCompileTS was called with content containing 'type Identifiable'
@@ -446,100 +474,42 @@ button[type="button"] {
                     typeof call[0] === 'string' &&
                     call[0].includes('type Identifiable'),
             );
-            expect(hasIdentifiableType).toBe(true); // Clean up spy
-            preCompileTSSpy.mockRestore();
+            expect(hasIdentifiableType).toBe(true);
         }, 15000); // 15 second timeout
     });
 
     describe('Performance Tests', () => {
         test('should handle large files efficiently', async () => {
-            // Create a large TypeScript file
+            // Crear un archivo TypeScript grande
             const largeTsPath = path.join(utilsDir, 'large-file.ts');
 
-            // Generate a large file with many functions and types
-            let largeFileContent = `
-// Large TypeScript file with many functions and types
-export namespace LargeModule {
-`;
+            // Generar un archivo grande con muchas funciones y tipos
+            let largeFileContent = `// Large TypeScript file with many functions and types\nexport namespace LargeModule {\n`;
 
-            // Add 100 interface definitions
+            // Agregar 100 definiciones de interfaces
             for (let i = 1; i <= 100; i++) {
-                largeFileContent += `
-    export interface Model${i} {
-        id: string;
-        name: string;
-        value: number;
-        created: Date;
-        properties: {
-            key1: string;
-            key2: number;
-            key3: boolean;
-        };
-        metadata: Record<string, any>;
-    }
-`;
+                largeFileContent += `    export interface Model${i} {\n        id: string;\n        name: string;\n        value: number;\n        created: Date;\n        properties: { key1: string; key2: number; key3: boolean; };\n        metadata: Record<string, any>;\n    }\n`;
             }
 
-            // Add 100 function implementations
+            // Agregar 100 implementaciones de funciones
             for (let i = 1; i <= 100; i++) {
-                largeFileContent += `
-    export function processData${i}<T extends Model${i}>(data: T): T {
-        console.log(\`Processing data for model ${i}\`);
-        return {
-            ...data,
-            processed: true,
-            processingDate: new Date()
-        } as T;
-    }
-`;
+                largeFileContent += `    export function processData${i}<T extends Model${i}>(data: T): T {\n        return { ...data, processed: true, processingDate: new Date() } as T;\n    }\n`;
             }
 
-            largeFileContent += `
-}
+            largeFileContent += `}\n\n// Usage examples\nconst testData: LargeModule.Model1 = {\n    id: '123',\n    name: 'Test',\n    value: 42,\n    created: new Date(),\n    properties: { key1: 'value1', key2: 123, key3: true },\n    metadata: { tag: 'important', priority: 'high' }\n};\n\nconst result = LargeModule.processData1(testData);\n`;
+            await fs.writeFile(largeTsPath, largeFileContent);
 
-// Usage examples
-const testData: LargeModule.Model1 = {
-    id: '123',
-    name: 'Test',
-    value: 42,
-    created: new Date(),
-    properties: {
-        key1: 'value1',
-        key2: 123,
-        key3: true
-    },
-    metadata: {
-        tag: 'important',
-        priority: 'high'
-    }
-};
-
-const result = LargeModule.processData1(testData);
-console.log(result);
-`;
-            await fs.writeFile(largeTsPath, largeFileContent); // Create a performance spy on the preCompileTS function
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
             const startTime = Date.now();
 
-            // Compile the large file
+            // Compilar el archivo grande
             const result = await compileFile(largeTsPath);
 
             const endTime = Date.now();
             const compilationTime = endTime - startTime;
 
             expect(result.success).toBe(true);
-
-            // Verify TypeScript compilation was called
             expect(preCompileTSSpy).toHaveBeenCalled();
-
-            // Log the compilation time for reference
-            console.log(`Large file compilation time: ${compilationTime}ms`);
-
-            // Compilation time should be reasonable (this threshold may need adjustment)
-            expect(compilationTime).toBeLessThan(10000); // Less than 10 seconds
-
-            // Clean up spy
-            preCompileTSSpy.mockRestore();
+            expect(compilationTime).toBeLessThan(10000); // Menos de 10 segundos
         });
 
         test('should compile large Vue components efficiently', async () => {
@@ -615,7 +585,6 @@ export default defineComponent({
                 timestamp: Date.now()
             };
             events.value.push(event);
-            console.log(\`Cell clicked: Row \${row}, Column \${column}\`);
         };
 
         return {
@@ -665,9 +634,7 @@ export default defineComponent({
 `;
             const largeComponentContent =
                 tableTemplate + componentScript + componentStyle;
-            await fs.writeFile(largeComponentPath, largeComponentContent); // Create performance spies
-            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
+            await fs.writeFile(largeComponentPath, largeComponentContent);
 
             const startTime = Date.now();
 
@@ -683,17 +650,8 @@ export default defineComponent({
             expect(preCompileVueSpy).toHaveBeenCalled();
             expect(preCompileTSSpy).toHaveBeenCalled();
 
-            // Log the compilation time for reference
-            console.log(
-                `Large Vue component compilation time: ${compilationTime}ms`,
-            );
-
             // Compilation time should be reasonable
             expect(compilationTime).toBeLessThan(10000); // Less than 10 seconds
-
-            // Clean up spies
-            preCompileVueSpy.mockRestore();
-            preCompileTSSpy.mockRestore();
         });
     });
 
@@ -761,10 +719,6 @@ export function utility3() {
                 await fs.writeFile(filePath, content);
                 filePaths.push(filePath);
             }
-            // Reset all mocks
-            jest.clearAllMocks(); // Set up spies BEFORE compilation
-            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
 
             // Compile all files concurrently
             const startTime = Date.now();
@@ -779,27 +733,18 @@ export function utility3() {
                 expect(result.success).toBe(true);
             });
 
-            // Log the time it took to compile all files
-            const totalTime = endTime - startTime;
-            console.log(
-                `Compiled ${filePaths.length} files concurrently in ${totalTime}ms`,
-            );
-
             // Verify the correct number of compilation calls
             // 3 Vue components + 3 TS files = at least 6 calls to precompileTS
             // (3 directly and 3 from Vue components with TypeScript)
             expect(preCompileTSSpy).toHaveBeenCalledTimes(6);
-            expect(preCompileVueSpy).toHaveBeenCalledTimes(3); // Verify each file was compiled
+            expect(preCompileVueSpy).toHaveBeenCalledTimes(3);
+
             results.forEach((result, index) => {
                 if (filePaths[index]) {
                     const parsedPath = path.parse(filePaths[index]);
                     expect(result.output).toContain(parsedPath.name);
                 }
             });
-
-            // Clean up spies
-            preCompileVueSpy.mockRestore();
-            preCompileTSSpy.mockRestore();
         }, 15000); // 15 second timeout
     });
 
@@ -1180,17 +1125,14 @@ export default defineComponent({
 
         const onLoginSuccess = (user: User) => {
             loginMessage.value = \`Welcome, \${user.name}!\`;
-            console.log('Login successful', user);
         };
 
         const onLoginFailure = (error: string) => {
             loginMessage.value = \`Login failed: \${error}\`;
-            console.error('Login failed', error);
         };
 
         const onLogout = () => {
             loginMessage.value = 'You have been logged out.';
-            console.log('User logged out');
         };
 
         return {
@@ -1245,12 +1187,11 @@ const app = createApp(App);
 app.mount('#app');
 `;
             await fs.writeFile(mainTsPath, mainTsContent);
-            // Mock the TypeScript and Vue compilers to avoid actual compilation in tests
-            jest.clearAllMocks(); // Set up spies BEFORE compilation
-            const preCompileTSSpy = jest.spyOn(tsCompiler, 'preCompileTS');
-            const preCompileVueSpy = jest.spyOn(vueCompiler, 'preCompileVue');
 
-            // Compile all files
+            // Reset spy call counts for this test
+            jest.clearAllMocks();
+
+            // Compile all files (order can matter for dependencies)
             const apiResult = await compileFile(apiClientPath);
             const storeResult = await compileFile(storeUtilPath);
             const loginFormResult = await compileFile(loginFormPath);
@@ -1265,15 +1206,12 @@ app.mount('#app');
             expect(userProfileResult.success).toBe(true);
             expect(appComponentResult.success).toBe(true);
             expect(mainResult.success).toBe(true);
+
             // Verify the correct number of compilation calls
             // We should have 3 TypeScript files compiled directly (api-client.ts, store.ts, main.ts)
             // and 3 Vue files that need TypeScript compilation (LoginForm.vue, UserProfile.vue, App.vue)
             expect(preCompileTSSpy).toHaveBeenCalledTimes(6);
             expect(preCompileVueSpy).toHaveBeenCalledTimes(3);
-
-            // Clean up spies
-            preCompileTSSpy.mockRestore();
-            preCompileVueSpy.mockRestore();
         }, 20000); // 20 second timeout for complex application structure
     });
 });
