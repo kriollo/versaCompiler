@@ -1,6 +1,11 @@
 // jest.config.cjs
 export default {
     testEnvironment: 'jsdom',
+    testMatch: [
+        '**/tests/**/*.test.ts',
+        '!**/public/**/*',
+        '!**/node_modules/**/*',
+    ],
     transform: {
         '^.+\\.ts$': [
             'ts-jest',
