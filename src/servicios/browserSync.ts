@@ -3,11 +3,16 @@ import path from 'node:path';
 import { env } from 'node:process';
 
 import browserSync from 'browser-sync';
-import chalk from 'chalk';
 import { html } from 'code-tag';
 import getPort from 'get-port';
 
 import { logger } from './logger';
+
+// Lazy loading para chalk
+const loadChalk = async () => {
+    const { default: chalk } = await import('chalk');
+    return chalk;
+};
 
 export async function browserSyncServer(): Promise<any> {
     try {
@@ -100,8 +105,9 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.end(fileContent);
                         } catch (error) {
+                            const chalkInstance = await loadChalk();
                             logger.error(
-                                chalk.red(
+                                chalkInstance.red(
                                     `🚩 :Error al leer el archivo ${vueLoaderPath}: ${error instanceof Error ? error.message : String(error)}/n ${error instanceof Error ? error.stack : ''}`,
                                 ),
                             );
@@ -126,8 +132,9 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.end(fileContent);
                         } catch (error) {
+                            const chalkInstance = await loadChalk();
                             logger.error(
-                                chalk.red(
+                                chalkInstance.red(
                                     `🚩 :Error al leer el archivo ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
                                 ),
                             );
@@ -148,8 +155,9 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.end(fileContent);
                         } catch (error) {
+                            const chalkInstance = await loadChalk();
                             logger.error(
-                                chalk.red(
+                                chalkInstance.red(
                                     `🚩 Error al leer el módulo ${modulePath}: ${error instanceof Error ? error.message : String(error)}`,
                                 ),
                             );
@@ -165,20 +173,27 @@ export async function browserSyncServer(): Promise<any> {
                     );
 
                     if (req.method === 'GET') {
+                        const chalkInstance = await loadChalk();
                         // omitir archivos estáticos sólo si AssetsOmit es true
                         if (isAssets && !AssetsOmit) {
-                            logger.info(chalk.white(`GET: ${req.url}`));
+                            logger.info(chalkInstance.white(`GET: ${req.url}`));
                         } else if (!isAssets) {
-                            logger.info(chalk.cyan(`GET: ${req.url}`));
+                            logger.info(chalkInstance.cyan(`GET: ${req.url}`));
                         }
                     } else if (req.method === 'POST') {
-                        logger.info(chalk.blue(`POST: ${req.url}`));
+                        const chalkInstance = await loadChalk();
+                        logger.info(chalkInstance.blue(`POST: ${req.url}`));
                     } else if (req.method === 'PUT') {
-                        logger.info(chalk.yellow(`PUT: ${req.url}`));
+                        const chalkInstance = await loadChalk();
+                        logger.info(chalkInstance.yellow(`PUT: ${req.url}`));
                     } else if (req.method === 'DELETE') {
-                        logger.info(chalk.red(`DELETE: ${req.url}`));
+                        const chalkInstance = await loadChalk();
+                        logger.info(chalkInstance.red(`DELETE: ${req.url}`));
                     } else {
-                        logger.info(chalk.gray(`${req.method}: ${req.url}`));
+                        const chalkInstance = await loadChalk();
+                        logger.info(
+                            chalkInstance.gray(`${req.method}: ${req.url}`),
+                        );
                     }
 
                     // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
@@ -196,9 +211,10 @@ export async function browserSyncServer(): Promise<any> {
     }
 }
 
-export function emitirCambios(bs: any, action: string, filePath: string) {
+export async function emitirCambios(bs: any, action: string, filePath: string) {
+    const chalkInstance = await loadChalk();
     logger.info(
-        chalk.green(`[HMR] Emitiendo cambios: ${action} ${filePath}\n`),
+        chalkInstance.green(`[HMR] Emitiendo cambios: ${action} ${filePath}\n`),
     );
     const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
     const nameFile = path.basename(

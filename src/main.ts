@@ -220,7 +220,7 @@ async function main() {
         if (argv.clean) {
             env.clean = 'true';
             const { cleanOutputDir } = await loadChokidarModule();
-            await cleanOutputDir(env.PATH_OUTPUT || './dist');
+            await cleanOutputDir(env.PATH_DIST || './dist');
         }
 
         // Manejar archivos pasados como argumentos posicionales

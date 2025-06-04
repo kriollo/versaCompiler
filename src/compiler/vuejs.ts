@@ -1,11 +1,19 @@
 import path from 'node:path';
 
-import chalk from 'chalk';
 import * as vCompiler from 'vue/compiler-sfc';
 
 import { logger } from '../servicios/logger';
 
 import { parser } from './parser';
+
+// Lazy loading para chalk
+let chalk: any;
+async function loadChalk() {
+    if (!chalk) {
+        chalk = (await import('chalk')).default;
+    }
+    return chalk;
+}
 
 const getComponentsVueMap = async (ast: any): Promise<string[]> => {
     let components: string[] = [];
@@ -218,8 +226,9 @@ export const preCompileVue = async (
             }
             templateCode = compiledTemplateResult.code;
         } else {
+            const chalkInstance = await loadChalk();
             logger.warn(
-                chalk.yellow(
+                chalkInstance.yellow(
                     `Advertencia: El componente Vue ${source} no tiene una sección de plantilla.`,
                 ),
             );

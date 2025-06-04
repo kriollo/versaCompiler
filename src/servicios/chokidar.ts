@@ -2,7 +2,6 @@ import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
 
-import chalk from 'chalk';
 import chokidar from 'chokidar';
 
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
@@ -10,6 +9,15 @@ import { promptUser } from '../utils/promptUser.js';
 
 import { emitirCambios } from './browserSync.js';
 import { logger } from './logger.js';
+
+// Lazy loading para chalk
+let chalk: any;
+async function loadChalk() {
+    if (!chalk) {
+        chalk = (await import('chalk')).default;
+    }
+    return chalk;
+}
 
 // const cacheImportMap = new Map<string, string[]>();
 // const cacheComponentMap = new Map<string, string[]>();
@@ -31,12 +39,12 @@ export async function cleanOutputDir(
                 );
                 return;
             }
-
             try {
                 if (env.yes === 'false') {
+                    const chalkInstance = await loadChalk();
                     const answer = await promptUser(
                         '\n\n¿Estás seguro deseas limpiar la carpeta ' +
-                            chalk.yellow(outputDir) +
+                            chalkInstance.yellow(outputDir) +
                             '? (s / N) : ',
                     );
                     if (answer.toLowerCase() !== 's') {
@@ -49,9 +57,9 @@ export async function cleanOutputDir(
                 process.exit(1);
             }
         }
-
+        const chalkInstance = await loadChalk();
         logger.info(
-            `🗑️ Limpiando directorio de salida: ${chalk.yellow(outputDir)}`,
+            `🗑️ Limpiando directorio de salida: ${chalkInstance.yellow(outputDir)}\n`,
         );
         const items = await readdir(outputDir);
         await Promise.all(
@@ -158,10 +166,10 @@ export async function initChokidar(bs: any) {
             ignoreInitial: true,
             ignored: regExtExtension,
         });
-
-        watcher.on('ready', () => {
+        watcher.on('ready', async () => {
+            const chalkInstance = await loadChalk();
             logger.info(
-                chalk.green(
+                chalkInstance.green(
                     `👀 : Listo para observar \n${fileWatch
                         .map((item: string) => `${item}`)
                         .join('\n')}\n`,
