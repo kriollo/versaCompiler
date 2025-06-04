@@ -1,10 +1,10 @@
 // Opción con librería 'resolve' (npm install resolve)
-import fs, { readdir, readFile, readFileSync, readlink, stat } from 'node:fs';
+import fs, { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { env } from 'node:process';
 
-import pkg from 'enhanced-resolve';
-import resolve from 'resolve';
+// import pkg from 'enhanced-resolve';
+// import resolve from 'resolve';
 
 import { logger } from '../servicios/logger';
 
@@ -28,57 +28,57 @@ const EXCLUDED_MODULES = new Set([
     // Agregar más módulos problemáticos aquí según sea necesario
 ]);
 
-function resolveESMWithLibrary(moduleName: string): string | null {
-    try {
-        // Resolver el módulo
-        const resolved = resolve.sync(moduleName, {
-            basedir: process.cwd(),
-            packageFilter: (pkg: any) => {
-                // Priorizar campos ESM
-                if (pkg.module) pkg.main = pkg.module;
-                else if (pkg.exports?.['.']?.import)
-                    pkg.main = pkg.exports['.'].import;
-                else if (pkg.exports?.import) pkg.main = pkg.exports.import;
-                return pkg;
-            },
-        });
-        return resolved;
-    } catch (error) {
-        if (env.VERBOSE === 'true')
-            logger.error(
-                `Error resolviendo ${moduleName}:`,
-                error instanceof Error ? error.message : String(error),
-            );
-        return null;
-    }
-}
+// function resolveESMWithLibrary(moduleName: string): string | null {
+//     try {
+//         // Resolver el módulo
+//         const resolved = resolve.sync(moduleName, {
+//             basedir: process.cwd(),
+//             packageFilter: (pkg: any) => {
+//                 // Priorizar campos ESM
+//                 if (pkg.module) pkg.main = pkg.module;
+//                 else if (pkg.exports?.['.']?.import)
+//                     pkg.main = pkg.exports['.'].import;
+//                 else if (pkg.exports?.import) pkg.main = pkg.exports.import;
+//                 return pkg;
+//             },
+//         });
+//         return resolved;
+//     } catch (error) {
+//         if (env.VERBOSE === 'true')
+//             logger.error(
+//                 `Error resolviendo ${moduleName}:`,
+//                 error instanceof Error ? error.message : String(error),
+//             );
+//         return null;
+//     }
+// }
 
 // Opción con 'enhanced-resolve' (webpack's resolver)
 // npm install enhanced-resolve
 
-const { ResolverFactory } = pkg;
+// const { ResolverFactory } = pkg;
 
-const resolver = ResolverFactory.createResolver({
-    fileSystem: {
-        readFile,
-        readlink,
-        stat,
-        readdir,
-    },
-    conditionNames: ['import', 'module', 'default'], // Priorizar ESM
-    extensions: ['.mjs', '.js', '.json'],
-    mainFields: ['module', 'main'], // Priorizar campo 'module'
-    aliasFields: ['browser'],
-});
+// const resolver = ResolverFactory.createResolver({
+//     fileSystem: {
+//         readFile,
+//         readlink,
+//         stat,
+//         readdir,
+//     },
+//     conditionNames: ['import', 'module', 'default'], // Priorizar ESM
+//     extensions: ['.mjs', '.js', '.json'],
+//     mainFields: ['module', 'main'], // Priorizar campo 'module'
+//     aliasFields: ['browser'],
+// });
 
-function resolveESMEnhanced(moduleName: string): Promise<string | null> {
-    return new Promise((resolve, reject) => {
-        resolver.resolve({}, process.cwd(), moduleName, {}, (err, result) => {
-            if (err) reject(err);
-            else resolve(result as string);
-        });
-    });
-}
+// function resolveESMEnhanced(moduleName: string): Promise<string | null> {
+//     return new Promise((resolve, reject) => {
+//         resolver.resolve({}, process.cwd(), moduleName, {}, (err, result) => {
+//             if (err) reject(err);
+//             else resolve(result as string);
+//         });
+//     });
+// }
 
 // Función dinámica para detectar versiones browser-compatible
 function findBrowserCompatibleVersion(
@@ -86,11 +86,11 @@ function findBrowserCompatibleVersion(
     originalEntry: string,
 ): string | null {
     const dir = dirname(originalEntry);
-    const baseName = originalEntry.split('/').pop() || '';
-    const extension = baseName.includes('.')
-        ? `.${baseName.split('.').pop()}`
-        : '.js';
-    const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
+    // const baseName = originalEntry.split('/').pop() || '';
+    // const extension = baseName.includes('.')
+    //     ? `.${baseName.split('.').pop()}`
+    //     : '.js';
+    // const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
 
     // Patrones que indican versiones NO compatibles con browser
     const bundlerPatterns = ['bundler', 'runtime', 'node', 'cjs', 'commonjs']; // Patrones que indican versiones SÍ compatibles con browser

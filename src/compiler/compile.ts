@@ -12,6 +12,8 @@ import path from 'node:path';
 import { env } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
+import { fileURLToPath } from 'node:url';
+
 import { logger } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
@@ -128,8 +130,8 @@ interface CacheEntry {
 let pathName: string;
 
 // Estrategia 1: Intentar con __filename (disponible en CommonJS y en ts-jest)
-// @ts-ignore - Suprime advertencia de TypeScript sobre __filename en ESM
-if (typeof __filename !== 'undefined') {
+const __filename = fileURLToPath(import.meta.url);
+if (typeof __filename !== 'undefined' && __filename) {
     pathName = path.dirname(__filename);
 } else {
     pathName = process.cwd();

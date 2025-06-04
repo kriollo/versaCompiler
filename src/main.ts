@@ -108,12 +108,6 @@ async function main() {
             description: 'Usar Yarn en lugar de npm',
             default: false,
         })
-        .option('lint-only', {
-            type: 'boolean',
-            description: 'Ejecutar solo el linter, sin compilar',
-            default: false,
-        })
-        .alias('l', 'lint-only')
         .option('typeCheck', {
             type: 'boolean',
             description:
@@ -141,17 +135,49 @@ async function main() {
             default: false,
         });
     }
+    interface CompileArgs {
+        init?: boolean;
+        watch?: boolean;
+        all?: boolean;
+        file?: string;
+        prod?: boolean;
+        verbose?: boolean;
+        clean?: boolean;
+        y?: boolean;
+        typeCheck?: boolean;
+        tailwind?: boolean;
+        linter?: boolean;
+        files?: string[];
+        _: (string | number)[];
+        $0: string;
+    }
+
+    interface YargsCommandBuilder {
+        positional(
+            key: string,
+            options: {
+                describe: string;
+                type: string;
+                array: boolean;
+            },
+        ): YargsCommandBuilder;
+    }
+
     const argv = (await yargInstance
         .help()
         .alias('h', 'help')
-        .command('* [files...]', 'Compilar archivos específicos', yargs => {
-            return yargs.positional('files', {
-                describe: 'Archivos para compilar',
-                type: 'string',
-                array: true,
-            });
-        })
-        .parse()) as any; // Usar any temporalmente para evitar problemas de tipos
+        .command(
+            '* [files...]',
+            'Compilar archivos específicos',
+            (yargs: YargsCommandBuilder) => {
+                return yargs.positional('files', {
+                    describe: 'Archivos para compilar',
+                    type: 'string',
+                    array: true,
+                });
+            },
+        )
+        .parse()) as CompileArgs;
 
     try {
         console.log(
@@ -177,7 +203,6 @@ async function main() {
         logger.info(chalk.green(`Watch: ${argv.watch}`));
         logger.info(chalk.green(`All: ${env.isALL}`));
         logger.info(chalk.green(`File: ${argv.file || 'N/A'}`));
-        logger.info(chalk.green(`Lint-only: ${argv['lint-only']}`));
         logger.info(chalk.green(`Prod: ${env.isPROD}`));
         logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
         logger.info(chalk.green(`Minification: ${env.isPROD}`));
@@ -195,20 +220,7 @@ async function main() {
             await cleanOutputDir(env.PATH_OUTPUT || './dist');
         }
 
-        if (argv['lint-only']) {
-            logger.info(chalk.yellow('🔍 Ejecutando solo linting...'));
-            const { runLinter } = await loadCompilerModule();
-            const lintResult = await runLinter(true);
-            if (lintResult) {
-                logger.info(
-                    chalk.green('✅ Linting completado sin errores críticos.'),
-                );
-                process.exit(0);
-            } else {
-                logger.error(chalk.red('❌ Linting falló o fue cancelado.'));
-                process.exit(1);
-            }
-        } // Manejar archivos pasados como argumentos posicionales
+        // Manejar archivos pasados como argumentos posicionales
         if (argv.files && argv.files.length > 0) {
             logger.info(
                 chalk.yellow(
