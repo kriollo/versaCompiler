@@ -19,7 +19,7 @@
         "dev": "tsx --watch src/main.ts --watch --verbose",
         "compile": "tsx src/main.ts --all",
         "test": "jest --config jest.config.js",
-        "build": "tsx src/main.ts --all",
+        "build": "tsx src/main.ts --all -t --clean -y",
         "lint": "oxlint --fix --config .oxlint.json",
         "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix",
         "perf": "scripts\\run-performance.bat",
