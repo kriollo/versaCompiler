@@ -7,7 +7,8 @@ import * as ts from 'typescript';
 import {
     createUnifiedErrorMessage,
     parseTypeScriptErrors,
-} from './typescript-error-parser';
+} from './typescript-error-parser.ts';
+import { TypeScriptWorkerManager } from './typescript-worker.ts';
 
 interface CompileResult {
     error: Error | null;
@@ -19,6 +20,140 @@ interface TypeCheckResult {
     diagnostics: ts.Diagnostic[];
     hasErrors: boolean;
 }
+
+/**
+ * Crea una versión ultra-limpia y serializable de las opciones del compilador TypeScript.
+ * Filtra todas las funciones y objetos complejos que causan errores de serialización en workers.
+ * @param options - Opciones originales del compilador
+ * @returns Opciones serializables seguras para workers
+ */
+const createSerializableCompilerOptions = (
+    options: ts.CompilerOptions,
+): Record<string, any> => {
+    // Lista blanca de propiedades seguras para serialización
+    const safeProperties = [
+        'target',
+        'module',
+        'lib',
+        'allowJs',
+        'checkJs',
+        'jsx',
+        'declaration',
+        'declarationMap',
+        'emitDeclarationOnly',
+        'sourceMap',
+        'outFile',
+        'outDir',
+        'rootDir',
+        'composite',
+        'tsBuildInfoFile',
+        'removeComments',
+        'noEmit',
+        'importHelpers',
+        'importsNotUsedAsValues',
+        'downlevelIteration',
+        'strict',
+        'noImplicitAny',
+        'strictNullChecks',
+        'strictFunctionTypes',
+        'strictBindCallApply',
+        'strictPropertyInitialization',
+        'noImplicitReturns',
+        'noImplicitThis',
+        'alwaysStrict',
+        'noUnusedLocals',
+        'noUnusedParameters',
+        'exactOptionalPropertyTypes',
+        'noImplicitOverride',
+        'noPropertyAccessFromIndexSignature',
+        'noUncheckedIndexedAccess',
+        'noImplicitUseStrict',
+        'noStrictGenericChecks',
+        'useUnknownInCatchVariables',
+        'suppressExcessPropertyErrors',
+        'suppressImplicitAnyIndexErrors',
+        'noErrorTruncation',
+        'allowUnreachableCode',
+        'allowUnusedLabels',
+        'skipDefaultLibCheck',
+        'skipLibCheck',
+        'moduleResolution',
+        'baseUrl',
+        'rootDirs',
+        'typeRoots',
+        'types',
+        'allowSyntheticDefaultImports',
+        'esModuleInterop',
+        'preserveSymlinks',
+        'allowUmdGlobalAccess',
+        'resolveJsonModule',
+        'experimentalDecorators',
+        'emitDecoratorMetadata',
+        'isolatedModules',
+        'verbatimModuleSyntax',
+    ];
+
+    const serializable: Record<string, any> = {};
+
+    // Copiar solo propiedades seguras y primitivas
+    for (const prop of safeProperties) {
+        if (prop in options) {
+            const value = (options as any)[prop];
+
+            // Solo incluir valores primitivos o arrays de primitivos
+            if (isPrimitiveOrSafeArray(value)) {
+                serializable[prop] = value;
+            }
+        }
+    }
+
+    // Valores por defecto seguros para asegurar funcionamiento
+    return {
+        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.ES2020,
+        strict: false,
+        noEmitOnError: false,
+        skipLibCheck: true,
+        skipDefaultLibCheck: true,
+        allowJs: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        declaration: false,
+        sourceMap: false,
+        noImplicitAny: false,
+        noImplicitReturns: false,
+        noImplicitThis: false,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        isolatedModules: true,
+        ...serializable, // Sobrescribir con valores del usuario si son seguros
+    };
+};
+
+/**
+ * Verifica si un valor es primitivo o un array de primitivos seguro para serialización
+ */
+const isPrimitiveOrSafeArray = (value: any): boolean => {
+    if (value === null || value === undefined) return true;
+
+    const type = typeof value;
+    if (type === 'string' || type === 'number' || type === 'boolean')
+        return true;
+
+    // Arrays de primitivos
+    if (Array.isArray(value)) {
+        return value.every(item => {
+            const itemType = typeof item;
+            return (
+                itemType === 'string' ||
+                itemType === 'number' ||
+                itemType === 'boolean'
+            );
+        });
+    }
+
+    return false;
+};
 
 /**
  * Crea un Language Service Host para validación de tipos eficiente.
@@ -287,7 +422,8 @@ export const validateVueTypes = (
 };
 
 /**
- * Precompila el código TypeScript proporcionado con validación de tipos mejorada.
+ * Precompila el código TypeScript proporcionado con pipeline híbrido optimizado.
+ * Separa la transpilación rápida del type checking asíncrono para máxima performance.
  * @param {string} data - El código TypeScript a precompilar.
  * @param {string} fileName - El nombre del archivo que contiene el código TypeScript.
  *
@@ -301,7 +437,9 @@ export const preCompileTS = async (
         // Si el código está vacío (sin contenido), devolver cadena vacía
         if (!data.trim()) {
             return { error: null, data: data, lang: 'ts' };
-        } // Buscar tsconfig.json en el directorio del archivo o sus padres
+        }
+
+        // Buscar tsconfig.json en el directorio del archivo o sus padres
         const fileDir = path.dirname(fileName);
         const configPath =
             ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
@@ -325,25 +463,53 @@ export const preCompileTS = async (
             config,
             ts.sys,
             path.dirname(configPath),
-        );
-
-        // Configurar opciones del compilador
+        ); // Configurar opciones del compilador
         const compilerOptions: ts.CompilerOptions = {
             ...parsedConfig.options,
-        };
-
+        }; // Crear versión ultra-limpia y serializable de las opciones para el worker
+        const serializableCompilerOptions =
+            createSerializableCompilerOptions(compilerOptions); // PIPELINE HÍBRIDO: Separar transpilación rápida del type checking lento
         if (env.typeCheck === 'true') {
-            // 1. Primero, validar tipos usando Language Service para validación completa
-            const typeCheckResult = validateTypesWithLanguageService(
-                fileName,
-                data,
-                compilerOptions,
+            // Obtener instancia del Worker Manager
+            const workerManager = TypeScriptWorkerManager.getInstance();
+
+            // Iniciar transpilación rápida y type checking asíncrono en paralelo
+            const [transpileResult, typeCheckResult] = await Promise.allSettled(
+                [
+                    // 1. Transpilación rápida (sin validación de tipos)
+                    Promise.resolve(
+                        ts.transpileModule(data, {
+                            compilerOptions: {
+                                ...compilerOptions,
+                                noLib: true, // Acelerar transpilación
+                                skipLibCheck: true,
+                            },
+                            fileName,
+                            reportDiagnostics: false, // No queremos diagnostics aquí
+                            transformers: undefined,
+                            moduleName: path.basename(
+                                fileName,
+                                path.extname(fileName),
+                            ),
+                        }),
+                    ), // 2. Type checking asíncrono en worker (o fallback síncrono)
+                    workerManager.typeCheck(
+                        fileName,
+                        data,
+                        serializableCompilerOptions,
+                    ),
+                ],
             );
-            if (typeCheckResult.hasErrors) {
+
+            // Verificar si el type checking encontró errores
+            if (
+                typeCheckResult.status === 'fulfilled' &&
+                typeCheckResult.value.hasErrors
+            ) {
                 // Crear un mensaje de error más limpio y estructurado
                 const errorMessage = createUnifiedErrorMessage(
                     parseTypeScriptErrors(
-                        typeCheckResult.diagnostics,
+                        typeCheckResult.value.diagnostics,
                         fileName,
                         data,
                     ),
@@ -354,80 +520,35 @@ export const preCompileTS = async (
                     lang: 'ts',
                 };
             }
-        } // 2. Si la validación de tipos pasa, usar transpileModule para generación de código
+
+            // Si type checking fue exitoso, usar el resultado de transpilación
+            if (transpileResult.status === 'fulfilled') {
+                const output = transpileResult.value.outputText;
+
+                // Remover "export {};" si es la única línea
+                if (output.trim() === 'export {};') {
+                    return { error: null, data: '', lang: 'ts' };
+                }
+
+                return { error: null, data: output, lang: 'ts' };
+            } else {
+                throw new Error(
+                    `Error en transpilación: ${transpileResult.reason}`,
+                );
+            }
+        } // Caso sin type checking: solo transpilación rápida
         const transpileResult = ts.transpileModule(data, {
-            compilerOptions,
+            compilerOptions: {
+                ...compilerOptions,
+                noLib: true,
+                skipLibCheck: true,
+            },
             fileName,
-            reportDiagnostics: true, // Importante: ahora sí queremos los diagnostics
+            reportDiagnostics: false,
             transformers: undefined,
             moduleName: path.basename(fileName, path.extname(fileName)),
-        }); // Si transpileModule retorna diagnostics de error, reportar como error
-        if (
-            transpileResult.diagnostics &&
-            transpileResult.diagnostics.length > 0
-        ) {
-            const errorDiagnostics = transpileResult.diagnostics.filter(
-                (d: ts.Diagnostic) => {
-                    if (d.category !== ts.DiagnosticCategory.Error) {
-                        return false;
-                    }
+        });
 
-                    const messageText = ts.flattenDiagnosticMessageText(
-                        d.messageText,
-                        '\n',
-                    );
-
-                    // Aplicar el mismo filtro que en Language Service
-                    return (
-                        !messageText.includes('Cannot find module') &&
-                        !messageText.includes('Could not find source file') &&
-                        !messageText.includes(
-                            "Parameter '$props' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$setup' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$data' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$options' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$event' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '_ctx' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '_cache' implicitly has an 'any' type",
-                        ) &&
-                        !(
-                            messageText.includes(
-                                "implicitly has an 'any' type",
-                            ) &&
-                            (messageText.includes('_ctx') ||
-                                messageText.includes('_cache') ||
-                                messageText.includes('$props') ||
-                                messageText.includes('$setup'))
-                        )
-                    );
-                },
-            );
-            if (errorDiagnostics.length > 0) {
-                const cleanErrors = parseTypeScriptErrors(
-                    errorDiagnostics,
-                    fileName,
-                    data,
-                );
-                const errorMessage = createUnifiedErrorMessage(cleanErrors);
-                return {
-                    error: new Error(errorMessage),
-                    data: null,
-                    lang: 'ts',
-                };
-            }
-        }
         const output = transpileResult.outputText;
 
         // Remover "export {};" si es la única línea
