@@ -4,11 +4,12 @@
  */
 
 import path from 'node:path';
+import { env } from 'node:process';
 import { Worker } from 'node:worker_threads';
 
 import * as ts from 'typescript';
 
-import { validateTypesWithLanguageService } from './typescript-sync-validator.ts';
+import { validateTypesWithLanguageService } from './typescript-sync-validator';
 
 /**
  * Resultado de la validación de tipos
@@ -87,22 +88,15 @@ export class TypeScriptWorkerManager {
 
         this.initPromise = this._performWorkerInitialization();
         return this.initPromise;
-    }
-
-    /**
+    } /**
      * Realiza la inicialización del worker thread
      */
     private async _performWorkerInitialization(): Promise<void> {
         try {
             // Obtener ruta al worker thread (compatible con ES modules y Windows)
-            const currentFilePath = new URL(import.meta.url).pathname;
-            const currentDir = path.dirname(
-                currentFilePath.startsWith('/')
-                    ? currentFilePath.slice(1)
-                    : currentFilePath,
-            );
-            const workerPath = path.resolve(
-                currentDir,
+
+            const workerPath = path.join(
+                env.PATH_PROY || process.cwd(),
                 'typescript-worker-thread.cjs',
             );
 
@@ -199,10 +193,8 @@ export class TypeScriptWorkerManager {
                 '[WorkerManager] Worker thread cerrado con código:',
                 code,
             );
-            this.workerReady = false;
-
-            // Rechazar todas las tareas pendientes
-            for (const [taskId, task] of this.pendingTasks) {
+            this.workerReady = false; // Rechazar todas las tareas pendientes
+            for (const [_, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(
                     new Error(
@@ -242,10 +234,8 @@ export class TypeScriptWorkerManager {
      * Maneja errores del worker thread
      */
     private handleWorkerError(error: Error): void {
-        console.error('[WorkerManager] Manejando error del worker:', error);
-
-        // Rechazar todas las tareas pendientes
-        for (const [taskId, task] of this.pendingTasks) {
+        console.error('[WorkerManager] Manejando error del worker:', error); // Rechazar todas las tareas pendientes
+        for (const [_, task] of this.pendingTasks) {
             clearTimeout(task.timeout);
             task.reject(new Error(`Error en worker: ${error.message}`));
         }
@@ -282,9 +272,13 @@ export class TypeScriptWorkerManager {
                 compilerOptions,
             );
         } catch (workerError) {
+            const errorMessage =
+                workerError instanceof Error
+                    ? workerError.message
+                    : String(workerError);
             console.warn(
                 '[WorkerManager] Error en worker, usando fallback síncrono:',
-                workerError.message,
+                errorMessage,
             );
 
             // Fallback a validación síncrona
@@ -391,7 +385,7 @@ export class TypeScriptWorkerManager {
             console.log('[WorkerManager] Cerrando worker thread...');
 
             // Rechazar todas las tareas pendientes
-            for (const [taskId, task] of this.pendingTasks) {
+            for (const [_, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker manager cerrado'));
             }

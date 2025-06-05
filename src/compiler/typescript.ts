@@ -7,8 +7,8 @@ import * as ts from 'typescript';
 import {
     createUnifiedErrorMessage,
     parseTypeScriptErrors,
-} from './typescript-error-parser.ts';
-import { TypeScriptWorkerManager } from './typescript-worker.ts';
+} from './typescript-error-parser';
+import { TypeScriptWorkerManager } from './typescript-worker';
 
 interface CompileResult {
     error: Error | null;
@@ -468,51 +468,31 @@ export const preCompileTS = async (
             ...parsedConfig.options,
         }; // Crear versión ultra-limpia y serializable de las opciones para el worker
         const serializableCompilerOptions =
-            createSerializableCompilerOptions(compilerOptions); // PIPELINE HÍBRIDO: Separar transpilación rápida del type checking lento
-        if (env.typeCheck === 'true') {
-            // Obtener instancia del Worker Manager
-            const workerManager = TypeScriptWorkerManager.getInstance();
+            createSerializableCompilerOptions(compilerOptions); // PASO 1: SIEMPRE verificar errores de sintaxis con transpilación
+        const transpileResult = ts.transpileModule(data, {
+            compilerOptions: {
+                ...compilerOptions,
+                noLib: true, // Acelerar transpilación
+                skipLibCheck: true,
+            },
+            fileName,
+            reportDiagnostics: true, // IMPORTANTE: Habilitar para detectar errores de sintaxis
+            transformers: undefined,
+            moduleName: path.basename(fileName, path.extname(fileName)),
+        });
 
-            // Iniciar transpilación rápida y type checking asíncrono en paralelo
-            const [transpileResult, typeCheckResult] = await Promise.allSettled(
-                [
-                    // 1. Transpilación rápida (sin validación de tipos)
-                    Promise.resolve(
-                        ts.transpileModule(data, {
-                            compilerOptions: {
-                                ...compilerOptions,
-                                noLib: true, // Acelerar transpilación
-                                skipLibCheck: true,
-                            },
-                            fileName,
-                            reportDiagnostics: false, // No queremos diagnostics aquí
-                            transformers: undefined,
-                            moduleName: path.basename(
-                                fileName,
-                                path.extname(fileName),
-                            ),
-                        }),
-                    ), // 2. Type checking asíncrono en worker (o fallback síncrono)
-                    workerManager.typeCheck(
-                        fileName,
-                        data,
-                        serializableCompilerOptions,
-                    ),
-                ],
+        // Verificar errores de sintaxis en transpilación
+        if (
+            transpileResult.diagnostics &&
+            transpileResult.diagnostics.length > 0
+        ) {
+            const syntaxErrors = transpileResult.diagnostics.filter(
+                diag => diag.category === ts.DiagnosticCategory.Error,
             );
 
-            // Verificar si el type checking encontró errores
-            if (
-                typeCheckResult.status === 'fulfilled' &&
-                typeCheckResult.value.hasErrors
-            ) {
-                // Crear un mensaje de error más limpio y estructurado
+            if (syntaxErrors.length > 0) {
                 const errorMessage = createUnifiedErrorMessage(
-                    parseTypeScriptErrors(
-                        typeCheckResult.value.diagnostics,
-                        fileName,
-                        data,
-                    ),
+                    parseTypeScriptErrors(syntaxErrors, fileName, data),
                 );
                 return {
                     error: new Error(errorMessage),
@@ -520,34 +500,45 @@ export const preCompileTS = async (
                     lang: 'ts',
                 };
             }
+        }
 
-            // Si type checking fue exitoso, usar el resultado de transpilación
-            if (transpileResult.status === 'fulfilled') {
-                const output = transpileResult.value.outputText;
+        // PASO 2: Si hay type checking habilitado, verificar errores de tipos
+        if (env.typeCheck === 'true') {
+            try {
+                // Obtener instancia del Worker Manager
+                const workerManager = TypeScriptWorkerManager.getInstance();
 
-                // Remover "export {};" si es la única línea
-                if (output.trim() === 'export {};') {
-                    return { error: null, data: '', lang: 'ts' };
+                // Type checking asíncrono en worker (o fallback síncrono)
+                const typeCheckResult = await workerManager.typeCheck(
+                    fileName,
+                    data,
+                    serializableCompilerOptions,
+                );
+
+                // Verificar si el type checking encontró errores
+                if (typeCheckResult.hasErrors) {
+                    // Crear un mensaje de error más limpio y estructurado
+                    const errorMessage = createUnifiedErrorMessage(
+                        parseTypeScriptErrors(
+                            typeCheckResult.diagnostics,
+                            fileName,
+                            data,
+                        ),
+                    );
+                    return {
+                        error: new Error(errorMessage),
+                        data: null,
+                        lang: 'ts',
+                    };
                 }
-
-                return { error: null, data: output, lang: 'ts' };
-            } else {
-                throw new Error(
-                    `Error en transpilación: ${transpileResult.reason}`,
+            } catch (typeCheckError) {
+                // Si el type checking falla, loggear pero continuar con la transpilación
+                console.warn(
+                    '[preCompileTS] Type checking failed:',
+                    typeCheckError,
                 );
             }
-        } // Caso sin type checking: solo transpilación rápida
-        const transpileResult = ts.transpileModule(data, {
-            compilerOptions: {
-                ...compilerOptions,
-                noLib: true,
-                skipLibCheck: true,
-            },
-            fileName,
-            reportDiagnostics: false,
-            transformers: undefined,
-            moduleName: path.basename(fileName, path.extname(fileName)),
-        });
+        }
 
         const output = transpileResult.outputText;
 
