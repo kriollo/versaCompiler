@@ -479,20 +479,41 @@ export const preCompileTS = async (
             reportDiagnostics: true, // IMPORTANTE: Habilitar para detectar errores de sintaxis
             transformers: undefined,
             moduleName: path.basename(fileName, path.extname(fileName)),
-        });
-
-        // Verificar errores de sintaxis en transpilación
+        }); // Verificar errores de sintaxis en transpilación
         if (
             transpileResult.diagnostics &&
             transpileResult.diagnostics.length > 0
         ) {
-            const syntaxErrors = transpileResult.diagnostics.filter(
-                diag => diag.category === ts.DiagnosticCategory.Error,
-            );
+            const criticalErrors = transpileResult.diagnostics.filter(diag => {
+                // Solo considerar errores críticos que impiden la transpilación
+                if (diag.category !== ts.DiagnosticCategory.Error) {
+                    return false;
+                }
 
-            if (syntaxErrors.length > 0) {
+                // Filtrar errores que no son críticos para la transpilación
+                const messageText = ts.flattenDiagnosticMessageText(
+                    diag.messageText,
+                    '\n',
+                );
+
+                // Los errores de módulo no encontrado NO deben detener la transpilación
+                // ya que pueden ser resueltos en runtime o por bundlers
+                if (
+                    messageText.includes('Cannot find module') ||
+                    messageText.includes('Could not find source file') ||
+                    diag.code === 2307 || // Cannot find module
+                    diag.code === 6059
+                ) {
+                    // File not found
+                    return false;
+                }
+
+                return true;
+            });
+
+            if (criticalErrors.length > 0) {
                 const errorMessage = createUnifiedErrorMessage(
-                    parseTypeScriptErrors(syntaxErrors, fileName, data),
+                    parseTypeScriptErrors(criticalErrors, fileName, data),
                 );
                 return {
                     error: new Error(errorMessage),
@@ -540,6 +561,7 @@ export const preCompileTS = async (
             }
         }
 
+        // PASO 3: Retornar resultado de transpilación exitosa
         const output = transpileResult.outputText;
 
         // Remover "export {};" si es la única línea
