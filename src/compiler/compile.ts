@@ -951,7 +951,7 @@ async function compileJS(
     await writeFile(outPath, code, 'utf-8');
 
     if (env.VERBOSE === 'true') {
-        console.log(`📊 Timings para ${path.basename(inPath)}:`, timings);
+        console.info(`📊 Timings para ${path.basename(inPath)}:`, timings);
     }
     return {
         error: null,

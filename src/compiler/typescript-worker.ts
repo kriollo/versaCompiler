@@ -100,7 +100,7 @@ export class TypeScriptWorkerManager {
                 'typescript-worker-thread.cjs',
             );
 
-            console.log('[WorkerManager] Inicializando worker en:', workerPath);
+            // console.log('[WorkerManager] Inicializando worker en:', workerPath);
 
             // Crear el worker thread
             this.worker = new Worker(workerPath, {
@@ -116,7 +116,7 @@ export class TypeScriptWorkerManager {
             // Esperar a que el worker esté listo
             await this.waitForWorkerReady();
 
-            console.log('[WorkerManager] Worker inicializado exitosamente');
+            // console.log('[WorkerManager] Worker inicializado exitosamente');
         } catch (error) {
             console.error('[WorkerManager] Error inicializando worker:', error);
             this.worker = null;
@@ -133,12 +133,12 @@ export class TypeScriptWorkerManager {
 
         this.worker.on('message', (response: WorkerResponse) => {
             try {
-                console.log('[WorkerManager] Mensaje recibido del worker:', {
-                    id: response.id,
-                    success: response.success,
-                    hasErrors: response.hasErrors,
-                    diagnosticsCount: response.diagnostics?.length,
-                });
+                // console.log('[WorkerManager] Mensaje recibido del worker:', {
+                //     id: response.id,
+                //     success: response.success,
+                //     hasErrors: response.hasErrors,
+                //     diagnosticsCount: response.diagnostics?.length,
+                // });
 
                 // Manejar mensaje de worker ready
                 if (response.id === 'worker-ready') {
@@ -328,12 +328,12 @@ export class TypeScriptWorkerManager {
                     compilerOptions,
                 };
 
-                console.log('[WorkerManager] Enviando tarea al worker:', {
-                    id: taskId,
-                    fileName,
-                    contentLength: content.length,
-                    compilerOptionsKeys: Object.keys(compilerOptions),
-                });
+                // console.log('[WorkerManager] Enviando tarea al worker:', {
+                //     id: taskId,
+                //     fileName,
+                //     contentLength: content.length,
+                //     compilerOptionsKeys: Object.keys(compilerOptions),
+                // });
 
                 // Enviar mensaje al worker
                 this.worker!.postMessage(message);
@@ -354,9 +354,9 @@ export class TypeScriptWorkerManager {
         content: string,
         compilerOptions: any,
     ): TypeCheckResult {
-        console.log(
-            '[WorkerManager] Ejecutando type checking síncrono como fallback',
-        );
+        // console.log(
+        //     '[WorkerManager] Ejecutando type checking síncrono como fallback',
+        // );
 
         try {
             return validateTypesWithLanguageService(
@@ -380,7 +380,7 @@ export class TypeScriptWorkerManager {
      */
     async terminate(): Promise<void> {
         if (this.worker) {
-            console.log('[WorkerManager] Cerrando worker thread...'); // Rechazar todas las tareas pendientes
+            // console.log('[WorkerManager] Cerrando worker thread...'); // Rechazar todas las tareas pendientes
             for (const [, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker manager cerrado'));
@@ -393,7 +393,7 @@ export class TypeScriptWorkerManager {
             this.workerReady = false;
             this.initPromise = null;
 
-            console.log('[WorkerManager] Worker cerrado exitosamente');
+            // console.log('[WorkerManager] Worker cerrado exitosamente');
         }
     }
 

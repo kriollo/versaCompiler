@@ -8,12 +8,12 @@ const path = require('node:path');
 const { parentPort } = require('node:worker_threads');
 
 // Debug: Log de inicio del worker
-console.log('[Worker] TypeScript Worker Thread iniciado');
+// console.log('[Worker] TypeScript Worker Thread iniciado');
 
 let ts;
 try {
     ts = require('typescript');
-    console.log('[Worker] TypeScript cargado exitosamente');
+    // console.log('[Worker] TypeScript cargado exitosamente');
 } catch (error) {
     console.error('[Worker] Error cargando TypeScript:', error);
     process.exit(1);
@@ -66,10 +66,10 @@ class WorkerTypeScriptLanguageServiceHost {
             allowNonTsExtensions: true,
         };
 
-        console.log(
-            '[Worker] Opciones del compilador limpias creadas:',
-            Object.keys(cleanOptions),
-        );
+        // console.log(
+        //     '[Worker] Opciones del compilador limpias creadas:',
+        //     Object.keys(cleanOptions),
+        // );
         return cleanOptions;
     }
 
@@ -168,19 +168,19 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             const virtualFileName = `${fileName}.ts`;
             host.addFile(virtualFileName, scriptContent);
             actualFileName = virtualFileName;
-            console.log('[Worker] Archivo Vue agregado como:', virtualFileName);
+            // console.log('[Worker] Archivo Vue agregado como:', virtualFileName);
         } else {
             // Para archivos virtuales, usar el nombre tal como viene
             host.addFile(fileName, scriptContent);
             actualFileName = fileName;
-            console.log('[Worker] Archivo agregado como:', fileName);
+            // console.log('[Worker] Archivo agregado como:', fileName);
         }
 
-        console.log(
-            '[Worker] Contenido del archivo:',
-            scriptContent.substring(0, 100) + '...',
-        );
-        console.log('[Worker] Archivos en host:', host.getScriptFileNames());
+        // console.log(
+        //     '[Worker] Contenido del archivo:',
+        //     scriptContent.substring(0, 100) + '...',
+        // );
+        // console.log('[Worker] Archivos en host:', host.getScriptFileNames());
 
         // Agregar declaraciones básicas de tipos para Vue si es necesario
         if (fileName.endsWith('.vue')) {
@@ -218,12 +218,12 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             try {
                 syntacticDiagnostics =
                     languageService.getSyntacticDiagnostics(actualFileName);
-                console.log(
-                    '[Worker] Diagnósticos sintácticos:',
-                    syntacticDiagnostics.length,
-                );
+                // console.log(
+                //     '[Worker] Diagnósticos sintácticos:',
+                //     syntacticDiagnostics.length,
+                // );
             } catch (error) {
-                console.log(
+                console.error(
                     '[Worker] Error obteniendo diagnósticos sintácticos:',
                     error.message,
                 );
@@ -232,12 +232,12 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             try {
                 semanticDiagnostics =
                     languageService.getSemanticDiagnostics(actualFileName);
-                console.log(
-                    '[Worker] Diagnósticos semánticos:',
-                    semanticDiagnostics.length,
-                );
+                // console.log(
+                //     '[Worker] Diagnósticos semánticos:',
+                //     semanticDiagnostics.length,
+                // );
             } catch (error) {
-                console.log(
+                console.error(
                     '[Worker] Error obteniendo diagnósticos semánticos:',
                     error.message,
                 );
@@ -247,21 +247,21 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                 ...semanticDiagnostics,
             ];
 
-            console.log(
-                '[Worker] Total diagnósticos encontrados:',
-                allDiagnostics.length,
-            );
+            // console.log(
+            //     '[Worker] Total diagnósticos encontrados:',
+            //     allDiagnostics.length,
+            // );
 
             // Log de todos los diagnósticos antes del filtrado
-            allDiagnostics.forEach((diag, index) => {
-                const messageText = ts.flattenDiagnosticMessageText(
-                    diag.messageText,
-                    '\n',
-                );
-                console.log(
-                    `[Worker] Diagnóstico ${index + 1}: [${diag.category}] ${messageText}`,
-                );
-            });
+            // allDiagnostics.forEach((diag, index) => {
+            //     const messageText = ts.flattenDiagnosticMessageText(
+            //         diag.messageText,
+            //         '\n',
+            //     );
+            //     console.log(
+            //         `[Worker] Diagnóstico ${index + 1}: [${diag.category}] ${messageText}`,
+            //     );
+            // });
 
             // Filtrar diagnósticos relevantes
             const filteredDiagnostics = allDiagnostics.filter(diag => {
@@ -339,12 +339,12 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
 if (parentPort) {
     parentPort.on('message', message => {
         try {
-            console.log('[Worker] Mensaje recibido:', {
-                id: message.id,
-                fileName: message.fileName,
-                contentLength: message.content?.length,
-                compilerOptions: Object.keys(message.compilerOptions || {}),
-            });
+            // console.log('[Worker] Mensaje recibido:', {
+            //     id: message.id,
+            //     fileName: message.fileName,
+            //     contentLength: message.content?.length,
+            //     compilerOptions: Object.keys(message.compilerOptions || {}),
+            // });
 
             const { id, fileName, content, compilerOptions } = message;
 
@@ -385,12 +385,12 @@ if (parentPort) {
             }));
 
             // Enviar respuesta al proceso principal
-            console.log('[Worker] Enviando respuesta:', {
-                id,
-                success: true,
-                diagnosticsCount: serializableDiagnostics.length,
-                hasErrors: result.hasErrors,
-            });
+            // console.log('[Worker] Enviando respuesta:', {
+            //     id,
+            //     success: true,
+            //     diagnosticsCount: serializableDiagnostics.length,
+            //     hasErrors: result.hasErrors,
+            // });
 
             parentPort.postMessage({
                 id,
@@ -426,7 +426,7 @@ process.on('uncaughtException', error => {
 });
 
 // Log de confirmación de que el worker está listo
-console.log('[Worker] TypeScript Worker Thread listo para recibir mensajes');
+// console.log('[Worker] TypeScript Worker Thread listo para recibir mensajes');
 
 // Señal de que el worker está listo
 if (parentPort) {

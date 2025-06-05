@@ -486,7 +486,7 @@ export async function estandarizaCode(
         if (ast && ast.errors && ast.errors.length > 0) {
             // Debug: mostrar la estructura del error para entender mejor qué información tenemos
             if (env.VERBOSE === 'true') {
-                console.log(
+                console.info(
                     'DEBUG - Estructura del error:',
                     JSON.stringify(ast.errors[0], null, 2),
                 );
