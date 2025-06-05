@@ -28,6 +28,162 @@ let estandarizaCode: any;
 let preCompileTS: any;
 let preCompileVue: any;
 
+// 🚀 Sistema de Carga Inteligente de Módulos
+class ModuleManager {
+    private static instance: ModuleManager;
+    private isInitialized: boolean = false;
+    private initializationPromise: Promise<void> | null = null;
+    private loadedModules: Set<string> = new Set();
+
+    private constructor() {}
+
+    static getInstance(): ModuleManager {
+        if (!ModuleManager.instance) {
+            ModuleManager.instance = new ModuleManager();
+        }
+        return ModuleManager.instance;
+    }
+
+    /**
+     * Inicializa los módulos necesarios según el contexto de compilación
+     * @param context Contexto de compilación: 'individual', 'batch', 'watch'
+     * @param fileExtensions Extensiones de archivos a compilar para optimizar la carga
+     */
+    async initializeModules(
+        context: 'individual' | 'batch' | 'watch' = 'individual',
+        fileExtensions: Set<string> = new Set(),
+    ): Promise<void> {
+        // Si ya hay una inicialización en progreso, esperar a que termine
+        if (this.initializationPromise) {
+            return this.initializationPromise;
+        }
+
+        // Si ya está inicializado y es el mismo contexto, no hacer nada
+        if (this.isInitialized && context !== 'individual') {
+            return;
+        }
+
+        this.initializationPromise = this._performInitialization(
+            context,
+            fileExtensions,
+        );
+        await this.initializationPromise;
+        this.initializationPromise = null;
+    }
+
+    private async _performInitialization(
+        context: 'individual' | 'batch' | 'watch',
+        fileExtensions: Set<string>,
+    ): Promise<void> {
+        const modulesToLoad: Promise<void>[] = [];
+
+        // Módulos siempre necesarios
+        if (!this.loadedModules.has('chalk')) {
+            modulesToLoad.push(this._loadModule('chalk', loadChalk));
+        }
+        if (!this.loadedModules.has('parser')) {
+            modulesToLoad.push(this._loadModule('parser', loadParser));
+        }
+        if (!this.loadedModules.has('transforms')) {
+            modulesToLoad.push(this._loadModule('transforms', loadTransforms));
+        }
+
+        // Carga contextual según el tipo de compilación
+        if (context === 'batch' || context === 'watch') {
+            // En modo batch/watch, precargar todos los módulos necesarios
+            if (!this.loadedModules.has('vue')) {
+                modulesToLoad.push(this._loadModule('vue', loadVue));
+            }
+            if (!this.loadedModules.has('typescript')) {
+                modulesToLoad.push(
+                    this._loadModule('typescript', loadTypeScript),
+                );
+            }
+            if (!this.loadedModules.has('minify')) {
+                modulesToLoad.push(this._loadModule('minify', loadMinify));
+            }
+        } else {
+            // En modo individual, cargar solo según las extensiones necesarias
+            if (fileExtensions.has('.vue') && !this.loadedModules.has('vue')) {
+                modulesToLoad.push(this._loadModule('vue', loadVue));
+            }
+            if (
+                (fileExtensions.has('.ts') || fileExtensions.has('.vue')) &&
+                !this.loadedModules.has('typescript')
+            ) {
+                modulesToLoad.push(
+                    this._loadModule('typescript', loadTypeScript),
+                );
+            }
+            if (env.isPROD === 'true' && !this.loadedModules.has('minify')) {
+                modulesToLoad.push(this._loadModule('minify', loadMinify));
+            }
+        }
+
+        // Cargar módulos en paralelo
+        await Promise.all(modulesToLoad);
+        this.isInitialized = true;
+    }
+
+    private async _loadModule(
+        name: string,
+        loadFunction: () => Promise<any>,
+    ): Promise<void> {
+        if (!this.loadedModules.has(name)) {
+            await loadFunction();
+            this.loadedModules.add(name);
+        }
+    }
+
+    /**
+     * Carga un módulo específico bajo demanda (lazy loading)
+     */
+    async ensureModuleLoaded(moduleName: string): Promise<void> {
+        if (this.loadedModules.has(moduleName)) {
+            return;
+        }
+
+        switch (moduleName) {
+            case 'vue':
+                await this._loadModule('vue', loadVue);
+                break;
+            case 'typescript':
+                await this._loadModule('typescript', loadTypeScript);
+                break;
+            case 'minify':
+                await this._loadModule('minify', loadMinify);
+                break;
+            case 'tailwind':
+                await this._loadModule('tailwind', loadTailwind);
+                break;
+            case 'linter':
+                await this._loadModule('linter', loadLinter);
+                break;
+            default:
+                throw new Error(`Módulo desconocido: ${moduleName}`);
+        }
+    }
+
+    /**
+     * Resetea el estado del manager (útil para tests)
+     */
+    reset(): void {
+        this.isInitialized = false;
+        this.initializationPromise = null;
+        this.loadedModules.clear();
+    }
+
+    /**
+     * Obtiene estadísticas de módulos cargados
+     */
+    getStats(): { loaded: string[]; initialized: boolean } {
+        return {
+            loaded: Array.from(this.loadedModules),
+            initialized: this.isInitialized,
+        };
+    }
+}
+
 // Lazy loading helper functions
 async function loadChalk() {
     if (!chalk) {
@@ -93,6 +249,9 @@ async function loadVue() {
     }
     return preCompileVue;
 }
+
+// ⚠️ Función eliminada: preloadAllModules()
+// Ahora usamos ModuleManager.getInstance().initializeModules() directamente
 
 // 🎯 Sistema Unificado de Manejo de Errores
 type CompilationMode = 'all' | 'individual' | 'watch';
@@ -536,15 +695,26 @@ async function compileJS(
     outPath: string,
     mode: CompilationMode = 'individual',
 ) {
+    const timings: Record<string, number> = {};
+
     // Si la ruta ya es absoluta, no la resolvamos de nuevo
     inPath = path.isAbsolute(inPath)
         ? normalizeRuta(inPath)
         : normalizeRuta(path.resolve(inPath));
 
+    // 🚀 Usar ModuleManager para carga optimizada
+    const moduleManager = ModuleManager.getInstance();
+
+    // Timing de lectura
+    let start = Date.now();
+
     const extension = path.extname(inPath);
+
+    // Asegurar que el parser esté cargado
+    await moduleManager.ensureModuleLoaded('parser');
     const getCodeFile = await loadParser();
     let { code, error } = await getCodeFile(inPath);
-
+    timings.fileRead = Date.now() - start;
     if (error) {
         await handleCompilationError(
             error instanceof Error ? error : new Error(String(error)),
@@ -555,7 +725,6 @@ async function compileJS(
         );
         throw new Error(error instanceof Error ? error.message : String(error));
     }
-
     if (
         !code ||
         code.trim().length === 0 ||
@@ -574,12 +743,17 @@ async function compileJS(
 
     // Logs detallados solo en modo verbose + all
     const shouldShowDetailedLogs = env.VERBOSE === 'true' && mode === 'all';
-    const chalk = shouldShowDetailedLogs ? await loadChalk() : null; // Compilación de Vue
+
+    // Compilación de Vue
     let vueResult;
     if (extension === '.vue') {
+        start = Date.now();
         if (shouldShowDetailedLogs) {
             logger.info(chalk!.green(`💚 Precompilando VUE: ${inPath}`));
         }
+
+        // Asegurar que el módulo Vue esté cargado
+        await moduleManager.ensureModuleLoaded('vue');
         const preCompileVue = await loadVue();
 
         if (typeof preCompileVue !== 'function') {
@@ -589,7 +763,7 @@ async function compileJS(
         }
 
         vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
-
+        timings.vueCompile = Date.now() - start;
         if (vueResult === undefined || vueResult === null) {
             throw new Error(
                 `preCompileVue devolvió ${vueResult} para archivo: ${inPath}`,
@@ -615,7 +789,6 @@ async function compileJS(
         registerCompilationSuccess(inPath, 'vue');
         code = vueResult.data;
     }
-
     if (!code || code.trim().length === 0) {
         await handleCompilationError(
             new Error('El código Vue compilado está vacío.'),
@@ -625,12 +798,18 @@ async function compileJS(
             env.VERBOSE === 'true',
         );
         throw new Error('El código Vue compilado está vacío.');
-    } // Compilación de TypeScript
+    }
+
+    // Compilación de TypeScript
     let tsResult;
     if (extension === '.ts' || vueResult?.lang === 'ts') {
+        start = Date.now();
         if (shouldShowDetailedLogs) {
             logger.info(chalk!.blue(`🔄️ Precompilando TS: ${inPath}`));
         }
+
+        // Asegurar que el módulo TypeScript esté cargado
+        await moduleManager.ensureModuleLoaded('typescript');
         const preCompileTS = await loadTypeScript();
 
         if (typeof preCompileTS !== 'function') {
@@ -640,7 +819,7 @@ async function compileJS(
         }
 
         tsResult = await preCompileTS(code, inPath);
-
+        timings.tsCompile = Date.now() - start;
         if (tsResult === undefined || tsResult === null) {
             throw new Error(
                 `preCompileTS devolvió ${tsResult} para archivo: ${inPath}`,
@@ -677,7 +856,6 @@ async function compileJS(
             code = tsResult.data;
         }
     }
-
     if (!code || code.trim().length === 0) {
         await handleCompilationError(
             new Error('El código TypeScript compilado está vacío.'),
@@ -693,9 +871,13 @@ async function compileJS(
     if (shouldShowDetailedLogs) {
         logger.info(chalk!.yellow(`💛 Estandarizando: ${inPath}`));
     }
+    start = Date.now();
+
+    // Asegurar que el módulo de transformaciones esté cargado
+    await moduleManager.ensureModuleLoaded('transforms');
     const estandarizaCode = await loadTransforms();
     const resultSTD = await estandarizaCode(code, inPath);
-
+    timings.standardization = Date.now() - start;
     if (resultSTD === undefined || resultSTD === null) {
         throw new Error(
             `estandarizaCode devolvió ${resultSTD} para archivo: ${inPath}`,
@@ -714,7 +896,6 @@ async function compileJS(
     }
     registerCompilationSuccess(inPath, 'standardization');
     code = resultSTD.code;
-
     if (!code || code.trim().length === 0) {
         await handleCompilationError(
             new Error('El código estandarizado está vacío.'),
@@ -728,12 +909,16 @@ async function compileJS(
 
     // Minificación (solo en producción)
     if (env.isPROD === 'true') {
+        start = Date.now();
         if (shouldShowDetailedLogs) {
             logger.info(chalk!.red(`🤖 Minificando: ${inPath}`));
         }
+
+        // Asegurar que el módulo de minificación esté cargado
+        await moduleManager.ensureModuleLoaded('minify');
         const minifyJS = await loadMinify();
         const resultMinify = await minifyJS(code, inPath, true);
-
+        timings.minification = Date.now() - start;
         if (resultMinify === undefined || resultMinify === null) {
             throw new Error(
                 `minifyJS devolvió ${resultMinify} para archivo: ${inPath}`,
@@ -765,6 +950,9 @@ async function compileJS(
     await mkdir(destinationDir, { recursive: true });
     await writeFile(outPath, code, 'utf-8');
 
+    if (env.VERBOSE === 'true') {
+        console.log(`📊 Timings para ${path.basename(inPath)}:`, timings);
+    }
     return {
         error: null,
         action: 'extension',
@@ -777,8 +965,20 @@ export async function initCompile(
     mode: CompilationMode = 'individual',
 ) {
     try {
+        // 🚀 Sistema de Carga Inteligente de Módulos
+        const moduleManager = ModuleManager.getInstance();
+        const fileExtension = path.extname(ruta);
+        const fileExtensions = new Set([fileExtension]);
+
+        // Inicializar módulos según el contexto
+        await moduleManager.initializeModules(
+            mode === 'all' ? 'batch' : mode,
+            fileExtensions,
+        );
+
         // Generar TailwindCSS si está habilitado
         if (compileTailwind && Boolean(env.TAILWIND)) {
+            await moduleManager.ensureModuleLoaded('tailwind');
             const generateTailwindCSS = await loadTailwind();
             const resultTW = await generateTailwindCSS();
             if (typeof resultTW !== 'boolean') {
