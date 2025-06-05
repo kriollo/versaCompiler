@@ -28,13 +28,11 @@ class WorkerTypeScriptLanguageServiceHost {
         // Crear opciones ultra-limpias para evitar problemas de serialización
         this.compilerOptions =
             this.createUltraCleanCompilerOptions(compilerOptions);
-    }
-
-    /**
-     * Crea opciones del compilador ultra-limpias que no causen problemas de clonación
+    } /**
+     * Crea opciones del compilador que respetan la configuración del tsconfig.json
      */
     createUltraCleanCompilerOptions(options) {
-        // Solo usar valores primitivos seguros
+        // Usar las opciones del tsconfig.json pasadas desde el hilo principal
         const cleanOptions = {
             target: options.target || ts.ScriptTarget.ES2020,
             module: options.module || ts.ModuleKind.ES2020,
@@ -56,9 +54,14 @@ class WorkerTypeScriptLanguageServiceHost {
             noUnusedParameters: Boolean(options.noUnusedParameters),
             isolatedModules: Boolean(options.isolatedModules !== false), // true por defecto
 
-            // Opciones críticas para evitar problemas de serialización
-            noLib: true, // Evitar cargar librerías complejas
-            noResolve: true, // Evitar resolución de módulos compleja
+            // Usar las librerías especificadas en el tsconfig.json
+            lib: Array.isArray(options.lib)
+                ? options.lib
+                : ['es2020', 'dom', 'dom.iterable'],
+
+            // Opciones críticas para el worker pero manteniendo compatibilidad
+            noLib: false, // Permitir librerías para APIs básicas (DOM, Promise, etc.)
+            noResolve: true, // Evitar resolución de módulos compleja pero mantener tipos globales
             suppressOutputPathCheck: true,
             allowNonTsExtensions: true,
         };

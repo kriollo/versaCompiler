@@ -94,9 +94,9 @@ export class TypeScriptWorkerManager {
     private async _performWorkerInitialization(): Promise<void> {
         try {
             // Obtener ruta al worker thread (compatible con ES modules y Windows)
-
             const workerPath = path.join(
                 env.PATH_PROY || process.cwd(),
+                'compiler',
                 'typescript-worker-thread.cjs',
             );
 
@@ -187,14 +187,13 @@ export class TypeScriptWorkerManager {
             console.error('[WorkerManager] Error en worker thread:', error);
             this.handleWorkerError(error);
         });
-
         this.worker.on('exit', code => {
             console.warn(
                 '[WorkerManager] Worker thread cerrado con código:',
                 code,
             );
             this.workerReady = false; // Rechazar todas las tareas pendientes
-            for (const [_, task] of this.pendingTasks) {
+            for (const [, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(
                     new Error(
@@ -232,10 +231,9 @@ export class TypeScriptWorkerManager {
 
     /**
      * Maneja errores del worker thread
-     */
-    private handleWorkerError(error: Error): void {
+     */ private handleWorkerError(error: Error): void {
         console.error('[WorkerManager] Manejando error del worker:', error); // Rechazar todas las tareas pendientes
-        for (const [_, task] of this.pendingTasks) {
+        for (const [, task] of this.pendingTasks) {
             clearTimeout(task.timeout);
             task.reject(new Error(`Error en worker: ${error.message}`));
         }
@@ -382,10 +380,8 @@ export class TypeScriptWorkerManager {
      */
     async terminate(): Promise<void> {
         if (this.worker) {
-            console.log('[WorkerManager] Cerrando worker thread...');
-
-            // Rechazar todas las tareas pendientes
-            for (const [_, task] of this.pendingTasks) {
+            console.log('[WorkerManager] Cerrando worker thread...'); // Rechazar todas las tareas pendientes
+            for (const [, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker manager cerrado'));
             }

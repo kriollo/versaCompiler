@@ -137,7 +137,9 @@ export class ErrorReporter {
             contextLines: options.contextLines ?? 2,
             colorize: options.colorize ?? true,
         };
-    } /**
+    }
+
+    /**
      * Analiza un error de oxc-parser y extrae información detallada
      */
     analyzeParsingError(
@@ -190,13 +192,20 @@ export class ErrorReporter {
             );
         }
 
-        // Agregar sugerencias basadas en el tipo de error
-        detailedError.suggestion = this.generateSuggestion(error.message);
+        // Detectar patrones específicos de errores para sugerencias más inteligentes
+        detailedError.suggestion = this.generateIntelligentSuggestion(
+            error.message,
+            sourceCode,
+            detailedError.line,
+            detailedError.column,
+        );
 
         // Extraer código de error si está disponible
         if (error.code) {
             detailedError.errorCode = error.code;
-        } // Si oxc-parser ya proporciona un codeframe, usarlo como referencia adicional
+        }
+
+        // Si oxc-parser ya proporciona un codeframe, usarlo como referencia adicional
         if (error.codeframe) {
             detailedError.codeContext = this.combineWithOxcCodeframe(
                 detailedError.codeContext,
@@ -244,7 +253,9 @@ export class ErrorReporter {
         }
 
         return { line, column };
-    } /**
+    }
+
+    /**
      * Genera contexto del código alrededor del error
      */
     private generateCodeContext(
@@ -326,8 +337,9 @@ export class ErrorReporter {
         }
 
         if (message.includes('const') && message.includes('initializer')) {
-            return 'Las declaraciones const requieren un valor inicial. Agrega = valor después del nombre.';
+            return 'Las declaraciones const requieren un valor inicial. Ejemplos válidos:\n   • const variable = "valor";\n   • const numero = 42;\n   • const objeto = { propiedad: "valor" };';
         }
+
         return 'Revisa la sintaxis del código alrededor de esta ubicación.';
     }
 
@@ -340,7 +352,9 @@ export class ErrorReporter {
     ): string {
         if (!ourContext) {
             return oxcCodeframe;
-        } // Si ya tenemos nuestro contexto, podemos agregar el de oxc como referencia adicional
+        }
+
+        // Si ya tenemos nuestro contexto, podemos agregar el de oxc como referencia adicional
         const chalkSync = getChalkSync();
         return (
             ourContext +
@@ -349,7 +363,9 @@ export class ErrorReporter {
             '\n' +
             oxcCodeframe
         );
-    } /**
+    }
+
+    /**
      * Formatea un error detallado como texto legible
      */
     formatError(error: DetailedParsingError): string {
@@ -384,12 +400,16 @@ export class ErrorReporter {
             }
         }
 
-        output += '\n'; // Mensaje de error
+        output += '\n';
+
+        // Mensaje de error
         if (this.options.colorize) {
             output += `💥 ${chalkSync.bold(error.message)}\n`;
         } else {
             output += `💥 ${error.message}\n`;
-        } // Código de error si está disponible
+        }
+
+        // Código de error si está disponible
         if (error.errorCode) {
             if (this.options.colorize) {
                 output += chalkSync.dim(`   Código: ${error.errorCode}\n`);
@@ -401,7 +421,9 @@ export class ErrorReporter {
         // Contexto del código
         if (error.codeContext) {
             output += error.codeContext;
-        } // Sugerencia
+        }
+
+        // Sugerencia
         if (error.suggestion) {
             if (this.options.colorize) {
                 output += `\n💡 ${chalkSync.yellow('Sugerencia:')} ${error.suggestion}\n`;
@@ -424,7 +446,9 @@ export class ErrorReporter {
         return errors.map(error =>
             this.analyzeParsingError(error, sourceCode, fileName),
         );
-    } /**
+    }
+
+    /**
      * Formatea múltiples errores como un reporte completo
      */
     formatMultipleErrors(errors: DetailedParsingError[]): string {
@@ -455,8 +479,110 @@ export class ErrorReporter {
                 }
             }
         });
-
         return output;
+    } /**
+     * Genera sugerencias más inteligentes basadas en análisis contextual del error
+     */
+    private generateIntelligentSuggestion(
+        errorMessage: string,
+        sourceCode: string,
+        line?: number,
+        _column?: number,
+    ): string {
+        const message = errorMessage.toLowerCase();
+
+        // Análisis contextual del código si tenemos la línea
+        if (line && sourceCode) {
+            const lines = sourceCode.split('\n');
+            const errorLine = lines[line - 1] || '';
+            const prevLine = line > 1 ? lines[line - 2] || '' : '';
+
+            // Análisis específico para declaraciones const
+            if (message.includes('const') && message.includes('initializer')) {
+                // Detectar el tipo de error específico analizando el contexto
+                if (
+                    errorLine
+                        .trim()
+                        .match(/^const\s+[a-zA-Z_][a-zA-Z0-9_]*\s*;/)
+                ) {
+                    return (
+                        'Declaración const incompleta. Agrega un valor inicial:\n   • const ' +
+                        errorLine.match(
+                            /const\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+                        )?.[1] +
+                        ' = "valor";\n   • const ' +
+                        errorLine.match(
+                            /const\s+([a-zA-Z_][a-zA-Z0-9_]*)/,
+                        )?.[1] +
+                        ' = 42;\n   • O cambia a "let" si planeas asignar después'
+                    );
+                }
+
+                if (
+                    errorLine.includes('=') &&
+                    !errorLine.trim().endsWith(';')
+                ) {
+                    return 'Parece que la declaración const está incompleta. Verifica:\n   • Que la expresión del lado derecho esté completa\n   • Que termine con punto y coma (;)\n   • Que no falten paréntesis o comillas';
+                }
+
+                return 'Las declaraciones const requieren un valor inicial:\n   • const variable = "valor";\n   • const numero = 42;\n   • const objeto = { propiedad: "valor" };\n   • const array = [1, 2, 3];';
+            }
+
+            // Análisis para identificadores inesperados
+            if (
+                message.includes('unexpected') &&
+                message.includes('identifier')
+            ) {
+                if (
+                    prevLine.trim() &&
+                    !prevLine.trim().endsWith(';') &&
+                    !prevLine.trim().endsWith('{') &&
+                    !prevLine.trim().endsWith('}')
+                ) {
+                    return 'La línea anterior parece incompleta. Verifica:\n   • Que termine con punto y coma (;)\n   • Que no falten operadores o comas\n   • Que los paréntesis estén balanceados';
+                }
+
+                if (errorLine.includes(',') && !errorLine.includes('=')) {
+                    return 'Posible error en declaración de múltiples variables:\n   • const a = 1, b = 2; (para const)\n   • let a, b; a = 1; b = 2; (para let)\n   • Verifica que cada variable tenga su valor asignado';
+                }
+            }
+
+            // Análisis para import/export malformados
+            if (message.includes('import') || message.includes('export')) {
+                if (
+                    errorLine.includes('import') &&
+                    !errorLine.includes('from')
+                ) {
+                    return 'Import statement incompleto:\n   • import { item } from "modulo";\n   • import defaultItem from "modulo";\n   • import * as alias from "modulo";';
+                }
+
+                if (
+                    errorLine.includes('export') &&
+                    errorLine.trim().endsWith('export')
+                ) {
+                    return 'Export statement incompleto:\n   • export { item };\n   • export default item;\n   • export const item = valor;';
+                }
+            }
+
+            // Análisis para paréntesis y brackets
+            if (message.includes('expected')) {
+                const openParens = (errorLine.match(/\(/g) || []).length;
+                const closeParens = (errorLine.match(/\)/g) || []).length;
+                const openBrackets = (errorLine.match(/\{/g) || []).length;
+                const closeBrackets = (errorLine.match(/\}/g) || []).length;
+
+                if (openParens !== closeParens) {
+                    return `Paréntesis desbalanceados (${openParens} abiertos, ${closeParens} cerrados):\n   • Verifica que cada ( tenga su correspondiente )\n   • Revisa llamadas a funciones y expresiones`;
+                }
+
+                if (openBrackets !== closeBrackets) {
+                    return `Llaves desbalanceadas (${openBrackets} abiertas, ${closeBrackets} cerradas):\n   • Verifica que cada { tenga su correspondiente }\n   • Revisa objetos, funciones y bloques de código`;
+                }
+            }
+        }
+
+        // Fallback a sugerencias básicas si no hay análisis contextual específico
+        return this.generateSuggestion(errorMessage);
     }
 }
 

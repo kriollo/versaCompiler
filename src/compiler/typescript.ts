@@ -22,146 +22,137 @@ interface TypeCheckResult {
 }
 
 /**
- * Crea una versión ultra-limpia y serializable de las opciones del compilador TypeScript.
- * Filtra todas las funciones y objetos complejos que causan errores de serialización en workers.
+ * Cache para la configuración de TypeScript para evitar lecturas repetidas
+ */
+let configCache: { path?: string; options?: ts.CompilerOptions } = {};
+
+/**
+ * Carga la configuración de TypeScript desde tsconfig.json
+ * @param fileName - Nombre del archivo para buscar el tsconfig.json relativo
+ * @returns Opciones del compilador TypeScript
+ */
+export const loadTypeScriptConfig = (fileName: string): ts.CompilerOptions => {
+    const fileDir = path.dirname(fileName);
+    const configPath =
+        ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
+        path.resolve(process.cwd(), 'tsconfig.json');
+
+    // Usar cache si el path no ha cambiado
+    if (configCache.path === configPath && configCache.options) {
+        return configCache.options;
+    }
+
+    let compilerOptions: ts.CompilerOptions;
+
+    if (configPath && fs.existsSync(configPath)) {
+        try {
+            const { config, error: configError } = ts.readConfigFile(
+                configPath,
+                ts.sys.readFile,
+            );
+            if (!configError) {
+                const parsedConfig = ts.parseJsonConfigFileContent(
+                    config,
+                    ts.sys,
+                    path.dirname(configPath),
+                );
+                compilerOptions = {
+                    ...parsedConfig.options,
+                    // Asegurar opciones básicas necesarias
+                    allowJs: parsedConfig.options.allowJs !== false,
+                    esModuleInterop:
+                        parsedConfig.options.esModuleInterop !== false,
+                    allowSyntheticDefaultImports:
+                        parsedConfig.options.allowSyntheticDefaultImports !==
+                        false,
+                    skipLibCheck: parsedConfig.options.skipLibCheck !== false,
+                };
+            } else {
+                throw new Error(
+                    `Error al leer tsconfig.json: ${configError.messageText}`,
+                );
+            }
+        } catch (error) {
+            console.warn(
+                `[loadTypeScriptConfig] Error cargando ${configPath}:`,
+                error,
+            );
+            // Fallback a opciones por defecto
+            compilerOptions = getDefaultCompilerOptions();
+        }
+    } else {
+        // Opciones por defecto si no se encuentra tsconfig.json
+        compilerOptions = getDefaultCompilerOptions();
+    }
+
+    // Guardar en cache
+    configCache = { path: configPath, options: compilerOptions };
+    return compilerOptions;
+};
+
+/**
+ * Obtiene las opciones por defecto del compilador TypeScript
+ */
+const getDefaultCompilerOptions = (): ts.CompilerOptions => ({
+    target: ts.ScriptTarget.ES2020,
+    module: ts.ModuleKind.ES2020,
+    lib: ['es2020', 'dom', 'dom.iterable'],
+    strict: false,
+    skipLibCheck: true,
+    allowJs: true,
+    esModuleInterop: true,
+    allowSyntheticDefaultImports: true,
+    isolatedModules: true,
+});
+
+/**
+ * Crea una versión optimizada y serializable de las opciones del compilador TypeScript.
  * @param options - Opciones originales del compilador
  * @returns Opciones serializables seguras para workers
  */
 const createSerializableCompilerOptions = (
     options: ts.CompilerOptions,
 ): Record<string, any> => {
-    // Lista blanca de propiedades seguras para serialización
-    const safeProperties = [
-        'target',
-        'module',
-        'lib',
-        'allowJs',
-        'checkJs',
-        'jsx',
-        'declaration',
-        'declarationMap',
-        'emitDeclarationOnly',
-        'sourceMap',
-        'outFile',
-        'outDir',
-        'rootDir',
-        'composite',
-        'tsBuildInfoFile',
-        'removeComments',
-        'noEmit',
-        'importHelpers',
-        'importsNotUsedAsValues',
-        'downlevelIteration',
-        'strict',
-        'noImplicitAny',
-        'strictNullChecks',
-        'strictFunctionTypes',
-        'strictBindCallApply',
-        'strictPropertyInitialization',
-        'noImplicitReturns',
-        'noImplicitThis',
-        'alwaysStrict',
-        'noUnusedLocals',
-        'noUnusedParameters',
-        'exactOptionalPropertyTypes',
-        'noImplicitOverride',
-        'noPropertyAccessFromIndexSignature',
-        'noUncheckedIndexedAccess',
-        'noImplicitUseStrict',
-        'noStrictGenericChecks',
-        'useUnknownInCatchVariables',
-        'suppressExcessPropertyErrors',
-        'suppressImplicitAnyIndexErrors',
-        'noErrorTruncation',
-        'allowUnreachableCode',
-        'allowUnusedLabels',
-        'skipDefaultLibCheck',
-        'skipLibCheck',
-        'moduleResolution',
-        'baseUrl',
-        'rootDirs',
-        'typeRoots',
-        'types',
-        'allowSyntheticDefaultImports',
-        'esModuleInterop',
-        'preserveSymlinks',
-        'allowUmdGlobalAccess',
-        'resolveJsonModule',
-        'experimentalDecorators',
-        'emitDecoratorMetadata',
-        'isolatedModules',
-        'verbatimModuleSyntax',
-    ];
+    // Usar las opciones del tsconfig.json pero con optimizaciones para el worker
+    const {
+        target = ts.ScriptTarget.ES2020,
+        module = ts.ModuleKind.ES2020,
+        lib = ['es2020', 'dom', 'dom.iterable'],
+        allowJs = true,
+        jsx,
+        strict = false,
+        skipLibCheck = true,
+        esModuleInterop = true,
+        allowSyntheticDefaultImports = true,
+        isolatedModules = true,
+    } = options;
 
-    const serializable: Record<string, any> = {};
-
-    // Copiar solo propiedades seguras y primitivas
-    for (const prop of safeProperties) {
-        if (prop in options) {
-            const value = (options as any)[prop];
-
-            // Solo incluir valores primitivos o arrays de primitivos
-            if (isPrimitiveOrSafeArray(value)) {
-                serializable[prop] = value;
-            }
-        }
-    }
-
-    // Valores por defecto seguros para asegurar funcionamiento
     return {
-        target: ts.ScriptTarget.ES2020,
-        module: ts.ModuleKind.ES2020,
-        strict: false,
-        noEmitOnError: false,
-        skipLibCheck: true,
+        target,
+        module,
+        lib: Array.isArray(lib) ? lib : ['es2020', 'dom', 'dom.iterable'],
+        allowJs,
+        jsx,
+        strict,
+        skipLibCheck,
         skipDefaultLibCheck: true,
-        allowJs: true,
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
+        esModuleInterop,
+        allowSyntheticDefaultImports,
+        isolatedModules,
+        noEmitOnError: false,
         declaration: false,
         sourceMap: false,
-        noImplicitAny: false,
-        noImplicitReturns: false,
-        noImplicitThis: false,
-        noUnusedLocals: false,
-        noUnusedParameters: false,
-        isolatedModules: true,
-        ...serializable, // Sobrescribir con valores del usuario si son seguros
     };
 };
 
 /**
- * Verifica si un valor es primitivo o un array de primitivos seguro para serialización
- */
-const isPrimitiveOrSafeArray = (value: any): boolean => {
-    if (value === null || value === undefined) return true;
-
-    const type = typeof value;
-    if (type === 'string' || type === 'number' || type === 'boolean')
-        return true;
-
-    // Arrays de primitivos
-    if (Array.isArray(value)) {
-        return value.every(item => {
-            const itemType = typeof item;
-            return (
-                itemType === 'string' ||
-                itemType === 'number' ||
-                itemType === 'boolean'
-            );
-        });
-    }
-
-    return false;
-};
-
-/**
- * Crea un Language Service Host para validación de tipos eficiente.
+ * Crea un Language Service Host optimizado para validación de tipos eficiente.
  */
 class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
     private files: Map<string, { version: number; content: string }> =
         new Map();
     private compilerOptions: ts.CompilerOptions;
+    private fileSystemCache: Map<string, string | undefined> = new Map();
 
     constructor(compilerOptions: ts.CompilerOptions) {
         this.compilerOptions = compilerOptions;
@@ -194,16 +185,26 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
             return ts.ScriptSnapshot.fromString(file.content);
         }
 
-        // Intentar leer el archivo del sistema de archivos para dependencias
-        if (fs.existsSync(fileName)) {
-            try {
-                const content = fs.readFileSync(fileName, 'utf-8');
-                return ts.ScriptSnapshot.fromString(content);
-            } catch {
-                return undefined;
-            }
+        // Cache de sistema de archivos para evitar lecturas repetidas
+        if (this.fileSystemCache.has(fileName)) {
+            const cachedContent = this.fileSystemCache.get(fileName);
+            return cachedContent
+                ? ts.ScriptSnapshot.fromString(cachedContent)
+                : undefined;
         }
 
+        // Intentar leer el archivo del sistema de archivos solo si es necesario
+        try {
+            if (fs.existsSync(fileName)) {
+                const content = fs.readFileSync(fileName, 'utf-8');
+                this.fileSystemCache.set(fileName, content);
+                return ts.ScriptSnapshot.fromString(content);
+            }
+        } catch {
+            // Error al leer archivo
+        }
+
+        this.fileSystemCache.set(fileName, undefined);
         return undefined;
     }
 
@@ -216,23 +217,36 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
     }
 
     fileExists(path: string): boolean {
-        return this.files.has(path) || fs.existsSync(path);
+        if (this.files.has(path)) return true;
+
+        if (this.fileSystemCache.has(path)) {
+            return this.fileSystemCache.get(path) !== undefined;
+        }
+
+        const exists = fs.existsSync(path);
+        if (!exists) this.fileSystemCache.set(path, undefined);
+        return exists;
     }
 
     readFile(path: string): string | undefined {
         const file = this.files.get(path);
-        if (file) {
-            return file.content;
+        if (file) return file.content;
+
+        if (this.fileSystemCache.has(path)) {
+            return this.fileSystemCache.get(path);
         }
 
-        if (fs.existsSync(path)) {
-            try {
-                return fs.readFileSync(path, 'utf-8');
-            } catch {
-                return undefined;
+        try {
+            if (fs.existsSync(path)) {
+                const content = fs.readFileSync(path, 'utf-8');
+                this.fileSystemCache.set(path, content);
+                return content;
             }
+        } catch {
+            // Error al leer archivo
         }
 
+        this.fileSystemCache.set(path, undefined);
         return undefined;
     }
 
@@ -242,7 +256,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
 }
 
 /**
- * Realiza validación de tipos usando TypeScript Language Service.
+ * Realiza validación de tipos optimizada usando TypeScript Language Service.
  * @param fileName - Nombre del archivo
  * @param content - Contenido del archivo
  * @param compilerOptions - Opciones del compilador
@@ -253,150 +267,112 @@ const validateTypesWithLanguageService = (
     content: string,
     compilerOptions: ts.CompilerOptions,
 ): TypeCheckResult => {
-    let actualFileName = fileName; // Declarar aquí para acceso en catch
     try {
-        let scriptContent = content; // Si el script está vacío o es solo espacios en blanco, no validar
-        if (!scriptContent.trim()) {
+        // Validación temprana: contenido vacío
+        if (!content.trim()) {
             return { diagnostics: [], hasErrors: false };
         }
 
-        // Crear Language Service Host
-        const host = new TypeScriptLanguageServiceHost(compilerOptions); // Para archivos Vue, crear un archivo virtual .ts
+        // Crear Language Service Host optimizado
+        const host = new TypeScriptLanguageServiceHost(compilerOptions);
+
+        // Determinar nombre de archivo efectivo
+        let actualFileName = path.isAbsolute(fileName)
+            ? fileName
+            : path.resolve(fileName);
+
+        // Para archivos Vue, crear archivo virtual
         if (fileName.endsWith('.vue')) {
-            // Usar ruta absoluta para el archivo virtual
-            const absolutePath = path.isAbsolute(fileName)
-                ? fileName
-                : path.resolve(fileName);
-            // Crear un nombre de archivo virtual único que no colisione
-            const virtualFileName = absolutePath.replace('.vue', '.vue.ts');
-            host.addFile(virtualFileName, scriptContent);
-            actualFileName = virtualFileName;
-        } else {
-            // Asegurar que usamos ruta absoluta
-            const absolutePath = path.isAbsolute(fileName)
-                ? fileName
-                : path.resolve(fileName);
-            host.addFile(absolutePath, scriptContent);
-            actualFileName = absolutePath;
-        } // Agregar declaraciones básicas de tipos para Vue si es necesario
-        if (fileName.endsWith('.vue')) {
-            // Usar el directorio del archivo actual para las declaraciones
-            const projectDir = path.dirname(actualFileName);
-            const vueTypesPath = path.join(projectDir, 'vue-types.d.ts');
-            const vueTypesDeclaration = `// Declaraciones de tipos Vue para validación
-                declare global {
-                    function ref<T>(value: T): { value: T };
-                    function reactive<T extends object>(target: T): T;
-                    function computed<T>(getter: () => T): { value: T };
-                    function defineComponent<T>(options: T): T;
-                    function defineProps<T = {}>(): T;
-                    function defineEmits<T = {}>(): T;
-                    function onMounted(fn: () => void): void;
-                    function onUnmounted(fn: () => void): void;
-                    function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
-                }
-                export {};            `;
+            actualFileName = actualFileName.replace('.vue', '.vue.ts');
+            host.addFile(actualFileName, content);
+
+            // Añadir declaraciones Vue básicas solo si es necesario
+            const vueTypesPath = path.join(
+                path.dirname(actualFileName),
+                'vue-types.d.ts',
+            );
+            const vueTypesDeclaration = `
+declare global {
+    function ref<T>(value: T): { value: T };
+    function reactive<T extends object>(target: T): T;
+    function computed<T>(getter: () => T): { value: T };
+    function defineComponent<T>(options: T): T;
+    function defineProps<T = {}>(): T;
+    function defineEmits<T = {}>(): T;
+    function onMounted(fn: () => void): void;
+    function onUnmounted(fn: () => void): void;
+    function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
+}
+export {};`;
             host.addFile(vueTypesPath, vueTypesDeclaration);
+        } else {
+            host.addFile(actualFileName, content);
         }
 
         // Crear Language Service
         const languageService = ts.createLanguageService(host);
 
-        try {
-            // Verificar que el archivo existe en el host antes de solicitar diagnósticos
-            if (!host.fileExists(actualFileName)) {
-                return { diagnostics: [], hasErrors: false };
-            } // Obtener diagnósticos de tipos con manejo de errores
-            let syntacticDiagnostics: ts.Diagnostic[] = [];
-            let semanticDiagnostics: ts.Diagnostic[] = [];
-            try {
-                syntacticDiagnostics =
-                    languageService.getSyntacticDiagnostics(actualFileName);
-            } catch {
-                // Ignorar errores de diagnósticos sintácticos
-            }
-            try {
-                semanticDiagnostics =
-                    languageService.getSemanticDiagnostics(actualFileName);
-            } catch {
-                // Ignorar errores de diagnósticos semánticos
-            } // Combinar todos los diagnósticos
-            const allDiagnostics = [
-                ...syntacticDiagnostics,
-                ...semanticDiagnostics,
-            ]; // Filtrar diagnósticos relevantes
-            const filteredDiagnostics = allDiagnostics.filter(
-                (diag: ts.Diagnostic) => {
-                    const messageText = ts.flattenDiagnosticMessageText(
-                        diag.messageText,
-                        '\n',
-                    );
-
-                    // Solo errores de categoría Error
-                    if (diag.category !== ts.DiagnosticCategory.Error) {
-                        return false;
-                    }
-
-                    // Ignorar SOLO errores específicos de infraestructura Vue y rutas de módulos
-                    return (
-                        !messageText.includes('Cannot find module') &&
-                        !messageText.includes('Could not find source file') &&
-                        !messageText.includes(
-                            "Parameter '$props' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$setup' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$data' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$options' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '$event' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '_ctx' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
-                            "Parameter '_cache' implicitly has an 'any' type",
-                        ) &&
-                        // Permitir errores de "Cannot find name" ya que son errores de código real
-                        // Solo filtrar parámetros implícitos de Vue generados automáticamente
-                        !(
-                            messageText.includes(
-                                "implicitly has an 'any' type",
-                            ) &&
-                            (messageText.includes('_ctx') ||
-                                messageText.includes('_cache') ||
-                                messageText.includes('$props') ||
-                                messageText.includes('$setup'))
-                        )
-                    );
-                },
-            );
-
-            return {
-                diagnostics: filteredDiagnostics,
-                hasErrors: filteredDiagnostics.length > 0,
-            };
-        } catch {
+        // Verificar existencia del archivo
+        if (!host.fileExists(actualFileName)) {
             return { diagnostics: [], hasErrors: false };
         }
-    } catch (error) {
-        // En caso de error, devolver diagnóstico de error
-        const errorDiagnostic: ts.Diagnostic = {
-            file: undefined,
-            start: undefined,
-            length: undefined,
-            messageText: `Error en validación de tipos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
-            category: ts.DiagnosticCategory.Error,
-            code: 0,
-        };
+
+        // Obtener diagnósticos con manejo de errores optimizado
+        const allDiagnostics: ts.Diagnostic[] = [];
+
+        try {
+            allDiagnostics.push(
+                ...languageService.getSyntacticDiagnostics(actualFileName),
+            );
+            allDiagnostics.push(
+                ...languageService.getSemanticDiagnostics(actualFileName),
+            );
+        } catch {
+            // Ignorar errores de diagnósticos
+            return { diagnostics: [], hasErrors: false };
+        }
+
+        // Filtrado optimizado de diagnósticos
+        const filteredDiagnostics = allDiagnostics.filter(diag => {
+            if (diag.category !== ts.DiagnosticCategory.Error) return false;
+
+            const messageText = ts.flattenDiagnosticMessageText(
+                diag.messageText,
+                '\n',
+            );
+
+            // Lista optimizada de patrones a ignorar
+            const ignorePatterns = [
+                'Cannot find module',
+                'Could not find source file',
+                "Parameter '$props' implicitly has an 'any' type",
+                "Parameter '$setup' implicitly has an 'any' type",
+                "Parameter '_ctx' implicitly has an 'any' type",
+                "Parameter '_cache' implicitly has an 'any' type",
+            ];
+
+            return !ignorePatterns.some(pattern =>
+                messageText.includes(pattern),
+            );
+        });
 
         return {
-            diagnostics: [errorDiagnostic],
+            diagnostics: filteredDiagnostics,
+            hasErrors: filteredDiagnostics.length > 0,
+        };
+    } catch (error) {
+        // Error handling simplificado
+        return {
+            diagnostics: [
+                {
+                    file: undefined,
+                    start: undefined,
+                    length: undefined,
+                    messageText: `Error en validación de tipos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+                    category: ts.DiagnosticCategory.Error,
+                    code: 0,
+                },
+            ],
             hasErrors: true,
         };
     }
@@ -406,14 +382,13 @@ const validateTypesWithLanguageService = (
  * Valida tipos en archivos Vue antes de la compilación
  * @param vueContent - Contenido del archivo Vue
  * @param fileName - Nombre del archivo Vue
- * @param compilerOptions - Opciones del compilador
  * @returns Resultado de la validación de tipos
  */
 export const validateVueTypes = (
     vueContent: string,
     fileName: string,
-    compilerOptions: ts.CompilerOptions,
 ): TypeCheckResult => {
+    const compilerOptions = loadTypeScriptConfig(fileName);
     return validateTypesWithLanguageService(
         fileName,
         vueContent,
@@ -422,11 +397,9 @@ export const validateVueTypes = (
 };
 
 /**
- * Precompila el código TypeScript proporcionado con pipeline híbrido optimizado.
- * Separa la transpilación rápida del type checking asíncrono para máxima performance.
+ * Precompila el código TypeScript con pipeline optimizado para máxima performance.
  * @param {string} data - El código TypeScript a precompilar.
  * @param {string} fileName - El nombre del archivo que contiene el código TypeScript.
- *
  * @returns {Promise<CompileResult>} - Un objeto con el código precompilado o un error.
  */
 export const preCompileTS = async (
@@ -434,81 +407,43 @@ export const preCompileTS = async (
     fileName: string,
 ): Promise<CompileResult> => {
     try {
-        // Si el código está vacío (sin contenido), devolver cadena vacía
+        // Validación temprana: contenido vacío
         if (!data.trim()) {
             return { error: null, data: data, lang: 'ts' };
         }
 
-        // Buscar tsconfig.json en el directorio del archivo o sus padres
-        const fileDir = path.dirname(fileName);
-        const configPath =
-            ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
-            path.resolve(process.cwd(), 'tsconfig.json');
+        // Cargar configuración de TypeScript desde tsconfig.json
+        const compilerOptions = loadTypeScriptConfig(fileName);
 
-        if (!configPath) {
-            throw new Error('No se pudo encontrar tsconfig.json');
-        }
-
-        const { config, error: configError } = ts.readConfigFile(
-            configPath,
-            ts.sys.readFile,
-        );
-        if (configError) {
-            throw new Error(
-                `Error al leer tsconfig.json: ${configError.messageText}`,
-            );
-        }
-
-        const parsedConfig = ts.parseJsonConfigFileContent(
-            config,
-            ts.sys,
-            path.dirname(configPath),
-        ); // Configurar opciones del compilador
-        const compilerOptions: ts.CompilerOptions = {
-            ...parsedConfig.options,
-        }; // Crear versión ultra-limpia y serializable de las opciones para el worker
-        const serializableCompilerOptions =
-            createSerializableCompilerOptions(compilerOptions); // PASO 1: SIEMPRE verificar errores de sintaxis con transpilación
+        // PASO 1: Transpilación rápida con detección de errores críticos
         const transpileResult = ts.transpileModule(data, {
             compilerOptions: {
                 ...compilerOptions,
-                noLib: true, // Acelerar transpilación
+                noLib: true,
                 skipLibCheck: true,
+                isolatedModules: true,
             },
             fileName,
-            reportDiagnostics: true, // IMPORTANTE: Habilitar para detectar errores de sintaxis
-            transformers: undefined,
-            moduleName: path.basename(fileName, path.extname(fileName)),
-        }); // Verificar errores de sintaxis en transpilación
-        if (
-            transpileResult.diagnostics &&
-            transpileResult.diagnostics.length > 0
-        ) {
-            const criticalErrors = transpileResult.diagnostics.filter(diag => {
-                // Solo considerar errores críticos que impiden la transpilación
-                if (diag.category !== ts.DiagnosticCategory.Error) {
-                    return false;
-                }
+            reportDiagnostics: true,
+        });
 
-                // Filtrar errores que no son críticos para la transpilación
+        // Verificar errores críticos de sintaxis
+        if (transpileResult.diagnostics?.length) {
+            const criticalErrors = transpileResult.diagnostics.filter(diag => {
+                if (diag.category !== ts.DiagnosticCategory.Error) return false;
+
                 const messageText = ts.flattenDiagnosticMessageText(
                     diag.messageText,
                     '\n',
                 );
 
-                // Los errores de módulo no encontrado NO deben detener la transpilación
-                // ya que pueden ser resueltos en runtime o por bundlers
-                if (
-                    messageText.includes('Cannot find module') ||
-                    messageText.includes('Could not find source file') ||
-                    diag.code === 2307 || // Cannot find module
-                    diag.code === 6059
-                ) {
-                    // File not found
-                    return false;
-                }
-
-                return true;
+                // Ignorar errores de módulo no encontrado
+                return (
+                    !messageText.includes('Cannot find module') &&
+                    !messageText.includes('Could not find source file') &&
+                    diag.code !== 2307 &&
+                    diag.code !== 6059
+                );
             });
 
             if (criticalErrors.length > 0) {
@@ -523,22 +458,20 @@ export const preCompileTS = async (
             }
         }
 
-        // PASO 2: Si hay type checking habilitado, verificar errores de tipos
+        // PASO 2: Type checking opcional (solo si está habilitado)
         if (env.typeCheck === 'true') {
             try {
-                // Obtener instancia del Worker Manager
                 const workerManager = TypeScriptWorkerManager.getInstance();
+                const serializableOptions =
+                    createSerializableCompilerOptions(compilerOptions);
 
-                // Type checking asíncrono en worker (o fallback síncrono)
                 const typeCheckResult = await workerManager.typeCheck(
                     fileName,
                     data,
-                    serializableCompilerOptions,
+                    serializableOptions,
                 );
 
-                // Verificar si el type checking encontró errores
                 if (typeCheckResult.hasErrors) {
-                    // Crear un mensaje de error más limpio y estructurado
                     const errorMessage = createUnifiedErrorMessage(
                         parseTypeScriptErrors(
                             typeCheckResult.diagnostics,
@@ -553,7 +486,7 @@ export const preCompileTS = async (
                     };
                 }
             } catch (typeCheckError) {
-                // Si el type checking falla, loggear pero continuar con la transpilación
+                // Type checking falla, pero continuar con transpilación
                 console.warn(
                     '[preCompileTS] Type checking failed:',
                     typeCheckError,
@@ -561,10 +494,10 @@ export const preCompileTS = async (
             }
         }
 
-        // PASO 3: Retornar resultado de transpilación exitosa
+        // PASO 3: Devolver resultado optimizado
         const output = transpileResult.outputText;
 
-        // Remover "export {};" si es la única línea
+        // Limpiar output vacío
         if (output.trim() === 'export {};') {
             return { error: null, data: '', lang: 'ts' };
         }
