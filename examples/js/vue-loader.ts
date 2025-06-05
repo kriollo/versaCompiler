@@ -16,6 +16,8 @@ async function loadModule() {
     const urlParams = url.search;
     const searchParams = new URLSearchParams(urlParams);
     let module = searchParams.get('m');
+    let validatedModule = 'unknown'; // Declarar fuera para uso en catch
+
     try {
         $contenedor.value = $dom('#app') as HTMLElement | null;
 
@@ -24,25 +26,34 @@ async function loadModule() {
                 'No se ha encontrado el contenedor para cargar el módulo.',
             );
         }
-
-        if (!module) {
+        if (
+            !module ||
+            module.trim() === '' ||
+            module === 'undefined' ||
+            module === 'null'
+        ) {
             throw new Error('No se ha especificado un módulo para cargar.');
-        }
-        module = sanitizeModulePath(module);
-        module = module.startsWith('/') ? module.slice(1) : module;
+        } // Type assertion: en este punto sabemos que module no es null
+        validatedModule = module;
+        validatedModule = sanitizeModulePath(validatedModule);
+        validatedModule = validatedModule.startsWith('/')
+            ? validatedModule.slice(1)
+            : validatedModule;
+
         // Validar el parámetro del módulo
-        if (!isValidModuleName(module)) {
+        if (!isValidModuleName(validatedModule)) {
             throw new Error(
                 'El parámetro del módulo contiene caracteres no permitidos.',
             );
         }
 
-        const component = module.split('/').pop() as string;
+        const component = validatedModule.split('/').pop() as string;
         if (!component) {
             throw new Error('No se ha especificado un componente para cargar.');
-        }
-        // Importar dinámicamente el módulo
-        const moduleResponse = await import(`@/${module}.js?v=${Date.now()}`);
+        } // Importar dinámicamente el módulo
+        const moduleResponse = await import(
+            `@/${validatedModule}.js?v=${Date.now()}`
+        );
         if (moduleResponse) {
             // Montar el módulo en el contenedor
             const app = createApp({
@@ -81,7 +92,7 @@ async function loadModule() {
             app.mount($contenedor.value, true);
         }
     } catch (e) {
-        handleError(e, module, $contenedor.value);
+        handleError(e, validatedModule, $contenedor.value);
     }
 }
 loadModule();
