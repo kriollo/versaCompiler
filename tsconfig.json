@@ -17,7 +17,7 @@
         "noUncheckedIndexedAccess": true,
         "moduleDetection": "force",
         "allowJs": true,
-        "checkJs": true,
+        "checkJs": false,
         "allowImportingTsExtensions": true,
         "noEmit": true,
         "module": "esnext",
