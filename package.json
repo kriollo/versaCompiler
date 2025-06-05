@@ -19,12 +19,14 @@
         "dev": "tsx --watch src/main.ts --watch --verbose",
         "compile": "tsx src/main.ts --all",
         "test": "jest --config jest.config.js",
-        "test:performance": "jest tests/performance.test.ts --config jest.config.js --testTimeout=300000",
-        "benchmark": "tsx benchmark.ts",
-        "benchmark:detailed": "tsx benchmark.ts --iterations 10",
         "build": "tsx src/main.ts --all",
         "lint": "oxlint --fix --config .oxlint.json",
-        "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix"
+        "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix",
+        "perf": "scripts\\run-performance.bat",
+        "perf:test": "jest tests/performance.test.ts --config jest.config.js --testTimeout=300000",
+        "perf:report": "node scripts/generate-performance-report.js",
+        "perf:open": "start performance-results/dashboard.html",
+        "perf:clean": "rmdir /s /q performance-results 2>nul || echo 'Performance results cleaned'"
     },
     "keywords": [
         "vue",
