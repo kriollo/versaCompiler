@@ -44,7 +44,6 @@ const TEMP_DIR = path.join(process.cwd(), 'tests', 'temp-performance');
 
 describe('VersaCompiler Performance Tests', () => {
     let originalEnv: any;
-
     beforeAll(async () => {
         // Guardar configuración original
         originalEnv = { ...env };
@@ -60,7 +59,34 @@ describe('VersaCompiler Performance Tests', () => {
         // Crear directorios temporales
         await fs.mkdir(TEMP_DIR, { recursive: true });
         await fs.mkdir(env.PATH_SOURCE!, { recursive: true });
-        await fs.mkdir(env.PATH_DIST!, { recursive: true });
+        await fs.mkdir(env.PATH_DIST!, { recursive: true }); // Crear directorio compiler en el directorio temporal (donde el worker lo espera)
+        const tempCompilerDir = path.join(TEMP_DIR, 'compiler');
+        await fs.mkdir(tempCompilerDir, { recursive: true });
+
+        // También crear src/compiler para otros archivos si es necesario
+        const tempSrcCompilerDir = path.join(TEMP_DIR, 'src', 'compiler');
+        await fs.mkdir(tempSrcCompilerDir, { recursive: true });
+
+        // Copiar el archivo typescript-worker-thread.cjs al directorio temporal
+        const originalWorkerPath = path.join(
+            process.cwd(),
+            'src',
+            'compiler',
+            'typescript-worker-thread.cjs',
+        );
+        const tempWorkerPath = path.join(
+            tempCompilerDir,
+            'typescript-worker-thread.cjs',
+        );
+
+        try {
+            const workerContent = await fs.readFile(originalWorkerPath, 'utf8');
+            await fs.writeFile(tempWorkerPath, workerContent, 'utf8');
+            console.log(`Worker file copied to: ${tempWorkerPath}`);
+        } catch (error) {
+            console.error('Error copying worker file:', error);
+            throw error;
+        }
     });
 
     afterAll(async () => {
