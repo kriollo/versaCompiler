@@ -218,4 +218,3 @@ export class ESLintNode {
         return new ESLintNode(options);
     }
 }
-

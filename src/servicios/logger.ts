@@ -30,9 +30,9 @@ class Logger {
     }
 
     table(data: any, title?: string[]): void {
-        const tableString = title ? 
-            console.table(data, title) : 
-            console.table(data);
+        const tableString = title
+            ? console.table(data, title)
+            : console.table(data);
         process.stdout.write(String(tableString) + '\n');
     }
 }

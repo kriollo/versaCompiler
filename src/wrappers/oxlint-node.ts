@@ -189,4 +189,3 @@ export class OxlintNode {
         return new OxlintNode(options);
     }
 }
-

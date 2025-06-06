@@ -62,7 +62,8 @@ export function parseTypeScriptErrors(
                         sourceFile.getLineAndCharacterOfPosition(
                             diagnostic.start,
                         );
-                    help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;                } catch {
+                    help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;
+                } catch {
                     // Si falla, solo mostrar la posición de carácter
                     help += ` | Posición ${diagnostic.start}`;
                 }
@@ -110,7 +111,7 @@ function enhanceErrorMessage(
             ? diagnostic.messageText
             : ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 
-    let enhancedMessage = cleanErrorMessage(message);    // Información de ubicación
+    let enhancedMessage = cleanErrorMessage(message); // Información de ubicación
     let location = `Código TS${diagnostic.code}`;
     let codeContext = '';
 
@@ -125,15 +126,19 @@ function enhanceErrorMessage(
                 const line = lineAndChar.line + 1;
                 const column = lineAndChar.character + 1;
 
-                location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;            } catch {
+                location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;
+            } catch {
                 // Si falla, solo mostrar la posición de carácter
                 location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
             }
         } else {
             // Fallback para cuando no está disponible el método (como en tests)
             location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
-        }        // Agregar contexto del código si está disponible
-        if ((sourceCode || sourceFile.text) && typeof sourceFile.getLineAndCharacterOfPosition === 'function') {
+        } // Agregar contexto del código si está disponible
+        if (
+            (sourceCode || sourceFile.text) &&
+            typeof sourceFile.getLineAndCharacterOfPosition === 'function'
+        ) {
             try {
                 const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
                     diagnostic.start,
@@ -160,7 +165,9 @@ function enhanceErrorMessage(
                         if (isErrorLine) {
                             codeContext += `  ${currentLine.toString().padStart(3, ' ')} ❌ ${lineContent}\n`;
                             // Agregar flecha apuntando al error
-                            const arrow = ' '.repeat(6 + lineAndChar.character + 1) + '^^^';
+                            const arrow =
+                                ' '.repeat(6 + lineAndChar.character + 1) +
+                                '^^^';
                             codeContext += `       ${arrow}\n`;
                         } else {
                             codeContext += `  ${currentLine.toString().padStart(3, ' ')}    ${lineContent}\n`;
@@ -328,7 +335,8 @@ export function createSimpleErrorMessage(
     );
 
     // Extraer solo la primera línea del mensaje para simplicidad
-    const simplifiedMessage = message.split('\n')[0];    let location = '';
+    const simplifiedMessage = message.split('\n')[0];
+    let location = '';
     if (firstDiagnostic.file && firstDiagnostic.start !== undefined) {
         const sourceFile = firstDiagnostic.file;
         // Verificar que el método getLineAndCharacterOfPosition existe (para compatibilidad con mocks)

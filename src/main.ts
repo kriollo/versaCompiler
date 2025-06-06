@@ -314,11 +314,13 @@ async function main() {
             const resultTW = await tailwindModule.generateTailwindCSS();
             if (typeof resultTW !== 'boolean') {
                 if (resultTW?.success) {
-                    logger.info(`🎨 ${resultTW.message}\n`);
+                    logger.info(
+                        `\nTailwind CSS compilado🎨 ${resultTW.message}\n`,
+                    );
                 } else {
                     const errorMsg = `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`;
                     logger.error(
-                        `❌ Error al generar Tailwind CSS: ${errorMsg}\n`,
+                        `\n❌ Error al generar Tailwind CSS: ${errorMsg}\n`,
                     );
                 }
             }
