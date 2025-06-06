@@ -12,9 +12,8 @@ import { env } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
-import { promptUser } from 'src/utils/promptUser';
-
 import { logger } from '../servicios/logger';
+import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
 // Heavy dependencies will be loaded dynamically when needed

@@ -9,7 +9,7 @@ import { Worker } from 'node:worker_threads';
 
 import * as ts from 'typescript';
 
-import { logger } from 'src/servicios/logger';
+import { logger } from '../servicios/logger';
 
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 
