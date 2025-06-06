@@ -3,7 +3,7 @@
 
     import operacionesMatematicas from 'e@/js/module/operacionesMatematicas.vue';
 
-    const message = ref('Hola desde versaCompiler!');
+    const message = ref('Hola desde versaCompiler!ss');
 
     setTimeout(() => {
         message.value = 'Hola desde versaCompiler después de 3 segundos!';
