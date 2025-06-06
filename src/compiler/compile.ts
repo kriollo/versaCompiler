@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
     glob,
     mkdir,
@@ -13,8 +12,9 @@ import { env } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
+import { promptUser } from 'src/utils/promptUser';
+
 import { logger } from '../servicios/logger';
-import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
 // Heavy dependencies will be loaded dynamically when needed
@@ -28,12 +28,17 @@ let estandarizaCode: any;
 let preCompileTS: any;
 let preCompileVue: any;
 
-// 🚀 Sistema de Carga Inteligente de Módulos
+// 🚀 Sistema de Carga Inteligente de Módulos - VERSIÓN OPTIMIZADA
 class ModuleManager {
     private static instance: ModuleManager;
     private isInitialized: boolean = false;
     private initializationPromise: Promise<void> | null = null;
     private loadedModules: Set<string> = new Set();
+
+    // NUEVOS: Gestión de modo y precarga
+    private currentMode: 'individual' | 'batch' | 'watch' | null = null;
+    private preloadPromises: Map<string, Promise<any>> = new Map();
+    private moduleCache: Map<string, any> = new Map();
 
     private constructor() {}
 
@@ -45,7 +50,28 @@ class ModuleManager {
     }
 
     /**
-     * Inicializa los módulos necesarios según el contexto de compilación
+     * NUEVO: Precarga estratégica para modo watch
+     */
+    async preloadForWatchMode(): Promise<void> {
+        const essentialModules = ['chalk', 'parser', 'transforms'];
+
+        const preloadPromises = essentialModules.map(async moduleName => {
+            if (!this.loadedModules.has(moduleName)) {
+                switch (moduleName) {
+                    case 'chalk':
+                        return this._loadModule('chalk', loadChalk);
+                    case 'parser':
+                        return this._loadModule('parser', loadParser);
+                    case 'transforms':
+                        return this._loadModule('transforms', loadTransforms);
+                }
+            }
+        });
+
+        await Promise.all(preloadPromises);
+        console.log('[ModuleManager] Precarga completada para modo watch');
+    } /**
+     * MEJORADO: Inicializa los módulos necesarios según el contexto de compilación
      * @param context Contexto de compilación: 'individual', 'batch', 'watch'
      * @param fileExtensions Extensiones de archivos a compilar para optimizar la carga
      */
@@ -53,12 +79,20 @@ class ModuleManager {
         context: 'individual' | 'batch' | 'watch' = 'individual',
         fileExtensions: Set<string> = new Set(),
     ): Promise<void> {
-        // Si ya hay una inicialización en progreso, esperar a que termine
+        // Si cambia el contexto, reinicializar
+        if (this.currentMode !== context) {
+            this.currentMode = context;
+
+            // En modo watch, precargar módulos esenciales
+            if (context === 'watch') {
+                await this.preloadForWatchMode();
+            }
+        }
+
         if (this.initializationPromise) {
             return this.initializationPromise;
         }
 
-        // Si ya está inicializado y es el mismo contexto, no hacer nada
         if (this.isInitialized && context !== 'individual') {
             return;
         }
@@ -254,7 +288,7 @@ async function loadVue() {
 // Ahora usamos ModuleManager.getInstance().initializeModules() directamente
 
 // 🎯 Sistema Unificado de Manejo de Errores
-type CompilationMode = 'all' | 'individual' | 'watch';
+type CompilationMode = 'all' | 'individual' | 'watch' | 'batch';
 
 type CompilationError = {
     file: string;
@@ -319,48 +353,6 @@ async function saveCache() {
         await writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
     } catch {
         // Ignore save errors
-    }
-}
-
-async function shouldRecompile(
-    filePath: string,
-    outputPath: string,
-): Promise<boolean> {
-    try {
-        const stats = await stat(filePath);
-        const cached = compilationCache.get(filePath);
-
-        if (!cached) return true;
-
-        if (stats.mtimeMs > cached.mtime) {
-            return true;
-        }
-
-        try {
-            await stat(outputPath);
-        } catch {
-            return true;
-        }
-
-        return false;
-    } catch {
-        return true;
-    }
-}
-
-async function updateCache(filePath: string, outputPath: string) {
-    try {
-        const stats = await stat(filePath);
-        const hash = createHash('md5')
-            .update(filePath + stats.mtimeMs)
-            .digest('hex');
-        compilationCache.set(filePath, {
-            hash,
-            mtime: stats.mtimeMs,
-            outputPath,
-        });
-    } catch {
-        // Ignorar errores de cache
     }
 }
 
@@ -622,6 +614,47 @@ async function displayCompilationSummary(
 }
 
 /**
+ * Muestra errores del linter de forma detallada
+ */
+async function displayLinterErrors(errors: any[]): Promise<void> {
+    const chalk = await loadChalk();
+    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
+
+    const errorsByFile = new Map<string, any[]>();
+    errors.forEach(error => {
+        if (!errorsByFile.has(error.file)) {
+            errorsByFile.set(error.file, []);
+        }
+        errorsByFile.get(error.file)!.push(error);
+    });
+
+    const totalErrors = errors.filter(e => e.severity === 'error').length;
+    const totalWarnings = errors.filter(e => e.severity === 'warning').length;
+    const totalFiles = errorsByFile.size;
+
+    logger.info(
+        chalk.yellow(
+            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
+        ),
+    );
+
+    errorsByFile.forEach((fileErrors, filePath) => {
+        const baseName = path.basename(filePath);
+        logger.info(chalk.cyan(`\n📄 ${baseName}`));
+
+        fileErrors.forEach(error => {
+            const icon = error.severity === 'error' ? '❌' : '⚠️';
+            logger.info(`${icon} ${error.message}`);
+            if (error.help) {
+                logger.info(`   └─ ${error.help}`);
+            }
+        });
+    });
+
+    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
+}
+
+/**
  * Obtiene el color apropiado para cada etapa de compilación
  */
 async function getStageColor(stage: string): Promise<(text: string) => string> {
@@ -687,6 +720,63 @@ export function getOutputPath(ruta: string) {
             .join(normalizedDist, fileName)
             .replace(/\\/g, '/');
         return outputPath.replace(/\.(vue|ts)$/, '.js');
+    }
+}
+
+// Optimización para modo watch: debouncing y cache de archivos
+class WatchModeOptimizer {
+    private static instance: WatchModeOptimizer;
+    private fileSystemCache: Map<string, { mtime: number }> = new Map();
+    private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private readonly DEBOUNCE_DELAY = 100; // 100ms debounce
+
+    static getInstance(): WatchModeOptimizer {
+        if (!WatchModeOptimizer.instance) {
+            WatchModeOptimizer.instance = new WatchModeOptimizer();
+        }
+        return WatchModeOptimizer.instance;
+    }
+
+    async compileForWatch(
+        filePath: string,
+        compileFn: (file: string) => Promise<any>,
+    ): Promise<any> {
+        return new Promise(resolve => {
+            const existingTimer = this.debounceTimers.get(filePath);
+            if (existingTimer) {
+                clearTimeout(existingTimer);
+            }
+            const timer = setTimeout(async () => {
+                this.debounceTimers.delete(filePath);
+                try {
+                    const stats = await stat(filePath);
+                    const cached = this.fileSystemCache.get(filePath);
+                    if (cached && cached.mtime >= stats.mtimeMs) {
+                        resolve({ success: true, cached: true });
+                        return;
+                    } // Configurar worker para modo watch
+                    const { TypeScriptWorkerManager } = await import(
+                        './typescript-worker'
+                    );
+                    const workerManager = TypeScriptWorkerManager.getInstance();
+                    workerManager.setMode('watch');
+                    const result = await compileFn(filePath);
+                    this.fileSystemCache.set(filePath, {
+                        mtime: stats.mtimeMs,
+                    });
+                    resolve(result);
+                } catch (error) {
+                    resolve({ success: false, error });
+                }
+            }, this.DEBOUNCE_DELAY);
+            this.debounceTimers.set(filePath, timer);
+        });
+    }
+
+    cleanup(): void {
+        this.debounceTimers.forEach(timer => clearTimeout(timer));
+        this.debounceTimers.clear();
+        this.fileSystemCache.clear();
     }
 }
 
@@ -1047,158 +1137,172 @@ export async function initCompile(
     }
 }
 
+// Variable para el último progreso mostrado (evitar spam)
+let lastProgressUpdate = 0;
+
+// Función para ejecutar el linter antes de la compilación
 export async function runLinter(showResult: boolean = false): Promise<boolean> {
     const linterENV = env.linter;
+    const linterPromises: Promise<void>[] = [];
+    const linterErrors: any[] = [];
     let proceedWithCompilation = true;
 
-    if (
-        typeof linterENV === 'string' &&
-        linterENV.trim() !== '' &&
-        env.ENABLE_LINTER !== 'false'
-    ) {
+    if (env.ENABLE_LINTER !== 'true') {
+        return true;
+    }
+    if (typeof linterENV === 'string' && linterENV.trim() !== '') {
         logger.info('🔍 Ejecutando linting...');
-
-        // Cargar dependencias de linting de forma lazy
-        const { ESLint, OxLint } = await loadLinter();
-
-        const linterPromises: Promise<void>[] = [];
-        const linterErrors: any[] = [];
-
-        const parsedLinterEnv = JSON.parse(linterENV);
-        if (Array.isArray(parsedLinterEnv)) {
-            for (const item of parsedLinterEnv) {
-                if (item.name.toLowerCase() === 'eslint') {
-                    logger.info(
-                        `🔧 Ejecutando ESLint con config: ${item.configFile || 'por defecto'}`,
-                    );
-                    const eslintPromise = ESLint(item)
-                        .then((eslintResult: any) => {
-                            if (eslintResult && eslintResult.json) {
-                                // Procesar resultados de ESLint
-                                if (Array.isArray(eslintResult.json)) {
-                                    eslintResult.json.forEach((result: any) => {
-                                        linterErrors.push({
-                                            file:
-                                                result.filePath ||
-                                                'archivo no especificado',
-                                            message: result.message,
-                                            severity:
-                                                result.severity === 2
-                                                    ? 'error'
-                                                    : 'warning',
-                                            help: result.ruleId
-                                                ? `Regla ESLint: ${result.ruleId}`
-                                                : undefined,
-                                        });
-                                    });
-                                } else if (
-                                    eslintResult.json.results &&
-                                    Array.isArray(eslintResult.json.results)
+        try {
+            const parsedLinterEnv = JSON.parse(linterENV);
+            if (Array.isArray(parsedLinterEnv)) {
+                // Cargar dependencias de linting de forma lazy
+                const { ESLint, OxLint } = await loadLinter();
+                for (const item of parsedLinterEnv) {
+                    if (item.name.toLowerCase() === 'eslint') {
+                        logger.info(
+                            `🔧 Ejecutando ESLint con config: ${item.configFile || 'por defecto'}`,
+                        );
+                        const eslintPromise = ESLint(item)
+                            .then((eslintResult: any) => {
+                                if (eslintResult && eslintResult.json) {
+                                    // Procesar resultados de ESLint
+                                    if (Array.isArray(eslintResult.json)) {
+                                        eslintResult.json.forEach(
+                                            (result: any) => {
+                                                linterErrors.push({
+                                                    file:
+                                                        result.filePath ||
+                                                        'archivo no especificado',
+                                                    message: result.message,
+                                                    severity:
+                                                        result.severity === 2
+                                                            ? 'error'
+                                                            : 'warning',
+                                                    help: result.ruleId
+                                                        ? `Regla ESLint: ${result.ruleId}`
+                                                        : undefined,
+                                                });
+                                            },
+                                        );
+                                    } else if (
+                                        eslintResult.json.results &&
+                                        Array.isArray(eslintResult.json.results)
+                                    ) {
+                                        eslintResult.json.results.forEach(
+                                            (fileResult: any) => {
+                                                if (
+                                                    fileResult.messages &&
+                                                    Array.isArray(
+                                                        fileResult.messages,
+                                                    )
+                                                ) {
+                                                    fileResult.messages.forEach(
+                                                        (msg: any) => {
+                                                            linterErrors.push({
+                                                                file:
+                                                                    fileResult.filePath ||
+                                                                    'archivo no especificado',
+                                                                message:
+                                                                    msg.message,
+                                                                severity:
+                                                                    msg.severity ===
+                                                                    2
+                                                                        ? 'error'
+                                                                        : 'warning',
+                                                                help: msg.ruleId
+                                                                    ? `Regla ESLint: ${msg.ruleId}`
+                                                                    : undefined,
+                                                            });
+                                                        },
+                                                    );
+                                                }
+                                            },
+                                        );
+                                    }
+                                }
+                            })
+                            .catch((err: any) => {
+                                logger.error(
+                                    `❌ Error durante la ejecución de ESLint: ${err.message}`,
+                                );
+                                linterErrors.push({
+                                    file: item.configFile || 'ESLint Config',
+                                    message: `Fallo al ejecutar ESLint: ${err.message}`,
+                                    severity: 'error',
+                                });
+                            });
+                        linterPromises.push(eslintPromise);
+                    } else if (item.name.toLowerCase() === 'oxlint') {
+                        logger.info(
+                            `🔧 Ejecutando OxLint con config: ${item.configFile || 'por defecto'}`,
+                        );
+                        const oxlintPromise = OxLint(item)
+                            .then((oxlintResult: any) => {
+                                if (
+                                    oxlintResult &&
+                                    oxlintResult['json'] &&
+                                    Array.isArray(oxlintResult['json'])
                                 ) {
-                                    eslintResult.json.results.forEach(
-                                        (fileResult: any) => {
-                                            if (
-                                                fileResult.messages &&
-                                                Array.isArray(
-                                                    fileResult.messages,
-                                                )
-                                            ) {
-                                                fileResult.messages.forEach(
-                                                    (msg: any) => {
-                                                        linterErrors.push({
-                                                            file:
-                                                                fileResult.filePath ||
-                                                                'archivo no especificado',
-                                                            message:
-                                                                msg.message,
-                                                            severity:
-                                                                msg.severity ===
-                                                                2
-                                                                    ? 'error'
-                                                                    : 'warning',
-                                                            help: msg.ruleId
-                                                                ? `Regla ESLint: ${msg.ruleId}`
-                                                                : undefined,
-                                                        });
-                                                    },
-                                                );
-                                            }
+                                    oxlintResult['json'].forEach(
+                                        (result: any) => {
+                                            linterErrors.push({
+                                                file:
+                                                    result.filename ||
+                                                    result.file ||
+                                                    'archivo no especificado',
+                                                message: result.message,
+                                                severity:
+                                                    typeof result.severity ===
+                                                    'string'
+                                                        ? result.severity.toLowerCase()
+                                                        : 'error',
+                                                help:
+                                                    result.help ||
+                                                    (result.rule_id
+                                                        ? `Regla Oxlint: ${result.rule_id}`
+                                                        : undefined),
+                                            });
                                         },
                                     );
                                 }
-                            }
-                        })
-                        .catch((err: any) => {
-                            logger.error(
-                                `❌ Error durante la ejecución de ESLint: ${err.message}`,
-                            );
-                            linterErrors.push({
-                                file: item.configFile || 'ESLint Config',
-                                message: `Fallo al ejecutar ESLint: ${err.message}`,
-                                severity: 'error',
-                            });
-                        });
-                    linterPromises.push(eslintPromise);
-                } else if (item.name.toLowerCase() === 'oxlint') {
-                    logger.info(
-                        `🔧 Ejecutando OxLint con config: ${item.configFile || 'por defecto'}`,
-                    );
-                    const oxlintPromise = OxLint(item)
-                        .then((oxlintResult: any) => {
-                            if (
-                                oxlintResult &&
-                                oxlintResult['json'] &&
-                                Array.isArray(oxlintResult['json'])
-                            ) {
-                                oxlintResult['json'].forEach((result: any) => {
-                                    linterErrors.push({
-                                        file:
-                                            result.filename ||
-                                            result.file ||
-                                            'archivo no especificado',
-                                        message: result.message,
-                                        severity:
-                                            typeof result.severity === 'string'
-                                                ? result.severity.toLowerCase()
-                                                : 'error',
-                                        help:
-                                            result.help ||
-                                            (result.rule_id
-                                                ? `Regla Oxlint: ${result.rule_id}`
-                                                : undefined),
-                                    });
+                            })
+                            .catch((err: any) => {
+                                logger.error(
+                                    `❌ Error durante la ejecución de OxLint: ${err.message}`,
+                                );
+                                linterErrors.push({
+                                    file: item.configFile || 'Oxlint Config',
+                                    message: `Fallo al ejecutar Oxlint: ${err.message}`,
+                                    severity: 'error',
                                 });
-                            }
-                        })
-                        .catch((err: any) => {
-                            logger.error(
-                                `❌ Error durante la ejecución de OxLint: ${err.message}`,
-                            );
-                            linterErrors.push({
-                                file: item.configFile || 'Oxlint Config',
-                                message: `Fallo al ejecutar Oxlint: ${err.message}`,
-                                severity: 'error',
                             });
-                        });
-                    linterPromises.push(oxlintPromise);
+                        linterPromises.push(oxlintPromise);
+                    }
                 }
-            }
-        } else {
-            logger.warn('⚠️ La configuración de linter no es un array válido.');
-        }
-
-        await Promise.all(linterPromises);
-        if (showResult) {
-            if (linterErrors.length > 0) {
-                await displayLinterErrors(linterErrors);
             } else {
-                const chalk = await loadChalk();
-                logger.info(
-                    chalk.green(
-                        '✅ No se encontraron errores ni advertencias de linting.',
-                    ),
+                logger.warn(
+                    '⚠️ La configuración de linter no es un array válido.',
                 );
             }
+
+            await Promise.all(linterPromises);
+
+            if (showResult) {
+                if (linterErrors.length > 0) {
+                    await displayLinterErrors(linterErrors);
+                } else {
+                    const chalk = await loadChalk();
+                    logger.info(
+                        chalk.green(
+                            '✅ No se encontraron errores ni advertencias de linting.',
+                        ),
+                    );
+                }
+            }
+        } catch (parseError) {
+            logger.warn(
+                `Error parseando configuración de linter: ${parseError instanceof Error ? parseError.message : 'Error desconocido'}, omitiendo...`,
+            );
         }
 
         if (!showResult && linterErrors.length > 0) {
@@ -1206,7 +1310,6 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             logger.warn(
                 '🚨 Se encontraron errores o advertencias durante el linting.',
             );
-
             if (env.yes === 'false') {
                 const result = await promptUser(
                     '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
@@ -1218,140 +1321,129 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             }
         }
     }
+
     return proceedWithCompilation;
 }
 
-async function displayLinterErrors(errors: any[]): Promise<void> {
-    const chalk = await loadChalk();
-    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
-
-    const errorsByFile = new Map<string, any[]>();
-    errors.forEach(error => {
-        if (!errorsByFile.has(error.file)) {
-            errorsByFile.set(error.file, []);
-        }
-        errorsByFile.get(error.file)!.push(error);
-    });
-
-    const totalErrors = errors.filter(e => e.severity === 'error').length;
-    const totalWarnings = errors.filter(e => e.severity === 'warning').length;
-    const totalFiles = errorsByFile.size;
-
-    logger.info(
-        chalk.yellow(
-            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
-        ),
-    );
-
-    errorsByFile.forEach((fileErrors, filePath) => {
-        const baseName = path.basename(filePath);
-        logger.info(chalk.cyan(`\n📄 ${baseName}`));
-
-        fileErrors.forEach(error => {
-            const icon = error.severity === 'error' ? '❌' : '⚠️';
-            logger.info(`${icon} ${error.message}`);
-            if (error.help) {
-                logger.info(`   └─ ${error.help}`);
-            }
-        });
-    });
-
-    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
-}
-
-// Función para generar barra de progreso
+// Función para crear una barra de progreso visual
 function createProgressBar(
     current: number,
     total: number,
-    barLength: number = 30,
+    width: number = 30,
 ): string {
     const percentage = Math.round((current / total) * 100);
-    const filledLength = Math.round((current / total) * barLength);
-    const emptyLength = barLength - filledLength;
-
-    const filled = '█'.repeat(filledLength);
-    const empty = '░'.repeat(emptyLength);
-
-    return `[${filled}${empty}] ${percentage}% (${current}/${total})`;
+    const filled = Math.round((percentage / 100) * width);
+    const empty = width - filled;
+    return `[${'█'.repeat(filled)}${' '.repeat(empty)}] ${percentage}% (${current}/${total})`;
 }
 
-// Variable para el último progreso mostrado (evitar spam)
-let lastProgressUpdate = 0;
+// Función helper para verificar si un archivo debe ser omitido por cache
+async function shouldSkipFile(filePath: string): Promise<boolean> {
+    try {
+        const stats = await stat(filePath);
+        const cacheEntry = compilationCache.get(filePath);
 
+        if (!cacheEntry) {
+            return false; // No hay entrada en cache, debe compilarse
+        }
+
+        // Verificar si el archivo no ha cambiado desde la última compilación
+        if (stats.mtimeMs <= cacheEntry.mtime) {
+            // Verificar si el archivo de salida existe
+            try {
+                await stat(cacheEntry.outputPath);
+                return true; // Archivo existe y no ha cambiado, se puede omitir
+            } catch {
+                return false; // Archivo de salida no existe, debe recompilarse
+            }
+        }
+
+        return false; // Archivo ha cambiado, debe recompilarse
+    } catch {
+        return false; // Error al verificar, compilar por seguridad
+    }
+}
+
+// Función para compilar archivos con límite de concurrencia
 async function compileWithConcurrencyLimit(
     files: string[],
     maxConcurrency: number = 8,
 ) {
     const results: any[] = [];
     const executing: Promise<any>[] = [];
+    const total = files.length;
     let completed = 0;
     let skipped = 0;
-    const total = files.length;
-
-    logger.info(`📊 Iniciando compilación de ${total} archivos...\n`);
-
-    const initialBar = createProgressBar(0, total);
-    process.stdout.write(`\r🚀 ${initialBar}`);
-
-    function updateProgressBar() {
-        const currentTotal = completed + skipped;
+    let failed = 0; // Función para mostrar progreso
+    function showProgress() {
+        const currentTotal = completed + skipped + failed;
         const progressBar = createProgressBar(currentTotal, total);
-
         const progressPercent = Math.round((currentTotal / total) * 100);
+
         if (
             progressPercent > lastProgressUpdate + 1 ||
             currentTotal === total
         ) {
             process.stdout.write(
-                `\r🚀 ${progressBar} [📁 ${completed} | ⚡ ${skipped}]`,
+                `\r🚀 ${progressBar} [✅ ${completed} | ⏭️ ${skipped} | ❌ ${failed}]`,
             );
             lastProgressUpdate = progressPercent;
         }
     }
-
     for (const file of files) {
         const promise = (async () => {
-            const outFile = getOutputPath(normalizeRuta(file));
+            try {
+                // Verificar cache antes de compilar
+                if (await shouldSkipFile(file)) {
+                    skipped++;
+                    showProgress();
+                    return {
+                        success: true,
+                        cached: true,
+                        output: compilationCache.get(file)?.outputPath || '',
+                    };
+                }
 
-            // Verificar cache
-            const needsRecompile = await shouldRecompile(file, outFile);
-            if (!needsRecompile) {
-                skipped++;
-                updateProgressBar();
-                return { success: true, cached: true, output: outFile };
+                const result = await initCompile(file, false, 'batch');
+
+                // Actualizar cache si la compilación fue exitosa
+                if (result.success && result.output) {
+                    const stats = await stat(file);
+                    compilationCache.set(file, {
+                        hash: '', // Se podría implementar hash del contenido si es necesario
+                        mtime: stats.mtimeMs,
+                        outputPath: result.output,
+                    });
+                }
+
+                completed++;
+                showProgress();
+                return result;
+            } catch (error) {
+                failed++;
+                showProgress();
+                return {
+                    success: false,
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                };
             }
-
-            const result = await initCompile(file, false, 'all');
-            if (result.success) {
-                await updateCache(file, result.output);
-            }
-
-            completed++;
-            updateProgressBar();
-            return result;
-        })().then(result => {
-            executing.splice(executing.indexOf(promise), 1);
-            return result;
-        });
+        })();
 
         results.push(promise);
         executing.push(promise);
 
         if (executing.length >= maxConcurrency) {
             await Promise.race(executing);
+            executing.splice(
+                executing.findIndex(p => p === promise),
+                1,
+            );
         }
     }
-    const finalResults = await Promise.all(results);
 
-    process.stdout.write('\n');
-    const chalk = await loadChalk();
-    logger.info(
-        chalk.green(
-            `✅ Compilación completada: ${completed} archivos compilados, ${skipped} desde cache`,
-        ),
-    );
-
-    return finalResults;
+    await Promise.all(results);
+    console.log('\n'); // Nueva línea después de la barra de progreso
 }
 
 export async function initCompileAll() {
@@ -1364,7 +1456,7 @@ export async function initCompileAll() {
         lastProgressUpdate = 0;
         const shouldContinue = await runLinter();
         if (!shouldContinue) {
-            await displayCompilationSummary(env.VERBOSE === 'true');
+            // await displayCompilationSummary(env.VERBOSE === 'true');
             return;
         }
 
@@ -1460,3 +1552,5 @@ export async function initCompileAll() {
 export async function compileFile(filePath: string) {
     return await initCompile(filePath, true, 'individual');
 }
+
+export { WatchModeOptimizer };

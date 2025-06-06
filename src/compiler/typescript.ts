@@ -427,6 +427,9 @@ export const preCompileTS = async (
             reportDiagnostics: true,
         });
 
+        // const transpileResult = traspileTStoJS(
+        //     fileName,data)
+
         // Verificar errores críticos de sintaxis
         if (transpileResult.diagnostics?.length) {
             const criticalErrors = transpileResult.diagnostics.filter(diag => {

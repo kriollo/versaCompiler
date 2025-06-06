@@ -3,5 +3,16 @@
     "git.ignoreLimitWarning": true,
     "typescript.preferences.includePackageJsonAutoImports": "auto",
     "typescript.tsdk": "./node_modules/typescript/lib",
-    "typescript.enablePromptUseWorkspaceTsdk": true
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "json.schemaDownload.enable": false,
+    "json.validate.enable": true,
+    "json.schemas": [
+        {
+            "fileMatch": ["tsconfig.json", "tsconfig.*.json"],
+            "url": "vscode://schemas/tsconfig"
+        }
+    ],
+    "typescript.suggest.autoImports": true,
+    "typescript.preferences.quoteStyle": "double",
+    "typescript.format.enable": true
 }

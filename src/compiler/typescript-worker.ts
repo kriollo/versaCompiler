@@ -62,11 +62,65 @@ export class TypeScriptWorkerManager {
     private workerReady: boolean = false;
     private initPromise: Promise<void> | null = null;
 
-    // Configuración del worker
-    private readonly WORKER_TIMEOUT = 10000; // 10 segundos timeout
+    // NUEVOS: Gestión de modo y estado para optimización
+    private currentMode: 'individual' | 'batch' | 'watch' | null = null;
+    private keepAliveInWatchMode: boolean = false;
+    private isTerminating: boolean = false;
+    private lastActivityTime: number = Date.now();
+
+    // NUEVO: Auto-cleanup timer para modo no-watch
+    private autoCleanupTimer: NodeJS.Timeout | null = null;
+    private readonly AUTO_CLEANUP_DELAY = 30000; // 30 segundos de inactividad
+
+    // Configuración del worker optimizada
+    private readonly WORKER_TIMEOUT = 15000; // Aumentado a 15 segundos
     private readonly MAX_RETRY_ATTEMPTS = 2;
 
-    private constructor() {}
+    private constructor() {
+        // NUEVO: Setup de auto-cleanup
+        this.setupAutoCleanup();
+    }
+
+    /**
+     * NUEVO: Configura auto-cleanup para modo no-watch
+     */
+    private setupAutoCleanup(): void {
+        const checkCleanup = () => {
+            if (
+                !this.keepAliveInWatchMode &&
+                this.pendingTasks.size === 0 &&
+                Date.now() - this.lastActivityTime > this.AUTO_CLEANUP_DELAY
+            ) {
+                this.terminate().catch(console.error);
+            } else if (!this.isTerminating) {
+                this.autoCleanupTimer = setTimeout(
+                    checkCleanup,
+                    this.AUTO_CLEANUP_DELAY,
+                );
+            }
+        };
+
+        this.autoCleanupTimer = setTimeout(
+            checkCleanup,
+            this.AUTO_CLEANUP_DELAY,
+        );
+    }
+
+    /**
+     * NUEVO: Configura el modo de operación del worker
+     */
+    setMode(mode: 'individual' | 'batch' | 'watch'): void {
+        this.currentMode = mode;
+        this.keepAliveInWatchMode = mode === 'watch';
+
+        // Cancelar auto-cleanup en modo watch
+        if (mode === 'watch' && this.autoCleanupTimer) {
+            clearTimeout(this.autoCleanupTimer);
+            this.autoCleanupTimer = null;
+        } else if (mode !== 'watch' && !this.autoCleanupTimer) {
+            this.setupAutoCleanup();
+        }
+    }
 
     /**
      * Obtiene la instancia singleton del Worker Manager
@@ -76,10 +130,8 @@ export class TypeScriptWorkerManager {
             TypeScriptWorkerManager.instance = new TypeScriptWorkerManager();
         }
         return TypeScriptWorkerManager.instance;
-    }
-
-    /**
-     * Inicializa el worker thread de TypeScript
+    } /**
+     * MEJORADO: Inicializa el worker thread con mejor gestión de errores
      */
     private async initializeWorker(): Promise<void> {
         if (this.initPromise) {
@@ -89,18 +141,33 @@ export class TypeScriptWorkerManager {
         this.initPromise = this._performWorkerInitialization();
         return this.initPromise;
     } /**
-     * Realiza la inicialización del worker thread
+     * MEJORADO: Realiza la inicialización del worker thread
      */
     private async _performWorkerInitialization(): Promise<void> {
         try {
-            // Obtener ruta al worker thread (compatible con ES modules y Windows)
-            const workerPath = path.join(
-                env.PATH_PROY || process.cwd(),
+            // No reinicializar si ya está listo y no estamos terminando
+            if (this.workerReady && this.worker && !this.isTerminating) {
+                return;
+            } // Obtener ruta al worker thread con lógica inteligente para tests
+            const projectRoot = env.PATH_PROY || process.cwd();
+            let workerPath: string;
+
+            // En modo test, verificar múltiples ubicaciones posibles
+
+            workerPath = path.join(
+                projectRoot,
+                'src',
                 'compiler',
                 'typescript-worker-thread.cjs',
             );
 
-            // console.log('[WorkerManager] Inicializando worker en:', workerPath);
+            console.log(
+                `[WorkerManager] Intentando cargar worker desde: ${workerPath}`,
+            );
+
+            console.log(
+                `[WorkerManager] Inicializando worker para modo: ${this.currentMode}`,
+            );
 
             // Crear el worker thread
             this.worker = new Worker(workerPath, {
@@ -116,11 +183,12 @@ export class TypeScriptWorkerManager {
             // Esperar a que el worker esté listo
             await this.waitForWorkerReady();
 
-            // console.log('[WorkerManager] Worker inicializado exitosamente');
+            console.log('[WorkerManager] Worker inicializado exitosamente');
         } catch (error) {
             console.error('[WorkerManager] Error inicializando worker:', error);
             this.worker = null;
             this.workerReady = false;
+            this.initPromise = null;
             throw error;
         }
     }
@@ -248,10 +316,8 @@ export class TypeScriptWorkerManager {
      */
     private generateTaskId(): string {
         return `task-${++this.taskCounter}-${Date.now()}`;
-    }
-
-    /**
-     * Realiza type checking usando el worker thread (con fallback síncrono)
+    } /**
+     * MEJORADO: Type checking con gestión de modo optimizada
      * @param fileName - Nombre del archivo TypeScript
      * @param content - Contenido del archivo
      * @param compilerOptions - Opciones del compilador TypeScript
@@ -262,8 +328,14 @@ export class TypeScriptWorkerManager {
         content: string,
         compilerOptions: any,
     ): Promise<TypeCheckResult> {
+        this.lastActivityTime = Date.now();
+
         try {
-            // Intentar usar el worker thread
+            // En modo watch, mantener worker siempre activo
+            if (this.currentMode === 'watch') {
+                await this.ensureWorkerForWatchMode();
+            }
+
             return await this.typeCheckWithWorker(
                 fileName,
                 content,
@@ -274,17 +346,26 @@ export class TypeScriptWorkerManager {
                 workerError instanceof Error
                     ? workerError.message
                     : String(workerError);
-            console.warn(
-                '[WorkerManager] Error en worker, usando fallback síncrono:',
-                errorMessage,
-            );
 
-            // Fallback a validación síncrona
+            // Solo mostrar warning en modo verbose
+            if (env.VERBOSE === 'true') {
+                console.warn('[WorkerManager] Worker fallback:', errorMessage);
+            }
+
             return this.typeCheckWithSyncFallback(
                 fileName,
                 content,
                 compilerOptions,
             );
+        }
+    }
+
+    /**
+     * NUEVO: Asegura que el worker esté activo en modo watch
+     */
+    private async ensureWorkerForWatchMode(): Promise<void> {
+        if (!this.worker || !this.workerReady) {
+            await this.initializeWorker();
         }
     }
 
@@ -373,28 +454,58 @@ export class TypeScriptWorkerManager {
                 hasErrors: false,
             };
         }
-    }
-
-    /**
-     * Cierra el worker thread y limpia recursos
+    } /**
+     * MEJORADO: Cierra el worker thread y limpia recursos
      */
     async terminate(): Promise<void> {
+        if (this.isTerminating) {
+            return;
+        }
+
+        this.isTerminating = true;
+
+        // Limpiar timers
+        if (this.autoCleanupTimer) {
+            clearTimeout(this.autoCleanupTimer);
+            this.autoCleanupTimer = null;
+        }
+
         if (this.worker) {
-            // console.log('[WorkerManager] Cerrando worker thread...'); // Rechazar todas las tareas pendientes
+            console.log('[WorkerManager] Cerrando worker thread...');
+
+            // Rechazar todas las tareas pendientes
             for (const [, task] of this.pendingTasks) {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker manager cerrado'));
             }
             this.pendingTasks.clear();
 
-            // Cerrar worker
-            await this.worker.terminate();
+            try {
+                // Cerrar worker
+                await this.worker.terminate();
+            } catch (error) {
+                console.error(
+                    '[WorkerManager] Error al terminar worker:',
+                    error,
+                );
+            }
+
             this.worker = null;
             this.workerReady = false;
             this.initPromise = null;
 
-            // console.log('[WorkerManager] Worker cerrado exitosamente');
+            console.log('[WorkerManager] Worker cerrado exitosamente');
         }
+
+        this.isTerminating = false;
+    }
+
+    /**
+     * NUEVO: Reinicia el worker si es necesario
+     */
+    async restart(): Promise<void> {
+        await this.terminate();
+        await this.initializeWorker();
     }
 
     /**

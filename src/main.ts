@@ -131,7 +131,7 @@ async function main() {
         yargInstance = yargInstance.option('linter', {
             type: 'boolean',
             description:
-                'Habilitar/Deshabilitar el linter. Por defecto --linter=true',
+                'Habilitar/Deshabilitar el linter. Por defecto --linter=false',
             default: false,
         });
     }
@@ -197,8 +197,7 @@ async function main() {
         env.isALL = argv.all ? 'true' : 'false';
         env.TAILWIND =
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
-        env.ENABLE_LINTER =
-            argv.linter === undefined ? 'true' : String(argv.linter);
+        env.ENABLE_LINTER = String(argv.linter);
         env.VERBOSE = argv.verbose ? 'true' : 'false';
         logger.info(chalk.green('Configuración de VersaCompiler:'));
         logger.info(chalk.green(`Watch: ${argv.watch}`));
@@ -303,6 +302,14 @@ async function main() {
             process.exit(0);
         }
 
+        if (!argv.watch) {
+            if (env.ENABLE_LINTER === 'true') {
+                const { runLinter } = await loadCompilerModule();
+                await runLinter(true);
+                process.exit(1);
+            }
+        }
+
         let bs: any;
         let watch: any;
         if (argv.watch) {
@@ -334,13 +341,6 @@ async function main() {
             stopCompile();
             process.exit(0);
         });
-        if (!argv.watch) {
-            if (env.ENABLE_LINTER === 'true') {
-                const { runLinter } = await loadCompilerModule();
-                await runLinter(true);
-                process.exit(1);
-            }
-        }
     } catch (error) {
         logger.error('Error en la aplicación:', error);
         stopCompile();
