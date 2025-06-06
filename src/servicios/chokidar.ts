@@ -213,7 +213,7 @@ export async function initChokidar(bs: any) {
 
         // Evento cuando se elimina un archivo
         watcher.on('unlink', async ruta => {
-            logger.info(`🗑️ eliminando archivo: ${ruta}`);
+            logger.info(`\n🗑️ eliminando archivo: ${ruta}`);
             const result = await deleteFile(getOutputPath(normalizeRuta(ruta)));
             if (result) {
                 logger.info(`Archivo eliminado: ${ruta}`);
