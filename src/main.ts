@@ -122,7 +122,7 @@ async function main() {
         yargInstance = yargInstance.option('tailwind', {
             type: 'boolean',
             description:
-                'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=true',
+                'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=false',
             default: false,
         });
     }
@@ -307,6 +307,20 @@ async function main() {
                 const { runLinter } = await loadCompilerModule();
                 await runLinter(true);
                 process.exit(1);
+            }
+        }
+        if (env.TAILWIND === 'true') {
+            const tailwindModule = await import('./compiler/tailwindcss');
+            const resultTW = await tailwindModule.generateTailwindCSS();
+            if (typeof resultTW !== 'boolean') {
+                if (resultTW?.success) {
+                    logger.info(`🎨 ${resultTW.message}`);
+                } else {
+                    const errorMsg = `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`;
+                    logger.error(
+                        `❌ Error al generar Tailwind CSS: ${errorMsg}`,
+                    );
+                }
             }
         }
 

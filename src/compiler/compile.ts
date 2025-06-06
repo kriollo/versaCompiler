@@ -69,7 +69,7 @@ class ModuleManager {
         });
 
         await Promise.all(preloadPromises);
-        console.log('[ModuleManager] Precarga completada para modo watch');
+        // console.log('[ModuleManager] Precarga completada para modo watch');
     } /**
      * MEJORADO: Inicializa los módulos necesarios según el contexto de compilación
      * @param context Contexto de compilación: 'individual', 'batch', 'watch'
@@ -1041,7 +1041,10 @@ async function compileJS(
     await writeFile(outPath, code, 'utf-8');
 
     if (env.VERBOSE === 'true') {
-        console.info(`📊 Timings para ${path.basename(inPath)}:`, timings);
+        logger.info(
+            `\n📊 Timings para ${path.basename(inPath)}:`,
+            JSON.stringify(timings),
+        );
     }
     return {
         error: null,
@@ -1073,9 +1076,7 @@ export async function initCompile(
             const resultTW = await generateTailwindCSS();
             if (typeof resultTW !== 'boolean') {
                 if (resultTW?.success) {
-                    if (mode === 'individual') {
-                        logger.info(`🎨 ${resultTW.message}`);
-                    }
+                    logger.info(`🎨 ${resultTW.message}`);
                 } else {
                     const errorMsg = `${resultTW.message}${resultTW.details ? '\n' + resultTW.details : ''}`;
                     await handleCompilationError(
