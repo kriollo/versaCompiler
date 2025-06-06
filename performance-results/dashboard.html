@@ -3,176 +3,454 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VersaCompiler Performance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>VersaCompiler Performance Dashboard</title>    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
             padding: 20px;
-            background: #f5f5f5;
         }
+        .container { max-width: 1400px; margin: 0 auto; }
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px;
-            border-radius: 10px;
+            padding: 40px;
+            border-radius: 15px;
             margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
         .stat-card {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             text-align: center;
+            transition: transform 0.3s ease;
         }
+        .stat-card:hover { transform: translateY(-5px); }
         .stat-value {
-            font-size: 2em;
+            font-size: 2.5em;
             font-weight: bold;
             color: #667eea;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            font-size: 1.1em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .chart-container {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+        }        .chart-container h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
+        }
+        .performance-table {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .performance-table h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
+        }
+        .perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1em;
+        }
+        .perf-table th,
+        .perf-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .perf-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+        }
+        .perf-table tr:hover {
+            background: #f8f9fa;
+        }
+        .perf-table .avg-time {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .perf-table .success-rate {
+            color: #27ae60;
         }
         .issues {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            margin-bottom: 30px;
         }
         .issue-card {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         }
-        .regression { border-left: 4px solid #e74c3c; }
-        .improvement { border-left: 4px solid #27ae60; }
+        .regression { border-left: 5px solid #e74c3c; }
+        .improvement { border-left: 5px solid #27ae60; }
+        .issue-card h3 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
         .issue-list {
             list-style: none;
             padding: 0;
         }
         .issue-list li {
-            padding: 8px 0;
+            padding: 12px 0;
             border-bottom: 1px solid #eee;
+            font-size: 1.1em;
         }
         .environment {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-top: 20px;
+        }
+        .environment h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .env-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .env-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .env-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .env-value {
+            font-size: 1.1em;
+            color: #333;
+            margin-top: 5px;
+        }
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .refresh-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚀 VersaCompiler Performance Dashboard</h1>
-        <p>Última actualización: 5/6/2025, 16:40:30</p>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 VersaCompiler Performance Dashboard</h1>
+            <p>Última actualización: 6/6/2025, 12:46:31</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">11</div>
+                <div class="stat-label">Tests Ejecutados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">11</div>
+                <div class="stat-label">Tests Exitosos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">69.5ms</div>
+                <div class="stat-label">Tiempo Promedio</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">100.0%</div>
+                <div class="stat-label">Tasa de Éxito</div>
+            </div>
+        </div>        <div class="chart-container">
+            <h2>📈 Tendencias de Performance</h2>
+            <canvas id="performanceChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="performance-table">
+            <h2>📊 Tiempos Promedio por Test</h2>
+            <table class="perf-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Tiempo Promedio</th>
+                        <th>Tiempo Mínimo</th>
+                        <th>Tiempo Máximo</th>
+                        <th>Tasa de Éxito</th>
+                        <th>Ejecuciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td><strong>JavaScript Simple</strong></td>
+                        <td class="avg-time">170.36ms</td>
+                        <td>170.36ms</td>
+                        <td>170.36ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>TypeScript Simple</strong></td>
+                        <td class="avg-time">126.53ms</td>
+                        <td>126.53ms</td>
+                        <td>126.53ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Vue Simple</strong></td>
+                        <td class="avg-time">65.23ms</td>
+                        <td>65.23ms</td>
+                        <td>65.23ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>preCompileVue Direct</strong></td>
+                        <td class="avg-time">5.92ms</td>
+                        <td>5.92ms</td>
+                        <td>5.92ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>preCompileTS Direct</strong></td>
+                        <td class="avg-time">14.20ms</td>
+                        <td>14.20ms</td>
+                        <td>14.20ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Batch Compilation</strong></td>
+                        <td class="avg-time">95.66ms</td>
+                        <td>95.66ms</td>
+                        <td>95.66ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Memory Usage</strong></td>
+                        <td class="avg-time">24.97ms</td>
+                        <td>24.97ms</td>
+                        <td>24.97ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Concurrent Compilation</strong></td>
+                        <td class="avg-time">31.54ms</td>
+                        <td>31.54ms</td>
+                        <td>31.54ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Large File Compilation</strong></td>
+                        <td class="avg-time">221.32ms</td>
+                        <td>221.32ms</td>
+                        <td>221.32ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Performance Baseline</strong></td>
+                        <td class="avg-time">2.63ms</td>
+                        <td>2.63ms</td>
+                        <td>2.63ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Performance Consistency</strong></td>
+                        <td class="avg-time">6.67ms</td>
+                        <td>6.67ms</td>
+                        <td>6.67ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+
+        <div class="issues">
+            <div class="issue-card regression">
+                <h3>⚠️ Regresiones Detectadas</h3>
+                <ul class="issue-list">
+                    <li><strong>Concurrent Compilation</strong>: +14.7%</li>
+                </ul>
+            </div>
+            <div class="issue-card improvement">
+                <h3>🎯 Mejoras Detectadas</h3>
+                <ul class="issue-list">
+                    <li><strong>JavaScript Simple</strong>: 48.4% faster</li><li><strong>TypeScript Simple</strong>: 37.8% faster</li><li><strong>Vue Simple</strong>: 31.1% faster</li><li><strong>preCompileVue Direct</strong>: 34.8% faster</li><li><strong>preCompileTS Direct</strong>: 38.7% faster</li><li><strong>Batch Compilation</strong>: 85.6% faster</li><li><strong>Large File Compilation</strong>: 13.0% faster</li><li><strong>Performance Consistency</strong>: 66.1% faster</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="environment">
+            <h3>🖥️ Información del Entorno</h3>
+            <div class="env-grid">
+                <div class="env-item">
+                    <div class="env-label">Node.js</div>
+                    <div class="env-value">v23.11.0</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">Plataforma</div>
+                    <div class="env-value">win32 x64</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">CPUs</div>
+                    <div class="env-value">8</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">Memoria</div>
+                    <div class="env-value">31.4 GB</div>
+                </div>
+                
+            </div>
+        </div>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">11</div>
-            <div>Tests Ejecutados</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">11</div>
-            <div>Tests Exitosos</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">45.0ms</div>
-            <div>Tiempo Promedio</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">100.0%</div>
-            <div>Tasa de Éxito</div>
-        </div>
-    </div>
-
-    <div class="chart-container">
-        <h2>📈 Tendencias de Performance</h2>
-        <canvas id="performanceChart" width="400" height="200"></canvas>
-    </div>
-
-    <div class="issues">
-        <div class="issue-card regression">
-            <h3>⚠️ Regresiones Detectadas</h3>
-            <ul class="issue-list">
-                <li>preCompileTS Direct: +16.6% slower</li><li>Concurrent Compilation: +38.8% slower</li><li>Large File Compilation: +18.9% slower</li><li>Performance Baseline: +18.8% slower</li><li>Performance Consistency: +25.5% slower</li>
-            </ul>
-        </div>
-        <div class="issue-card improvement">
-            <h3>🎯 Mejoras Detectadas</h3>
-            <ul class="issue-list">
-                <li>JavaScript Simple: 80.8% faster</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="environment">
-        <h3>🖥️ Información del Entorno</h3>
-        <p><strong>Node.js:</strong> v23.11.0</p>
-        <p><strong>Plataforma:</strong> win32 x64</p>
-        <p><strong>CPUs:</strong> 8</p>
-        <p><strong>Memoria:</strong> 31.4 GB</p>
-        <p><strong>Git:</strong> master@6a8cf517</p>
-    </div>
-
-    <script>
+    <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar</button>    <script>
         const ctx = document.getElementById('performanceChart').getContext('2d');
-        const chartData = [{"name":"JavaScript Simple","data":[{"x":1749091309307,"y":47.3311},{"x":1749091337951,"y":68.2397},{"x":1749091406276,"y":40.2552},{"x":1749091741648,"y":52.5736},{"x":1749091771222,"y":48.4955},{"x":1749091821042,"y":53.61},{"x":1749091933973,"y":124.2286},{"x":1749133356800,"y":155.7748},{"x":1749133457605,"y":58.8137},{"x":1749133546404,"y":32.6047},{"x":1749149300521,"y":86.53},{"x":1749149392258,"y":70.7264},{"x":1749149567363,"y":59.0488},{"x":1749149907879,"y":65.5643},{"x":1749150010582,"y":114.6826},{"x":1749150155199,"y":20.8389},{"x":1749150264392,"y":24.6483},{"x":1749151792678,"y":132.0683},{"x":1749151903028,"y":55.5093},{"x":1749152028845,"y":194.0266},{"x":1749152201369,"y":49.1771},{"x":1749152526057,"y":59.1026},{"x":1749154274311,"y":152.2175},{"x":1749154621347,"y":59.58},{"x":1749154719442,"y":24.5652},{"x":1749155020157,"y":19.8017},{"x":1749155631301,"y":143.0163},{"x":1749156028399,"y":27.4918}]},{"name":"TypeScript Simple","data":[{"x":1749091309610,"y":130.9944},{"x":1749091338251,"y":116.4624},{"x":1749091406596,"y":120.8613},{"x":1749091741931,"y":111.1789},{"x":1749091771507,"y":112.8254},{"x":1749091821319,"y":108.1871},{"x":1749091936336,"y":480.8869},{"x":1749133358322,"y":319.3448},{"x":1749133457973,"y":160.1505},{"x":1749133546662,"y":98.4666},{"x":1749149301146,"y":185.2968},{"x":1749149392853,"y":225.4184},{"x":1749149567962,"y":235.7},{"x":1749149908634,"y":183.111},{"x":1749150011941,"y":244.012},{"x":1749150155417,"y":84.4407},{"x":1749150264619,"y":98.0877},{"x":1749151793416,"y":282.2129},{"x":1749151903572,"y":157.8988},{"x":1749152029549,"y":231.9387},{"x":1749152202101,"y":272.8328},{"x":1749152526680,"y":141.6035},{"x":1749154274553,"y":94.954},{"x":1749154622168,"y":207.6019},{"x":1749154719675,"y":89.5566},{"x":1749155020442,"y":124.8047},{"x":1749155631534,"y":85.6229},{"x":1749156028632,"y":89.0422}]},{"name":"Vue Simple","data":[{"x":1749091309850,"y":80.0522},{"x":1749091338474,"y":62.4819},{"x":1749091406798,"y":54.1836},{"x":1749091742131,"y":53.9297},{"x":1749091771712,"y":54.5342},{"x":1749091821515,"y":55.2969},{"x":1749091937281,"y":101.4935},{"x":1749133359351,"y":204.3983},{"x":1749133458511,"y":90.3035},{"x":1749133546858,"y":56.9807},{"x":1749149301517,"y":155.2404},{"x":1749149393277,"y":117.2134},{"x":1749149568351,"y":87.0839},{"x":1749149909069,"y":99.5344},{"x":1749150012334,"y":66.3816},{"x":1749150155575,"y":44.9072},{"x":1749150264772,"y":44.4132},{"x":1749151794135,"y":127.0738},{"x":1749151903998,"y":55.8279},{"x":1749152029954,"y":103.8723},{"x":1749152202709,"y":95.1569},{"x":1749152527373,"y":67.8389},{"x":1749154274718,"y":46.0274},{"x":1749154622560,"y":83.4574},{"x":1749154719840,"y":45.5876},{"x":1749155020642,"y":46.5369},{"x":1749155631695,"y":45.3521},{"x":1749156028800,"y":49.3525}]},{"name":"preCompileVue Direct","data":[{"x":1749091310012,"y":9.0766},{"x":1749091338766,"y":8.7726},{"x":1749091406951,"y":8.4392},{"x":1749091742276,"y":7.9399},{"x":1749091771860,"y":7.5824},{"x":1749091821660,"y":7.4706},{"x":1749091938297,"y":9.958},{"x":1749133360374,"y":9.791},{"x":1749133458786,"y":11.1847},{"x":1749133547010,"y":8.7489},{"x":1749149301700,"y":14.2056},{"x":1749149393547,"y":10.3682},{"x":1749149568691,"y":11.5924},{"x":1749149909302,"y":11.6784},{"x":1749150012684,"y":12.252},{"x":1749150155692,"y":6.1504},{"x":1749150264889,"y":7.2934},{"x":1749151794333,"y":11.312},{"x":1749151904356,"y":9.0986},{"x":1749152030103,"y":9.1171},{"x":1749152203430,"y":9.9247},{"x":1749152527917,"y":8.9408},{"x":1749154274836,"y":6.3176},{"x":1749154623108,"y":9.7274},{"x":1749154719967,"y":6.1062},{"x":1749155020757,"y":6.2821},{"x":1749155631815,"y":7.0326},{"x":1749156028920,"y":6.7898}]},{"name":"preCompileTS Direct","data":[{"x":1749091310166,"y":18.3058},{"x":1749091338986,"y":25.4388},{"x":1749091407104,"y":18.6532},{"x":1749091742435,"y":18.5996},{"x":1749091772005,"y":18.265},{"x":1749091821813,"y":17.6257},{"x":1749091938641,"y":21.7462},{"x":1749133360595,"y":20.2819},{"x":1749133458963,"y":22.4748},{"x":1749133547157,"y":17.9493},{"x":1749149301967,"y":18.9016},{"x":1749149393853,"y":26.9322},{"x":1749149569040,"y":23.5759},{"x":1749149909571,"y":21.8348},{"x":1749150013342,"y":21.6755},{"x":1749150155802,"y":12.9374},{"x":1749150265007,"y":13.4578},{"x":1749151794790,"y":20.0255},{"x":1749151904779,"y":20.7681},{"x":1749152030275,"y":22.0591},{"x":1749152204101,"y":20.9584},{"x":1749152528297,"y":18.4055},{"x":1749154274957,"y":15.2254},{"x":1749154623837,"y":20.7031},{"x":1749154720097,"y":14.3035},{"x":1749155020891,"y":23.3523},{"x":1749155631932,"y":13.2383},{"x":1749156029049,"y":15.4311}]},{"name":"Batch Compilation","data":[{"x":1749091310632,"y":149.3015},{"x":1749091339677,"y":471.1134},{"x":1749091407540,"y":172.8849},{"x":1749091742844,"y":143.005},{"x":1749091772458,"y":139.494},{"x":1749091822270,"y":160.907},{"x":1749091939472,"y":254.0838},{"x":1749133361008,"y":179.8233},{"x":1749133459838,"y":303.239},{"x":1749133547497,"y":187.2276},{"x":1749149302274,"y":131.7403},{"x":1749149394501,"y":375.0414},{"x":1749149569548,"y":201.1778},{"x":1749149910292,"y":322.7558},{"x":1749150013857,"y":199.1899},{"x":1749150156015,"y":96.5429},{"x":1749150265244,"y":111.3063},{"x":1749151795138,"y":148.7799},{"x":1749151905418,"y":172.6932},{"x":1749152030533,"y":108.2104},{"x":1749152204674,"y":200.2946},{"x":1749152528755,"y":165.1006},{"x":1749154275169,"y":77.027},{"x":1749154624916,"y":227.0459},{"x":1749154720347,"y":98.219},{"x":1749155021127,"y":86.303},{"x":1749155632144,"y":79.3519},{"x":1749156029273,"y":85.521}]},{"name":"Memory Usage","data":[{"x":1749091310851,"y":21.4352},{"x":1749091339876,"y":21.7103},{"x":1749091407756,"y":19.8015},{"x":1749091743020,"y":22.0204},{"x":1749091772652,"y":20.2233},{"x":1749091822459,"y":21.431},{"x":1749091940233,"y":41.5712},{"x":1749133361290,"y":42.3825},{"x":1749133460207,"y":44.742},{"x":1749133547660,"y":17.9291},{"x":1749149302415,"y":29.8418},{"x":1749149394694,"y":22.4143},{"x":1749149569721,"y":20.8691},{"x":1749149910537,"y":44.0847},{"x":1749150014038,"y":20.0138},{"x":1749150156155,"y":20.0381},{"x":1749150265374,"y":17.6501},{"x":1749151795271,"y":16.6855},{"x":1749151906132,"y":40.3924},{"x":1749152030658,"y":14.2531},{"x":1749152204881,"y":18.7525},{"x":1749152528906,"y":17.6201},{"x":1749154275370,"y":9.0328},{"x":1749154625673,"y":10.5578},{"x":1749154720553,"y":11.1553},{"x":1749155021408,"y":14.5297},{"x":1749155632350,"y":13.7475},{"x":1749156029429,"y":13.8226}]},{"name":"Concurrent Compilation","data":[{"x":1749091311161,"y":72.5218},{"x":1749091340107,"y":69.5672},{"x":1749091408003,"y":82.9226},{"x":1749091743260,"y":56.8973},{"x":1749091772895,"y":59.635},{"x":1749091822707,"y":57.1558},{"x":1749091940793,"y":196.5937},{"x":1749133361959,"y":63.2645},{"x":1749133460435,"y":68.0798},{"x":1749133547920,"y":61.2},{"x":1749149302587,"y":41.2983},{"x":1749149394950,"y":74.3275},{"x":1749149569910,"y":58.3106},{"x":1749149910783,"y":53.578},{"x":1749150014253,"y":49.3752},{"x":1749150156297,"y":37.1784},{"x":1749150265516,"y":36.4418},{"x":1749151795431,"y":41.4485},{"x":1749151906414,"y":52.2392},{"x":1749152030817,"y":48.2004},{"x":1749152205233,"y":53.7777},{"x":1749152529252,"y":51.9581},{"x":1749154275517,"y":23.6687},{"x":1749154626124,"y":34.043},{"x":1749154720734,"y":37.8206},{"x":1749155021796,"y":78.1415},{"x":1749155632483,"y":21.6306},{"x":1749156029607,"y":30.0314}]},{"name":"Large File Compilation","data":[{"x":1749091311460,"y":141.4631},{"x":1749091340445,"y":169.0029},{"x":1749091408360,"y":194.7876},{"x":1749091743659,"y":239.2103},{"x":1749091773203,"y":154.445},{"x":1749091823111,"y":227.0889},{"x":1749091941883,"y":505.0758},{"x":1749133362279,"y":173.8742},{"x":1749133460795,"y":184.0375},{"x":1749133548260,"y":180.3644},{"x":1749149302967,"y":216.6916},{"x":1749149395430,"y":319.162},{"x":1749149570193,"y":132.8826},{"x":1749149911254,"y":227.8071},{"x":1749150014621,"y":152.0668},{"x":1749150156511,"y":93.1838},{"x":1749150265770,"y":120.2467},{"x":1749151795670,"y":119.6388},{"x":1749151906714,"y":140.5963},{"x":1749152031054,"y":116.3788},{"x":1749152205709,"y":267.7008},{"x":1749152529665,"y":151.3842},{"x":1749154275866,"y":197.1659},{"x":1749154626532,"y":207.9172},{"x":1749154721084,"y":189.5846},{"x":1749155022093,"y":138.2269},{"x":1749155632766,"y":139.2706},{"x":1749156029944,"y":165.5605}]},{"name":"Performance Baseline","data":[{"x":1749091311613,"y":4.5056},{"x":1749091340602,"y":4.2224},{"x":1749091408501,"y":3.1564},{"x":1749091743796,"y":3.1856},{"x":1749091773343,"y":3.2996},{"x":1749091823303,"y":7.296},{"x":1749091942132,"y":20.4121},{"x":1749133362417,"y":4.4175},{"x":1749133460953,"y":4.82},{"x":1749133548406,"y":2.9805},{"x":1749149303133,"y":20.8011},{"x":1749149395591,"y":3.9824},{"x":1749149570346,"y":3.9155},{"x":1749149911505,"y":5.7065},{"x":1749150014764,"y":3.1775},{"x":1749150156636,"y":2.8014},{"x":1749150265886,"y":2.9132},{"x":1749151795785,"y":2.3089},{"x":1749151906905,"y":5.7527},{"x":1749152031163,"y":2.4995},{"x":1749152205861,"y":4.082},{"x":1749152529889,"y":5.1719},{"x":1749154275984,"y":3.3246},{"x":1749154626855,"y":4.7021},{"x":1749154721213,"y":3.9346},{"x":1749155022210,"y":3.1263},{"x":1749155632885,"y":3.7199},{"x":1749156030069,"y":4.4183}]},{"name":"Performance Consistency","data":[{"x":1749091311766,"y":15.8904},{"x":1749091340763,"y":16.0896},{"x":1749091408650,"y":15.4019},{"x":1749091743946,"y":15.5242},{"x":1749091773531,"y":22.4339},{"x":1749091823468,"y":19.1074},{"x":1749091942350,"y":24.1807},{"x":1749133362589,"y":17.0819},{"x":1749133461149,"y":21.9856},{"x":1749133548562,"y":17.2901},{"x":1749149303284,"y":14.0903},{"x":1749149395816,"y":30.0321},{"x":1749149570520,"y":16.4158},{"x":1749149911778,"y":16.0274},{"x":1749150014931,"y":14.8083},{"x":1749150156768,"y":17.9867},{"x":1749150265996,"y":11.1997},{"x":1749151795943,"y":15.4492},{"x":1749151907084,"y":18.2374},{"x":1749152031284,"y":11.9331},{"x":1749152205991,"y":13.4256},{"x":1749152530090,"y":22.0674},{"x":1749154276100,"y":6.4165},{"x":1749154627150,"y":15.0461},{"x":1749154721352,"y":7.9086},{"x":1749155022328,"y":6.8608},{"x":1749155632997,"y":5.5778},{"x":1749156030191,"y":7.0028}]}];
+        const chartData = [{"name":"JavaScript Simple","data":[{"x":1,"y":47.3311,"timestamp":"4/6/2025, 22:41:49"},{"x":2,"y":68.2397,"timestamp":"4/6/2025, 22:42:17"},{"x":3,"y":40.2552,"timestamp":"4/6/2025, 22:43:26"},{"x":4,"y":52.5736,"timestamp":"4/6/2025, 22:49:01"},{"x":5,"y":48.4955,"timestamp":"4/6/2025, 22:49:31"},{"x":6,"y":53.61,"timestamp":"4/6/2025, 22:50:21"},{"x":7,"y":124.2286,"timestamp":"4/6/2025, 22:52:13"},{"x":8,"y":155.7748,"timestamp":"5/6/2025, 10:22:36"},{"x":9,"y":58.8137,"timestamp":"5/6/2025, 10:24:17"},{"x":10,"y":32.6047,"timestamp":"5/6/2025, 10:25:46"},{"x":11,"y":86.53,"timestamp":"5/6/2025, 14:48:20"},{"x":12,"y":70.7264,"timestamp":"5/6/2025, 14:49:52"},{"x":13,"y":59.0488,"timestamp":"5/6/2025, 14:52:47"},{"x":14,"y":65.5643,"timestamp":"5/6/2025, 14:58:27"},{"x":15,"y":114.6826,"timestamp":"5/6/2025, 15:00:10"},{"x":16,"y":20.8389,"timestamp":"5/6/2025, 15:02:35"},{"x":17,"y":24.6483,"timestamp":"5/6/2025, 15:04:24"},{"x":18,"y":132.0683,"timestamp":"5/6/2025, 15:29:52"},{"x":19,"y":55.5093,"timestamp":"5/6/2025, 15:31:43"},{"x":20,"y":194.0266,"timestamp":"5/6/2025, 15:33:48"},{"x":21,"y":49.1771,"timestamp":"5/6/2025, 15:36:41"},{"x":22,"y":59.1026,"timestamp":"5/6/2025, 15:42:06"},{"x":23,"y":152.2175,"timestamp":"5/6/2025, 16:11:14"},{"x":24,"y":59.58,"timestamp":"5/6/2025, 16:17:01"},{"x":25,"y":24.5652,"timestamp":"5/6/2025, 16:18:39"},{"x":26,"y":19.8017,"timestamp":"5/6/2025, 16:23:40"},{"x":27,"y":143.0163,"timestamp":"5/6/2025, 16:33:51"},{"x":28,"y":27.4918,"timestamp":"5/6/2025, 16:40:28"},{"x":29,"y":9.4586,"timestamp":"5/6/2025, 17:52:17"},{"x":30,"y":25.4703,"timestamp":"5/6/2025, 17:53:57"},{"x":31,"y":28.6377,"timestamp":"5/6/2025, 18:02:19"},{"x":32,"y":15.8222,"timestamp":"5/6/2025, 18:55:24"},{"x":33,"y":25.7164,"timestamp":"5/6/2025, 19:14:19"},{"x":34,"y":24.3435,"timestamp":"5/6/2025, 19:14:56"},{"x":35,"y":25.8981,"timestamp":"5/6/2025, 19:21:41"},{"x":36,"y":40.1789,"timestamp":"5/6/2025, 19:32:48"},{"x":37,"y":109.3739,"timestamp":"5/6/2025, 19:35:24"},{"x":38,"y":330.2668,"timestamp":"5/6/2025, 19:36:25"},{"x":39,"y":170.36,"timestamp":"6/6/2025, 11:17:09"}]},{"name":"TypeScript Simple","data":[{"x":1,"y":130.9944,"timestamp":"4/6/2025, 22:41:49"},{"x":2,"y":116.4624,"timestamp":"4/6/2025, 22:42:18"},{"x":3,"y":120.8613,"timestamp":"4/6/2025, 22:43:26"},{"x":4,"y":111.1789,"timestamp":"4/6/2025, 22:49:01"},{"x":5,"y":112.8254,"timestamp":"4/6/2025, 22:49:31"},{"x":6,"y":108.1871,"timestamp":"4/6/2025, 22:50:21"},{"x":7,"y":480.8869,"timestamp":"4/6/2025, 22:52:16"},{"x":8,"y":319.3448,"timestamp":"5/6/2025, 10:22:38"},{"x":9,"y":160.1505,"timestamp":"5/6/2025, 10:24:17"},{"x":10,"y":98.4666,"timestamp":"5/6/2025, 10:25:46"},{"x":11,"y":185.2968,"timestamp":"5/6/2025, 14:48:21"},{"x":12,"y":225.4184,"timestamp":"5/6/2025, 14:49:52"},{"x":13,"y":235.7,"timestamp":"5/6/2025, 14:52:47"},{"x":14,"y":183.111,"timestamp":"5/6/2025, 14:58:28"},{"x":15,"y":244.012,"timestamp":"5/6/2025, 15:00:11"},{"x":16,"y":84.4407,"timestamp":"5/6/2025, 15:02:35"},{"x":17,"y":98.0877,"timestamp":"5/6/2025, 15:04:24"},{"x":18,"y":282.2129,"timestamp":"5/6/2025, 15:29:53"},{"x":19,"y":157.8988,"timestamp":"5/6/2025, 15:31:43"},{"x":20,"y":231.9387,"timestamp":"5/6/2025, 15:33:49"},{"x":21,"y":272.8328,"timestamp":"5/6/2025, 15:36:42"},{"x":22,"y":141.6035,"timestamp":"5/6/2025, 15:42:06"},{"x":23,"y":94.954,"timestamp":"5/6/2025, 16:11:14"},{"x":24,"y":207.6019,"timestamp":"5/6/2025, 16:17:02"},{"x":25,"y":89.5566,"timestamp":"5/6/2025, 16:18:39"},{"x":26,"y":124.8047,"timestamp":"5/6/2025, 16:23:40"},{"x":27,"y":85.6229,"timestamp":"5/6/2025, 16:33:51"},{"x":28,"y":89.0422,"timestamp":"5/6/2025, 16:40:28"},{"x":29,"y":39.0466,"timestamp":"5/6/2025, 17:52:17"},{"x":30,"y":82.656,"timestamp":"5/6/2025, 17:53:57"},{"x":31,"y":84.6887,"timestamp":"5/6/2025, 18:02:20"},{"x":32,"y":36.6711,"timestamp":"5/6/2025, 18:55:25"},{"x":33,"y":90.4202,"timestamp":"5/6/2025, 19:14:19"},{"x":34,"y":86.7154,"timestamp":"5/6/2025, 19:14:56"},{"x":35,"y":82.4692,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":56.0832,"timestamp":"5/6/2025, 19:32:49"},{"x":37,"y":42.8077,"timestamp":"5/6/2025, 19:35:25"},{"x":38,"y":203.5069,"timestamp":"5/6/2025, 19:36:25"},{"x":39,"y":126.5295,"timestamp":"6/6/2025, 11:17:09"}]},{"name":"Vue Simple","data":[{"x":1,"y":80.0522,"timestamp":"4/6/2025, 22:41:49"},{"x":2,"y":62.4819,"timestamp":"4/6/2025, 22:42:18"},{"x":3,"y":54.1836,"timestamp":"4/6/2025, 22:43:26"},{"x":4,"y":53.9297,"timestamp":"4/6/2025, 22:49:02"},{"x":5,"y":54.5342,"timestamp":"4/6/2025, 22:49:31"},{"x":6,"y":55.2969,"timestamp":"4/6/2025, 22:50:21"},{"x":7,"y":101.4935,"timestamp":"4/6/2025, 22:52:17"},{"x":8,"y":204.3983,"timestamp":"5/6/2025, 10:22:39"},{"x":9,"y":90.3035,"timestamp":"5/6/2025, 10:24:18"},{"x":10,"y":56.9807,"timestamp":"5/6/2025, 10:25:46"},{"x":11,"y":155.2404,"timestamp":"5/6/2025, 14:48:21"},{"x":12,"y":117.2134,"timestamp":"5/6/2025, 14:49:53"},{"x":13,"y":87.0839,"timestamp":"5/6/2025, 14:52:48"},{"x":14,"y":99.5344,"timestamp":"5/6/2025, 14:58:29"},{"x":15,"y":66.3816,"timestamp":"5/6/2025, 15:00:12"},{"x":16,"y":44.9072,"timestamp":"5/6/2025, 15:02:35"},{"x":17,"y":44.4132,"timestamp":"5/6/2025, 15:04:24"},{"x":18,"y":127.0738,"timestamp":"5/6/2025, 15:29:54"},{"x":19,"y":55.8279,"timestamp":"5/6/2025, 15:31:43"},{"x":20,"y":103.8723,"timestamp":"5/6/2025, 15:33:49"},{"x":21,"y":95.1569,"timestamp":"5/6/2025, 15:36:42"},{"x":22,"y":67.8389,"timestamp":"5/6/2025, 15:42:07"},{"x":23,"y":46.0274,"timestamp":"5/6/2025, 16:11:14"},{"x":24,"y":83.4574,"timestamp":"5/6/2025, 16:17:02"},{"x":25,"y":45.5876,"timestamp":"5/6/2025, 16:18:39"},{"x":26,"y":46.5369,"timestamp":"5/6/2025, 16:23:40"},{"x":27,"y":45.3521,"timestamp":"5/6/2025, 16:33:51"},{"x":28,"y":49.3525,"timestamp":"5/6/2025, 16:40:28"},{"x":29,"y":17.1006,"timestamp":"5/6/2025, 17:52:17"},{"x":30,"y":58.5538,"timestamp":"5/6/2025, 17:53:57"},{"x":31,"y":45.3301,"timestamp":"5/6/2025, 18:02:20"},{"x":32,"y":124.876,"timestamp":"5/6/2025, 18:55:25"},{"x":33,"y":43.4582,"timestamp":"5/6/2025, 19:14:19"},{"x":34,"y":48.692,"timestamp":"5/6/2025, 19:14:56"},{"x":35,"y":44.5154,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":28.7935,"timestamp":"5/6/2025, 19:32:49"},{"x":37,"y":57.365,"timestamp":"5/6/2025, 19:35:25"},{"x":38,"y":94.7141,"timestamp":"5/6/2025, 19:36:26"},{"x":39,"y":65.2268,"timestamp":"6/6/2025, 11:17:09"}]},{"name":"preCompileVue Direct","data":[{"x":1,"y":9.0766,"timestamp":"4/6/2025, 22:41:50"},{"x":2,"y":8.7726,"timestamp":"4/6/2025, 22:42:18"},{"x":3,"y":8.4392,"timestamp":"4/6/2025, 22:43:26"},{"x":4,"y":7.9399,"timestamp":"4/6/2025, 22:49:02"},{"x":5,"y":7.5824,"timestamp":"4/6/2025, 22:49:31"},{"x":6,"y":7.4706,"timestamp":"4/6/2025, 22:50:21"},{"x":7,"y":9.958,"timestamp":"4/6/2025, 22:52:18"},{"x":8,"y":9.791,"timestamp":"5/6/2025, 10:22:40"},{"x":9,"y":11.1847,"timestamp":"5/6/2025, 10:24:18"},{"x":10,"y":8.7489,"timestamp":"5/6/2025, 10:25:47"},{"x":11,"y":14.2056,"timestamp":"5/6/2025, 14:48:21"},{"x":12,"y":10.3682,"timestamp":"5/6/2025, 14:49:53"},{"x":13,"y":11.5924,"timestamp":"5/6/2025, 14:52:48"},{"x":14,"y":11.6784,"timestamp":"5/6/2025, 14:58:29"},{"x":15,"y":12.252,"timestamp":"5/6/2025, 15:00:12"},{"x":16,"y":6.1504,"timestamp":"5/6/2025, 15:02:35"},{"x":17,"y":7.2934,"timestamp":"5/6/2025, 15:04:24"},{"x":18,"y":11.312,"timestamp":"5/6/2025, 15:29:54"},{"x":19,"y":9.0986,"timestamp":"5/6/2025, 15:31:44"},{"x":20,"y":9.1171,"timestamp":"5/6/2025, 15:33:50"},{"x":21,"y":9.9247,"timestamp":"5/6/2025, 15:36:43"},{"x":22,"y":8.9408,"timestamp":"5/6/2025, 15:42:07"},{"x":23,"y":6.3176,"timestamp":"5/6/2025, 16:11:14"},{"x":24,"y":9.7274,"timestamp":"5/6/2025, 16:17:03"},{"x":25,"y":6.1062,"timestamp":"5/6/2025, 16:18:39"},{"x":26,"y":6.2821,"timestamp":"5/6/2025, 16:23:40"},{"x":27,"y":7.0326,"timestamp":"5/6/2025, 16:33:51"},{"x":28,"y":6.7898,"timestamp":"5/6/2025, 16:40:28"},{"x":29,"y":5.4363,"timestamp":"5/6/2025, 17:52:17"},{"x":30,"y":7.3991,"timestamp":"5/6/2025, 17:53:57"},{"x":31,"y":7.255,"timestamp":"5/6/2025, 18:02:20"},{"x":32,"y":8.5716,"timestamp":"5/6/2025, 18:55:25"},{"x":33,"y":7.1491,"timestamp":"5/6/2025, 19:14:19"},{"x":34,"y":6.4118,"timestamp":"5/6/2025, 19:14:56"},{"x":35,"y":6.5897,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":5.7205,"timestamp":"5/6/2025, 19:32:50"},{"x":37,"y":9.0937,"timestamp":"5/6/2025, 19:35:26"},{"x":38,"y":9.0776,"timestamp":"5/6/2025, 19:36:26"},{"x":39,"y":5.9231,"timestamp":"6/6/2025, 11:17:09"}]},{"name":"preCompileTS Direct","data":[{"x":1,"y":18.3058,"timestamp":"4/6/2025, 22:41:50"},{"x":2,"y":25.4388,"timestamp":"4/6/2025, 22:42:18"},{"x":3,"y":18.6532,"timestamp":"4/6/2025, 22:43:27"},{"x":4,"y":18.5996,"timestamp":"4/6/2025, 22:49:02"},{"x":5,"y":18.265,"timestamp":"4/6/2025, 22:49:32"},{"x":6,"y":17.6257,"timestamp":"4/6/2025, 22:50:21"},{"x":7,"y":21.7462,"timestamp":"4/6/2025, 22:52:18"},{"x":8,"y":20.2819,"timestamp":"5/6/2025, 10:22:40"},{"x":9,"y":22.4748,"timestamp":"5/6/2025, 10:24:18"},{"x":10,"y":17.9493,"timestamp":"5/6/2025, 10:25:47"},{"x":11,"y":18.9016,"timestamp":"5/6/2025, 14:48:21"},{"x":12,"y":26.9322,"timestamp":"5/6/2025, 14:49:53"},{"x":13,"y":23.5759,"timestamp":"5/6/2025, 14:52:49"},{"x":14,"y":21.8348,"timestamp":"5/6/2025, 14:58:29"},{"x":15,"y":21.6755,"timestamp":"5/6/2025, 15:00:13"},{"x":16,"y":12.9374,"timestamp":"5/6/2025, 15:02:35"},{"x":17,"y":13.4578,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":20.0255,"timestamp":"5/6/2025, 15:29:54"},{"x":19,"y":20.7681,"timestamp":"5/6/2025, 15:31:44"},{"x":20,"y":22.0591,"timestamp":"5/6/2025, 15:33:50"},{"x":21,"y":20.9584,"timestamp":"5/6/2025, 15:36:44"},{"x":22,"y":18.4055,"timestamp":"5/6/2025, 15:42:08"},{"x":23,"y":15.2254,"timestamp":"5/6/2025, 16:11:14"},{"x":24,"y":20.7031,"timestamp":"5/6/2025, 16:17:03"},{"x":25,"y":14.3035,"timestamp":"5/6/2025, 16:18:40"},{"x":26,"y":23.3523,"timestamp":"5/6/2025, 16:23:40"},{"x":27,"y":13.2383,"timestamp":"5/6/2025, 16:33:51"},{"x":28,"y":15.4311,"timestamp":"5/6/2025, 16:40:29"},{"x":29,"y":15.3066,"timestamp":"5/6/2025, 17:52:18"},{"x":30,"y":12.9633,"timestamp":"5/6/2025, 17:53:57"},{"x":31,"y":13.5873,"timestamp":"5/6/2025, 18:02:20"},{"x":32,"y":15.1586,"timestamp":"5/6/2025, 18:55:25"},{"x":33,"y":15.1054,"timestamp":"5/6/2025, 19:14:20"},{"x":34,"y":14.9147,"timestamp":"5/6/2025, 19:14:56"},{"x":35,"y":14.3812,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":14.3298,"timestamp":"5/6/2025, 19:32:50"},{"x":37,"y":11.4966,"timestamp":"5/6/2025, 19:35:27"},{"x":38,"y":23.1655,"timestamp":"5/6/2025, 19:36:27"},{"x":39,"y":14.1968,"timestamp":"6/6/2025, 11:17:09"}]},{"name":"Batch Compilation","data":[{"x":1,"y":149.3015,"timestamp":"4/6/2025, 22:41:50"},{"x":2,"y":471.1134,"timestamp":"4/6/2025, 22:42:19"},{"x":3,"y":172.8849,"timestamp":"4/6/2025, 22:43:27"},{"x":4,"y":143.005,"timestamp":"4/6/2025, 22:49:02"},{"x":5,"y":139.494,"timestamp":"4/6/2025, 22:49:32"},{"x":6,"y":160.907,"timestamp":"4/6/2025, 22:50:22"},{"x":7,"y":254.0838,"timestamp":"4/6/2025, 22:52:19"},{"x":8,"y":179.8233,"timestamp":"5/6/2025, 10:22:41"},{"x":9,"y":303.239,"timestamp":"5/6/2025, 10:24:19"},{"x":10,"y":187.2276,"timestamp":"5/6/2025, 10:25:47"},{"x":11,"y":131.7403,"timestamp":"5/6/2025, 14:48:22"},{"x":12,"y":375.0414,"timestamp":"5/6/2025, 14:49:54"},{"x":13,"y":201.1778,"timestamp":"5/6/2025, 14:52:49"},{"x":14,"y":322.7558,"timestamp":"5/6/2025, 14:58:30"},{"x":15,"y":199.1899,"timestamp":"5/6/2025, 15:00:13"},{"x":16,"y":96.5429,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":111.3063,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":148.7799,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":172.6932,"timestamp":"5/6/2025, 15:31:45"},{"x":20,"y":108.2104,"timestamp":"5/6/2025, 15:33:50"},{"x":21,"y":200.2946,"timestamp":"5/6/2025, 15:36:44"},{"x":22,"y":165.1006,"timestamp":"5/6/2025, 15:42:08"},{"x":23,"y":77.027,"timestamp":"5/6/2025, 16:11:15"},{"x":24,"y":227.0459,"timestamp":"5/6/2025, 16:17:04"},{"x":25,"y":98.219,"timestamp":"5/6/2025, 16:18:40"},{"x":26,"y":86.303,"timestamp":"5/6/2025, 16:23:41"},{"x":27,"y":79.3519,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":85.521,"timestamp":"5/6/2025, 16:40:29"},{"x":29,"y":59.2938,"timestamp":"5/6/2025, 17:52:18"},{"x":30,"y":74.2762,"timestamp":"5/6/2025, 17:53:58"},{"x":31,"y":87.9028,"timestamp":"5/6/2025, 18:02:20"},{"x":32,"y":188.4763,"timestamp":"5/6/2025, 18:55:26"},{"x":33,"y":74.6085,"timestamp":"5/6/2025, 19:14:20"},{"x":34,"y":70.7394,"timestamp":"5/6/2025, 19:14:57"},{"x":35,"y":78.0899,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":63.5313,"timestamp":"5/6/2025, 19:32:50"},{"x":37,"y":119.3319,"timestamp":"5/6/2025, 19:35:28"},{"x":38,"y":666.2178,"timestamp":"5/6/2025, 19:36:28"},{"x":39,"y":95.6592,"timestamp":"6/6/2025, 11:17:10"}]},{"name":"Memory Usage","data":[{"x":1,"y":21.4352,"timestamp":"4/6/2025, 22:41:50"},{"x":2,"y":21.7103,"timestamp":"4/6/2025, 22:42:19"},{"x":3,"y":19.8015,"timestamp":"4/6/2025, 22:43:27"},{"x":4,"y":22.0204,"timestamp":"4/6/2025, 22:49:03"},{"x":5,"y":20.2233,"timestamp":"4/6/2025, 22:49:32"},{"x":6,"y":21.431,"timestamp":"4/6/2025, 22:50:22"},{"x":7,"y":41.5712,"timestamp":"4/6/2025, 22:52:20"},{"x":8,"y":42.3825,"timestamp":"5/6/2025, 10:22:41"},{"x":9,"y":44.742,"timestamp":"5/6/2025, 10:24:20"},{"x":10,"y":17.9291,"timestamp":"5/6/2025, 10:25:47"},{"x":11,"y":29.8418,"timestamp":"5/6/2025, 14:48:22"},{"x":12,"y":22.4143,"timestamp":"5/6/2025, 14:49:54"},{"x":13,"y":20.8691,"timestamp":"5/6/2025, 14:52:49"},{"x":14,"y":44.0847,"timestamp":"5/6/2025, 14:58:30"},{"x":15,"y":20.0138,"timestamp":"5/6/2025, 15:00:14"},{"x":16,"y":20.0381,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":17.6501,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":16.6855,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":40.3924,"timestamp":"5/6/2025, 15:31:46"},{"x":20,"y":14.2531,"timestamp":"5/6/2025, 15:33:50"},{"x":21,"y":18.7525,"timestamp":"5/6/2025, 15:36:44"},{"x":22,"y":17.6201,"timestamp":"5/6/2025, 15:42:08"},{"x":23,"y":9.0328,"timestamp":"5/6/2025, 16:11:15"},{"x":24,"y":10.5578,"timestamp":"5/6/2025, 16:17:05"},{"x":25,"y":11.1553,"timestamp":"5/6/2025, 16:18:40"},{"x":26,"y":14.5297,"timestamp":"5/6/2025, 16:23:41"},{"x":27,"y":13.7475,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":13.8226,"timestamp":"5/6/2025, 16:40:29"},{"x":29,"y":11.0921,"timestamp":"5/6/2025, 17:52:18"},{"x":30,"y":8.8295,"timestamp":"5/6/2025, 17:53:58"},{"x":31,"y":11.5397,"timestamp":"5/6/2025, 18:02:21"},{"x":32,"y":15.2286,"timestamp":"5/6/2025, 18:55:27"},{"x":33,"y":26.6817,"timestamp":"5/6/2025, 19:14:20"},{"x":34,"y":8.4592,"timestamp":"5/6/2025, 19:14:57"},{"x":35,"y":7.8952,"timestamp":"5/6/2025, 19:21:42"},{"x":36,"y":7.9714,"timestamp":"5/6/2025, 19:32:51"},{"x":37,"y":21.2865,"timestamp":"5/6/2025, 19:35:28"},{"x":38,"y":23.8834,"timestamp":"5/6/2025, 19:36:28"},{"x":39,"y":24.9732,"timestamp":"6/6/2025, 11:17:10"}]},{"name":"Concurrent Compilation","data":[{"x":1,"y":72.5218,"timestamp":"4/6/2025, 22:41:51"},{"x":2,"y":69.5672,"timestamp":"4/6/2025, 22:42:20"},{"x":3,"y":82.9226,"timestamp":"4/6/2025, 22:43:28"},{"x":4,"y":56.8973,"timestamp":"4/6/2025, 22:49:03"},{"x":5,"y":59.635,"timestamp":"4/6/2025, 22:49:32"},{"x":6,"y":57.1558,"timestamp":"4/6/2025, 22:50:22"},{"x":7,"y":196.5937,"timestamp":"4/6/2025, 22:52:20"},{"x":8,"y":63.2645,"timestamp":"5/6/2025, 10:22:41"},{"x":9,"y":68.0798,"timestamp":"5/6/2025, 10:24:20"},{"x":10,"y":61.2,"timestamp":"5/6/2025, 10:25:47"},{"x":11,"y":41.2983,"timestamp":"5/6/2025, 14:48:22"},{"x":12,"y":74.3275,"timestamp":"5/6/2025, 14:49:54"},{"x":13,"y":58.3106,"timestamp":"5/6/2025, 14:52:49"},{"x":14,"y":53.578,"timestamp":"5/6/2025, 14:58:30"},{"x":15,"y":49.3752,"timestamp":"5/6/2025, 15:00:14"},{"x":16,"y":37.1784,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":36.4418,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":41.4485,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":52.2392,"timestamp":"5/6/2025, 15:31:46"},{"x":20,"y":48.2004,"timestamp":"5/6/2025, 15:33:50"},{"x":21,"y":53.7777,"timestamp":"5/6/2025, 15:36:45"},{"x":22,"y":51.9581,"timestamp":"5/6/2025, 15:42:09"},{"x":23,"y":23.6687,"timestamp":"5/6/2025, 16:11:15"},{"x":24,"y":34.043,"timestamp":"5/6/2025, 16:17:06"},{"x":25,"y":37.8206,"timestamp":"5/6/2025, 16:18:40"},{"x":26,"y":78.1415,"timestamp":"5/6/2025, 16:23:41"},{"x":27,"y":21.6306,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":30.0314,"timestamp":"5/6/2025, 16:40:29"},{"x":29,"y":23.5108,"timestamp":"5/6/2025, 17:52:18"},{"x":30,"y":69.319,"timestamp":"5/6/2025, 17:53:58"},{"x":31,"y":31.2142,"timestamp":"5/6/2025, 18:02:21"},{"x":32,"y":40.54,"timestamp":"5/6/2025, 18:55:27"},{"x":33,"y":31.453,"timestamp":"5/6/2025, 19:14:20"},{"x":34,"y":23.702,"timestamp":"5/6/2025, 19:14:57"},{"x":35,"y":31.11,"timestamp":"5/6/2025, 19:21:43"},{"x":36,"y":6.2011,"timestamp":"5/6/2025, 19:32:51"},{"x":37,"y":7.8599,"timestamp":"5/6/2025, 19:35:28"},{"x":38,"y":27.4858,"timestamp":"5/6/2025, 19:36:29"},{"x":39,"y":31.5375,"timestamp":"6/6/2025, 11:17:10"}]},{"name":"Large File Compilation","data":[{"x":1,"y":141.4631,"timestamp":"4/6/2025, 22:41:51"},{"x":2,"y":169.0029,"timestamp":"4/6/2025, 22:42:20"},{"x":3,"y":194.7876,"timestamp":"4/6/2025, 22:43:28"},{"x":4,"y":239.2103,"timestamp":"4/6/2025, 22:49:03"},{"x":5,"y":154.445,"timestamp":"4/6/2025, 22:49:33"},{"x":6,"y":227.0889,"timestamp":"4/6/2025, 22:50:23"},{"x":7,"y":505.0758,"timestamp":"4/6/2025, 22:52:21"},{"x":8,"y":173.8742,"timestamp":"5/6/2025, 10:22:42"},{"x":9,"y":184.0375,"timestamp":"5/6/2025, 10:24:20"},{"x":10,"y":180.3644,"timestamp":"5/6/2025, 10:25:48"},{"x":11,"y":216.6916,"timestamp":"5/6/2025, 14:48:22"},{"x":12,"y":319.162,"timestamp":"5/6/2025, 14:49:55"},{"x":13,"y":132.8826,"timestamp":"5/6/2025, 14:52:50"},{"x":14,"y":227.8071,"timestamp":"5/6/2025, 14:58:31"},{"x":15,"y":152.0668,"timestamp":"5/6/2025, 15:00:14"},{"x":16,"y":93.1838,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":120.2467,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":119.6388,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":140.5963,"timestamp":"5/6/2025, 15:31:46"},{"x":20,"y":116.3788,"timestamp":"5/6/2025, 15:33:51"},{"x":21,"y":267.7008,"timestamp":"5/6/2025, 15:36:45"},{"x":22,"y":151.3842,"timestamp":"5/6/2025, 15:42:09"},{"x":23,"y":197.1659,"timestamp":"5/6/2025, 16:11:15"},{"x":24,"y":207.9172,"timestamp":"5/6/2025, 16:17:06"},{"x":25,"y":189.5846,"timestamp":"5/6/2025, 16:18:41"},{"x":26,"y":138.2269,"timestamp":"5/6/2025, 16:23:42"},{"x":27,"y":139.2706,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":165.5605,"timestamp":"5/6/2025, 16:40:29"},{"x":29,"y":340.0725,"timestamp":"5/6/2025, 17:52:19"},{"x":30,"y":122.3798,"timestamp":"5/6/2025, 17:53:58"},{"x":31,"y":165.7306,"timestamp":"5/6/2025, 18:02:21"},{"x":32,"y":210.8366,"timestamp":"5/6/2025, 18:55:27"},{"x":33,"y":282.7384,"timestamp":"5/6/2025, 19:14:21"},{"x":34,"y":185.6895,"timestamp":"5/6/2025, 19:14:57"},{"x":35,"y":102.7565,"timestamp":"5/6/2025, 19:21:43"},{"x":36,"y":49.6951,"timestamp":"5/6/2025, 19:32:51"},{"x":37,"y":51.3242,"timestamp":"5/6/2025, 19:35:29"},{"x":38,"y":254.4428,"timestamp":"5/6/2025, 19:36:29"},{"x":39,"y":221.3212,"timestamp":"6/6/2025, 11:17:10"}]},{"name":"Performance Baseline","data":[{"x":1,"y":4.5056,"timestamp":"4/6/2025, 22:41:51"},{"x":2,"y":4.2224,"timestamp":"4/6/2025, 22:42:20"},{"x":3,"y":3.1564,"timestamp":"4/6/2025, 22:43:28"},{"x":4,"y":3.1856,"timestamp":"4/6/2025, 22:49:03"},{"x":5,"y":3.2996,"timestamp":"4/6/2025, 22:49:33"},{"x":6,"y":7.296,"timestamp":"4/6/2025, 22:50:23"},{"x":7,"y":20.4121,"timestamp":"4/6/2025, 22:52:22"},{"x":8,"y":4.4175,"timestamp":"5/6/2025, 10:22:42"},{"x":9,"y":4.82,"timestamp":"5/6/2025, 10:24:20"},{"x":10,"y":2.9805,"timestamp":"5/6/2025, 10:25:48"},{"x":11,"y":20.8011,"timestamp":"5/6/2025, 14:48:23"},{"x":12,"y":3.9824,"timestamp":"5/6/2025, 14:49:55"},{"x":13,"y":3.9155,"timestamp":"5/6/2025, 14:52:50"},{"x":14,"y":5.7065,"timestamp":"5/6/2025, 14:58:31"},{"x":15,"y":3.1775,"timestamp":"5/6/2025, 15:00:14"},{"x":16,"y":2.8014,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":2.9132,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":2.3089,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":5.7527,"timestamp":"5/6/2025, 15:31:46"},{"x":20,"y":2.4995,"timestamp":"5/6/2025, 15:33:51"},{"x":21,"y":4.082,"timestamp":"5/6/2025, 15:36:45"},{"x":22,"y":5.1719,"timestamp":"5/6/2025, 15:42:09"},{"x":23,"y":3.3246,"timestamp":"5/6/2025, 16:11:15"},{"x":24,"y":4.7021,"timestamp":"5/6/2025, 16:17:06"},{"x":25,"y":3.9346,"timestamp":"5/6/2025, 16:18:41"},{"x":26,"y":3.1263,"timestamp":"5/6/2025, 16:23:42"},{"x":27,"y":3.7199,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":4.4183,"timestamp":"5/6/2025, 16:40:30"},{"x":29,"y":4.0957,"timestamp":"5/6/2025, 17:52:19"},{"x":30,"y":3.2728,"timestamp":"5/6/2025, 17:53:58"},{"x":31,"y":2.7859,"timestamp":"5/6/2025, 18:02:21"},{"x":32,"y":5.0434,"timestamp":"5/6/2025, 18:55:27"},{"x":33,"y":3.0365,"timestamp":"5/6/2025, 19:14:21"},{"x":34,"y":5.0469,"timestamp":"5/6/2025, 19:14:58"},{"x":35,"y":3.1791,"timestamp":"5/6/2025, 19:21:43"},{"x":36,"y":4.6387,"timestamp":"5/6/2025, 19:32:51"},{"x":37,"y":4.4959,"timestamp":"5/6/2025, 19:35:29"},{"x":38,"y":2.762,"timestamp":"5/6/2025, 19:36:29"},{"x":39,"y":2.6262,"timestamp":"6/6/2025, 11:17:11"}]},{"name":"Performance Consistency","data":[{"x":1,"y":15.8904,"timestamp":"4/6/2025, 22:41:51"},{"x":2,"y":16.0896,"timestamp":"4/6/2025, 22:42:20"},{"x":3,"y":15.4019,"timestamp":"4/6/2025, 22:43:28"},{"x":4,"y":15.5242,"timestamp":"4/6/2025, 22:49:03"},{"x":5,"y":22.4339,"timestamp":"4/6/2025, 22:49:33"},{"x":6,"y":19.1074,"timestamp":"4/6/2025, 22:50:23"},{"x":7,"y":24.1807,"timestamp":"4/6/2025, 22:52:22"},{"x":8,"y":17.0819,"timestamp":"5/6/2025, 10:22:42"},{"x":9,"y":21.9856,"timestamp":"5/6/2025, 10:24:21"},{"x":10,"y":17.2901,"timestamp":"5/6/2025, 10:25:48"},{"x":11,"y":14.0903,"timestamp":"5/6/2025, 14:48:23"},{"x":12,"y":30.0321,"timestamp":"5/6/2025, 14:49:55"},{"x":13,"y":16.4158,"timestamp":"5/6/2025, 14:52:50"},{"x":14,"y":16.0274,"timestamp":"5/6/2025, 14:58:31"},{"x":15,"y":14.8083,"timestamp":"5/6/2025, 15:00:14"},{"x":16,"y":17.9867,"timestamp":"5/6/2025, 15:02:36"},{"x":17,"y":11.1997,"timestamp":"5/6/2025, 15:04:25"},{"x":18,"y":15.4492,"timestamp":"5/6/2025, 15:29:55"},{"x":19,"y":18.2374,"timestamp":"5/6/2025, 15:31:47"},{"x":20,"y":11.9331,"timestamp":"5/6/2025, 15:33:51"},{"x":21,"y":13.4256,"timestamp":"5/6/2025, 15:36:45"},{"x":22,"y":22.0674,"timestamp":"5/6/2025, 15:42:10"},{"x":23,"y":6.4165,"timestamp":"5/6/2025, 16:11:16"},{"x":24,"y":15.0461,"timestamp":"5/6/2025, 16:17:07"},{"x":25,"y":7.9086,"timestamp":"5/6/2025, 16:18:41"},{"x":26,"y":6.8608,"timestamp":"5/6/2025, 16:23:42"},{"x":27,"y":5.5778,"timestamp":"5/6/2025, 16:33:52"},{"x":28,"y":7.0028,"timestamp":"5/6/2025, 16:40:30"},{"x":29,"y":8.0424,"timestamp":"5/6/2025, 17:52:19"},{"x":30,"y":6.5712,"timestamp":"5/6/2025, 17:53:59"},{"x":31,"y":5.9372,"timestamp":"5/6/2025, 18:02:21"},{"x":32,"y":8.2695,"timestamp":"5/6/2025, 18:55:28"},{"x":33,"y":7.0254,"timestamp":"5/6/2025, 19:14:21"},{"x":34,"y":5.6453,"timestamp":"5/6/2025, 19:14:58"},{"x":35,"y":5.5029,"timestamp":"5/6/2025, 19:21:43"},{"x":36,"y":4.355,"timestamp":"5/6/2025, 19:32:51"},{"x":37,"y":8.0285,"timestamp":"5/6/2025, 19:35:29"},{"x":38,"y":19.6689,"timestamp":"5/6/2025, 19:36:30"},{"x":39,"y":6.6668,"timestamp":"6/6/2025, 11:17:11"}]}];
 
-        const datasets = chartData.map((test, index) => ({
-            label: test.name,
-            data: test.data,
-            borderColor: `hsl(${index * 137.5 % 360}, 70%, 50%)`,
-            backgroundColor: `hsla(${index * 137.5 % 360}, 70%, 50%, 0.1)`,
-            fill: false,
-            tension: 0.1
-        }));
+        // Verificar si hay datos para mostrar
+        if (chartData.length === 0) {
+            document.getElementById('performanceChart').style.display = 'none';
+            document.querySelector('.chart-container').innerHTML = '<p style="text-align: center; color: #666;">No hay datos históricos disponibles. Ejecuta más tests para ver las tendencias.</p>';        } else {
+            // Preparar datasets para Chart.js usando índices (puntos de control)
+            const datasets = chartData.map((test, index) => ({
+                label: test.name,
+                data: test.data.map(point => ({
+                    x: point.x, // Ya es índice (1, 2, 3, etc.)
+                    y: point.y,
+                    timestamp: point.timestamp // Para tooltip
+                })),
+                borderColor: `hsl(${index * 137.5 % 360}, 70%, 50%)`,
+                backgroundColor: `hsla(${index * 137.5 % 360}, 70%, 50%, 0.1)`,
+                fill: false,
+                tension: 0.4,
+                borderWidth: 3,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }));
 
-        new Chart(ctx, {
-            type: 'line',
-            data: { datasets },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Performance over time'
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            displayFormats: {
-                                minute: 'HH:mm',
-                                hour: 'HH:mm',
-                                day: 'DD/MM'
+            new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Tendencias de Performance - Puntos de Control',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const dataPoint = context[0].raw;
+                                    return `Ejecución #${dataPoint.x} - ${dataPoint.timestamp}`;
+                                },
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}ms`;
+                                }
                             }
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Tiempo (ms)'
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Número de Ejecución'
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return '#' + value;
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Tiempo (ms)'
+                            }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
-            }
-        });
+            });
+        }
     </script>
 </body>
 </html>

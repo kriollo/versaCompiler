@@ -224,14 +224,18 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
         console.log(`📄 Markdown report generated: ${markdownFile}`);
         return markdownFile;
     }
-
     async generateDashboard() {
         const report = await this.generateReport();
         const history = await this.loadHistory();
 
+        // Crear datos para el gráfico usando solo puntos de control (índices)
         const chartData = history.map(testHistory => ({
             name: testHistory.testName,
-            data: testHistory.results.map(r => ({ x: r.timestamp, y: r.avg })),
+            data: testHistory.results.map((r, index) => ({
+                x: index + 1, // Usar índice en lugar de timestamp
+                y: r.avg,
+                timestamp: new Date(r.timestamp).toLocaleString('es-ES'), // Para mostrar en tooltip
+            })),
         }));
 
         const html = `<!DOCTYPE html>
@@ -293,11 +297,51 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
             border-radius: 15px;
             box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
-        }
-        .chart-container h2 {
+        }        .chart-container h2 {
             margin-bottom: 20px;
             color: #333;
             font-size: 1.8em;
+        }
+        .performance-table {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .performance-table h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
+        }
+        .perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1em;
+        }
+        .perf-table th,
+        .perf-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .perf-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+        }
+        .perf-table tr:hover {
+            background: #f8f9fa;
+        }
+        .perf-table .avg-time {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .perf-table .success-rate {
+            color: #27ae60;
         }
         .issues {
             display: grid;
@@ -404,11 +448,41 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
                 <div class="stat-value">${((report.passedTests / report.totalTests) * 100).toFixed(1)}%</div>
                 <div class="stat-label">Tasa de Éxito</div>
             </div>
-        </div>
-
-        <div class="chart-container">
+        </div>        <div class="chart-container">
             <h2>📈 Tendencias de Performance</h2>
             <canvas id="performanceChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="performance-table">
+            <h2>📊 Tiempos Promedio por Test</h2>
+            <table class="perf-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Tiempo Promedio</th>
+                        <th>Tiempo Mínimo</th>
+                        <th>Tiempo Máximo</th>
+                        <th>Tasa de Éxito</th>
+                        <th>Ejecuciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${report.results
+                        .map(
+                            r => `
+                    <tr>
+                        <td><strong>${r.name}</strong></td>
+                        <td class="avg-time">${r.avg.toFixed(2)}ms</td>
+                        <td>${r.min.toFixed(2)}ms</td>
+                        <td>${r.max.toFixed(2)}ms</td>
+                        <td class="success-rate">${(r.successRate * 100).toFixed(1)}%</td>
+                        <td>${r.runs}</td>
+                    </tr>
+                    `,
+                        )
+                        .join('')}
+                </tbody>
+            </table>
         </div>
 
         <div class="issues">
@@ -488,14 +562,14 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
         // Verificar si hay datos para mostrar
         if (chartData.length === 0) {
             document.getElementById('performanceChart').style.display = 'none';
-            document.querySelector('.chart-container').innerHTML = '<p style="text-align: center; color: #666;">No hay datos históricos disponibles. Ejecuta más tests para ver las tendencias.</p>';
-        } else {
-            // Preparar datasets para Chart.js
+            document.querySelector('.chart-container').innerHTML = '<p style="text-align: center; color: #666;">No hay datos históricos disponibles. Ejecuta más tests para ver las tendencias.</p>';        } else {
+            // Preparar datasets para Chart.js usando índices (puntos de control)
             const datasets = chartData.map((test, index) => ({
                 label: test.name,
                 data: test.data.map(point => ({
-                    x: new Date(point.x),
-                    y: point.y
+                    x: point.x, // Ya es índice (1, 2, 3, etc.)
+                    y: point.y,
+                    timestamp: point.timestamp // Para tooltip
                 })),
                 borderColor: \`hsl(\${index * 137.5 % 360}, 70%, 50%)\`,
                 backgroundColor: \`hsla(\${index * 137.5 % 360}, 70%, 50%, 0.1)\`,
@@ -506,106 +580,61 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
                 pointHoverRadius: 8
             }));
 
-            try {
-                new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Performance over time',
-                                font: { size: 16 }
-                            },
-                            legend: {
-                                position: 'top',
-                                labels: { usePointStyle: true }
-                            }
+            new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Tendencias de Performance - Puntos de Control',
+                            font: { size: 16 }
                         },
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    displayFormats: {
-                                        minute: 'HH:mm',
-                                        hour: 'HH:mm',
-                                        day: 'MM/DD'
-                                    }
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const dataPoint = context[0].raw;
+                                    return \`Ejecución #\${dataPoint.x} - \${dataPoint.timestamp}\`;
                                 },
-                                title: {
-                                    display: true,
-                                    text: 'Tiempo'
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Tiempo (ms)'
+                                label: function(context) {
+                                    return \`\${context.dataset.label}: \${context.parsed.y.toFixed(2)}ms\`;
                                 }
                             }
-                        },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
                         }
-                    }
-                });
-            } catch (error) {
-                console.error('Error creando el gráfico con escala de tiempo:', error);
-
-                // Fallback: usar índices en lugar de fechas
-                const fallbackDatasets = chartData.map((test, index) => ({
-                    label: test.name,
-                    data: test.data.map((point, idx) => ({ x: idx + 1, y: point.y })),
-                    borderColor: \`hsl(\${index * 137.5 % 360}, 70%, 50%)\`,
-                    backgroundColor: \`hsla(\${index * 137.5 % 360}, 70%, 50%, 0.1)\`,
-                    fill: false,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 6,
-                    pointHoverRadius: 8
-                }));
-
-                new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets: fallbackDatasets },
-                    options: {
-                        responsive: true,
-                        plugins: {
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
                             title: {
                                 display: true,
-                                text: 'Performance over time',
-                                font: { size: 16 }
+                                text: 'Número de Ejecución'
                             },
-                            legend: {
-                                position: 'top',
-                                labels: { usePointStyle: true }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Ejecución #'
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Tiempo (ms)'
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return '#' + value;
                                 }
                             }
                         },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Tiempo (ms)'
+                            }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
-                });
-            }
+                }
+            });
         }
     </script>
 </body>
