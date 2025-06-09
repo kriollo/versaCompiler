@@ -55,10 +55,6 @@ function stopCompile() {
 }
 
 async function main() {
-    if (!(await readConfig())) {
-        process.exit(1);
-    }
-
     // Load yargs dynamically
     const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
     const chalk = await loadChalk();
@@ -191,6 +187,10 @@ async function main() {
             const { initConfig } = await loadConfigModule();
             await initConfig();
             process.exit(0);
+        }
+
+        if (!(await readConfig())) {
+            process.exit(1);
         }
 
         env.isPROD = argv.prod ? 'true' : 'false';

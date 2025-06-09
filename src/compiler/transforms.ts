@@ -435,14 +435,116 @@ async function replaceAliasImportDynamic(
 }
 
 /**
+ * Reemplaza alias en strings del código JavaScript (no solo en imports)
+ * Maneja casos como: link.href = 'P@/vendor/sweetalert2/sweetalert2.dark.min.css';
+ * @param code - El código JavaScript a transformar
+ * @returns El código con los alias reemplazados en strings
+ */
+async function replaceAliasInStrings(code: string): Promise<string> {
+    if (!env.PATH_ALIAS || !env.PATH_DIST) {
+        return code;
+    }
+
+    const pathAlias = JSON.parse(env.PATH_ALIAS);
+    const pathDist = env.PATH_DIST;
+    let resultCode = code; // Regex para encontrar strings que contengan posibles alias
+    // Busca strings entre comillas simples, dobles o backticks que contengan alias
+    const stringRegex = /(['"`])([^'"`]+)(['"`])/g;
+
+    // Crear un array para procesar todas las coincidencias
+    const matches = Array.from(resultCode.matchAll(stringRegex));
+    for (const match of matches) {
+        const [fullMatch, openQuote, stringContent, closeQuote] = match;
+
+        // Verificar que las comillas de apertura y cierre coincidan
+        if (openQuote !== closeQuote || !stringContent) continue;
+
+        // Verificar si el string contiene algún alias
+        let transformed = false;
+        let newStringContent = stringContent;
+        for (const [alias] of Object.entries(pathAlias)) {
+            const aliasPattern = alias.replace('/*', '');
+
+            // Verificar si el string contiene el alias
+            if (stringContent.includes(aliasPattern)) {
+                // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
+                if (isExternalModule(stringContent, pathAlias)) {
+                    // Para strings que parecen ser módulos externos, verificar si están excluidos
+                    const EXCLUDED_MODULES = new Set([
+                        'vue/compiler-sfc',
+                        'vue/dist/vue.runtime.esm-bundler',
+                        '@vue/compiler-sfc',
+                        '@vue/compiler-dom',
+                        '@vue/runtime-core',
+                        '@vue/runtime-dom',
+                        'oxc-parser',
+                        'oxc-parser/wasm',
+                        'oxc-minify',
+                        'oxc-minify/browser',
+                        '@oxc-parser/binding-wasm32-wasi',
+                        '@oxc-minify/binding-wasm32-wasi',
+                        'typescript/lib/typescript',
+                    ]);
+
+                    if (EXCLUDED_MODULES.has(stringContent)) {
+                        // Es un módulo excluido, no transformar
+                        continue;
+                    }
+                }
+
+                // Reemplazar el alias con la ruta del target
+                const relativePath = stringContent.replace(aliasPattern, '');
+
+                // Construir la nueva ruta
+                let newPath = path.join('/', pathDist, relativePath);
+
+                // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                newPath = newPath.replace(/\/\.\//g, '/').replace(/\\/g, '/');
+
+                // Para archivos estáticos (CSS, JS, imágenes, etc.), mantener la extensión original
+                // No agregar .js automáticamente como hacemos con imports
+                newStringContent = newPath;
+                transformed = true;
+                break;
+            }
+        } // Si se transformó, reemplazar en el código
+        if (transformed) {
+            const newFullMatch = `${openQuote}${newStringContent}${closeQuote}`;
+            // Usar una expresión regular más específica para evitar reemplazos accidentales
+            const escapedOriginal = fullMatch.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                '\\$&',
+            );
+            const specificRegex = new RegExp(escapedOriginal, 'g');
+
+            resultCode = resultCode.replace(specificRegex, newFullMatch);
+
+            if (env.VERBOSE === 'true') {
+                logger.info(
+                    `Alias en string transformado: ${stringContent} -> ${newStringContent}`,
+                );
+            }
+        }
+    }
+
+    return resultCode;
+}
+
+/**
  * Elimina la etiqueta "html" de una cadena de plantilla.
  * @param {string} data - La cadena de plantilla de la cual eliminar la etiqueta "html".
  * @returns {Promise<string>} - La cadena de plantilla modificada sin la etiqueta "html".
  */
 const removehtmlOfTemplateString = async (data: string): Promise<string> => {
-    const htmlRegExp = /html\s*`/g;
+    // Regex más específico que busca la etiqueta html seguida de un template literal
+    // Debe estar al inicio de línea o después de espacios/operadores, no después de punto
+    const htmlRegExp = /(?:^|[^.])html\s*`/g;
 
-    data = data.replace(htmlRegExp, '`');
+    data = data.replace(htmlRegExp, match => {
+        // Preservar el carácter que no es punto antes de html
+        const beforeHtml = match.charAt(0) !== 'h' ? match.charAt(0) : '';
+        return beforeHtml + '`';
+    });
 
     //remove ""
     const htmlGetterRegExp = /,\s*get\s+html\(\)\s*{\s*return\s*html\s*}/g;
@@ -513,6 +615,7 @@ export async function estandarizaCode(
             ast?.module.dynamicImports,
             file,
         );
+        code = await replaceAliasInStrings(code);
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
 

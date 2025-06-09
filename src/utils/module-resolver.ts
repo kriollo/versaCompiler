@@ -24,8 +24,18 @@ const EXCLUDED_MODULES = new Set([
     '@oxc-parser/binding-wasm32-wasi',
     '@oxc-minify/binding-wasm32-wasi',
     // Módulos de TypeScript que pueden tener resoluciones complejas
-    'typescript/lib/typescript',
+    'typescript',
     // Agregar más módulos problemáticos aquí según sea necesario
+    'yargs',
+    'yargs/helpers',
+    'yargs-parser',
+    'chalk',
+    'browser-sync',
+    'chokidar',
+    'get-port',
+    'execa',
+    'find-root',
+    'fs-extra',
 ]);
 
 // function resolveESMWithLibrary(moduleName: string): string | null {
@@ -80,104 +90,280 @@ const EXCLUDED_MODULES = new Set([
 //     });
 // }
 
-// Función dinámica para detectar versiones browser-compatible
-function findBrowserCompatibleVersion(
+// Función para buscar la mejor versión ESM/browser optimizada de un archivo
+function findOptimalESMVersion(
     moduleDir: string,
-    originalEntry: string,
+    entryPoint: string,
 ): string | null {
-    const dir = dirname(originalEntry);
-    // const baseName = originalEntry.split('/').pop() || '';
-    // const extension = baseName.includes('.')
-    //     ? `.${baseName.split('.').pop()}`
-    //     : '.js';
-    // const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
+    const dir = dirname(entryPoint);
+    const baseName = entryPoint.split('/').pop() || '';
+    const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
 
-    // Patrones que indican versiones NO compatibles con browser
-    const bundlerPatterns = ['bundler', 'runtime', 'node', 'cjs', 'commonjs']; // Patrones que indican versiones SÍ compatibles con browser
-    const browserPatterns = [
-        'esm-browser', // Prioridad máxima
-        'browser',
-        'es-browser',
-        'web',
-        'global',
-        'umd',
-    ];
+    // Directorio donde buscar
+    const searchDir = join(moduleDir, dir);
 
-    // Si el archivo original ya es browser-compatible, devolverlo
-    const hasBrowserPattern = browserPatterns.some(pattern =>
-        originalEntry.toLowerCase().includes(pattern),
-    );
-
-    if (hasBrowserPattern) {
-        return originalEntry;
+    if (!fs.existsSync(searchDir)) {
+        return entryPoint;
     }
 
-    // Si contiene patrones de bundler, buscar alternativas
-    const hasBundlerPattern = bundlerPatterns.some(pattern =>
-        originalEntry.toLowerCase().includes(pattern),
-    );
+    try {
+        const files = fs.readdirSync(searchDir); // Patrones de prioridad para buscar versiones optimizadas
+        // Prioriza versiones completas de desarrollo para mejor debugging
+        const priorityPatterns = [
+            // Máxima prioridad: ESM-Browser completo (sin runtime, desarrollo)
+            `${nameWithoutExt}.esm-browser.js`,
+            // ESM puro sin minificar (desarrollo)
+            `${nameWithoutExt}.esm.all.js`,
+            `${nameWithoutExt}.esm.js`,
+            `${nameWithoutExt}.module.js`,
+            // Browser puro sin minificar (desarrollo)
+            `${nameWithoutExt}.browser.js`,
+            `${nameWithoutExt}.web.js`,
+            // UMD sin minificar (desarrollo)
+            `${nameWithoutExt}.umd.js`,
+            `${nameWithoutExt}.global.js`,
+            // Fallback a versiones minificadas sin runtime
+            `${nameWithoutExt}.esm-browser.min.js`,
+            `${nameWithoutExt}.esm-browser.prod.js`,
+            `${nameWithoutExt}.esm.all.min.js`,
+            `${nameWithoutExt}.esm.min.js`,
+            `${nameWithoutExt}.module.min.js`,
+            `${nameWithoutExt}.browser.min.js`,
+            `${nameWithoutExt}.browser.prod.js`,
+            `${nameWithoutExt}.web.min.js`,
+            `${nameWithoutExt}.umd.min.js`,
+            `${nameWithoutExt}.global.min.js`,
+            `${nameWithoutExt}.min.js`,
+            // Último recurso: versiones runtime (solo si no hay alternativas)
+            `${nameWithoutExt}.runtime.esm-browser.js`,
+            `${nameWithoutExt}.runtime.esm-browser.min.js`,
+            `${nameWithoutExt}.runtime.esm-browser.prod.js`,
+        ];
 
-    if (hasBundlerPattern) {
-        // Buscar en el directorio del módulo
-        const searchDir = join(moduleDir, dir);
-
-        if (fs.existsSync(searchDir)) {
-            try {
-                const files = fs.readdirSync(searchDir);
-
-                // Buscar archivos que contengan patrones browser
-                const browserFiles = files.filter(file => {
-                    const lowerFile = file.toLowerCase();
-                    return (
-                        browserPatterns.some(pattern =>
-                            lowerFile.includes(pattern),
-                        ) &&
-                        (file.endsWith('.js') || file.endsWith('.mjs'))
+        // Buscar archivos que coincidan exactamente con los patrones
+        for (const pattern of priorityPatterns) {
+            if (files.includes(pattern)) {
+                const optimizedPath = join(dir, pattern).replace(/\\/g, '/');
+                if (env.VERBOSE === 'true') {
+                    logger.info(
+                        `Versión optimizada encontrada: ${optimizedPath}`,
                     );
-                });
-
-                if (browserFiles.length > 0) {
-                    // Priorizar por orden de preferencia
-                    const priorityOrder = [
-                        'esm-browser', // Máxima prioridad
-                        'browser',
-                        'web',
-                        'global',
-                        'umd',
-                    ];
-
-                    for (const priority of priorityOrder) {
-                        const found = browserFiles.find(file =>
-                            file.toLowerCase().includes(priority),
-                        );
-                        if (found) {
-                            const browserPath = join(dir, found).replace(
-                                /\\/g,
-                                '/',
-                            );
-
-                            return browserPath;
-                        }
-                    } // Si no hay coincidencia exacta, usar el primero encontrado
-                    if (browserFiles[0]) {
-                        const browserPath = join(dir, browserFiles[0]).replace(
-                            /\\/g,
-                            '/',
-                        );
-                        return browserPath;
-                    }
                 }
-            } catch (error) {
-                if (env.VERBOSE === 'true')
-                    logger.warn(
-                        `No se pudo leer directorio ${searchDir}:`,
-                        error instanceof Error ? error.message : String(error),
-                    );
+                return optimizedPath;
             }
+        } // Buscar archivos que contengan patrones ESM/browser dinámicamente
+        const esmBrowserFiles = files.filter(file => {
+            const lowerFile = file.toLowerCase();
+            return (
+                (lowerFile.includes('.esm-browser.') || // Prioridad alta: combinación esm-browser
+                    lowerFile.includes('.esm.') ||
+                    lowerFile.includes('.module.') ||
+                    lowerFile.includes('.browser.') ||
+                    lowerFile.includes('.web.') ||
+                    lowerFile.includes('.runtime.esm-browser.')) && // Runtime como última opción
+                (file.endsWith('.js') || file.endsWith('.mjs'))
+            );
+        });
+
+        if (esmBrowserFiles.length > 0) {
+            // Primera prioridad: archivos que combinan ESM y Browser (sin runtime)
+            const esmBrowserCombined = esmBrowserFiles.filter(
+                file =>
+                    file.toLowerCase().includes('.esm-browser.') &&
+                    !file.toLowerCase().includes('.runtime.'),
+            );
+
+            if (esmBrowserCombined.length > 0) {
+                // Dentro de esm-browser, priorizar desarrollo > .prod > .min
+                const devFiles = esmBrowserCombined.filter(
+                    file =>
+                        !file.toLowerCase().includes('.prod.') &&
+                        !file.toLowerCase().includes('.min.'),
+                );
+                if (devFiles.length > 0 && devFiles[0]) {
+                    const optimizedPath = join(dir, devFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión ESM-Browser dev encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+
+                const prodFiles = esmBrowserCombined.filter(file =>
+                    file.toLowerCase().includes('.prod.'),
+                );
+                if (prodFiles.length > 0 && prodFiles[0]) {
+                    const optimizedPath = join(dir, prodFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión ESM-Browser producción encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+
+                const minFiles = esmBrowserCombined.filter(file =>
+                    file.toLowerCase().includes('.min.'),
+                );
+                if (minFiles.length > 0 && minFiles[0]) {
+                    const optimizedPath = join(dir, minFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión ESM-Browser minificada encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+
+                if (esmBrowserCombined[0]) {
+                    const optimizedPath = join(
+                        dir,
+                        esmBrowserCombined[0],
+                    ).replace(/\\/g, '/');
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión ESM-Browser encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+            }
+
+            // Segunda prioridad: cualquier versión ESM disponible (sin minificar)
+            const esmFiles = esmBrowserFiles.filter(
+                file =>
+                    (file.toLowerCase().includes('.esm.') ||
+                        file.toLowerCase().includes('.module.')) &&
+                    !file.toLowerCase().includes('.min.') &&
+                    !file.toLowerCase().includes('.prod.') &&
+                    !file.toLowerCase().includes('.runtime.'),
+            );
+
+            if (esmFiles.length > 0 && esmFiles[0]) {
+                const optimizedPath = join(dir, esmFiles[0]).replace(
+                    /\\/g,
+                    '/',
+                );
+                if (env.VERBOSE === 'true') {
+                    logger.info(`Versión ESM dev encontrada: ${optimizedPath}`);
+                }
+                return optimizedPath;
+            }
+
+            // Tercera prioridad: archivos minificados de cualquier tipo ESM/browser (sin runtime)
+            const minifiedFiles = esmBrowserFiles.filter(
+                file =>
+                    (file.toLowerCase().includes('.min.') ||
+                        file.toLowerCase().includes('.prod.')) &&
+                    !file.toLowerCase().includes('.runtime.'),
+            );
+            if (minifiedFiles.length > 0) {
+                // Priorizar ESM sobre browser sobre UMD
+                const esmFiles = minifiedFiles.filter(
+                    file =>
+                        file.toLowerCase().includes('.esm.') ||
+                        file.toLowerCase().includes('.module.'),
+                );
+
+                if (esmFiles.length > 0 && esmFiles[0]) {
+                    const optimizedPath = join(dir, esmFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión ESM minificada encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+
+                if (minifiedFiles[0]) {
+                    const optimizedPath = join(dir, minifiedFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión minificada encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+            }
+
+            // Cuarta prioridad: versiones runtime como último recurso
+            const runtimeFiles = esmBrowserFiles.filter(file =>
+                file.toLowerCase().includes('.runtime.esm-browser.'),
+            );
+
+            if (runtimeFiles.length > 0) {
+                // Priorizar desarrollo sobre producción en runtime también
+                const devRuntimeFiles = runtimeFiles.filter(
+                    file =>
+                        !file.toLowerCase().includes('.prod.') &&
+                        !file.toLowerCase().includes('.min.'),
+                );
+
+                if (devRuntimeFiles.length > 0 && devRuntimeFiles[0]) {
+                    const optimizedPath = join(dir, devRuntimeFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión Runtime ESM-Browser dev encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+
+                if (runtimeFiles[0]) {
+                    const optimizedPath = join(dir, runtimeFiles[0]).replace(
+                        /\\/g,
+                        '/',
+                    );
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `Versión Runtime ESM-Browser encontrada: ${optimizedPath}`,
+                        );
+                    }
+                    return optimizedPath;
+                }
+            }
+
+            // Fallback: cualquier versión browser
+            if (esmBrowserFiles[0]) {
+                const optimizedPath = join(dir, esmBrowserFiles[0]).replace(
+                    /\\/g,
+                    '/',
+                );
+                if (env.VERBOSE === 'true') {
+                    logger.info(`Versión browser encontrada: ${optimizedPath}`);
+                }
+                return optimizedPath;
+            }
+        }
+    } catch (error) {
+        if (env.VERBOSE === 'true') {
+            logger.warn(
+                `No se pudo leer directorio ${searchDir}:`,
+                error instanceof Error ? error.message : String(error),
+            );
         }
     }
 
-    return originalEntry; // Si no se encuentra alternativa, usar original
+    return entryPoint; // Fallback al entry point original
 }
 
 // Función mejorada para detectar automáticamente entry points browser-compatible
@@ -200,13 +386,16 @@ function simpleESMResolver(moduleName: string): string | null {
 
         packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
         const moduleDir = dirname(packagePath);
-        const isESM = packageJson.type === 'module';
-
-        // Determinar el entry point ESM
+        const isESM = packageJson.type === 'module'; // Determinar el entry point ESM/Browser optimizado
         let entryPoint: string | null = null;
 
-        // 1. Revisar exports field
-        if (packageJson.exports) {
+        // 1. Prioridad máxima: campo module para ESM
+        if (packageJson.module) {
+            entryPoint = packageJson.module;
+        }
+
+        // 2. Revisar exports field con prioridad ESM
+        else if (packageJson.exports) {
             if (typeof packageJson.exports === 'string') {
                 entryPoint = packageJson.exports;
             } else if (packageJson.exports['.']) {
@@ -214,7 +403,7 @@ function simpleESMResolver(moduleName: string): string | null {
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    // Priorizar browser > import > default para compatibilidad web
+                    // Priorizar import > browser > default para compatibilidad ESM
                     // Buscar específicamente patrones esm-browser primero
                     const exportKeys = Object.keys(dotExport);
                     const esmBrowserKey = exportKeys.find(
@@ -229,12 +418,12 @@ function simpleESMResolver(moduleName: string): string | null {
                     ) {
                         entryPoint = dotExport[esmBrowserKey];
                     } else {
-                        // Fallback a la lógica original
+                        // Priorizar import > browser > default
                         entryPoint =
-                            dotExport.browser ||
                             (typeof dotExport.import === 'string'
                                 ? dotExport.import
                                 : null) ||
+                            dotExport.browser ||
                             (typeof dotExport.default === 'string'
                                 ? dotExport.default
                                 : null);
@@ -243,8 +432,8 @@ function simpleESMResolver(moduleName: string): string | null {
             }
         }
 
-        // 2. Revisar browser field específico
-        if (!entryPoint && packageJson.browser) {
+        // 3. Revisar browser field específico
+        else if (packageJson.browser) {
             if (typeof packageJson.browser === 'string') {
                 entryPoint = packageJson.browser;
             } else if (typeof packageJson.browser === 'object') {
@@ -255,13 +444,8 @@ function simpleESMResolver(moduleName: string): string | null {
             }
         }
 
-        // 3. Fallback a module field para ESM
-        if (!entryPoint && packageJson.module) {
-            entryPoint = packageJson.module;
-        }
-
         // 4. Fallback a main field
-        if (!entryPoint && packageJson.main) {
+        else if (packageJson.main) {
             entryPoint = packageJson.main;
         }
 
@@ -281,13 +465,10 @@ function simpleESMResolver(moduleName: string): string | null {
         } // Resolver la ruta final
         let finalPath = join(moduleDir, entryPoint);
 
-        // Buscar una versión browser-compatible si está disponible
-        const browserCompatibleEntry = findBrowserCompatibleVersion(
-            moduleDir,
-            entryPoint,
-        );
-        if (browserCompatibleEntry && browserCompatibleEntry !== entryPoint) {
-            finalPath = join(moduleDir, browserCompatibleEntry);
+        // Buscar una versión ESM/browser optimizada
+        const optimizedEntry = findOptimalESMVersion(moduleDir, entryPoint);
+        if (optimizedEntry && optimizedEntry !== entryPoint) {
+            finalPath = join(moduleDir, optimizedEntry);
         }
 
         // Si es ESM, verificar si hay imports privados que necesiten ser resueltos
@@ -374,49 +555,32 @@ function simpleESMResolver(moduleName: string): string | null {
     }
 }
 
-// Función utilitaria para obtener solo la parte relativa de node_modules
+// Función utilitaria para obtener rutas absolutas desde la raíz del proyecto
 function getNodeModulesRelativePath(
     fullPath: string | null,
-    fromFile?: string,
+    _fromFile?: string,
 ): string | null {
     if (!fullPath) return null;
+
     const idx = fullPath.indexOf('node_modules');
     if (idx !== -1) {
+        // Extraer solo la parte desde node_modules en adelante
         let relativePath = fullPath.substring(idx).replace(/\\/g, '/');
-        // Si se proporciona fromFile, calcular la ruta relativa correcta
-        if (fromFile) {
-            const fromDir = dirname(fromFile);
-            const distDir = env.PATH_DIST || 'dist';
 
-            // Calcular niveles de profundidad desde el archivo de destino en dist
-            // Transformar la ruta del archivo fuente al archivo de destino
-            const relativeToSrc = relative('./src', fromDir).replace(
-                /\\/g,
-                '/',
-            );
-            const targetPath = join(distDir, relativeToSrc).replace(/\\/g, '/');
-
-            // Contar los directorios en el path de destino
-            const pathParts = targetPath
-                .split('/')
-                .filter(part => part && part !== '.');
-            const levels = pathParts.length - 1; // -1 porque el último es el archivo
-            const upLevels = '../'.repeat(levels + 1); // +1 para salir del directorio de compilación
-
-            relativePath = upLevels + relativePath;
-        } else {
-            // Fallback: usar ../ para archivos compilados en dist
-            relativePath = '../' + relativePath;
-        }
-        return relativePath;
+        // Devolver ruta absoluta desde la raíz del proyecto (sin ../)
+        // Esto permite que los archivos compilados accedan directamente a node_modules
+        return '/' + relativePath;
     }
-    // Siempre retorna la ruta relativa al cwd, y si es igual, devuelve '.'
+
+    // Para rutas que no están en node_modules, convertir a ruta absoluta desde la raíz
     let rel = relative(process.cwd(), fullPath).replace(/\\/g, '/');
     if (!rel) rel = '.';
-    // Para rutas relativas, usar ../ para ir desde dist a la raíz
-    if (!rel.startsWith('./') && !rel.startsWith('../')) {
-        rel = '../' + rel;
+
+    // Convertir a ruta absoluta desde la raíz
+    if (!rel.startsWith('/')) {
+        rel = '/' + rel;
     }
+
     return rel;
 }
 
