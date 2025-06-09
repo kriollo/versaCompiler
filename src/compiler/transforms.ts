@@ -457,16 +457,25 @@ async function replaceAliasInStrings(code: string): Promise<string> {
         const [fullMatch, openQuote, stringContent, closeQuote] = match;
 
         // Verificar que las comillas de apertura y cierre coincidan
-        if (openQuote !== closeQuote || !stringContent) continue;
-
-        // Verificar si el string contiene algún alias
+        if (openQuote !== closeQuote || !stringContent) continue; // Verificar si el string contiene algún alias
         let transformed = false;
         let newStringContent = stringContent;
-        for (const [alias] of Object.entries(pathAlias)) {
+
+        // Ordenar alias por longitud (más largos primero) para priorizar alias más específicos
+        const sortedAliases = Object.entries(pathAlias).sort((a, b) => {
+            const aliasA = a[0].replace('/*', '');
+            const aliasB = b[0].replace('/*', '');
+            return aliasB.length - aliasA.length;
+        });
+
+        for (const [alias, target] of sortedAliases) {
             const aliasPattern = alias.replace('/*', '');
 
-            // Verificar si el string contiene el alias
-            if (stringContent.includes(aliasPattern)) {
+            // Verificar coincidencia exacta del alias seguido de '/' o al final del string
+            const aliasRegex = new RegExp(
+                `^${aliasPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`,
+            );
+            if (aliasRegex.test(stringContent)) {
                 // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
                 if (isExternalModule(stringContent, pathAlias)) {
                     // Para strings que parecen ser módulos externos, verificar si están excluidos
@@ -490,16 +499,82 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                         // Es un módulo excluido, no transformar
                         continue;
                     }
-                }
-
-                // Reemplazar el alias con la ruta del target
+                } // Reemplazar el alias con la ruta del target
                 const relativePath = stringContent.replace(aliasPattern, '');
 
-                // Construir la nueva ruta
-                let newPath = path.join('/', pathDist, relativePath);
+                // Construir la nueva ruta basada en la configuración del target
+                let newPath: string;
+
+                // El target puede ser un array de strings o un string
+                const targetArray = Array.isArray(target) ? target : [target];
+                const targetPath = targetArray[0];
+
+                // Debug logs
+                if (env.VERBOSE === 'true') {
+                    console.log(`🔍 DEBUG replaceAliasInStrings:
+  - stringContent: "${stringContent}"
+  - aliasPattern: "${aliasPattern}"
+  - relativePath: "${relativePath}"
+  - targetPath: "${targetPath}"
+  - pathDist: "${pathDist}"`);
+                }
+
+                if (targetPath.startsWith('/')) {
+                    // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
+                    // Remover /* del final si existe
+                    const cleanTarget = targetPath.replace('/*', '');
+                    newPath = path.join(cleanTarget, relativePath);
+                    if (env.VERBOSE === 'true') {
+                        console.log(
+                            `  ✅ Ruta absoluta: cleanTarget="${cleanTarget}", newPath="${newPath}"`,
+                        );
+                    }
+                } else {
+                    // Si es una ruta relativa, verificar si ya apunta al directorio de distribución
+                    const cleanTarget = targetPath
+                        .replace('./', '')
+                        .replace('/*', '');
+                    const normalizedPathDist = pathDist.replace('./', '');
+
+                    if (env.VERBOSE === 'true') {
+                        console.log(
+                            `  🔍 Ruta relativa: cleanTarget="${cleanTarget}", normalizedPathDist="${normalizedPathDist}"`,
+                        );
+                    }
+
+                    if (cleanTarget === normalizedPathDist) {
+                        // Si el target es el mismo que PATH_DIST, no duplicar
+                        newPath = path.join(
+                            '/',
+                            normalizedPathDist,
+                            relativePath,
+                        );
+                        if (env.VERBOSE === 'true') {
+                            console.log(
+                                `  ✅ Sin duplicación: newPath="${newPath}"`,
+                            );
+                        }
+                    } else {
+                        // Si es diferente, usar PATH_DIST como base
+                        newPath = path.join(
+                            '/',
+                            normalizedPathDist,
+                            cleanTarget,
+                            relativePath,
+                        );
+                        if (env.VERBOSE === 'true') {
+                            console.log(
+                                `  ✅ Con PATH_DIST: newPath="${newPath}"`,
+                            );
+                        }
+                    }
+                }
 
                 // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                newPath = newPath.replace(/\/\.\//g, '/').replace(/\\/g, '/');
+                newPath = newPath
+                    .replace(/\/\.\//g, '/')
+                    .replace(/\\/g, '/')
+                    .replace(/\/+/g, '/');
 
                 // Para archivos estáticos (CSS, JS, imágenes, etc.), mantener la extensión original
                 // No agregar .js automáticamente como hacemos con imports
