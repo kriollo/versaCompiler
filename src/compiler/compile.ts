@@ -326,7 +326,7 @@ const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {
     try {
-        if (env.clean === 'true') {
+        if (env.cleanCache === 'true') {
             compilationCache.clear();
             try {
                 await unlink(CACHE_FILE);
@@ -701,6 +701,7 @@ export function getOutputPath(ruta: string) {
     const normalizedSource = path.normalize(pathSource).replace(/\\/g, '/');
     const normalizedDist = path.normalize(pathDist).replace(/\\/g, '/');
 
+    let outputPath;
     if (normalizedRuta.includes(normalizedSource)) {
         const relativePath = normalizedRuta
             .substring(
@@ -709,16 +710,17 @@ export function getOutputPath(ruta: string) {
             )
             .replace(/^[/\\]/, '');
 
-        const outputPath = path
+        outputPath = path
             .join(normalizedDist, relativePath)
             .replace(/\\/g, '/');
-        return outputPath.replace(/\.(vue|ts)$/, '.js');
     } else {
         const fileName = path.basename(normalizedRuta);
-        const outputPath = path
-            .join(normalizedDist, fileName)
-            .replace(/\\/g, '/');
+        outputPath = path.join(normalizedDist, fileName).replace(/\\/g, '/');
+    }
+    if (outputPath.includes('vue') || outputPath.includes('ts')) {
         return outputPath.replace(/\.(vue|ts)$/, '.js');
+    } else {
+        return outputPath;
     }
 }
 
@@ -1470,6 +1472,8 @@ export async function initCompileAll() {
             `${normalizedGlobPathSource}/**/*.js`,
             `${normalizedGlobPathSource}/**/*.vue`,
             `${normalizedGlobPathSource}/**/*.ts`,
+            `${normalizedGlobPathSource}/**/*.mjs`,
+            `${normalizedGlobPathSource}/**/*.cjs`,
         ];
 
         logger.info(`📝 Compilando todos los archivos...`);
