@@ -117,16 +117,20 @@ export async function initChokidar(bs: any) {
         const watchJS = `${env.PATH_SOURCE}/**/*.js`;
         const watchVue = `${env.PATH_SOURCE}/**/*.vue`;
         const watchTS = `${env.PATH_SOURCE}/**/*.ts`;
+        const watchCJS = `${env.PATH_SOURCE}/**/*.cjs`;
+        const watchMJS = `${env.PATH_SOURCE}/**/*.mjs`;
 
         //TODO: agregar watch para CSS
         const watchAditional = JSON.parse(env.aditionalWatch || '[]');
-        let fileWatch = [watchJS, watchVue, watchTS, ...watchAditional];
+        let fileWatch = [watchJS, watchVue, watchTS, watchCJS, watchMJS, ...watchAditional];
 
         //extraer sólo las extesniones  de fileWatch
         const accionExtension = {
             vue: 'HRMVue',
             js: 'HRMHelper',
             ts: 'HRMHelper',
+            cjs: 'HRMHelper',
+            mjs: 'HRMHelper',
         };
         const extendsionWatch = fileWatch.map(item => {
             const ext = item.split('.').pop();
