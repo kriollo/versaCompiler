@@ -1,343 +1,388 @@
 {
-  "timestamp": 1749228993924,
+  "timestamp": 1749481671378,
   "environment": {
     "nodeVersion": "v23.11.0",
     "platform": "win32 x64",
     "cpuCount": 8,
     "totalMemory": 33674285056,
-    "timestamp": "2025-06-06T16:56:33.924Z"
+    "timestamp": "2025-06-09T15:07:51.378Z"
   },
   "totalTests": 11,
   "passedTests": 11,
-  "avgPerformance": 162.22352727272727,
-  "regressions": [
-    {
-      "testName": "TypeScript Simple",
-      "change": "+105.0%",
-      "previousAvg": 126.5295,
-      "currentAvg": 259.3923
-    },
-    {
-      "testName": "Vue Simple",
-      "change": "+482.7%",
-      "previousAvg": 65.2268,
-      "currentAvg": 380.0476
-    },
-    {
-      "testName": "preCompileVue Direct",
-      "change": "+78.8%",
-      "previousAvg": 5.9231,
-      "currentAvg": 10.5914
-    },
-    {
-      "testName": "preCompileTS Direct",
-      "change": "+61.5%",
-      "previousAvg": 14.1968,
-      "currentAvg": 22.9343
-    },
-    {
-      "testName": "Batch Compilation",
-      "change": "+184.6%",
-      "previousAvg": 95.6592,
-      "currentAvg": 272.2021
-    },
-    {
-      "testName": "Memory Usage",
-      "change": "+82.0%",
-      "previousAvg": 24.9732,
-      "currentAvg": 45.4526
-    },
-    {
-      "testName": "Large File Compilation",
-      "change": "+159.5%",
-      "previousAvg": 221.3212,
-      "currentAvg": 574.3232
-    },
-    {
-      "testName": "Performance Baseline",
-      "change": "+939.6%",
-      "previousAvg": 2.6262,
-      "currentAvg": 27.3028
-    },
-    {
-      "testName": "Performance Consistency",
-      "change": "+61.6%",
-      "previousAvg": 6.6668,
-      "currentAvg": 10.774
-    }
-  ],
+  "avgPerformance": 40.67509090909091,
+  "regressions": [],
   "improvements": [
     {
       "testName": "JavaScript Simple",
-      "change": "12.2% faster",
-      "previousAvg": 170.36,
-      "currentAvg": 149.6086
+      "change": "87.5% faster",
+      "previousAvg": 230.1559,
+      "currentAvg": 28.7858
+    },
+    {
+      "testName": "TypeScript Simple",
+      "change": "89.0% faster",
+      "previousAvg": 795.8702,
+      "currentAvg": 87.5668
+    },
+    {
+      "testName": "Vue Simple",
+      "change": "44.7% faster",
+      "previousAvg": 72.6727,
+      "currentAvg": 40.2241
+    },
+    {
+      "testName": "preCompileVue Direct",
+      "change": "43.3% faster",
+      "previousAvg": 9.821,
+      "currentAvg": 5.5661
+    },
+    {
+      "testName": "preCompileTS Direct",
+      "change": "48.9% faster",
+      "previousAvg": 26.7258,
+      "currentAvg": 13.6545
+    },
+    {
+      "testName": "Batch Compilation",
+      "change": "61.4% faster",
+      "previousAvg": 182.628,
+      "currentAvg": 70.4664
+    },
+    {
+      "testName": "Memory Usage",
+      "change": "49.0% faster",
+      "previousAvg": 20.3073,
+      "currentAvg": 10.3577
+    },
+    {
+      "testName": "Concurrent Compilation",
+      "change": "32.2% faster",
+      "previousAvg": 40.9673,
+      "currentAvg": 27.7805
+    },
+    {
+      "testName": "Large File Compilation",
+      "change": "42.2% faster",
+      "previousAvg": 267.2555,
+      "currentAvg": 154.3479
+    },
+    {
+      "testName": "Performance Baseline",
+      "change": "43.6% faster",
+      "previousAvg": 5.4945,
+      "currentAvg": 3.098
+    },
+    {
+      "testName": "Performance Consistency",
+      "change": "47.1% faster",
+      "previousAvg": 10.5487,
+      "currentAvg": 5.5782
     }
   ],
   "results": [
     {
       "name": "JavaScript Simple",
-      "avg": 149.6086,
-      "min": 149.6086,
-      "max": 149.6086,
-      "median": 149.6086,
+      "avg": 28.7858,
+      "min": 28.7858,
+      "max": 28.7858,
+      "median": 28.7858,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 1701096,
-      "timestamp": 1749228952834,
+      "avgMemoryUsage": 1646920,
+      "timestamp": 1749481664337,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -87.49291241284712,
+      "previousAvg": 230.1559
     },
     {
       "name": "TypeScript Simple",
-      "avg": 259.3923,
-      "min": 259.3923,
-      "max": 259.3923,
-      "median": 259.3923,
+      "avg": 87.5668,
+      "min": 87.5668,
+      "max": 87.5668,
+      "median": 87.5668,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 4318672,
-      "timestamp": 1749228954452,
+      "avgMemoryUsage": 4323288,
+      "timestamp": 1749481664567,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -88.99735157818449,
+      "previousAvg": 795.8702
     },
     {
       "name": "Vue Simple",
-      "avg": 380.0476,
-      "min": 380.0476,
-      "max": 380.0476,
-      "median": 380.0476,
+      "avg": 40.2241,
+      "min": 40.2241,
+      "max": 40.2241,
+      "median": 40.2241,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "timestamp": 1749228955438,
+      "avgMemoryUsage": 1785848,
+      "timestamp": 1749481664729,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -44.65032949099181,
+      "previousAvg": 72.6727
     },
     {
       "name": "preCompileVue Direct",
-      "avg": 10.5914,
-      "min": 10.5914,
-      "max": 10.5914,
-      "median": 10.5914,
+      "avg": 5.5661,
+      "min": 5.5661,
+      "max": 5.5661,
+      "median": 5.5661,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 749744,
-      "timestamp": 1749228956487,
+      "avgMemoryUsage": 742856,
+      "timestamp": 1749481664845,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -43.32450870583444,
+      "previousAvg": 9.821
     },
     {
       "name": "preCompileTS Direct",
-      "avg": 22.9343,
-      "min": 22.9343,
-      "max": 22.9343,
-      "median": 22.9343,
+      "avg": 13.6545,
+      "min": 13.6545,
+      "max": 13.6545,
+      "median": 13.6545,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 1510736,
-      "timestamp": 1749228957822,
+      "avgMemoryUsage": 1516768,
+      "timestamp": 1749481664965,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -48.90891947107289,
+      "previousAvg": 26.7258
     },
     {
       "name": "Batch Compilation",
-      "avg": 272.2021,
-      "min": 272.2021,
-      "max": 272.2021,
-      "median": 272.2021,
+      "avg": 70.4664,
+      "min": 70.4664,
+      "max": 70.4664,
+      "median": 70.4664,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 8131328,
-      "timestamp": 1749228958838,
+      "timestamp": 1749481665180,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -61.415336093041596,
+      "previousAvg": 182.628
     },
     {
       "name": "Memory Usage",
-      "avg": 45.4526,
-      "min": 45.4526,
-      "max": 45.4526,
-      "median": 45.4526,
+      "avg": 10.3577,
+      "min": 10.3577,
+      "max": 10.3577,
+      "median": 10.3577,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "timestamp": 1749228959855,
+      "avgMemoryUsage": 730176,
+      "timestamp": 1749481665373,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -48.99518892221025,
+      "previousAvg": 20.3073
     },
     {
       "name": "Concurrent Compilation",
-      "avg": 31.8299,
-      "min": 31.8299,
-      "max": 31.8299,
-      "median": 31.8299,
+      "avg": 27.7805,
+      "min": 27.7805,
+      "max": 27.7805,
+      "median": 27.7805,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 2673000,
-      "timestamp": 1749228961194,
+      "avgMemoryUsage": 2679168,
+      "timestamp": 1749481665604,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -32.18859919984964,
+      "previousAvg": 40.9673
     },
     {
       "name": "Large File Compilation",
-      "avg": 574.3232,
-      "min": 574.3232,
-      "max": 574.3232,
-      "median": 574.3232,
+      "avg": 154.3479,
+      "min": 154.3479,
+      "max": 154.3479,
+      "median": 154.3479,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 1123648,
-      "timestamp": 1749228962325,
+      "avgMemoryUsage": 5103064,
+      "timestamp": 1749481665911,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -42.24706320356362,
+      "previousAvg": 267.2555
     },
     {
       "name": "Performance Baseline",
-      "avg": 27.3028,
-      "min": 27.3028,
-      "max": 27.3028,
-      "median": 27.3028,
+      "avg": 3.098,
+      "min": 3.098,
+      "max": 3.098,
+      "median": 3.098,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 51864,
-      "timestamp": 1749228962654,
+      "avgMemoryUsage": 51752,
+      "timestamp": 1749481666032,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -43.61634361634362,
+      "previousAvg": 5.4945
     },
     {
       "name": "Performance Consistency",
-      "avg": 10.774,
-      "min": 10.774,
-      "max": 10.774,
-      "median": 10.774,
+      "avg": 5.5782,
+      "min": 5.5782,
+      "max": 5.5782,
+      "median": 5.5782,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 586656,
-      "timestamp": 1749228962927,
+      "avgMemoryUsage": 591768,
+      "timestamp": 1749481666144,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -47.11955027633737,
+      "previousAvg": 10.5487
     }
   ],
   "summary": {
     "fastestTest": {
-      "name": "preCompileVue Direct",
-      "avg": 10.5914,
-      "min": 10.5914,
-      "max": 10.5914,
-      "median": 10.5914,
+      "name": "Performance Baseline",
+      "avg": 3.098,
+      "min": 3.098,
+      "max": 3.098,
+      "median": 3.098,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 749744,
-      "timestamp": 1749228956487,
+      "avgMemoryUsage": 51752,
+      "timestamp": 1749481666032,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -43.61634361634362,
+      "previousAvg": 5.4945
     },
     "slowestTest": {
       "name": "Large File Compilation",
-      "avg": 574.3232,
-      "min": 574.3232,
-      "max": 574.3232,
-      "median": 574.3232,
+      "avg": 154.3479,
+      "min": 154.3479,
+      "max": 154.3479,
+      "median": 154.3479,
       "std": 0,
       "runs": 1,
       "successRate": 1,
-      "avgMemoryUsage": 1123648,
-      "timestamp": 1749228962325,
+      "avgMemoryUsage": 5103064,
+      "timestamp": 1749481665911,
       "environment": {
         "nodeVersion": "v23.11.0",
         "platform": "win32 x64",
         "cpuCount": 8,
         "totalMemory": 33674285056,
-        "gitCommit": "acdb5beb",
+        "gitCommit": "0b2d6e34",
         "branch": "master"
-      }
+      },
+      "trend": "improvement",
+      "trendChange": -42.24706320356362,
+      "previousAvg": 267.2555
     },
-    "totalTime": 1784.4587999999999,
+    "totalTime": 447.42600000000004,
     "memoryUsage": {
-      "average": 2316304.888888889
+      "average": 1917160.8000000003
     }
   }
 }

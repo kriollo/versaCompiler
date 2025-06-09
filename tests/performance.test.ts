@@ -39,6 +39,9 @@ interface BenchmarkStats {
     avgMemoryUsage?: number;
     timestamp: number;
     environment: PerformanceEnvironment;
+    trend?: string;
+    trendChange?: number;
+    previousAvg?: number;
 }
 
 interface PerformanceEnvironment {
@@ -155,32 +158,48 @@ class PerformancePersistence {
         const regressions: string[] = [];
         const improvements: string[] = [];
 
-        // Detectar regresiones y mejoras comparando con resultados anteriores
-        for (const testHistory of history) {
-            if (testHistory.results.length >= 2) {
-                const current =
-                    testHistory.results[testHistory.results.length - 1];
+        // Calcular tendencias por test individual
+        const resultsWithTrends = currentResults.map(current => {
+            const testHistory = history.find(h => h.testName === current.name);
+            let trend = 'stable';
+            let trendChange = 0;
+            let previousAvg = 0;
+
+            if (testHistory && testHistory.results.length >= 2) {
                 const previous =
                     testHistory.results[testHistory.results.length - 2];
-
-                if (current && previous) {
+                if (previous) {
+                    previousAvg = previous.avg;
                     const perfChange =
                         ((current.avg - previous.avg) / previous.avg) * 100;
+                    trendChange = perfChange;
 
                     if (perfChange > 10) {
-                        // Regresión si es >10% más lento
+                        trend = 'regression';
                         regressions.push(
                             `${testHistory.testName}: +${perfChange.toFixed(1)}% slower`,
                         );
                     } else if (perfChange < -10) {
-                        // Mejora si es >10% más rápido
+                        trend = 'improvement';
                         improvements.push(
                             `${testHistory.testName}: ${Math.abs(perfChange).toFixed(1)}% faster`,
                         );
+                    } else if (Math.abs(perfChange) > 5) {
+                        trend =
+                            perfChange > 0
+                                ? 'slight-regression'
+                                : 'slight-improvement';
                     }
                 }
             }
-        }
+
+            return {
+                ...current,
+                trend,
+                trendChange,
+                previousAvg,
+            };
+        });
 
         const avgPerformance =
             currentResults.length > 0
@@ -196,7 +215,7 @@ class PerformancePersistence {
             avgPerformance,
             regressions,
             improvements,
-            results: currentResults,
+            results: resultsWithTrends,
         };
     }
 
@@ -255,13 +274,65 @@ class PerformancePersistence {
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
-        }
-        .chart-container {
+        }        .chart-container {
             background: white;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+        }
+        .performance-table {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .performance-table h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        .perf-table th,
+        .perf-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .perf-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8em;
+        }
+        .perf-table tr:hover {
+            background: #f8f9fa;
+        }
+        .perf-table .avg-time {
+            font-weight: bold;
+            color: #667eea;
+        }        .perf-table .success-rate {
+            color: #27ae60;
+        }
+        .trend-indicator {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
+        .trend-regression { color: #e74c3c; }
+        .trend-improvement { color: #27ae60; }
+        .trend-slight { color: #f39c12; }
+        .trend-stable { color: #95a5a6; }
+        .trend-change {
+            font-size: 0.85em;
+            font-weight: normal;
+            margin-left: 5px;
         }
         .issues {
             display: grid;
@@ -316,11 +387,93 @@ class PerformancePersistence {
             <div class="stat-value">${((summary.passedTests / summary.totalTests) * 100).toFixed(1)}%</div>
             <div>Tasa de Éxito</div>
         </div>
-    </div>
-
-    <div class="chart-container">
+    </div>    <div class="chart-container">
         <h2>📈 Tendencias de Performance</h2>
         <canvas id="performanceChart" width="400" height="200"></canvas>
+    </div>
+
+    <div class="performance-table">
+        <h2>📊 Tiempos Promedio por Test</h2>        <table class="perf-table">
+            <thead>
+                <tr>
+                    <th>Test</th>
+                    <th>Tiempo Promedio</th>
+                    <th>Tiempo Mínimo</th>
+                    <th>Tiempo Máximo</th>
+                    <th>Tasa de Éxito</th>
+                    <th>Ejecuciones</th>
+                    <th>Tendencia</th>
+                </tr>
+            </thead>
+            <tbody>                ${summary.results
+                .map(r => {
+                    const getTrendIndicator = (trend: string) => {
+                        switch (trend) {
+                            case 'regression':
+                                return {
+                                    icon: '🔴',
+                                    label: 'Regresión',
+                                    class: 'trend-regression',
+                                };
+                            case 'improvement':
+                                return {
+                                    icon: '🟢',
+                                    label: 'Mejora',
+                                    class: 'trend-improvement',
+                                };
+                            case 'slight-regression':
+                                return {
+                                    icon: '🟡',
+                                    label: 'Ligera regresión',
+                                    class: 'trend-slight',
+                                };
+                            case 'slight-improvement':
+                                return {
+                                    icon: '🟡',
+                                    label: 'Ligera mejora',
+                                    class: 'trend-slight',
+                                };
+                            case 'stable':
+                                return {
+                                    icon: '⚪',
+                                    label: 'Estable',
+                                    class: 'trend-stable',
+                                };
+                            default:
+                                return {
+                                    icon: '⚫',
+                                    label: 'Sin datos',
+                                    class: 'trend-stable',
+                                };
+                        }
+                    };
+
+                    const trendInfo = getTrendIndicator(r.trend || 'stable');
+                    const changeText = r.trendChange
+                        ? `${r.trendChange > 0 ? '+' : ''}${r.trendChange.toFixed(1)}%`
+                        : '';
+
+                    return `
+                <tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td class="avg-time">${r.avg.toFixed(2)}ms</td>
+                    <td>${r.min.toFixed(2)}ms</td>
+                    <td>${r.max.toFixed(2)}ms</td>
+                    <td class="success-rate">${(r.successRate * 100).toFixed(1)}%</td>
+                    <td>${r.runs}</td>
+                    <td>
+                        <span class="trend-indicator ${trendInfo.class}" title="${trendInfo.label}">
+                            ${trendInfo.icon}
+                        </span>
+                        ${trendInfo.label}
+                        ${changeText ? `<span class="trend-change ${trendInfo.class}">(${changeText})</span>` : ''}
+                    </td>
+                </tr>
+                `;
+                })
+                .join('')}
+            </tbody>
+        </table>
     </div>
 
     <div class="issues">

@@ -120,488 +120,488 @@ describe('VersaCompiler Performance Tests', () => {
     // Utilities para crear archivos de prueba
     const createSampleFiles = {
         simpleJS: () => `
-// Simple JavaScript file
-const message = 'Hello World';
-const numbers = [1, 2, 3, 4, 5];
+            // Simple JavaScript file
+            const message = 'Hello World';
+            const numbers = [1, 2, 3, 4, 5];
 
-function greet(name) {
-    return \`Hello, \${name}!\`;
-}
+            function greet(name) {
+                return \`Hello, \${name}!\`;
+            }
 
-export { message, numbers, greet };
+            export { message, numbers, greet };
         `,
 
         simpleTS: () => `
-// Simple TypeScript file
-interface User {
-    name: string;
-    age: number;
-    email: string;
-}
+            // Simple TypeScript file
+            interface User {
+                name: string;
+                age: number;
+                email: string;
+            }
 
-interface APIResponse<T> {
-    data: T;
-    status: number;
-    message: string;
-}
+            interface APIResponse<T> {
+                data: T;
+                status: number;
+                message: string;
+            }
 
-class UserService {
-    private baseUrl: string = 'https://api.example.com';
+            class UserService {
+                private baseUrl: string = 'https://api.example.com';
 
-    async getUser(id: number): Promise<APIResponse<User>> {
-        const response = await fetch(\`\${this.baseUrl}/users/\${id}\`);
-        return response.json();
-    }
+                async getUser(id: number): Promise<APIResponse<User>> {
+                    const response = await fetch(\`\${this.baseUrl}/users/\${id}\`);
+                    return response.json();
+                }
 
-    validateUser(user: User): boolean {
-        return user.name.length > 0 && user.age > 0 && user.email.includes('@');
-    }
-}
+                validateUser(user: User): boolean {
+                    return user.name.length > 0 && user.age > 0 && user.email.includes('@');
+                }
+            }
 
-export { User, UserService, APIResponse };
+            export { User, UserService, APIResponse };
         `,
 
         complexTS: () => `
-// Complex TypeScript file with advanced types
-type EventType = 'click' | 'hover' | 'focus' | 'blur';
+            // Complex TypeScript file with advanced types
+            type EventType = 'click' | 'hover' | 'focus' | 'blur';
 
-interface BaseEvent {
-    type: EventType;
-    timestamp: number;
-    target: HTMLElement;
-}
+            interface BaseEvent {
+                type: EventType;
+                timestamp: number;
+                target: HTMLElement;
+            }
 
-interface ClickEvent extends BaseEvent {
-    type: 'click';
-    coordinates: { x: number; y: number };
-    button: 'left' | 'right' | 'middle';
-}
+            interface ClickEvent extends BaseEvent {
+                type: 'click';
+                coordinates: { x: number; y: number };
+                button: 'left' | 'right' | 'middle';
+            }
 
-interface HoverEvent extends BaseEvent {
-    type: 'hover';
-    duration: number;
-}
+            interface HoverEvent extends BaseEvent {
+                type: 'hover';
+                duration: number;
+            }
 
-type CustomEvent = ClickEvent | HoverEvent;
+            type CustomEvent = ClickEvent | HoverEvent;
 
-class EventManager<T extends CustomEvent> {
-    private listeners: Map<EventType, ((event: T) => void)[]> = new Map();
-    private eventHistory: T[] = [];
+            class EventManager<T extends CustomEvent> {
+                private listeners: Map<EventType, ((event: T) => void)[]> = new Map();
+                private eventHistory: T[] = [];
 
-    constructor(private maxHistory: number = 100) {}
+                constructor(private maxHistory: number = 100) {}
 
-    addEventListener<K extends T['type']>(
-        type: K,
-        listener: (event: Extract<T, { type: K }>) => void
-    ): void {
-        if (!this.listeners.has(type)) {
-            this.listeners.set(type, []);
-        }
-        this.listeners.get(type)!.push(listener as any);
-    }
+                addEventListener<K extends T['type']>(
+                    type: K,
+                    listener: (event: Extract<T, { type: K }>) => void
+                ): void {
+                    if (!this.listeners.has(type)) {
+                        this.listeners.set(type, []);
+                    }
+                    this.listeners.get(type)!.push(listener as any);
+                }
 
-    emit<K extends T['type']>(event: Extract<T, { type: K }>): void {
-        this.eventHistory.push(event as T);
-        if (this.eventHistory.length > this.maxHistory) {
-            this.eventHistory.shift();
-        }
+                emit<K extends T['type']>(event: Extract<T, { type: K }>): void {
+                    this.eventHistory.push(event as T);
+                    if (this.eventHistory.length > this.maxHistory) {
+                        this.eventHistory.shift();
+                    }
 
-        const listeners = this.listeners.get(event.type);
-        if (listeners) {
-            listeners.forEach(listener => listener(event as any));
-        }
-    }
+                    const listeners = this.listeners.get(event.type);
+                    if (listeners) {
+                        listeners.forEach(listener => listener(event as any));
+                    }
+                }
 
-    getHistory(): T[] {
-        return [...this.eventHistory];
-    }
+                getHistory(): T[] {
+                    return [...this.eventHistory];
+                }
 
-    clear(): void {
-        this.eventHistory = [];
-        this.listeners.clear();
-    }
-}
+                clear(): void {
+                    this.eventHistory = [];
+                    this.listeners.clear();
+                }
+            }
 
-// Generic utilities
-function debounce<T extends (...args: any[]) => any>(
-    func: T,
-    wait: number
-): (...args: Parameters<T>) => Promise<ReturnType<T>> {
-    let timeout: NodeJS.Timeout;
-    return (...args: Parameters<T>): Promise<ReturnType<T>> => {
-        return new Promise((resolve) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => resolve(func(...args)), wait);
-        });
-    };
-}
+            // Generic utilities
+            function debounce<T extends (...args: any[]) => any>(
+                func: T,
+                wait: number
+            ): (...args: Parameters<T>) => Promise<ReturnType<T>> {
+                let timeout: NodeJS.Timeout;
+                return (...args: Parameters<T>): Promise<ReturnType<T>> => {
+                    return new Promise((resolve) => {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => resolve(func(...args)), wait);
+                    });
+                };
+            }
 
-export { EventManager, EventType, CustomEvent, debounce };
+            export { EventManager, EventType, CustomEvent, debounce };
         `,
 
         simpleVue: () => `
-<template>
-    <div class="simple-component">
-        <h1>{{ title }}</h1>
-        <p>{{ message }}</p>
-        <button @click="handleClick">Click me</button>
-    </div>
-</template>
+            <template>
+                <div class="simple-component">
+                    <h1>{{ title }}</h1>
+                    <p>{{ message }}</p>
+                    <button @click="handleClick">Click me</button>
+                </div>
+            </template>
 
-<script setup>
-import { ref } from 'vue'
+            <script setup>
+            import { ref } from 'vue'
 
-const title = ref('Simple Vue Component')
-const message = ref('This is a basic Vue component for performance testing')
+            const title = ref('Simple Vue Component')
+            const message = ref('This is a basic Vue component for performance testing')
 
-const handleClick = () => {
-    message.value = 'Button clicked at ' + new Date().toLocaleTimeString()
-}
-</script>
+            const handleClick = () => {
+                message.value = 'Button clicked at ' + new Date().toLocaleTimeString()
+            }
+            </script>
 
-<style scoped>
-.simple-component {
-    padding: 20px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-}
+            <style scoped>
+            .simple-component {
+                padding: 20px;
+                border: 1px solid #ccc;
+                border-radius: 8px;
+            }
 
-button {
-    background-color: #007bff;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
+            button {
+                background-color: #007bff;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
 
-button:hover {
-    background-color: #0056b3;
-}
-</style>
+            button:hover {
+                background-color: #0056b3;
+            }
+            </style>
         `,
 
         complexVue: () => `
-<template>
-    <div class="complex-component">
-        <header class="header">
-            <h1>{{ title }}</h1>
-            <nav>
-                <ul>
-                    <li v-for="item in navigation" :key="item.id" @click="navigate(item)">
-                        {{ item.label }}
-                    </li>
-                </ul>
-            </nav>
-        </header>
+            <template>
+                <div class="complex-component">
+                    <header class="header">
+                        <h1>{{ title }}</h1>
+                        <nav>
+                            <ul>
+                                <li v-for="item in navigation" :key="item.id" @click="navigate(item)">
+                                    {{ item.label }}
+                                </li>
+                            </ul>
+                        </nav>
+                    </header>
 
-        <main class="main-content">
-            <section v-if="loading" class="loading">
-                <div class="spinner"></div>
-                <p>Loading...</p>
-            </section>
+                    <main class="main-content">
+                        <section v-if="loading" class="loading">
+                            <div class="spinner"></div>
+                            <p>Loading...</p>
+                        </section>
 
-            <section v-else-if="error" class="error">
-                <h2>Error occurred</h2>
-                <p>{{ error.message }}</p>
-                <button @click="retry">Retry</button>
-            </section>
+                        <section v-else-if="error" class="error">
+                            <h2>Error occurred</h2>
+                            <p>{{ error.message }}</p>
+                            <button @click="retry">Retry</button>
+                        </section>
 
-            <section v-else class="content">
-                <div class="filters">
-                    <input
-                        v-model="searchTerm"
-                        placeholder="Search users..."
-                        @input="handleSearch"
-                    />
-                    <select v-model="selectedCategory">
-                        <option value="">All Categories</option>
-                        <option v-for="cat in categories" :key="cat" :value="cat">
-                            {{ cat }}
-                        </option>
-                    </select>
+                        <section v-else class="content">
+                            <div class="filters">
+                                <input
+                                    v-model="searchTerm"
+                                    placeholder="Search users..."
+                                    @input="handleSearch"
+                                />
+                                <select v-model="selectedCategory">
+                                    <option value="">All Categories</option>
+                                    <option v-for="cat in categories" :key="cat" :value="cat">
+                                        {{ cat }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="user-grid">
+                                <div v-for="user in filteredUsers" :key="user.id" class="user-card">
+                                    <h3>{{ user.name }}</h3>
+                                    <p>{{ user.email }}</p>
+                                    <span class="status" :class="user.status">{{ user.status }}</span>
+                                </div>
+                            </div>
+
+                            <div class="pagination">
+                                <button
+                                    v-for="page in paginationPages"
+                                    :key="page"
+                                    :class="{ active: page === currentPage }"
+                                    @click="changePage(page)"
+                                >
+                                    {{ page }}
+                                </button>
+                            </div>
+                        </section>
+                    </main>
                 </div>
+            </template>
 
-                <div class="user-grid">
-                    <div v-for="user in filteredUsers" :key="user.id" class="user-card">
-                        <h3>{{ user.name }}</h3>
-                        <p>{{ user.email }}</p>
-                        <span class="status" :class="user.status">{{ user.status }}</span>
-                    </div>
-                </div>
+            <script setup lang="ts">
+            import { ref, computed, onMounted } from 'vue'
 
-                <div class="pagination">
-                    <button
-                        v-for="page in paginationPages"
-                        :key="page"
-                        :class="{ active: page === currentPage }"
-                        @click="changePage(page)"
-                    >
-                        {{ page }}
-                    </button>
-                </div>
-            </section>
-        </main>
-    </div>
-</template>
+            interface User {
+                id: number
+                name: string
+                email: string
+                category: string
+                status: 'active' | 'inactive'
+            }
 
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+            interface NavigationItem {
+                id: string
+                label: string
+                path: string
+            }
 
-interface User {
-    id: number
-    name: string
-    email: string
-    category: string
-    status: 'active' | 'inactive'
-}
+            interface ApiError {
+                message: string
+                code: number
+            }
 
-interface NavigationItem {
-    id: string
-    label: string
-    path: string
-}
+            const title = ref('Complex Vue Component')
+            const loading = ref(false)
+            const error = ref<ApiError | null>(null)
+            const users = ref<User[]>([])
+            const searchTerm = ref('')
+            const selectedCategory = ref('')
+            const currentPage = ref(1)
 
-interface ApiError {
-    message: string
-    code: number
-}
+            const navigation: NavigationItem[] = [
+                { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+                { id: 'users', label: 'Users', path: '/users' },
+                { id: 'settings', label: 'Settings', path: '/settings' }
+            ]
 
-const title = ref('Complex Vue Component')
-const loading = ref(false)
-const error = ref<ApiError | null>(null)
-const users = ref<User[]>([])
-const searchTerm = ref('')
-const selectedCategory = ref('')
-const currentPage = ref(1)
+            const categories = computed(() => {
+                const cats = users.value.map(user => user.category)
+                return [...new Set(cats)].sort()
+            })
 
-const navigation: NavigationItem[] = [
-    { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-    { id: 'users', label: 'Users', path: '/users' },
-    { id: 'settings', label: 'Settings', path: '/settings' }
-]
+            const filteredUsers = computed(() => {
+                let filtered = users.value
 
-const categories = computed(() => {
-    const cats = users.value.map(user => user.category)
-    return [...new Set(cats)].sort()
-})
+                if (searchTerm.value) {
+                    const term = searchTerm.value.toLowerCase()
+                    filtered = filtered.filter(user =>
+                        user.name.toLowerCase().includes(term) ||
+                        user.email.toLowerCase().includes(term)
+                    )
+                }
 
-const filteredUsers = computed(() => {
-    let filtered = users.value
+                if (selectedCategory.value) {
+                    filtered = filtered.filter(user => user.category === selectedCategory.value)
+                }
 
-    if (searchTerm.value) {
-        const term = searchTerm.value.toLowerCase()
-        filtered = filtered.filter(user =>
-            user.name.toLowerCase().includes(term) ||
-            user.email.toLowerCase().includes(term)
-        )
-    }
+                return filtered
+            })
 
-    if (selectedCategory.value) {
-        filtered = filtered.filter(user => user.category === selectedCategory.value)
-    }
+            const paginationPages = computed(() => {
+                const totalPages = Math.ceil(filteredUsers.value.length / 10)
+                return Array.from({ length: totalPages }, (_, i) => i + 1)
+            })
 
-    return filtered
-})
+            const navigate = (item: NavigationItem) => {
+                console.log('Navigating to:', item.path)
+            }
 
-const paginationPages = computed(() => {
-    const totalPages = Math.ceil(filteredUsers.value.length / 10)
-    return Array.from({ length: totalPages }, (_, i) => i + 1)
-})
+            const handleSearch = () => {
+                currentPage.value = 1
+            }
 
-const navigate = (item: NavigationItem) => {
-    console.log('Navigating to:', item.path)
-}
+            const changePage = (page: number) => {
+                currentPage.value = page
+            }
 
-const handleSearch = () => {
-    currentPage.value = 1
-}
+            const retry = () => {
+                error.value = null
+                fetchUsers()
+            }
 
-const changePage = (page: number) => {
-    currentPage.value = page
-}
+            const fetchUsers = async () => {
+                loading.value = true
+                error.value = null
 
-const retry = () => {
-    error.value = null
-    fetchUsers()
-}
+                try {
+                    // Simular llamada API
+                    await new Promise(resolve => setTimeout(resolve, 1000))
 
-const fetchUsers = async () => {
-    loading.value = true
-    error.value = null
+                    users.value = Array.from({ length: 50 }, (_, i) => ({
+                        id: i + 1,
+                        name: \`User \${i + 1}\`,
+                        email: \`user\${i + 1}@example.com\`,
+                        category: ['admin', 'user', 'guest'][i % 3],
+                        status: i % 2 === 0 ? 'active' : 'inactive'
+                    }))
+                } catch (err) {
+                    error.value = {
+                        message: 'Failed to fetch users',
+                        code: 500
+                    }
+                } finally {
+                    loading.value = false
+                }
+            }
 
-    try {
-        // Simular llamada API
-        await new Promise(resolve => setTimeout(resolve, 1000))
+            onMounted(() => {
+                fetchUsers()
+            })
+            </script>
 
-        users.value = Array.from({ length: 50 }, (_, i) => ({
-            id: i + 1,
-            name: \`User \${i + 1}\`,
-            email: \`user\${i + 1}@example.com\`,
-            category: ['admin', 'user', 'guest'][i % 3],
-            status: i % 2 === 0 ? 'active' : 'inactive'
-        }))
-    } catch (err) {
-        error.value = {
-            message: 'Failed to fetch users',
-            code: 500
-        }
-    } finally {
-        loading.value = false
-    }
-}
+            <style scoped>
+            .complex-component {
+                min-height: 100vh;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
 
-onMounted(() => {
-    fetchUsers()
-})
-</script>
+            .header {
+                background: white;
+                padding: 1rem 2rem;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
 
-<style scoped>
-.complex-component {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
+            .header h1 {
+                margin: 0 0 1rem 0;
+                color: #333;
+            }
 
-.header {
-    background: white;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+            .header nav ul {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                display: flex;
+                gap: 2rem;
+            }
 
-.header h1 {
-    margin: 0 0 1rem 0;
-    color: #333;
-}
+            .header nav li {
+                cursor: pointer;
+                padding: 0.5rem 1rem;
+                border-radius: 4px;
+                transition: background-color 0.2s;
+            }
 
-.header nav ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    gap: 2rem;
-}
+            .header nav li:hover {
+                background-color: #f0f0f0;
+            }
 
-.header nav li {
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
+            .main-content {
+                padding: 2rem;
+            }
 
-.header nav li:hover {
-    background-color: #f0f0f0;
-}
+            .loading, .error {
+                text-align: center;
+                padding: 4rem;
+                background: white;
+                border-radius: 8px;
+                margin-bottom: 2rem;
+            }
 
-.main-content {
-    padding: 2rem;
-}
+            .spinner {
+                width: 40px;
+                height: 40px;
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 1rem;
+            }
 
-.loading, .error {
-    text-align: center;
-    padding: 4rem;
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-}
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
 
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-}
+            .content {
+                background: white;
+                border-radius: 8px;
+                padding: 2rem;
+            }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
+            .filters {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
 
-.content {
-    background: white;
-    border-radius: 8px;
-    padding: 2rem;
-}
+            .filters input,
+            .filters select {
+                padding: 0.5rem;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
 
-.filters {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
+            .user-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
 
-.filters input,
-.filters select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
+            .user-card {
+                padding: 1rem;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                background: white;
+            }
 
-.user-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
+            .user-card h3 {
+                margin: 0 0 0.5rem 0;
+            }
 
-.user-card {
-    padding: 1rem;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    background: white;
-}
+            .user-card p {
+                margin: 0 0 0.5rem 0;
+                color: #666;
+            }
 
-.user-card h3 {
-    margin: 0 0 0.5rem 0;
-}
+            .status {
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.875rem;
+                font-weight: bold;
+            }
 
-.user-card p {
-    margin: 0 0 0.5rem 0;
-    color: #666;
-}
+            .status.active {
+                background: #d4edda;
+                color: #155724;
+            }
 
-.status {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: bold;
-}
+            .status.inactive {
+                background: #f8d7da;
+                color: #721c24;
+            }
 
-.status.active {
-    background: #d4edda;
-    color: #155724;
-}
+            .pagination {
+                display: flex;
+                justify-content: center;
+                gap: 0.5rem;
+            }
 
-.status.inactive {
-    background: #f8d7da;
-    color: #721c24;
-}
+            .pagination button {
+                padding: 0.5rem 1rem;
+                border: 1px solid #ddd;
+                background: white;
+                cursor: pointer;
+                border-radius: 4px;
+            }
 
-.pagination {
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-}
+            .pagination button.active {
+                background: #007bff;
+                color: white;
+                border-color: #007bff;
+            }
 
-.pagination button {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ddd;
-    background: white;
-    cursor: pointer;
-    border-radius: 4px;
-}
-
-.pagination button.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.pagination button:hover:not(.active) {
-    background: #f8f9fa;
-}
-</style>
+            .pagination button:hover:not(.active) {
+                background: #f8f9fa;
+            }
+            </style>
         `,
     };
 

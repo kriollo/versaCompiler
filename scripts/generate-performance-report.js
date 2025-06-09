@@ -62,7 +62,6 @@ class PerformanceReportGenerator {
             return [];
         }
     }
-
     async generateReport() {
         const history = await this.loadHistory();
         const environment = await this.getEnvironmentInfo();
@@ -75,19 +74,25 @@ class PerformanceReportGenerator {
         const regressions = [];
         const improvements = [];
 
-        // Detectar regresiones y mejoras comparando con resultados anteriores
-        for (const testHistory of history) {
-            if (testHistory.results.length >= 2) {
-                const current =
-                    testHistory.results[testHistory.results.length - 1];
+        // Agregar análisis de tendencias individuales por test
+        const resultsWithTrends = currentResults.map(current => {
+            // Buscar el historial de este test específico
+            const testHistory = history.find(h => h.testName === current.name);
+            let trend = 'stable';
+            let trendChange = null;
+            let previousAvg = null;
+
+            if (testHistory && testHistory.results.length >= 2) {
                 const previous =
                     testHistory.results[testHistory.results.length - 2];
-
+                previousAvg = previous.avg;
                 const perfChange =
                     ((current.avg - previous.avg) / previous.avg) * 100;
 
+                trendChange = perfChange;
+
                 if (perfChange > 10) {
-                    // Regresión si es >10% más lento
+                    trend = 'regression';
                     regressions.push({
                         testName: testHistory.testName,
                         change: `+${perfChange.toFixed(1)}%`,
@@ -95,48 +100,60 @@ class PerformanceReportGenerator {
                         currentAvg: current.avg,
                     });
                 } else if (perfChange < -10) {
-                    // Mejora si es >10% más rápido
+                    trend = 'improvement';
                     improvements.push({
                         testName: testHistory.testName,
                         change: `${Math.abs(perfChange).toFixed(1)}% faster`,
                         previousAvg: previous.avg,
                         currentAvg: current.avg,
                     });
+                } else if (Math.abs(perfChange) > 5) {
+                    trend =
+                        perfChange > 0
+                            ? 'slight-regression'
+                            : 'slight-improvement';
                 }
             }
-        }
+
+            return {
+                ...current,
+                trend,
+                trendChange,
+                previousAvg,
+            };
+        });
 
         const avgPerformance =
-            currentResults.length > 0
-                ? currentResults.reduce((sum, r) => sum + r.avg, 0) /
-                  currentResults.length
+            resultsWithTrends.length > 0
+                ? resultsWithTrends.reduce((sum, r) => sum + r.avg, 0) /
+                  resultsWithTrends.length
                 : 0;
-
         const report = {
             timestamp,
             environment,
-            totalTests: currentResults.length,
-            passedTests: currentResults.filter(r => r.successRate === 1).length,
+            totalTests: resultsWithTrends.length,
+            passedTests: resultsWithTrends.filter(r => r.successRate === 1)
+                .length,
             avgPerformance,
             regressions,
             improvements,
-            results: currentResults,
+            results: resultsWithTrends,
             summary: {
                 fastestTest:
-                    currentResults.length > 0
-                        ? currentResults.reduce((min, r) =>
+                    resultsWithTrends.length > 0
+                        ? resultsWithTrends.reduce((min, r) =>
                               r.avg < min.avg ? r : min,
                           )
                         : null,
                 slowestTest:
-                    currentResults.length > 0
-                        ? currentResults.reduce((max, r) =>
+                    resultsWithTrends.length > 0
+                        ? resultsWithTrends.reduce((max, r) =>
                               r.avg > max.avg ? r : max,
                           )
                         : null,
-                totalTime: currentResults.reduce((sum, r) => sum + r.avg, 0),
+                totalTime: resultsWithTrends.reduce((sum, r) => sum + r.avg, 0),
                 memoryUsage: {
-                    average: currentResults
+                    average: resultsWithTrends
                         .filter(r => r.avgMemoryUsage)
                         .reduce(
                             (sum, r, _, arr) =>
@@ -335,13 +352,25 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
         }
         .perf-table tr:hover {
             background: #f8f9fa;
-        }
-        .perf-table .avg-time {
+        }        .perf-table .avg-time {
             font-weight: bold;
             color: #667eea;
         }
         .perf-table .success-rate {
             color: #27ae60;
+        }
+        .trend-indicator {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
+        .trend-regression { color: #e74c3c; }
+        .trend-improvement { color: #27ae60; }
+        .trend-slight { color: #f39c12; }
+        .trend-stable { color: #95a5a6; }
+        .trend-change {
+            font-size: 0.85em;
+            font-weight: normal;
+            margin-left: 5px;
         }
         .issues {
             display: grid;
@@ -454,8 +483,7 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
         </div>
 
         <div class="performance-table">
-            <h2>📊 Tiempos Promedio por Test</h2>
-            <table class="perf-table">
+            <h2>📊 Tiempos Promedio por Test</h2>            <table class="perf-table">
                 <thead>
                     <tr>
                         <th>Test</th>
@@ -464,12 +492,60 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
                         <th>Tiempo Máximo</th>
                         <th>Tasa de Éxito</th>
                         <th>Ejecuciones</th>
+                        <th>Tendencia</th>
                     </tr>
-                </thead>
-                <tbody>
+                </thead>                <tbody>
                     ${report.results
-                        .map(
-                            r => `
+                        .map(r => {
+                            const getTrendIndicator = trend => {
+                                switch (trend) {
+                                    case 'regression':
+                                        return {
+                                            icon: '🔴',
+                                            label: 'Regresión',
+                                            class: 'trend-regression',
+                                        };
+                                    case 'improvement':
+                                        return {
+                                            icon: '🟢',
+                                            label: 'Mejora',
+                                            class: 'trend-improvement',
+                                        };
+                                    case 'slight-regression':
+                                        return {
+                                            icon: '🟡',
+                                            label: 'Ligera regresión',
+                                            class: 'trend-slight',
+                                        };
+                                    case 'slight-improvement':
+                                        return {
+                                            icon: '🟡',
+                                            label: 'Ligera mejora',
+                                            class: 'trend-slight',
+                                        };
+                                    case 'stable':
+                                        return {
+                                            icon: '⚪',
+                                            label: 'Estable',
+                                            class: 'trend-stable',
+                                        };
+                                    default:
+                                        return {
+                                            icon: '⚫',
+                                            label: 'Sin datos',
+                                            class: 'trend-stable',
+                                        };
+                                }
+                            };
+
+                            const trendInfo = getTrendIndicator(
+                                r.trend || 'stable',
+                            );
+                            const changeText = r.trendChange
+                                ? `${r.trendChange > 0 ? '+' : ''}${r.trendChange.toFixed(1)}%`
+                                : '';
+
+                            return `
                     <tr>
                         <td><strong>${r.name}</strong></td>
                         <td class="avg-time">${r.avg.toFixed(2)}ms</td>
@@ -477,9 +553,16 @@ ${report.results.map(r => `| ${r.name} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2
                         <td>${r.max.toFixed(2)}ms</td>
                         <td class="success-rate">${(r.successRate * 100).toFixed(1)}%</td>
                         <td>${r.runs}</td>
+                        <td>
+                            <span class="trend-indicator ${trendInfo.class}" title="${trendInfo.label}">
+                                ${trendInfo.icon}
+                            </span>
+                            ${trendInfo.label}
+                            ${changeText ? `<span class="trend-change ${trendInfo.class}">(${changeText})</span>` : ''}
+                        </td>
                     </tr>
-                    `,
-                        )
+                    `;
+                        })
                         .join('')}
                 </tbody>
             </table>
