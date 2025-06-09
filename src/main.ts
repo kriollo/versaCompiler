@@ -94,16 +94,25 @@ async function main() {
             default: false, // Por defecto, verbose está deshabilitado
         })
         .alias('v', 'verbose')
-        .option('clean', {
+        .option('cleanOutput', {
             type: 'boolean',
-            description: 'Limpiar la salida antes de compilar',
+            description: 'Limpiar el directorio de salida antes de compilar',
             default: false, // Por defecto, clean está deshabilitado
         })
-        .option('y', {
+        .alias('co', 'cleanOutput')
+        .option('cleanCache', {
             type: 'boolean',
-            description: 'Usar Yarn en lugar de npm',
-            default: false,
+            description: 'Limpiar el cache de compilación antes de compilar',
+            default: false, // Por defecto, clean está deshabilitado
         })
+        .alias('cc', 'cleanCache')
+        .option('yes', {
+            type: 'boolean',
+            description:
+                'Confirmar automáticamente las acciones que requieren confirmación',
+            default: false, // Por defecto, no se confirma automáticamente
+        })
+        .alias('y', 'yes')
         .option('typeCheck', {
             type: 'boolean',
             description:
@@ -138,7 +147,8 @@ async function main() {
         file?: string;
         prod?: boolean;
         verbose?: boolean;
-        clean?: boolean;
+        cleanOutput?: boolean;
+        cleanCache?: boolean;
         y?: boolean;
         typeCheck?: boolean;
         tailwind?: boolean;
@@ -208,15 +218,15 @@ async function main() {
         logger.info(chalk.green(`Minification: ${env.isPROD}`));
         logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}`));
         logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
-        logger.info(chalk.green(`Clean: ${argv.clean}`));
+        logger.info(chalk.green(`Clean Output: ${argv.cleanOutput}`));
+        logger.info(chalk.green(`Clean Cache: ${argv.cleanCache}`));
         logger.info(chalk.green(`Type Check: ${argv.typeCheck}`));
         logger.log(`\n`);
         env.typeCheck = argv.typeCheck ? 'true' : 'false';
 
-        env.clean = 'false';
+        env.cleanCache = argv.cleanCache ? 'true' : 'false';
         env.yes = argv.y ? 'true' : 'false';
-        if (argv.clean) {
-            env.clean = 'true';
+        if (argv.cleanOutput) {
             const { cleanOutputDir } = await loadChokidarModule();
             await cleanOutputDir(env.PATH_DIST || './dist');
         }
