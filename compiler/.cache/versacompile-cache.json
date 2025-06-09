@@ -1,17 +1,17 @@
 {
-  "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\simple.js": {
-    "hash": "",
-    "mtime": 1749479949324.1484,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js"
-  },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\Component.vue": {
     "hash": "",
-    "mtime": 1749479949325.6567,
+    "mtime": 1749499137722.9268,
     "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/Component.js"
+  },
+  "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\simple.js": {
+    "hash": "",
+    "mtime": 1749499137718.413,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js"
   },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\AdvancedComponent.vue": {
     "hash": "",
-    "mtime": 1749479949327.6748,
+    "mtime": 1749499137728.1292,
     "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/AdvancedComponent.js"
   }
 }

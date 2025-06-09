@@ -42,7 +42,7 @@ describe('getModulePath - Resolución de módulos', () => {
             if (result) {
                 expect(typeof result).toBe('string');
                 expect(result).toMatch(/\/node_modules/);
-                expect(result).toMatch(/\.js$/);
+                expect(result).toMatch(/\.(js|cjs)$/); // Acepta tanto .js como .cjs
                 expect(result).toMatch(/^(\/|\.\.\/)/); // Puede empezar con / o ../
             }
         }

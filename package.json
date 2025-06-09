@@ -89,6 +89,7 @@
         "oxlint": "^0.17.0",
         "prettier": "3.5.3",
         "rimraf": "^6.0.1",
+        "sweetalert2": "^11.22.0",
         "tailwindcss": "^4.1.8",
         "ts-jest": "^29.3.4",
         "tsx": "^4.19.4",
