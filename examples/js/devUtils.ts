@@ -1,5 +1,13 @@
 import { html } from 'code-tag';
 
+const loadSwallCss = () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'P@/vendor/sweetalert2/sweetalert2.dark.min.css';
+    document.head.appendChild(link);
+};
+// loadSwallCss();
+
 /**
  * Sanitize the module path to prevent directory traversal attacks.
  * @param {string} module - The module path to sanitize.

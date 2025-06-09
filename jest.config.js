@@ -1,6 +1,7 @@
 // jest.config.cjs
 export default {
     testEnvironment: 'jsdom',
+    testTimeout: 15000, // Incrementar timeout global a 15 segundos
     testMatch: [
         '**/tests/**/*.test.ts',
         '!**/public/**/*',

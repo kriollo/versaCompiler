@@ -38,6 +38,7 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
         "types": ["jest", "node"]
     },
     "include": ["tests/**/*", "src/**/*", "examples/**/*"],

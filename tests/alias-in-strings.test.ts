@@ -35,10 +35,9 @@ const loadSwallCss = () => {
         const result = await estandarizaCode(inputCode, 'test.js');
 
         console.log('Código transformado:', result.code);
-
         expect(result.error).toBeNull();
         expect(result.code).toContain(
-            '/dist/vendor/sweetalert2/sweetalert2.dark.min.css',
+            '/public/vendor/sweetalert2/sweetalert2.dark.min.css',
         );
         expect(result.code).not.toContain('P@/vendor');
     });
@@ -52,10 +51,9 @@ const stylePath = '@/styles/main.css';
         const result = await estandarizaCode(inputCode, 'test.js');
 
         console.log('Código con @ transformado:', result.code);
-
         expect(result.error).toBeNull();
-        expect(result.code).toContain('/dist/assets/images/logo.png');
-        expect(result.code).toContain('/dist/styles/main.css');
+        expect(result.code).toContain('/src/assets/images/logo.png');
+        expect(result.code).toContain('/src/styles/main.css');
         expect(result.code).not.toContain('@/assets');
         expect(result.code).not.toContain('@/styles');
     });
@@ -70,11 +68,10 @@ const backtick = \`P@/vendor/template.html\`;
         const result = await estandarizaCode(inputCode, 'test.js');
 
         console.log('Diferentes comillas transformadas:', result.code);
-
         expect(result.error).toBeNull();
-        expect(result.code).toContain('/dist/vendor/style.css');
-        expect(result.code).toContain('/dist/vendor/script.js');
-        expect(result.code).toContain('/dist/vendor/template.html');
+        expect(result.code).toContain('/public/vendor/style.css');
+        expect(result.code).toContain('/public/vendor/script.js');
+        expect(result.code).toContain('/public/vendor/template.html');
         expect(result.code).not.toContain('P@/vendor');
     });
 
@@ -86,10 +83,42 @@ const relativeString = './relative/path/file.png';
 `;
 
         const result = await estandarizaCode(inputCode, 'test.js');
-
         expect(result.error).toBeNull();
         expect(result.code).toContain('normal/path/file.css');
         expect(result.code).toContain('/absolute/path/file.js');
         expect(result.code).toContain('./relative/path/file.png');
+    });
+
+    test('Debug: P@ alias duplicación', async () => {
+        // Configuración exacta como en versacompile.config.ts
+        env.PATH_ALIAS = JSON.stringify({
+            '@/*': ['examples/*'],
+            'P@/*': ['public/*'],
+            'e@/*': ['examples/*'],
+        });
+        env.PATH_DIST = 'public';
+        env.VERBOSE = 'true';
+
+        const code = `const loadSwallCss = () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'P@/vendor/sweetalert2/sweetalert2.dark.min.css';
+    document.head.appendChild(link);
+};`;
+
+        console.log('\n🔍 DEBUG - Configuración:');
+        console.log('PATH_ALIAS:', env.PATH_ALIAS);
+        console.log('PATH_DIST:', env.PATH_DIST);
+        console.log('\n📝 DEBUG - Código original:');
+        console.log(code);
+
+        const result = await estandarizaCode(code, 'test-debug.js');
+
+        console.log('\n✅ DEBUG - Código transformado:');
+        console.log(result.code);
+
+        // Verificar que no hay duplicación
+        expect(result.code).not.toContain('/public/public/');
+        expect(result.code).toContain('/public/vendor/');
     });
 });
