@@ -61,7 +61,7 @@ export class TypeScriptWorkerManager {
     private taskCounter: number = 0;
     private workerReady: boolean = false;
     private initPromise: Promise<void> | null = null;
-      // Configuración del worker
+    // Configuración del worker
     private readonly WORKER_TIMEOUT = 30000; // 30 segundos timeout (incrementado)
     private readonly MAX_RETRY_ATTEMPTS = 2;
 
@@ -100,7 +100,7 @@ export class TypeScriptWorkerManager {
 
         this.initPromise = this._performWorkerInitialization();
         return this.initPromise;
-    }    /**
+    } /**
      * Realiza la inicialización del worker thread
      */
     private async _performWorkerInitialization(): Promise<void> {
@@ -113,7 +113,7 @@ export class TypeScriptWorkerManager {
             );
 
             // console.log('[WorkerManager] Inicializando worker en:', workerPath);
-            
+
             // Crear el worker thread sin tsx para evitar dependencias externas
             this.worker = new Worker(workerPath, {
                 env: {
@@ -199,15 +199,15 @@ export class TypeScriptWorkerManager {
             console.error('[WorkerManager] Error en worker thread:', error);
             this.handleWorkerError(error);
         });
-        
+
         this.worker.on('exit', code => {
             console.warn(
                 '[WorkerManager] Worker thread cerrado con código:',
                 code,
             );
             this.workerReady = false;
-              // Rechazar todas las tareas pendientes
-            this.pendingTasks.forEach((task) => {
+            // Rechazar todas las tareas pendientes
+            this.pendingTasks.forEach(task => {
                 clearTimeout(task.timeout);
                 task.reject(
                     new Error(
@@ -217,7 +217,7 @@ export class TypeScriptWorkerManager {
             });
             this.pendingTasks.clear();
         });
-    }    /**
+    } /**
      * Espera a que el worker esté listo para recibir tareas
      */
     private async waitForWorkerReady(): Promise<void> {
@@ -247,8 +247,8 @@ export class TypeScriptWorkerManager {
      */
     private handleWorkerError(error: Error): void {
         console.error('[WorkerManager] Manejando error del worker:', error);
-          // Rechazar todas las tareas pendientes
-        this.pendingTasks.forEach((task) => {
+        // Rechazar todas las tareas pendientes
+        this.pendingTasks.forEach(task => {
             clearTimeout(task.timeout);
             task.reject(new Error(`Error en worker: ${error.message}`));
         });
@@ -263,7 +263,7 @@ export class TypeScriptWorkerManager {
      */
     private generateTaskId(): string {
         return `task-${++this.taskCounter}-${Date.now()}`;
-    }    /**
+    } /**
      * Realiza type checking usando el worker thread (con fallback síncrono)
      * @param fileName - Nombre del archivo TypeScript
      * @param content - Contenido del archivo
@@ -286,13 +286,19 @@ export class TypeScriptWorkerManager {
 
         try {
             // Intentar usar el worker thread con timeout más corto
-            const workerPromise = this.typeCheckWithWorker(fileName, content, compilerOptions);
-            const timeoutPromise = new Promise<TypeCheckResult>((resolve, reject) => {
-                setTimeout(() => {
-                    reject(new Error('Worker timeout - usando fallback'));
-                }, 5000); // 5 segundos max para worker
-            });
-            
+            const workerPromise = this.typeCheckWithWorker(
+                fileName,
+                content,
+                compilerOptions,
+            );
+            const timeoutPromise = new Promise<TypeCheckResult>(
+                (resolve, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Worker timeout - usando fallback'));
+                    }, 5000); // 5 segundos max para worker
+                },
+            );
+
             return await Promise.race([workerPromise, timeoutPromise]);
         } catch (workerError) {
             const errorMessage =
@@ -406,8 +412,8 @@ export class TypeScriptWorkerManager {
     async terminate(): Promise<void> {
         if (this.worker) {
             // console.log('[WorkerManager] Cerrando worker thread...');
-              // Rechazar todas las tareas pendientes
-            this.pendingTasks.forEach((task) => {
+            // Rechazar todas las tareas pendientes
+            this.pendingTasks.forEach(task => {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker manager cerrado'));
             });

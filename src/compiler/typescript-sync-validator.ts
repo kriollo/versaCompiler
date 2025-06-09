@@ -231,7 +231,8 @@ export const validateTypesWithLanguageService = (
                         ) &&
                         !messageText.includes(
                             "Parameter '_ctx' implicitly has an 'any' type",
-                        ) &&                        !messageText.includes(
+                        ) &&
+                        !messageText.includes(
                             "Parameter '_cache' implicitly has an 'any' type",
                         ) &&
                         // Ignorar errores específicos de decorators cuando están mal configurados
@@ -243,7 +244,7 @@ export const validateTypesWithLanguageService = (
                         ) &&
                         // Ignorar errores TS7031 (binding element implicitly has any type)
                         diag.code !== 7031 &&
-                        // Ignorar errores TS7006 (parameter implicitly has any type) 
+                        // Ignorar errores TS7006 (parameter implicitly has any type)
                         diag.code !== 7006 &&
                         // Ignorar errores TS1241 (decorator signature mismatch) durante desarrollo
                         diag.code !== 1241 &&

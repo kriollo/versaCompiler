@@ -58,8 +58,12 @@ class WorkerTypeScriptLanguageServiceHost {
                 : ['es2020', 'dom', 'dom.iterable'],
 
             // Soporte para decorators
-            experimentalDecorators: Boolean(options.experimentalDecorators !== false),
-            emitDecoratorMetadata: Boolean(options.emitDecoratorMetadata !== false),
+            experimentalDecorators: Boolean(
+                options.experimentalDecorators !== false,
+            ),
+            emitDecoratorMetadata: Boolean(
+                options.emitDecoratorMetadata !== false,
+            ),
 
             // Opciones críticas para el worker pero manteniendo compatibilidad
             noLib: false, // Permitir librerías para APIs básicas (DOM, Promise, etc.)
@@ -275,7 +279,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                 // Solo errores de categoría Error
                 if (diag.category !== ts.DiagnosticCategory.Error) {
                     return false;
-                }                // Ignorar SOLO errores específicos de infraestructura Vue y rutas de módulos
+                } // Ignorar SOLO errores específicos de infraestructura Vue y rutas de módulos
                 return (
                     !messageText.includes('Cannot find module') &&
                     !messageText.includes('Could not find source file') &&
@@ -296,7 +300,8 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     ) &&
                     !messageText.includes(
                         "Parameter '_ctx' implicitly has an 'any' type",
-                    ) &&                    !messageText.includes(
+                    ) &&
+                    !messageText.includes(
                         "Parameter '_cache' implicitly has an 'any' type",
                     ) &&
                     // Ignorar errores específicos de decorators cuando están mal configurados
@@ -308,7 +313,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     ) &&
                     // Ignorar errores TS7031 (binding element implicitly has any type)
                     diag.code !== 7031 &&
-                    // Ignorar errores TS7006 (parameter implicitly has any type) 
+                    // Ignorar errores TS7006 (parameter implicitly has any type)
                     diag.code !== 7006 &&
                     // Ignorar errores TS1241 (decorator signature mismatch) durante desarrollo
                     diag.code !== 1241 &&
