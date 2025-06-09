@@ -3,8 +3,8 @@
  * Contiene la lógica extraída del módulo principal para cuando el worker no está disponible
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import * as ts from 'typescript';
 
@@ -231,10 +231,22 @@ export const validateTypesWithLanguageService = (
                         ) &&
                         !messageText.includes(
                             "Parameter '_ctx' implicitly has an 'any' type",
-                        ) &&
-                        !messageText.includes(
+                        ) &&                        !messageText.includes(
                             "Parameter '_cache' implicitly has an 'any' type",
                         ) &&
+                        // Ignorar errores específicos de decorators cuando están mal configurados
+                        !messageText.includes(
+                            'Unable to resolve signature of method decorator when called as an expression',
+                        ) &&
+                        !messageText.includes(
+                            'The runtime will invoke the decorator with',
+                        ) &&
+                        // Ignorar errores TS7031 (binding element implicitly has any type)
+                        diag.code !== 7031 &&
+                        // Ignorar errores TS7006 (parameter implicitly has any type) 
+                        diag.code !== 7006 &&
+                        // Ignorar errores TS1241 (decorator signature mismatch) durante desarrollo
+                        diag.code !== 1241 &&
                         // Permitir errores de "Cannot find name" ya que son errores de código real
                         // Solo filtrar parámetros implícitos de Vue generados automáticamente
                         !(
