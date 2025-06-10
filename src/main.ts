@@ -116,8 +116,8 @@ async function main() {
         .option('typeCheck', {
             type: 'boolean',
             description:
-                'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=true',
-            default: true,
+                'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=false',
+            default: false,
         })
         .alias('t', 'typeCheck');
 

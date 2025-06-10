@@ -8,7 +8,7 @@ import {
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { env } from 'node:process';
+import { cwd, env, stdout } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
@@ -319,7 +319,7 @@ interface CacheEntry {
 
 const compilationCache = new Map<string, CacheEntry>();
 const CACHE_DIR = path.join(
-    path.resolve(env.PATH_PROY || process.cwd(), 'compiler'),
+    path.resolve(env.PATH_PROY || cwd(), 'compiler'),
     '.cache',
 );
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
@@ -1380,7 +1380,7 @@ async function compileWithConcurrencyLimit(
             progressPercent > lastProgressUpdate + 1 ||
             currentTotal === total
         ) {
-            process.stdout.write(
+            stdout.write(
                 `\r🚀 ${progressBar} [✅ ${completed} | ⏭️ ${skipped} | ❌ ${failed}]`,
             );
             lastProgressUpdate = progressPercent;

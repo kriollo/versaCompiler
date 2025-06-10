@@ -60,10 +60,10 @@ export class TypeScriptWorkerManager {
     private pendingTasks: Map<string, PendingTask> = new Map();
     private taskCounter: number = 0;
     private workerReady: boolean = false;
-    private initPromise: Promise<void> | null = null; // Configuración del worker
-    private readonly WORKER_TIMEOUT = 45000; // 45 segundos timeout (incrementado para manejar concurrencia)
+    private initPromise: Promise<void> | null = null; // Configuración del worker    private readonly WORKER_TIMEOUT = 45000; // 45 segundos timeout (incrementado para manejar concurrencia)
     private readonly MAX_RETRY_ATTEMPTS = 2;
-    private readonly MAX_CONCURRENT_TASKS = 10; // Limitar tareas concurrentes
+    private readonly MAX_CONCURRENT_TASKS = 20; // Aumentar límite de tareas concurrentes
+    private readonly TASK_TIMEOUT = 15000; // 15 segundos timeout por tarea individual
 
     // NUEVOS: Gestión de modo y estado para optimización
     private currentMode: 'individual' | 'batch' | 'watch' | null = null;
@@ -336,7 +336,7 @@ export class TypeScriptWorkerManager {
         }
         try {
             console.log('[WorkerManager] 🚀 Intentando usar worker thread...');
-            // Intentar usar el worker thread con timeout más corto
+            // Intentar usar el worker thread con timeout más realista
             const workerPromise = this.typeCheckWithWorker(
                 fileName,
                 content,
@@ -349,7 +349,7 @@ export class TypeScriptWorkerManager {
                             '[WorkerManager] ⏰ Worker timeout, usando fallback',
                         );
                         reject(new Error('Worker timeout - usando fallback'));
-                    }, 5000); // 5 segundos max para worker
+                    }, this.TASK_TIMEOUT); // Usar timeout por tarea más realista
                 },
             );
 
@@ -392,13 +392,11 @@ export class TypeScriptWorkerManager {
         }
 
         return new Promise<TypeCheckResult>((resolve, reject) => {
-            const taskId = this.generateTaskId();
-
-            // Configurar timeout para la tarea
+            const taskId = this.generateTaskId(); // Configurar timeout para la tarea
             const timeout = setTimeout(() => {
                 this.pendingTasks.delete(taskId);
                 reject(new Error(`Timeout en type checking para ${fileName}`));
-            }, this.WORKER_TIMEOUT);
+            }, this.TASK_TIMEOUT);
 
             // Agregar tarea a la lista de pendientes
             this.pendingTasks.set(taskId, {
