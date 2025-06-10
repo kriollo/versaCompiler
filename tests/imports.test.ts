@@ -507,11 +507,10 @@ const dynamicRelative = await import('./modules/loader.vue');
             expect(result.code).toContain("'/public/utils/runtime.js'"); // dinámico alias
             expect(result.code).toContain("'./modules/loader.js'"); // dinámico relativo
         });
-
         test('debe manejar casos del mundo real como main.ts', async () => {
             const inputCode = `
 import { browserSyncServer } from './servicios/browserSync';
-import { initChokidar } from './servicios/chokidar';
+import { initChokidar } from './servicios/file-watcher';
 import { logger } from './servicios/logger';
 `;
             const result = await estandarizaCode(inputCode, 'main.ts');

@@ -17,8 +17,10 @@ jest.mock('../src/compiler/vuejs', () => {
 });
 
 // Mock tsCompiler
-jest.mock('../src/compiler/typescript', () => {
-    const actualTsCompiler = jest.requireActual('../src/compiler/typescript');
+jest.mock('../src/compiler/typescript-manager', () => {
+    const actualTsCompiler = jest.requireActual(
+        '../src/compiler/typescript-manager',
+    );
     preCompileTSSpy = jest.spyOn(actualTsCompiler, 'preCompileTS');
     return {
         __esModule: true,
