@@ -1,3 +1,5 @@
+import * as process from 'node:process';
+
 class Logger {
     constructor() {
         // Bind console methods

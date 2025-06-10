@@ -1041,12 +1041,6 @@ async function compileJS(
     await mkdir(destinationDir, { recursive: true });
     await writeFile(outPath, code, 'utf-8');
 
-    if (env.VERBOSE === 'true') {
-        logger.info(
-            `\n📊 Timings para ${path.basename(inPath)}:`,
-            JSON.stringify(timings),
-        );
-    }
     return {
         error: null,
         action: 'extension',

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import * as process from 'node:process';
 import { env } from 'node:process';
 
-import * as ts from 'typescript';
+import * as TypeScript from 'typescript';
 
 import {
     createUnifiedErrorMessage,
@@ -17,43 +18,47 @@ interface CompileResult {
 }
 
 interface TypeCheckResult {
-    diagnostics: ts.Diagnostic[];
+    diagnostics: TypeScript.Diagnostic[];
     hasErrors: boolean;
 }
 
 /**
  * Cache para la configuración de TypeScript para evitar lecturas repetidas
  */
-let configCache: { path?: string; options?: ts.CompilerOptions } = {};
+let configCache: { path?: string; options?: TypeScript.CompilerOptions } = {};
 
 /**
  * Carga la configuración de TypeScript desde tsconfig.json
  * @param fileName - Nombre del archivo para buscar el tsconfig.json relativo
  * @returns Opciones del compilador TypeScript
  */
-export const loadTypeScriptConfig = (fileName: string): ts.CompilerOptions => {
+export const loadTypeScriptConfig = (
+    fileName: string,
+): TypeScript.CompilerOptions => {
     const fileDir = path.dirname(fileName);
     const configPath =
-        ts.findConfigFile(fileDir, ts.sys.fileExists, 'tsconfig.json') ||
-        path.resolve(process.cwd(), 'tsconfig.json');
+        TypeScript.findConfigFile(
+            fileDir,
+            TypeScript.sys.fileExists,
+            'tsconfig.json',
+        ) || path.resolve(process.cwd(), 'tsconfig.json');
 
     // Usar cache si el path no ha cambiado
     if (configCache.path === configPath && configCache.options) {
         return configCache.options;
     }
-
-    let compilerOptions: ts.CompilerOptions;
+    let compilerOptions: TypeScript.CompilerOptions;
 
     if (configPath && fs.existsSync(configPath)) {
         try {
-            const { config, error: configError } = ts.readConfigFile(
+            const { config, error: configError } = TypeScript.readConfigFile(
                 configPath,
-                ts.sys.readFile,
+                TypeScript.sys.readFile,
             );
             if (!configError) {
-                const parsedConfig = ts.parseJsonConfigFileContent(
+                const parsedConfig = TypeScript.parseJsonConfigFileContent(
                     config,
-                    ts.sys,
+                    TypeScript.sys,
                     path.dirname(configPath),
                 );
                 compilerOptions = {
@@ -93,9 +98,9 @@ export const loadTypeScriptConfig = (fileName: string): ts.CompilerOptions => {
 /**
  * Obtiene las opciones por defecto del compilador TypeScript
  */
-const getDefaultCompilerOptions = (): ts.CompilerOptions => ({
-    target: ts.ScriptTarget.ES2020,
-    module: ts.ModuleKind.ES2020,
+const getDefaultCompilerOptions = (): TypeScript.CompilerOptions => ({
+    target: TypeScript.ScriptTarget.ES2020,
+    module: TypeScript.ModuleKind.ES2020,
     lib: ['es2020', 'dom', 'dom.iterable'],
     strict: false,
     skipLibCheck: true,
@@ -111,12 +116,12 @@ const getDefaultCompilerOptions = (): ts.CompilerOptions => ({
  * @returns Opciones serializables seguras para workers
  */
 const createSerializableCompilerOptions = (
-    options: ts.CompilerOptions,
+    options: TypeScript.CompilerOptions,
 ): Record<string, any> => {
     // Usar las opciones del tsconfig.json pero con optimizaciones para el worker
     const {
-        target = ts.ScriptTarget.ES2020,
-        module = ts.ModuleKind.ES2020,
+        target = TypeScript.ScriptTarget.ES2020,
+        module = TypeScript.ModuleKind.ES2020,
         lib = ['es2020', 'dom', 'dom.iterable'],
         allowJs = true,
         jsx,
@@ -148,13 +153,13 @@ const createSerializableCompilerOptions = (
 /**
  * Crea un Language Service Host optimizado para validación de tipos eficiente.
  */
-class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
+class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
     private files: Map<string, { version: number; content: string }> =
         new Map();
-    private compilerOptions: ts.CompilerOptions;
+    private compilerOptions: TypeScript.CompilerOptions;
     private fileSystemCache: Map<string, string | undefined> = new Map();
 
-    constructor(compilerOptions: ts.CompilerOptions) {
+    constructor(compilerOptions: TypeScript.CompilerOptions) {
         this.compilerOptions = compilerOptions;
     }
 
@@ -166,7 +171,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
         });
     }
 
-    getCompilationSettings(): ts.CompilerOptions {
+    getCompilationSettings(): TypeScript.CompilerOptions {
         return this.compilerOptions;
     }
 
@@ -178,18 +183,19 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
         const file = this.files.get(fileName);
         return file ? file.version.toString() : '0';
     }
-
-    getScriptSnapshot(fileName: string): ts.IScriptSnapshot | undefined {
+    getScriptSnapshot(
+        fileName: string,
+    ): TypeScript.IScriptSnapshot | undefined {
         const file = this.files.get(fileName);
         if (file) {
-            return ts.ScriptSnapshot.fromString(file.content);
+            return TypeScript.ScriptSnapshot.fromString(file.content);
         }
 
         // Cache de sistema de archivos para evitar lecturas repetidas
         if (this.fileSystemCache.has(fileName)) {
             const cachedContent = this.fileSystemCache.get(fileName);
             return cachedContent
-                ? ts.ScriptSnapshot.fromString(cachedContent)
+                ? TypeScript.ScriptSnapshot.fromString(cachedContent)
                 : undefined;
         }
 
@@ -198,7 +204,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
             if (fs.existsSync(fileName)) {
                 const content = fs.readFileSync(fileName, 'utf-8');
                 this.fileSystemCache.set(fileName, content);
-                return ts.ScriptSnapshot.fromString(content);
+                return TypeScript.ScriptSnapshot.fromString(content);
             }
         } catch {
             // Error al leer archivo
@@ -212,8 +218,8 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
         return process.cwd();
     }
 
-    getDefaultLibFileName(options: ts.CompilerOptions): string {
-        return ts.getDefaultLibFilePath(options);
+    getDefaultLibFileName(options: TypeScript.CompilerOptions): string {
+        return TypeScript.getDefaultLibFilePath(options);
     }
 
     fileExists(path: string): boolean {
@@ -249,9 +255,8 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
         this.fileSystemCache.set(path, undefined);
         return undefined;
     }
-
     getNewLine(): string {
-        return ts.sys.newLine;
+        return TypeScript.sys.newLine;
     }
 }
 
@@ -265,7 +270,7 @@ class TypeScriptLanguageServiceHost implements ts.LanguageServiceHost {
 const validateTypesWithLanguageService = (
     fileName: string,
     content: string,
-    compilerOptions: ts.CompilerOptions,
+    compilerOptions: TypeScript.CompilerOptions,
 ): TypeCheckResult => {
     try {
         // Validación temprana: contenido vacío
@@ -307,10 +312,8 @@ export {};`;
             host.addFile(vueTypesPath, vueTypesDeclaration);
         } else {
             host.addFile(actualFileName, content);
-        }
-
-        // Crear Language Service
-        const languageService = ts.createLanguageService(host);
+        } // Crear Language Service
+        const languageService = TypeScript.createLanguageService(host);
 
         // Verificar existencia del archivo
         if (!host.fileExists(actualFileName)) {
@@ -318,7 +321,7 @@ export {};`;
         }
 
         // Obtener diagnósticos con manejo de errores optimizado
-        const allDiagnostics: ts.Diagnostic[] = [];
+        const allDiagnostics: TypeScript.Diagnostic[] = [];
 
         try {
             allDiagnostics.push(
@@ -330,13 +333,12 @@ export {};`;
         } catch {
             // Ignorar errores de diagnósticos
             return { diagnostics: [], hasErrors: false };
-        }
-
-        // Filtrado optimizado de diagnósticos
+        } // Filtrado optimizado de diagnósticos
         const filteredDiagnostics = allDiagnostics.filter(diag => {
-            if (diag.category !== ts.DiagnosticCategory.Error) return false;
+            if (diag.category !== TypeScript.DiagnosticCategory.Error)
+                return false;
 
-            const messageText = ts.flattenDiagnosticMessageText(
+            const messageText = TypeScript.flattenDiagnosticMessageText(
                 diag.messageText,
                 '\n',
             );
@@ -369,7 +371,7 @@ export {};`;
                     start: undefined,
                     length: undefined,
                     messageText: `Error en validación de tipos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
-                    category: ts.DiagnosticCategory.Error,
+                    category: TypeScript.DiagnosticCategory.Error,
                     code: 0,
                 },
             ],
@@ -413,10 +415,8 @@ export const preCompileTS = async (
         }
 
         // Cargar configuración de TypeScript desde tsconfig.json
-        const compilerOptions = loadTypeScriptConfig(fileName);
-
-        // PASO 1: Transpilación rápida con detección de errores críticos
-        const transpileResult = ts.transpileModule(data, {
+        const compilerOptions = loadTypeScriptConfig(fileName); // PASO 1: Transpilación rápida con detección de errores críticos
+        const transpileResult = TypeScript.transpileModule(data, {
             compilerOptions: {
                 ...compilerOptions,
                 noLib: true,
@@ -432,22 +432,25 @@ export const preCompileTS = async (
 
         // Verificar errores críticos de sintaxis
         if (transpileResult.diagnostics?.length) {
-            const criticalErrors = transpileResult.diagnostics.filter(diag => {
-                if (diag.category !== ts.DiagnosticCategory.Error) return false;
+            const criticalErrors = transpileResult.diagnostics.filter(
+                (diag: TypeScript.Diagnostic) => {
+                    if (diag.category !== TypeScript.DiagnosticCategory.Error)
+                        return false;
 
-                const messageText = ts.flattenDiagnosticMessageText(
-                    diag.messageText,
-                    '\n',
-                );
+                    const messageText = TypeScript.flattenDiagnosticMessageText(
+                        diag.messageText,
+                        '\n',
+                    );
 
-                // Ignorar errores de módulo no encontrado
-                return (
-                    !messageText.includes('Cannot find module') &&
-                    !messageText.includes('Could not find source file') &&
-                    diag.code !== 2307 &&
-                    diag.code !== 6059
-                );
-            });
+                    // Ignorar errores de módulo no encontrado
+                    return (
+                        !messageText.includes('Cannot find module') &&
+                        !messageText.includes('Could not find source file') &&
+                        diag.code !== 2307 &&
+                        diag.code !== 6059
+                    );
+                },
+            );
 
             if (criticalErrors.length > 0) {
                 const errorMessage = createUnifiedErrorMessage(

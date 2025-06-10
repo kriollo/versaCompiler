@@ -34,15 +34,13 @@ export function parseTypeScriptErrors(
             diagnostic,
             fileName,
             sourceCode,
-        );
-
-        // Determinar la severidad
+        ); // Determinar la severidad
         let severity: 'error' | 'warning' | 'info';
         switch (diagnostic.category) {
-            case ts.DiagnosticCategory.Error:
+            case TypeScript.DiagnosticCategory.Error:
                 severity = 'error';
                 break;
-            case ts.DiagnosticCategory.Warning:
+            case TypeScript.DiagnosticCategory.Warning:
                 severity = 'warning';
                 break;
             default:
@@ -101,7 +99,7 @@ function cleanErrorMessage(message: string): string {
  * Mejora significativamente el mensaje de error TypeScript con contexto visual
  */
 function enhanceErrorMessage(
-    diagnostic: ts.Diagnostic,
+    diagnostic: TypeScript.Diagnostic,
     fileName: string,
     sourceCode?: string,
 ): string {
@@ -109,7 +107,10 @@ function enhanceErrorMessage(
     const message =
         typeof diagnostic.messageText === 'string'
             ? diagnostic.messageText
-            : ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+            : TypeScript.flattenDiagnosticMessageText(
+                  diagnostic.messageText,
+                  '\n',
+              );
 
     let enhancedMessage = cleanErrorMessage(message); // Información de ubicación
     let location = `Código TS${diagnostic.code}`;
@@ -321,7 +322,7 @@ export function createUnifiedErrorMessage(
  * Crea un mensaje de error simplificado para modo normal
  */
 export function createSimpleErrorMessage(
-    diagnostics: ts.Diagnostic[],
+    diagnostics: TypeScript.Diagnostic[],
     _fileName: string,
 ): string {
     if (diagnostics.length === 0) return '';
@@ -329,7 +330,7 @@ export function createSimpleErrorMessage(
     const firstDiagnostic = diagnostics[0];
     if (!firstDiagnostic) return '';
 
-    const message = ts.flattenDiagnosticMessageText(
+    const message = TypeScript.flattenDiagnosticMessageText(
         firstDiagnostic.messageText,
         '\n',
     );
@@ -362,7 +363,7 @@ export function createSimpleErrorMessage(
  * Crea un mensaje de error detallado para modo verbose
  */
 export function createDetailedErrorMessage(
-    diagnostics: ts.Diagnostic[],
+    diagnostics: TypeScript.Diagnostic[],
     fileName: string,
     sourceCode?: string,
 ): string {
@@ -378,7 +379,7 @@ export function createDetailedErrorMessage(
  * Registra errores de TypeScript en el inventario usando el parser limpio
  */
 export function registerCleanTypeScriptErrors(
-    diagnostics: ts.Diagnostic[],
+    diagnostics: TypeScript.Diagnostic[],
     fileName: string,
     registerInventoryError: (
         file: string,

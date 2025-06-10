@@ -526,12 +526,6 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                         .replace('/*', '');
                     const normalizedPathDist = pathDist.replace('./', '');
 
-                    if (env.VERBOSE === 'true') {
-                        console.log(
-                            `  🔍 Ruta relativa: cleanTarget="${cleanTarget}", normalizedPathDist="${normalizedPathDist}"`,
-                        );
-                    }
-
                     if (cleanTarget === normalizedPathDist) {
                         // Si el target es el mismo que PATH_DIST, no duplicar
                         newPath = path.join(
@@ -552,11 +546,6 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                             cleanTarget,
                             relativePath,
                         );
-                        if (env.VERBOSE === 'true') {
-                            console.log(
-                                `  ✅ Con PATH_DIST: newPath="${newPath}"`,
-                            );
-                        }
                     }
                 }
 
@@ -583,12 +572,6 @@ async function replaceAliasInStrings(code: string): Promise<string> {
             const specificRegex = new RegExp(escapedOriginal, 'g');
 
             resultCode = resultCode.replace(specificRegex, newFullMatch);
-
-            if (env.VERBOSE === 'true') {
-                logger.info(
-                    `Alias en string transformado: ${stringContent} -> ${newStringContent}`,
-                );
-            }
         }
     }
 

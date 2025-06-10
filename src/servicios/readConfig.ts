@@ -1,4 +1,5 @@
 import { normalize, relative, resolve } from 'node:path';
+import * as process from 'node:process';
 import { env } from 'node:process';
 import { pathToFileURL } from 'node:url';
 

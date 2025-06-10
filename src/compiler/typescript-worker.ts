@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import * as process from 'node:process';
 import { Worker } from 'node:worker_threads';
 
-import * as ts from 'typescript';
+import * as TypeScript from 'typescript';
 
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 
@@ -15,7 +15,7 @@ import { validateTypesWithLanguageService } from './typescript-sync-validator';
  * Resultado de la validación de tipos
  */
 interface TypeCheckResult {
-    diagnostics: ts.Diagnostic[];
+    diagnostics: TypeScript.Diagnostic[];
     hasErrors: boolean;
 }
 
@@ -35,7 +35,7 @@ interface WorkerMessage {
 interface WorkerResponse {
     id: string;
     success: boolean;
-    diagnostics?: ts.Diagnostic[];
+    diagnostics?: TypeScript.Diagnostic[];
     hasErrors?: boolean;
     error?: string;
     message?: string;
@@ -47,7 +47,7 @@ interface WorkerResponse {
 interface PendingTask {
     resolve: (result: TypeCheckResult) => void;
     reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
+    timeout: ReturnType<typeof setTimeout>;
 }
 
 /**

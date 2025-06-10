@@ -493,7 +493,7 @@ function simpleESMResolver(moduleName: string): string | null {
                     if (env.VERBOSE === 'true')
                         logger.info(
                             `Módulo ${moduleName} usa imports privados:`,
-                            privateImports.map(m => m[1]),
+                            privateImports.map((m: RegExpMatchArray) => m[1]),
                         );
                     // Si usa imports privados, asegurarnos de que estén disponibles
                     for (const [, importPath] of privateImports) {
@@ -510,11 +510,6 @@ function simpleESMResolver(moduleName: string): string | null {
 
         // Verificar que el archivo existe
         if (!fs.existsSync(finalPath)) {
-            if (env.VERBOSE === 'true')
-                logger.warn(
-                    `⚠️ Archivo no existe: ${finalPath}, buscando alternativas...`,
-                );
-
             // Intentar alternativas comunes
             const alternatives = [
                 entryPoint,
@@ -580,10 +575,6 @@ export function getModulePath(
 ): string | null {
     // Verificar si el módulo está en la lista de excluidos
     if (EXCLUDED_MODULES.has(moduleName)) {
-        // if (env.VERBOSE === 'true')
-        //     logger.info(
-        //         `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
-        //     );
         return null; // Retornar null para mantener la importación original
     }
 
@@ -597,10 +588,6 @@ export function getModuleSubPath(
 ): string | null {
     // Verificar si el módulo está en la lista de excluidos
     if (EXCLUDED_MODULES.has(moduleName)) {
-        if (env.VERBOSE === 'true')
-            logger.info(
-                `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
-            );
         return null; // Retornar null para mantener la importación original
     } // Si contiene '/', es un subpath
     if (moduleName.includes('/')) {

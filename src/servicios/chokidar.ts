@@ -2,7 +2,7 @@ import { readdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
 
-import chokidar from 'chokidar';
+import * as chokidar from 'chokidar';
 
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser.js';
