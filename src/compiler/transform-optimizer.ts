@@ -239,7 +239,7 @@ export class TransformOptimizer {
             default:
                 throw new Error(`Transformación desconocida: ${transform}`);
         }
-    }    /**
+    } /**
      * Aplica transformación TypeScript
      */
     private async applyTypeScriptTransform(
@@ -261,7 +261,7 @@ export class TransformOptimizer {
             map: sourceMap, // Mantener source map existente por ahora
             dependencies: [], // TypeScript puede extraer dependencias en el futuro
         };
-    }    /**
+    } /**
      * Aplica transformación Vue
      */
     private async applyVueTransform(
@@ -282,7 +282,7 @@ export class TransformOptimizer {
             map: sourceMap,
             dependencies: [],
         };
-    }    /**
+    } /**
      * Aplica transformación de minificación
      */
     private async applyMinifyTransform(

@@ -5,6 +5,10 @@ import { logger } from '../servicios/logger';
 import { getModuleSubPath } from '../utils/module-resolver';
 
 import { analyzeAndFormatMultipleErrors } from './error-reporter';
+import {
+    getOptimizedAliasPath,
+    getOptimizedModulePath,
+} from './module-resolution-optimizer';
 import { parser } from './parser';
 
 // Módulos built-in de Node.js que no deben ser resueltos
@@ -139,20 +143,31 @@ export async function replaceAliasImportStatic(
         if (!moduleRequest) continue; // Skip if moduleRequest is undefined
 
         let newPath: string | null = null;
-        let transformed = false;
-
-        // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
+        let transformed = false; // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
-                const modulePath = getModuleSubPath(moduleRequest, file);
-                if (modulePath === null) {
-                    // Si getModuleSubPath retorna null, significa que es un módulo excluido
-                    // No transformar y continuar con el siguiente import
+                // Usar el sistema optimizado primero
+                const optimizedPath = await getOptimizedModulePath(
+                    moduleRequest,
+                    file,
+                );
+                if (optimizedPath === null) {
+                    // Si el optimizador retorna null, significa que es un módulo excluido
                     continue;
                 }
-                if (modulePath) {
-                    newPath = modulePath;
+                if (optimizedPath) {
+                    newPath = optimizedPath;
                     transformed = true;
+                } else {
+                    // Fallback al sistema anterior
+                    const modulePath = getModuleSubPath(moduleRequest, file);
+                    if (modulePath === null) {
+                        continue;
+                    }
+                    if (modulePath) {
+                        newPath = modulePath;
+                        transformed = true;
+                    }
                 }
             } catch (error) {
                 if (env.VERBOSE === 'true')
@@ -160,46 +175,66 @@ export async function replaceAliasImportStatic(
                         `Error resolviendo módulo ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                     );
             }
-        }
-
-        // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
+        } // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
         if (!transformed) {
-            for (const [alias] of Object.entries(pathAlias)) {
-                const aliasPattern = alias.replace('/*', '');
-                if (moduleRequest.startsWith(aliasPattern)) {
-                    // Reemplazar el alias con la ruta del target
-                    const relativePath = moduleRequest.replace(
-                        aliasPattern,
-                        '',
-                    );
-                    // Para alias que apuntan a la raíz (como @/* -> /src/*),
-                    // solo usamos PATH_DIST + relativePath
-                    let newImportPath = path.join(
-                        '/',
-                        env.PATH_DIST!,
-                        relativePath,
-                    );
+            // Usar el sistema optimizado de alias
+            const aliasPath = getOptimizedAliasPath(moduleRequest);
+            if (aliasPath) {
+                let newImportPath = aliasPath;
 
-                    // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                    newImportPath = newImportPath
-                        .replace(/\/\.\//g, '/')
-                        .replace(/\\/g, '/');
+                // Transformar extensiones
+                if (
+                    newImportPath.endsWith('.ts') ||
+                    newImportPath.endsWith('.vue')
+                ) {
+                    newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
+                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+                    newImportPath += '.js';
+                }
 
-                    if (
-                        newImportPath.endsWith('.ts') ||
-                        newImportPath.endsWith('.vue')
-                    ) {
-                        newImportPath = newImportPath.replace(
-                            /\.(ts|vue)$/,
-                            '.js',
+                newPath = newImportPath;
+                transformed = true;
+            } else {
+                // Fallback al sistema anterior
+                for (const [alias] of Object.entries(pathAlias)) {
+                    const aliasPattern = alias.replace('/*', '');
+                    if (moduleRequest.startsWith(aliasPattern)) {
+                        // Reemplazar el alias con la ruta del target
+                        const relativePath = moduleRequest.replace(
+                            aliasPattern,
+                            '',
                         );
-                    } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
-                        newImportPath += '.js';
-                    }
+                        // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                        // solo usamos PATH_DIST + relativePath
+                        let newImportPath = path.join(
+                            '/',
+                            env.PATH_DIST!,
+                            relativePath,
+                        );
 
-                    newPath = newImportPath;
-                    transformed = true;
-                    break;
+                        // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                        newImportPath = newImportPath
+                            .replace(/\/\.\//g, '/')
+                            .replace(/\\/g, '/');
+
+                        if (
+                            newImportPath.endsWith('.ts') ||
+                            newImportPath.endsWith('.vue')
+                        ) {
+                            newImportPath = newImportPath.replace(
+                                /\.(ts|vue)$/,
+                                '.js',
+                            );
+                        } else if (
+                            !/\.(js|mjs|css|json)$/.test(newImportPath)
+                        ) {
+                            newImportPath += '.js';
+                        }
+
+                        newPath = newImportPath;
+                        transformed = true;
+                        break;
+                    }
                 }
             }
         }
@@ -261,20 +296,31 @@ async function replaceAliasImportDynamic(
         if (!moduleRequest) continue; // Skip if moduleRequest is undefined
 
         let newPath: string | null = null;
-        let transformed = false;
-
-        // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
+        let transformed = false; // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
-                const modulePath = getModuleSubPath(moduleRequest, file);
-                if (modulePath === null) {
-                    // Si getModuleSubPath retorna null, significa que es un módulo excluido
-                    // No transformar y continuar con el siguiente import
+                // Usar el sistema optimizado primero
+                const optimizedPath = await getOptimizedModulePath(
+                    moduleRequest,
+                    file,
+                );
+                if (optimizedPath === null) {
+                    // Si el optimizador retorna null, significa que es un módulo excluido
                     continue;
                 }
-                if (modulePath) {
-                    newPath = modulePath;
+                if (optimizedPath) {
+                    newPath = optimizedPath;
                     transformed = true;
+                } else {
+                    // Fallback al sistema anterior
+                    const modulePath = getModuleSubPath(moduleRequest, file);
+                    if (modulePath === null) {
+                        continue;
+                    }
+                    if (modulePath) {
+                        newPath = modulePath;
+                        transformed = true;
+                    }
                 }
             } catch (error) {
                 if (env.VERBOSE === 'true')
@@ -282,42 +328,66 @@ async function replaceAliasImportDynamic(
                         `Error resolviendo módulo dinámico ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
                     );
             }
-        }
-
-        // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
+        } // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
         if (!transformed) {
-            for (const [alias] of Object.entries(pathAlias)) {
-                const aliasPattern = alias.replace('/*', '');
-                if (moduleRequest.startsWith(aliasPattern)) {
-                    // Reemplazar el alias con la ruta del target
-                    const relativePath = moduleRequest.replace(
-                        aliasPattern,
-                        '',
-                    );
-                    // Para alias que apuntan a la raíz (como @/* -> /src/*),
-                    // solo usamos PATH_DIST + relativePath
-                    let newImportPath = path.join('/', pathDist, relativePath);
+            // Usar el sistema optimizado de alias
+            const aliasPath = getOptimizedAliasPath(moduleRequest);
+            if (aliasPath) {
+                let newImportPath = aliasPath;
 
-                    // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                    newImportPath = newImportPath
-                        .replace(/\/\.\//g, '/')
-                        .replace(/\\/g, '/');
+                // Transformar extensiones
+                if (
+                    newImportPath.endsWith('.ts') ||
+                    newImportPath.endsWith('.vue')
+                ) {
+                    newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
+                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+                    newImportPath += '.js';
+                }
 
-                    if (
-                        newImportPath.endsWith('.ts') ||
-                        newImportPath.endsWith('.vue')
-                    ) {
-                        newImportPath = newImportPath.replace(
-                            /\.(ts|vue)$/,
-                            '.js',
+                newPath = newImportPath;
+                transformed = true;
+            } else {
+                // Fallback al sistema anterior
+                for (const [alias] of Object.entries(pathAlias)) {
+                    const aliasPattern = alias.replace('/*', '');
+                    if (moduleRequest.startsWith(aliasPattern)) {
+                        // Reemplazar el alias con la ruta del target
+                        const relativePath = moduleRequest.replace(
+                            aliasPattern,
+                            '',
                         );
-                    } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
-                        newImportPath += '.js';
-                    }
+                        // Para alias que apuntan a la raíz (como @/* -> /src/*),
+                        // solo usamos PATH_DIST + relativePath
+                        let newImportPath = path.join(
+                            '/',
+                            pathDist,
+                            relativePath,
+                        );
 
-                    newPath = newImportPath;
-                    transformed = true;
-                    break;
+                        // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+                        newImportPath = newImportPath
+                            .replace(/\/\.\//g, '/')
+                            .replace(/\\/g, '/');
+
+                        if (
+                            newImportPath.endsWith('.ts') ||
+                            newImportPath.endsWith('.vue')
+                        ) {
+                            newImportPath = newImportPath.replace(
+                                /\.(ts|vue)$/,
+                                '.js',
+                            );
+                        } else if (
+                            !/\.(js|mjs|css|json)$/.test(newImportPath)
+                        ) {
+                            newImportPath += '.js';
+                        }
+
+                        newPath = newImportPath;
+                        transformed = true;
+                        break;
+                    }
                 }
             }
         }

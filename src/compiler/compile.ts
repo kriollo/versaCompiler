@@ -31,6 +31,9 @@ let preCompileVue: any;
 // 🚀 Importar optimizador de transformaciones
 let TransformOptimizer: any;
 
+// 🚀 Importar optimizador de resolución de módulos
+let ModuleResolutionOptimizer: any;
+
 // 🚀 Sistema de Carga Inteligente de Módulos - VERSIÓN OPTIMIZADA V2
 class OptimizedModuleManager {
     private static instance: OptimizedModuleManager;
@@ -101,12 +104,15 @@ class OptimizedModuleManager {
             await this.backgroundLoader;
         }
 
-        const toPreload: string[] = [];
-
-        // Precarga basada en contexto
+        const toPreload: string[] = []; // Precarga basada en contexto
         if (context === 'batch' || context === 'watch') {
             // En batch/watch, precargar todos los módulos comunes
-            toPreload.push('transforms', 'vue', 'typescript');
+            toPreload.push(
+                'transforms',
+                'vue',
+                'typescript',
+                'module-resolution-optimizer',
+            );
         } else {
             // En individual, cargar solo según tipos de archivo detectados
             if (fileTypes.has('.vue')) toPreload.push('vue');
@@ -173,8 +179,7 @@ class OptimizedModuleManager {
 
     /**
      * ✨ MEJORADO: Carga interna de módulos con mejor manejo de errores
-     */
-    private async loadModuleInternal(moduleName: string): Promise<any> {
+     */ private async loadModuleInternal(moduleName: string): Promise<any> {
         switch (moduleName) {
             case 'chalk':
                 return this.loadChalk();
@@ -192,6 +197,10 @@ class OptimizedModuleManager {
                 return this.loadTailwind();
             case 'linter':
                 return this.loadLinter();
+            case 'transform-optimizer':
+                return this.loadTransformOptimizer();
+            case 'module-resolution-optimizer':
+                return this.loadModuleResolutionOptimizer();
             default:
                 throw new Error(`Módulo desconocido: ${moduleName}`);
         }
@@ -267,6 +276,17 @@ class OptimizedModuleManager {
                 transformModule.TransformOptimizer.getInstance();
         }
         return TransformOptimizer;
+    }
+
+    private async loadModuleResolutionOptimizer(): Promise<any> {
+        if (!ModuleResolutionOptimizer) {
+            const resolutionModule = await import(
+                './module-resolution-optimizer'
+            );
+            ModuleResolutionOptimizer =
+                resolutionModule.ModuleResolutionOptimizer.getInstance();
+        }
+        return ModuleResolutionOptimizer;
     }
 
     /**
