@@ -580,10 +580,10 @@ export function getModulePath(
 ): string | null {
     // Verificar si el módulo está en la lista de excluidos
     if (EXCLUDED_MODULES.has(moduleName)) {
-        if (env.VERBOSE === 'true')
-            logger.info(
-                `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
-            );
+        // if (env.VERBOSE === 'true')
+        //     logger.info(
+        //         `Módulo ${moduleName} está en la lista de excluidos, manteniendo importación original`,
+        //     );
         return null; // Retornar null para mantener la importación original
     }
 

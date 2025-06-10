@@ -509,16 +509,6 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                 const targetArray = Array.isArray(target) ? target : [target];
                 const targetPath = targetArray[0];
 
-                // Debug logs
-                if (env.VERBOSE === 'true') {
-                    console.log(`🔍 DEBUG replaceAliasInStrings:
-  - stringContent: "${stringContent}"
-  - aliasPattern: "${aliasPattern}"
-  - relativePath: "${relativePath}"
-  - targetPath: "${targetPath}"
-  - pathDist: "${pathDist}"`);
-                }
-
                 if (targetPath.startsWith('/')) {
                     // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
                     // Remover /* del final si existe
