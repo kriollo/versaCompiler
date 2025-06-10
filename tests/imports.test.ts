@@ -518,7 +518,7 @@ import { logger } from './servicios/logger';
 
             expect(result.error).toBeNull();
             expect(result.code).toContain("'./servicios/browserSync.js'");
-            expect(result.code).toContain("'./servicios/chokidar.js'");
+            expect(result.code).toContain("'./servicios/file-watcher.js'");
             expect(result.code).toContain("'./servicios/logger.js'");
         });
 

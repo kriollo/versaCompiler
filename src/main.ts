@@ -43,7 +43,7 @@ async function loadBrowserSyncModule() {
 }
 
 async function loadChokidarModule() {
-    return await import('./servicios/chokidar');
+    return await import('./servicios/file-watcher');
 }
 
 async function loadConfigModule() {

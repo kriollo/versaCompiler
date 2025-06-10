@@ -268,7 +268,7 @@ async function loadTransforms() {
 
 async function loadTypeScript() {
     if (!preCompileTS) {
-        const typescriptModule = await import('./typescript');
+        const typescriptModule = await import('./typescript-manager');
         preCompileTS = typescriptModule.preCompileTS;
     }
 

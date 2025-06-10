@@ -9,7 +9,7 @@ import { env } from 'node:process';
 import path from 'path';
 import { promisify } from 'util';
 import { compileFile } from '../src/compiler/compile';
-import { preCompileTS } from '../src/compiler/typescript';
+import { preCompileTS } from '../src/compiler/typescript-manager';
 import { preCompileVue } from '../src/compiler/vuejs';
 
 // Función de delay sin crear promesas nuevas

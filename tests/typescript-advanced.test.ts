@@ -5,7 +5,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { preCompileTS } from '../src/compiler/typescript';
+import { preCompileTS } from '../src/compiler/typescript-manager';
 
 // Mock the TypeScript module
 jest.mock('typescript', () => {

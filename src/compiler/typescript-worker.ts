@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import * as process from 'node:process';
 import { Worker } from 'node:worker_threads';
 
-import * as TypeScript from 'typescript';
+import * as typescript from 'typescript';
 
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 
@@ -15,7 +15,7 @@ import { validateTypesWithLanguageService } from './typescript-sync-validator';
  * Resultado de la validación de tipos
  */
 interface TypeCheckResult {
-    diagnostics: TypeScript.Diagnostic[];
+    diagnostics: typescript.Diagnostic[];
     hasErrors: boolean;
 }
 
@@ -35,7 +35,7 @@ interface WorkerMessage {
 interface WorkerResponse {
     id: string;
     success: boolean;
-    diagnostics?: TypeScript.Diagnostic[];
+    diagnostics?: typescript.Diagnostic[];
     hasErrors?: boolean;
     error?: string;
     message?: string;

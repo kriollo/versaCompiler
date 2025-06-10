@@ -3,66 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VersaCompiler Performance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>VersaCompiler Performance Dashboard</title>    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
             padding: 20px;
-            background: #f5f5f5;
         }
+        .container { max-width: 1400px; margin: 0 auto; }
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px;
-            border-radius: 10px;
+            padding: 40px;
+            border-radius: 15px;
             margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
         .stat-card {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             text-align: center;
+            transition: transform 0.3s ease;
         }
+        .stat-card:hover { transform: translateY(-5px); }
         .stat-value {
-            font-size: 2em;
+            font-size: 2.5em;
             font-weight: bold;
             color: #667eea;
-        }        .chart-container {
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            font-size: 1.1em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .chart-container {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+        }        .chart-container h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
         }
         .performance-table {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-bottom: 30px;
         }
         .performance-table h2 {
             margin-bottom: 20px;
             color: #333;
-            font-size: 1.5em;
+            font-size: 1.8em;
         }
         .perf-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9em;
+            font-size: 1em;
         }
         .perf-table th,
         .perf-table td {
-            padding: 12px;
+            padding: 15px;
             text-align: left;
             border-bottom: 1px solid #eee;
         }
@@ -72,15 +91,15 @@
             color: #333;
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-size: 0.8em;
+            font-size: 0.9em;
         }
         .perf-table tr:hover {
             background: #f8f9fa;
-        }
-        .perf-table .avg-time {
+        }        .perf-table .avg-time {
             font-weight: bold;
             color: #667eea;
-        }        .perf-table .success-rate {
+        }
+        .perf-table .success-rate {
             color: #27ae60;
         }
         .trend-indicator {
@@ -100,323 +119,426 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            margin-bottom: 30px;
         }
         .issue-card {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
         }
-        .regression { border-left: 4px solid #e74c3c; }
-        .improvement { border-left: 4px solid #27ae60; }
+        .regression { border-left: 5px solid #e74c3c; }
+        .improvement { border-left: 5px solid #27ae60; }
+        .issue-card h3 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
         .issue-list {
             list-style: none;
             padding: 0;
         }
         .issue-list li {
-            padding: 8px 0;
+            padding: 12px 0;
             border-bottom: 1px solid #eee;
+            font-size: 1.1em;
         }
         .environment {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             margin-top: 20px;
+        }
+        .environment h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.5em;
+        }
+        .env-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .env-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .env-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .env-value {
+            font-size: 1.1em;
+            color: #333;
+            margin-top: 5px;
+        }
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .refresh-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚀 VersaCompiler Performance Dashboard</h1>
-        <p>Última actualización: 9/6/2025, 19:13:02</p>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 VersaCompiler Performance Dashboard</h1>
+            <p>Última actualización: 9/6/2025, 20:47:39</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">11</div>
+                <div class="stat-label">Tests Ejecutados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">11</div>
+                <div class="stat-label">Tests Exitosos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">73.5ms</div>
+                <div class="stat-label">Tiempo Promedio</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">100.0%</div>
+                <div class="stat-label">Tasa de Éxito</div>
+            </div>
+        </div>        <div class="chart-container">
+            <h2>📈 Tendencias de Performance</h2>
+            <canvas id="performanceChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="performance-table">
+            <h2>📊 Tiempos Promedio por Test</h2>            <table class="perf-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Tiempo Promedio</th>
+                        <th>Tiempo Mínimo</th>
+                        <th>Tiempo Máximo</th>
+                        <th>Tasa de Éxito</th>
+                        <th>Ejecuciones</th>
+                        <th>Tendencia</th>
+                    </tr>
+                </thead>                <tbody>
+                    
+                    <tr>
+                        <td><strong>JavaScript Simple</strong></td>
+                        <td class="avg-time">255.34ms</td>
+                        <td>255.34ms</td>
+                        <td>255.34ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+96.3%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>TypeScript Simple</strong></td>
+                        <td class="avg-time">106.99ms</td>
+                        <td>106.99ms</td>
+                        <td>106.99ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+31.5%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Vue Simple</strong></td>
+                        <td class="avg-time">72.25ms</td>
+                        <td>72.25ms</td>
+                        <td>72.25ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+266.0%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>preCompileVue Direct</strong></td>
+                        <td class="avg-time">7.42ms</td>
+                        <td>7.42ms</td>
+                        <td>7.42ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-slight" title="Ligera regresión">
+                                🟡
+                            </span>
+                            Ligera regresión
+                            <span class="trend-change trend-slight">(+9.1%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>preCompileTS Direct</strong></td>
+                        <td class="avg-time">15.00ms</td>
+                        <td>15.00ms</td>
+                        <td>15.00ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-improvement" title="Mejora">
+                                🟢
+                            </span>
+                            Mejora
+                            <span class="trend-change trend-improvement">(-15.3%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Batch Compilation</strong></td>
+                        <td class="avg-time">94.83ms</td>
+                        <td>94.83ms</td>
+                        <td>94.83ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-improvement" title="Mejora">
+                                🟢
+                            </span>
+                            Mejora
+                            <span class="trend-change trend-improvement">(-74.0%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Memory Usage</strong></td>
+                        <td class="avg-time">31.46ms</td>
+                        <td>31.46ms</td>
+                        <td>31.46ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+217.0%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Concurrent Compilation</strong></td>
+                        <td class="avg-time">33.77ms</td>
+                        <td>33.77ms</td>
+                        <td>33.77ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+41.0%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Large File Compilation</strong></td>
+                        <td class="avg-time">174.70ms</td>
+                        <td>174.70ms</td>
+                        <td>174.70ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-slight" title="Ligera regresión">
+                                🟡
+                            </span>
+                            Ligera regresión
+                            <span class="trend-change trend-slight">(+9.4%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Performance Baseline</strong></td>
+                        <td class="avg-time">3.49ms</td>
+                        <td>3.49ms</td>
+                        <td>3.49ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-slight" title="Ligera mejora">
+                                🟡
+                            </span>
+                            Ligera mejora
+                            <span class="trend-change trend-slight">(-9.3%)</span>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td><strong>Performance Consistency</strong></td>
+                        <td class="avg-time">12.70ms</td>
+                        <td>12.70ms</td>
+                        <td>12.70ms</td>
+                        <td class="success-rate">100.0%</td>
+                        <td>1</td>
+                        <td>
+                            <span class="trend-indicator trend-regression" title="Regresión">
+                                🔴
+                            </span>
+                            Regresión
+                            <span class="trend-change trend-regression">(+68.5%)</span>
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+
+        <div class="issues">
+            <div class="issue-card regression">
+                <h3>⚠️ Regresiones Detectadas</h3>
+                <ul class="issue-list">
+                    <li><strong>JavaScript Simple</strong>: +96.3%</li><li><strong>TypeScript Simple</strong>: +31.5%</li><li><strong>Vue Simple</strong>: +266.0%</li><li><strong>Memory Usage</strong>: +217.0%</li><li><strong>Concurrent Compilation</strong>: +41.0%</li><li><strong>Performance Consistency</strong>: +68.5%</li>
+                </ul>
+            </div>
+            <div class="issue-card improvement">
+                <h3>🎯 Mejoras Detectadas</h3>
+                <ul class="issue-list">
+                    <li><strong>preCompileTS Direct</strong>: 15.3% faster</li><li><strong>Batch Compilation</strong>: 74.0% faster</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="environment">
+            <h3>🖥️ Información del Entorno</h3>
+            <div class="env-grid">
+                <div class="env-item">
+                    <div class="env-label">Node.js</div>
+                    <div class="env-value">v23.11.0</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">Plataforma</div>
+                    <div class="env-value">win32 x64</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">CPUs</div>
+                    <div class="env-value">8</div>
+                </div>
+                <div class="env-item">
+                    <div class="env-label">Memoria</div>
+                    <div class="env-value">31.4 GB</div>
+                </div>
+                
+            </div>
+        </div>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">11</div>
-            <div>Tests Ejecutados</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">11</div>
-            <div>Tests Exitosos</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">75.0ms</div>
-            <div>Tiempo Promedio</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">100.0%</div>
-            <div>Tasa de Éxito</div>
-        </div>
-    </div>    <div class="chart-container">
-        <h2>📈 Tendencias de Performance</h2>
-        <canvas id="performanceChart" width="400" height="200"></canvas>
-    </div>
-
-    <div class="performance-table">
-        <h2>📊 Tiempos Promedio por Test</h2>        <table class="perf-table">
-            <thead>
-                <tr>
-                    <th>Test</th>
-                    <th>Tiempo Promedio</th>
-                    <th>Tiempo Mínimo</th>
-                    <th>Tiempo Máximo</th>
-                    <th>Tasa de Éxito</th>
-                    <th>Ejecuciones</th>
-                    <th>Tendencia</th>
-                </tr>
-            </thead>
-            <tbody>                
-                <tr>
-                    <td><strong>JavaScript Simple</strong></td>
-                    <td class="avg-time">130.08ms</td>
-                    <td>130.08ms</td>
-                    <td>130.08ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-regression" title="Regresión">
-                            🔴
-                        </span>
-                        Regresión
-                        <span class="trend-change trend-regression">(+168.4%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>TypeScript Simple</strong></td>
-                    <td class="avg-time">81.39ms</td>
-                    <td>81.39ms</td>
-                    <td>81.39ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-improvement" title="Mejora">
-                            🟢
-                        </span>
-                        Mejora
-                        <span class="trend-change trend-improvement">(-34.9%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Vue Simple</strong></td>
-                    <td class="avg-time">19.74ms</td>
-                    <td>19.74ms</td>
-                    <td>19.74ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-improvement" title="Mejora">
-                            🟢
-                        </span>
-                        Mejora
-                        <span class="trend-change trend-improvement">(-75.2%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>preCompileVue Direct</strong></td>
-                    <td class="avg-time">6.80ms</td>
-                    <td>6.80ms</td>
-                    <td>6.80ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-improvement" title="Mejora">
-                            🟢
-                        </span>
-                        Mejora
-                        <span class="trend-change trend-improvement">(-19.5%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>preCompileTS Direct</strong></td>
-                    <td class="avg-time">17.72ms</td>
-                    <td>17.72ms</td>
-                    <td>17.72ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-stable" title="Estable">
-                            ⚪
-                        </span>
-                        Estable
-                        <span class="trend-change trend-stable">(-0.7%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Batch Compilation</strong></td>
-                    <td class="avg-time">364.48ms</td>
-                    <td>364.48ms</td>
-                    <td>364.48ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-regression" title="Regresión">
-                            🔴
-                        </span>
-                        Regresión
-                        <span class="trend-change trend-regression">(+298.9%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Memory Usage</strong></td>
-                    <td class="avg-time">9.92ms</td>
-                    <td>9.92ms</td>
-                    <td>9.92ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-improvement" title="Mejora">
-                            🟢
-                        </span>
-                        Mejora
-                        <span class="trend-change trend-improvement">(-19.4%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Concurrent Compilation</strong></td>
-                    <td class="avg-time">23.94ms</td>
-                    <td>23.94ms</td>
-                    <td>23.94ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-improvement" title="Mejora">
-                            🟢
-                        </span>
-                        Mejora
-                        <span class="trend-change trend-improvement">(-13.5%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Large File Compilation</strong></td>
-                    <td class="avg-time">159.69ms</td>
-                    <td>159.69ms</td>
-                    <td>159.69ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-regression" title="Regresión">
-                            🔴
-                        </span>
-                        Regresión
-                        <span class="trend-change trend-regression">(+18.9%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Performance Baseline</strong></td>
-                    <td class="avg-time">3.85ms</td>
-                    <td>3.85ms</td>
-                    <td>3.85ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-regression" title="Regresión">
-                            🔴
-                        </span>
-                        Regresión
-                        <span class="trend-change trend-regression">(+33.4%)</span>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <td><strong>Performance Consistency</strong></td>
-                    <td class="avg-time">7.54ms</td>
-                    <td>7.54ms</td>
-                    <td>7.54ms</td>
-                    <td class="success-rate">100.0%</td>
-                    <td>1</td>
-                    <td>
-                        <span class="trend-indicator trend-stable" title="Estable">
-                            ⚪
-                        </span>
-                        Estable
-                        <span class="trend-change trend-stable">(-3.5%)</span>
-                    </td>
-                </tr>
-                
-            </tbody>
-        </table>
-    </div>
-
-    <div class="issues">
-        <div class="issue-card regression">
-            <h3>⚠️ Regresiones Detectadas</h3>
-            <ul class="issue-list">
-                <li>JavaScript Simple: +168.4% slower</li><li>Batch Compilation: +298.9% slower</li><li>Large File Compilation: +18.9% slower</li><li>Performance Baseline: +33.4% slower</li>
-            </ul>
-        </div>
-        <div class="issue-card improvement">
-            <h3>🎯 Mejoras Detectadas</h3>
-            <ul class="issue-list">
-                <li>TypeScript Simple: 34.9% faster</li><li>Vue Simple: 75.2% faster</li><li>preCompileVue Direct: 19.5% faster</li><li>Memory Usage: 19.4% faster</li><li>Concurrent Compilation: 13.5% faster</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="environment">
-        <h3>🖥️ Información del Entorno</h3>
-        <p><strong>Node.js:</strong> v23.11.0</p>
-        <p><strong>Plataforma:</strong> win32 x64</p>
-        <p><strong>CPUs:</strong> 8</p>
-        <p><strong>Memoria:</strong> 31.4 GB</p>
-        <p><strong>Git:</strong> master@4fd6f00f</p>
-    </div>
-
-    <script>
+    <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar</button>    <script>
         const ctx = document.getElementById('performanceChart').getContext('2d');
-        const chartData = [{"name":"JavaScript Simple","data":[{"x":1749326766010,"y":26.039},{"x":1749326881970,"y":27.5714},{"x":1749475634176,"y":89.2529},{"x":1749479935765,"y":230.1559},{"x":1749481664337,"y":28.7858},{"x":1749495540343,"y":72.1493},{"x":1749498091608,"y":124.2086},{"x":1749498540312,"y":244.6976},{"x":1749499123397,"y":233.5237},{"x":1749499836245,"y":231.6208},{"x":1749500047569,"y":229.2782},{"x":1749500636785,"y":265.2807},{"x":1749505983660,"y":110.9534},{"x":1749507269440,"y":97.3896},{"x":1749510288724,"y":48.4627},{"x":1749510775535,"y":130.0812}]},{"name":"TypeScript Simple","data":[{"x":1749326766407,"y":153.4149},{"x":1749326882228,"y":90.7958},{"x":1749475634430,"y":103.172},{"x":1749479936948,"y":795.8702},{"x":1749481664567,"y":87.5668},{"x":1749495541581,"y":397.945},{"x":1749498093860,"y":603.4858},{"x":1749498541814,"y":308.7075},{"x":1749499125243,"y":613.671},{"x":1749499837452,"y":147.5985},{"x":1749500048530,"y":320.4894},{"x":1749500638645,"y":738.4573},{"x":1749505984397,"y":285.8581},{"x":1749507271655,"y":278.7619},{"x":1749510289171,"y":125.0937},{"x":1749510776673,"y":81.3902}]},{"name":"Vue Simple","data":[{"x":1749326766582,"y":46.8291},{"x":1749326882455,"y":65.5504},{"x":1749475634619,"y":74.6435},{"x":1749479937433,"y":72.6727},{"x":1749481664729,"y":40.2241},{"x":1749495543399,"y":180.486},{"x":1749498094762,"y":224.9624},{"x":1749498542857,"y":82.1932},{"x":1749499126852,"y":318.4012},{"x":1749499838734,"y":139.9671},{"x":1749500049658,"y":126.5171},{"x":1749500639810,"y":154.978},{"x":1749505985015,"y":177.601},{"x":1749507273135,"y":210.3035},{"x":1749510289615,"y":79.5959},{"x":1749510777457,"y":19.7399}]},{"name":"preCompileVue Direct","data":[{"x":1749326766709,"y":8.2685},{"x":1749326882609,"y":9.2025},{"x":1749475634742,"y":6.1001},{"x":1749479937964,"y":9.821},{"x":1749481664845,"y":5.5661},{"x":1749495544162,"y":10.7773},{"x":1749498095734,"y":11.8389},{"x":1749498543777,"y":9.5535},{"x":1749499127965,"y":11.9023},{"x":1749499840101,"y":23.697},{"x":1749500049939,"y":14.1319},{"x":1749500640864,"y":16.9233},{"x":1749505985648,"y":12.7256},{"x":1749507274528,"y":9.7657},{"x":1749510289875,"y":8.4517},{"x":1749510778661,"y":6.8013}]},{"name":"preCompileTS Direct","data":[{"x":1749326766838,"y":15.7618},{"x":1749326882751,"y":16.2351},{"x":1749475634867,"y":13.5797},{"x":1749479938179,"y":26.7258},{"x":1749481664965,"y":13.6545},{"x":1749495545335,"y":53.1903},{"x":1749498096287,"y":32.4544},{"x":1749498545338,"y":23.3343},{"x":1749499129569,"y":130.6821},{"x":1749499841751,"y":440.7437},{"x":1749500050434,"y":35.7316},{"x":1749500641576,"y":33.0853},{"x":1749505986126,"y":34.3483},{"x":1749507277839,"y":24.0525},{"x":1749510290330,"y":17.8375},{"x":1749510779334,"y":17.7182}]},{"name":"Batch Compilation","data":[{"x":1749326767370,"y":100.4954},{"x":1749326883206,"y":114.8915},{"x":1749475635084,"y":91.3917},{"x":1749479938740,"y":182.628},{"x":1749481665180,"y":70.4664},{"x":1749495548043,"y":806.3771},{"x":1749498096841,"y":159.27},{"x":1749498548322,"y":662.5167},{"x":1749499130804,"y":369.6293},{"x":1749499843553,"y":975.8931},{"x":1749500051185,"y":270.9495},{"x":1749500642705,"y":652.5945},{"x":1749505987366,"y":296.7883},{"x":1749507278752,"y":191.6734},{"x":1749510290638,"y":91.3796},{"x":1749510780774,"y":364.4788}]},{"name":"Memory Usage","data":[{"x":1749326767672,"y":48.2493},{"x":1749326883372,"y":8.5971},{"x":1749475635360,"y":31.5668},{"x":1749479939024,"y":20.3073},{"x":1749481665373,"y":10.3577},{"x":1749495548523,"y":40.9659},{"x":1749498097173,"y":37.7969},{"x":1749498548776,"y":14.018},{"x":1749499131192,"y":17.1651},{"x":1749499844141,"y":21.2949},{"x":1749500051638,"y":41.1443},{"x":1749500643340,"y":19.0526},{"x":1749505987680,"y":38.8403},{"x":1749507279520,"y":29.4908},{"x":1749510290979,"y":12.3158},{"x":1749510781420,"y":9.923}]},{"name":"Concurrent Compilation","data":[{"x":1749326767860,"y":36.8819},{"x":1749326883564,"y":39.7844},{"x":1749475635622,"y":47.869},{"x":1749479939309,"y":40.9673},{"x":1749481665604,"y":27.7805},{"x":1749495549820,"y":37.4578},{"x":1749498097615,"y":43.5707},{"x":1749498549175,"y":31.8923},{"x":1749499132088,"y":48.928},{"x":1749499844905,"y":39.2698},{"x":1749500052025,"y":43.6666},{"x":1749500644527,"y":300.8465},{"x":1749505988065,"y":39.5466},{"x":1749507280022,"y":27.9277},{"x":1749510291155,"y":27.684},{"x":1749510781792,"y":23.9422}]},{"name":"Large File Compilation","data":[{"x":1749326768131,"y":127.6351},{"x":1749326883877,"y":160.1855},{"x":1749475635997,"y":238.8461},{"x":1749479939767,"y":267.2555},{"x":1749481665911,"y":154.3479},{"x":1749495552001,"y":829.0337},{"x":1749498098194,"y":265.0521},{"x":1749498550036,"y":435.0763},{"x":1749499132845,"y":329.0495},{"x":1749499845466,"y":274.568},{"x":1749500052716,"y":320.0889},{"x":1749500645549,"y":504.5844},{"x":1749505988574,"y":271.0525},{"x":1749507281397,"y":344.8258},{"x":1749510291481,"y":134.2545},{"x":1749510782241,"y":159.6853}]},{"name":"Performance Baseline","data":[{"x":1749326768257,"y":2.7047},{"x":1749326884009,"y":3.6515},{"x":1749475636120,"y":5.9999},{"x":1749479939932,"y":5.4945},{"x":1749481666032,"y":3.098},{"x":1749495552632,"y":26.5729},{"x":1749498098444,"y":6.5636},{"x":1749498550676,"y":12.0859},{"x":1749499133240,"y":4.8656},{"x":1749499845731,"y":5.8187},{"x":1749500053033,"y":10.33},{"x":1749500646044,"y":5.61},{"x":1749505988830,"y":6.1079},{"x":1749507282714,"y":4.3354},{"x":1749510291618,"y":2.8873},{"x":1749510782469,"y":3.851}]},{"name":"Performance Consistency","data":[{"x":1749326768387,"y":5.7939},{"x":1749326884156,"y":6.5276},{"x":1749475636306,"y":6.2059},{"x":1749479940071,"y":10.5487},{"x":1749481666144,"y":5.5782},{"x":1749495552937,"y":9.3305},{"x":1749498098682,"y":15.5694},{"x":1749498550991,"y":10.0731},{"x":1749499133547,"y":15.503},{"x":1749499845978,"y":15.2659},{"x":1749500053444,"y":20.324},{"x":1749500646369,"y":13.7895},{"x":1749505989148,"y":17.227},{"x":1749507283273,"y":9.1659},{"x":1749510291778,"y":7.811},{"x":1749510782713,"y":7.5354}]}];
+        const chartData = [{"name":"JavaScript Simple","data":[{"x":1,"y":26.039,"timestamp":"7/6/2025, 16:06:06"},{"x":2,"y":27.5714,"timestamp":"7/6/2025, 16:08:01"},{"x":3,"y":89.2529,"timestamp":"9/6/2025, 9:27:14"},{"x":4,"y":230.1559,"timestamp":"9/6/2025, 10:38:55"},{"x":5,"y":28.7858,"timestamp":"9/6/2025, 11:07:44"},{"x":6,"y":72.1493,"timestamp":"9/6/2025, 14:59:00"},{"x":7,"y":124.2086,"timestamp":"9/6/2025, 15:41:31"},{"x":8,"y":244.6976,"timestamp":"9/6/2025, 15:49:00"},{"x":9,"y":233.5237,"timestamp":"9/6/2025, 15:58:43"},{"x":10,"y":231.6208,"timestamp":"9/6/2025, 16:10:36"},{"x":11,"y":229.2782,"timestamp":"9/6/2025, 16:14:07"},{"x":12,"y":265.2807,"timestamp":"9/6/2025, 16:23:56"},{"x":13,"y":110.9534,"timestamp":"9/6/2025, 17:53:03"},{"x":14,"y":97.3896,"timestamp":"9/6/2025, 18:14:29"},{"x":15,"y":48.4627,"timestamp":"9/6/2025, 19:04:48"},{"x":16,"y":130.0812,"timestamp":"9/6/2025, 19:12:55"},{"x":17,"y":255.3433,"timestamp":"9/6/2025, 20:47:15"}]},{"name":"TypeScript Simple","data":[{"x":1,"y":153.4149,"timestamp":"7/6/2025, 16:06:06"},{"x":2,"y":90.7958,"timestamp":"7/6/2025, 16:08:02"},{"x":3,"y":103.172,"timestamp":"9/6/2025, 9:27:14"},{"x":4,"y":795.8702,"timestamp":"9/6/2025, 10:38:56"},{"x":5,"y":87.5668,"timestamp":"9/6/2025, 11:07:44"},{"x":6,"y":397.945,"timestamp":"9/6/2025, 14:59:01"},{"x":7,"y":603.4858,"timestamp":"9/6/2025, 15:41:33"},{"x":8,"y":308.7075,"timestamp":"9/6/2025, 15:49:01"},{"x":9,"y":613.671,"timestamp":"9/6/2025, 15:58:45"},{"x":10,"y":147.5985,"timestamp":"9/6/2025, 16:10:37"},{"x":11,"y":320.4894,"timestamp":"9/6/2025, 16:14:08"},{"x":12,"y":738.4573,"timestamp":"9/6/2025, 16:23:58"},{"x":13,"y":285.8581,"timestamp":"9/6/2025, 17:53:04"},{"x":14,"y":278.7619,"timestamp":"9/6/2025, 18:14:31"},{"x":15,"y":125.0937,"timestamp":"9/6/2025, 19:04:49"},{"x":16,"y":81.3902,"timestamp":"9/6/2025, 19:12:56"},{"x":17,"y":106.9896,"timestamp":"9/6/2025, 20:47:15"}]},{"name":"Vue Simple","data":[{"x":1,"y":46.8291,"timestamp":"7/6/2025, 16:06:06"},{"x":2,"y":65.5504,"timestamp":"7/6/2025, 16:08:02"},{"x":3,"y":74.6435,"timestamp":"9/6/2025, 9:27:14"},{"x":4,"y":72.6727,"timestamp":"9/6/2025, 10:38:57"},{"x":5,"y":40.2241,"timestamp":"9/6/2025, 11:07:44"},{"x":6,"y":180.486,"timestamp":"9/6/2025, 14:59:03"},{"x":7,"y":224.9624,"timestamp":"9/6/2025, 15:41:34"},{"x":8,"y":82.1932,"timestamp":"9/6/2025, 15:49:02"},{"x":9,"y":318.4012,"timestamp":"9/6/2025, 15:58:46"},{"x":10,"y":139.9671,"timestamp":"9/6/2025, 16:10:38"},{"x":11,"y":126.5171,"timestamp":"9/6/2025, 16:14:09"},{"x":12,"y":154.978,"timestamp":"9/6/2025, 16:23:59"},{"x":13,"y":177.601,"timestamp":"9/6/2025, 17:53:05"},{"x":14,"y":210.3035,"timestamp":"9/6/2025, 18:14:33"},{"x":15,"y":79.5959,"timestamp":"9/6/2025, 19:04:49"},{"x":16,"y":19.7399,"timestamp":"9/6/2025, 19:12:57"},{"x":17,"y":72.2495,"timestamp":"9/6/2025, 20:47:15"}]},{"name":"preCompileVue Direct","data":[{"x":1,"y":8.2685,"timestamp":"7/6/2025, 16:06:06"},{"x":2,"y":9.2025,"timestamp":"7/6/2025, 16:08:02"},{"x":3,"y":6.1001,"timestamp":"9/6/2025, 9:27:14"},{"x":4,"y":9.821,"timestamp":"9/6/2025, 10:38:57"},{"x":5,"y":5.5661,"timestamp":"9/6/2025, 11:07:44"},{"x":6,"y":10.7773,"timestamp":"9/6/2025, 14:59:04"},{"x":7,"y":11.8389,"timestamp":"9/6/2025, 15:41:35"},{"x":8,"y":9.5535,"timestamp":"9/6/2025, 15:49:03"},{"x":9,"y":11.9023,"timestamp":"9/6/2025, 15:58:47"},{"x":10,"y":23.697,"timestamp":"9/6/2025, 16:10:40"},{"x":11,"y":14.1319,"timestamp":"9/6/2025, 16:14:09"},{"x":12,"y":16.9233,"timestamp":"9/6/2025, 16:24:00"},{"x":13,"y":12.7256,"timestamp":"9/6/2025, 17:53:05"},{"x":14,"y":9.7657,"timestamp":"9/6/2025, 18:14:34"},{"x":15,"y":8.4517,"timestamp":"9/6/2025, 19:04:49"},{"x":16,"y":6.8013,"timestamp":"9/6/2025, 19:12:58"},{"x":17,"y":7.4182,"timestamp":"9/6/2025, 20:47:15"}]},{"name":"preCompileTS Direct","data":[{"x":1,"y":15.7618,"timestamp":"7/6/2025, 16:06:06"},{"x":2,"y":16.2351,"timestamp":"7/6/2025, 16:08:02"},{"x":3,"y":13.5797,"timestamp":"9/6/2025, 9:27:14"},{"x":4,"y":26.7258,"timestamp":"9/6/2025, 10:38:58"},{"x":5,"y":13.6545,"timestamp":"9/6/2025, 11:07:44"},{"x":6,"y":53.1903,"timestamp":"9/6/2025, 14:59:05"},{"x":7,"y":32.4544,"timestamp":"9/6/2025, 15:41:36"},{"x":8,"y":23.3343,"timestamp":"9/6/2025, 15:49:05"},{"x":9,"y":130.6821,"timestamp":"9/6/2025, 15:58:49"},{"x":10,"y":440.7437,"timestamp":"9/6/2025, 16:10:41"},{"x":11,"y":35.7316,"timestamp":"9/6/2025, 16:14:10"},{"x":12,"y":33.0853,"timestamp":"9/6/2025, 16:24:01"},{"x":13,"y":34.3483,"timestamp":"9/6/2025, 17:53:06"},{"x":14,"y":24.0525,"timestamp":"9/6/2025, 18:14:37"},{"x":15,"y":17.8375,"timestamp":"9/6/2025, 19:04:50"},{"x":16,"y":17.7182,"timestamp":"9/6/2025, 19:12:59"},{"x":17,"y":15.0037,"timestamp":"9/6/2025, 20:47:15"}]},{"name":"Batch Compilation","data":[{"x":1,"y":100.4954,"timestamp":"7/6/2025, 16:06:07"},{"x":2,"y":114.8915,"timestamp":"7/6/2025, 16:08:03"},{"x":3,"y":91.3917,"timestamp":"9/6/2025, 9:27:15"},{"x":4,"y":182.628,"timestamp":"9/6/2025, 10:38:58"},{"x":5,"y":70.4664,"timestamp":"9/6/2025, 11:07:45"},{"x":6,"y":806.3771,"timestamp":"9/6/2025, 14:59:08"},{"x":7,"y":159.27,"timestamp":"9/6/2025, 15:41:36"},{"x":8,"y":662.5167,"timestamp":"9/6/2025, 15:49:08"},{"x":9,"y":369.6293,"timestamp":"9/6/2025, 15:58:50"},{"x":10,"y":975.8931,"timestamp":"9/6/2025, 16:10:43"},{"x":11,"y":270.9495,"timestamp":"9/6/2025, 16:14:11"},{"x":12,"y":652.5945,"timestamp":"9/6/2025, 16:24:02"},{"x":13,"y":296.7883,"timestamp":"9/6/2025, 17:53:07"},{"x":14,"y":191.6734,"timestamp":"9/6/2025, 18:14:38"},{"x":15,"y":91.3796,"timestamp":"9/6/2025, 19:04:50"},{"x":16,"y":364.4788,"timestamp":"9/6/2025, 19:13:00"},{"x":17,"y":94.829,"timestamp":"9/6/2025, 20:47:16"}]},{"name":"Memory Usage","data":[{"x":1,"y":48.2493,"timestamp":"7/6/2025, 16:06:07"},{"x":2,"y":8.5971,"timestamp":"7/6/2025, 16:08:03"},{"x":3,"y":31.5668,"timestamp":"9/6/2025, 9:27:15"},{"x":4,"y":20.3073,"timestamp":"9/6/2025, 10:38:59"},{"x":5,"y":10.3577,"timestamp":"9/6/2025, 11:07:45"},{"x":6,"y":40.9659,"timestamp":"9/6/2025, 14:59:08"},{"x":7,"y":37.7969,"timestamp":"9/6/2025, 15:41:37"},{"x":8,"y":14.018,"timestamp":"9/6/2025, 15:49:08"},{"x":9,"y":17.1651,"timestamp":"9/6/2025, 15:58:51"},{"x":10,"y":21.2949,"timestamp":"9/6/2025, 16:10:44"},{"x":11,"y":41.1443,"timestamp":"9/6/2025, 16:14:11"},{"x":12,"y":19.0526,"timestamp":"9/6/2025, 16:24:03"},{"x":13,"y":38.8403,"timestamp":"9/6/2025, 17:53:07"},{"x":14,"y":29.4908,"timestamp":"9/6/2025, 18:14:39"},{"x":15,"y":12.3158,"timestamp":"9/6/2025, 19:04:50"},{"x":16,"y":9.923,"timestamp":"9/6/2025, 19:13:01"},{"x":17,"y":31.4601,"timestamp":"9/6/2025, 20:47:16"}]},{"name":"Concurrent Compilation","data":[{"x":1,"y":36.8819,"timestamp":"7/6/2025, 16:06:07"},{"x":2,"y":39.7844,"timestamp":"7/6/2025, 16:08:03"},{"x":3,"y":47.869,"timestamp":"9/6/2025, 9:27:15"},{"x":4,"y":40.9673,"timestamp":"9/6/2025, 10:38:59"},{"x":5,"y":27.7805,"timestamp":"9/6/2025, 11:07:45"},{"x":6,"y":37.4578,"timestamp":"9/6/2025, 14:59:09"},{"x":7,"y":43.5707,"timestamp":"9/6/2025, 15:41:37"},{"x":8,"y":31.8923,"timestamp":"9/6/2025, 15:49:09"},{"x":9,"y":48.928,"timestamp":"9/6/2025, 15:58:52"},{"x":10,"y":39.2698,"timestamp":"9/6/2025, 16:10:44"},{"x":11,"y":43.6666,"timestamp":"9/6/2025, 16:14:12"},{"x":12,"y":300.8465,"timestamp":"9/6/2025, 16:24:04"},{"x":13,"y":39.5466,"timestamp":"9/6/2025, 17:53:08"},{"x":14,"y":27.9277,"timestamp":"9/6/2025, 18:14:40"},{"x":15,"y":27.684,"timestamp":"9/6/2025, 19:04:51"},{"x":16,"y":23.9422,"timestamp":"9/6/2025, 19:13:01"},{"x":17,"y":33.7656,"timestamp":"9/6/2025, 20:47:16"}]},{"name":"Large File Compilation","data":[{"x":1,"y":127.6351,"timestamp":"7/6/2025, 16:06:08"},{"x":2,"y":160.1855,"timestamp":"7/6/2025, 16:08:03"},{"x":3,"y":238.8461,"timestamp":"9/6/2025, 9:27:15"},{"x":4,"y":267.2555,"timestamp":"9/6/2025, 10:38:59"},{"x":5,"y":154.3479,"timestamp":"9/6/2025, 11:07:45"},{"x":6,"y":829.0337,"timestamp":"9/6/2025, 14:59:12"},{"x":7,"y":265.0521,"timestamp":"9/6/2025, 15:41:38"},{"x":8,"y":435.0763,"timestamp":"9/6/2025, 15:49:10"},{"x":9,"y":329.0495,"timestamp":"9/6/2025, 15:58:52"},{"x":10,"y":274.568,"timestamp":"9/6/2025, 16:10:45"},{"x":11,"y":320.0889,"timestamp":"9/6/2025, 16:14:12"},{"x":12,"y":504.5844,"timestamp":"9/6/2025, 16:24:05"},{"x":13,"y":271.0525,"timestamp":"9/6/2025, 17:53:08"},{"x":14,"y":344.8258,"timestamp":"9/6/2025, 18:14:41"},{"x":15,"y":134.2545,"timestamp":"9/6/2025, 19:04:51"},{"x":16,"y":159.6853,"timestamp":"9/6/2025, 19:13:02"},{"x":17,"y":174.7043,"timestamp":"9/6/2025, 20:47:16"}]},{"name":"Performance Baseline","data":[{"x":1,"y":2.7047,"timestamp":"7/6/2025, 16:06:08"},{"x":2,"y":3.6515,"timestamp":"7/6/2025, 16:08:04"},{"x":3,"y":5.9999,"timestamp":"9/6/2025, 9:27:16"},{"x":4,"y":5.4945,"timestamp":"9/6/2025, 10:38:59"},{"x":5,"y":3.098,"timestamp":"9/6/2025, 11:07:46"},{"x":6,"y":26.5729,"timestamp":"9/6/2025, 14:59:12"},{"x":7,"y":6.5636,"timestamp":"9/6/2025, 15:41:38"},{"x":8,"y":12.0859,"timestamp":"9/6/2025, 15:49:10"},{"x":9,"y":4.8656,"timestamp":"9/6/2025, 15:58:53"},{"x":10,"y":5.8187,"timestamp":"9/6/2025, 16:10:45"},{"x":11,"y":10.33,"timestamp":"9/6/2025, 16:14:13"},{"x":12,"y":5.61,"timestamp":"9/6/2025, 16:24:06"},{"x":13,"y":6.1079,"timestamp":"9/6/2025, 17:53:08"},{"x":14,"y":4.3354,"timestamp":"9/6/2025, 18:14:42"},{"x":15,"y":2.8873,"timestamp":"9/6/2025, 19:04:51"},{"x":16,"y":3.851,"timestamp":"9/6/2025, 19:13:02"},{"x":17,"y":3.4929,"timestamp":"9/6/2025, 20:47:17"}]},{"name":"Performance Consistency","data":[{"x":1,"y":5.7939,"timestamp":"7/6/2025, 16:06:08"},{"x":2,"y":6.5276,"timestamp":"7/6/2025, 16:08:04"},{"x":3,"y":6.2059,"timestamp":"9/6/2025, 9:27:16"},{"x":4,"y":10.5487,"timestamp":"9/6/2025, 10:39:00"},{"x":5,"y":5.5782,"timestamp":"9/6/2025, 11:07:46"},{"x":6,"y":9.3305,"timestamp":"9/6/2025, 14:59:12"},{"x":7,"y":15.5694,"timestamp":"9/6/2025, 15:41:38"},{"x":8,"y":10.0731,"timestamp":"9/6/2025, 15:49:10"},{"x":9,"y":15.503,"timestamp":"9/6/2025, 15:58:53"},{"x":10,"y":15.2659,"timestamp":"9/6/2025, 16:10:45"},{"x":11,"y":20.324,"timestamp":"9/6/2025, 16:14:13"},{"x":12,"y":13.7895,"timestamp":"9/6/2025, 16:24:06"},{"x":13,"y":17.227,"timestamp":"9/6/2025, 17:53:09"},{"x":14,"y":9.1659,"timestamp":"9/6/2025, 18:14:43"},{"x":15,"y":7.811,"timestamp":"9/6/2025, 19:04:51"},{"x":16,"y":7.5354,"timestamp":"9/6/2025, 19:13:02"},{"x":17,"y":12.6966,"timestamp":"9/6/2025, 20:47:17"}]}];
 
-        const datasets = chartData.map((test, index) => ({
-            label: test.name,
-            data: test.data,
-            borderColor: `hsl(${index * 137.5 % 360}, 70%, 50%)`,
-            backgroundColor: `hsla(${index * 137.5 % 360}, 70%, 50%, 0.1)`,
-            fill: false,
-            tension: 0.1
-        }));
+        // Verificar si hay datos para mostrar
+        if (chartData.length === 0) {
+            document.getElementById('performanceChart').style.display = 'none';
+            document.querySelector('.chart-container').innerHTML = '<p style="text-align: center; color: #666;">No hay datos históricos disponibles. Ejecuta más tests para ver las tendencias.</p>';        } else {
+            // Preparar datasets para Chart.js usando índices (puntos de control)
+            const datasets = chartData.map((test, index) => ({
+                label: test.name,
+                data: test.data.map(point => ({
+                    x: point.x, // Ya es índice (1, 2, 3, etc.)
+                    y: point.y,
+                    timestamp: point.timestamp // Para tooltip
+                })),
+                borderColor: `hsl(${index * 137.5 % 360}, 70%, 50%)`,
+                backgroundColor: `hsla(${index * 137.5 % 360}, 70%, 50%, 0.1)`,
+                fill: false,
+                tension: 0.4,
+                borderWidth: 3,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }));
 
-        new Chart(ctx, {
-            type: 'line',
-            data: { datasets },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Performance over time'
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            displayFormats: {
-                                minute: 'HH:mm',
-                                hour: 'HH:mm',
-                                day: 'DD/MM'
+            new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Tendencias de Performance - Puntos de Control',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const dataPoint = context[0].raw;
+                                    return `Ejecución #${dataPoint.x} - ${dataPoint.timestamp}`;
+                                },
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}ms`;
+                                }
                             }
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Tiempo (ms)'
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Número de Ejecución'
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return '#' + value;
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Tiempo (ms)'
+                            }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
-            }
-        });
+            });
+        }
     </script>
 </body>
 </html>

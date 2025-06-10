@@ -3,7 +3,7 @@
  * Verifica la compilación de TypeScript con diferentes configuraciones
  */
 
-import { preCompileTS } from '../src/compiler/typescript';
+import { preCompileTS } from '../src/compiler/typescript-manager';
 
 describe('preCompileTS - Compilación TypeScript', () => {
     describe('Compilación básica', () => {

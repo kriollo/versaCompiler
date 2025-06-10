@@ -7,25 +7,25 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as process from 'node:process';
 
-import * as TypeScript from 'typescript';
+import * as typescript from 'typescript';
 
 /**
  * Resultado de la validación de tipos
  */
 interface TypeCheckResult {
-    diagnostics: TypeScript.Diagnostic[];
+    diagnostics: typescript.Diagnostic[];
     hasErrors: boolean;
 }
 
 /**
  * Language Service Host para validación de tipos eficiente
  */
-class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
+class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
     private files: Map<string, { version: number; content: string }> =
         new Map();
-    private compilerOptions: TypeScript.CompilerOptions;
+    private compilerOptions: typescript.CompilerOptions;
 
-    constructor(compilerOptions: TypeScript.CompilerOptions) {
+    constructor(compilerOptions: typescript.CompilerOptions) {
         this.compilerOptions = compilerOptions;
     }
 
@@ -36,7 +36,7 @@ class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
             content,
         });
     }
-    getCompilationSettings(): TypeScript.CompilerOptions {
+    getCompilationSettings(): typescript.CompilerOptions {
         return this.compilerOptions;
     }
 
@@ -50,17 +50,15 @@ class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
     }
     getScriptSnapshot(
         fileName: string,
-    ): TypeScript.IScriptSnapshot | undefined {
+    ): typescript.IScriptSnapshot | undefined {
         const file = this.files.get(fileName);
         if (file) {
-            return TypeScript.ScriptSnapshot.fromString(file.content);
-        }
-
-        // Intentar leer el archivo del sistema de archivos para dependencias
+            return typescript.ScriptSnapshot.fromString(file.content);
+        } // Intentar leer el archivo del sistema de archivos para dependencias
         if (fs.existsSync(fileName)) {
             try {
                 const content = fs.readFileSync(fileName, 'utf-8');
-                return TypeScript.ScriptSnapshot.fromString(content);
+                return typescript.ScriptSnapshot.fromString(content);
             } catch {
                 return undefined;
             }
@@ -72,9 +70,8 @@ class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
     getCurrentDirectory(): string {
         return process.cwd();
     }
-
-    getDefaultLibFileName(options: TypeScript.CompilerOptions): string {
-        return TypeScript.getDefaultLibFilePath(options);
+    getDefaultLibFileName(options: typescript.CompilerOptions): string {
+        return typescript.getDefaultLibFilePath(options);
     }
 
     fileExists(path: string): boolean {
@@ -98,7 +95,7 @@ class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
         return undefined;
     }
     getNewLine(): string {
-        return TypeScript.sys.newLine;
+        return typescript.sys.newLine;
     }
 }
 
@@ -112,7 +109,7 @@ class TypeScriptLanguageServiceHost implements TypeScript.LanguageServiceHost {
 export const validateTypesWithLanguageService = (
     fileName: string,
     content: string,
-    compilerOptions: TypeScript.CompilerOptions,
+    compilerOptions: typescript.CompilerOptions,
 ): TypeCheckResult => {
     let actualFileName = fileName; // Declarar aquí para acceso en catch
 
@@ -163,7 +160,7 @@ export const validateTypesWithLanguageService = (
                 export {};            `;
             host.addFile(vueTypesPath, vueTypesDeclaration);
         } // Crear Language Service
-        const languageService = TypeScript.createLanguageService(host);
+        const languageService = typescript.createLanguageService(host);
 
         try {
             // Verificar que el archivo existe en el host antes de solicitar diagnósticos
@@ -172,8 +169,8 @@ export const validateTypesWithLanguageService = (
             }
 
             // Obtener diagnósticos de tipos con manejo de errores
-            let syntacticDiagnostics: TypeScript.Diagnostic[] = [];
-            let semanticDiagnostics: TypeScript.Diagnostic[] = [];
+            let syntacticDiagnostics: typescript.Diagnostic[] = [];
+            let semanticDiagnostics: typescript.Diagnostic[] = [];
 
             try {
                 syntacticDiagnostics =
@@ -195,14 +192,14 @@ export const validateTypesWithLanguageService = (
                 ...semanticDiagnostics,
             ]; // Filtrar diagnósticos relevantes
             const filteredDiagnostics = allDiagnostics.filter(
-                (diag: TypeScript.Diagnostic) => {
-                    const messageText = TypeScript.flattenDiagnosticMessageText(
+                (diag: typescript.Diagnostic) => {
+                    const messageText = typescript.flattenDiagnosticMessageText(
                         diag.messageText,
                         '\n',
                     );
 
                     // Solo errores de categoría Error
-                    if (diag.category !== TypeScript.DiagnosticCategory.Error) {
+                    if (diag.category !== typescript.DiagnosticCategory.Error) {
                         return false;
                     }
 
@@ -268,12 +265,12 @@ export const validateTypesWithLanguageService = (
         }
     } catch (error) {
         // En caso de error, devolver diagnóstico de error
-        const errorDiagnostic: TypeScript.Diagnostic = {
+        const errorDiagnostic: typescript.Diagnostic = {
             file: undefined,
             start: undefined,
             length: undefined,
             messageText: `Error en validación de tipos: ${error instanceof Error ? error.message : 'Error desconocido'}`,
-            category: TypeScript.DiagnosticCategory.Error,
+            category: typescript.DiagnosticCategory.Error,
             code: 0,
         };
 
@@ -294,7 +291,7 @@ export const validateTypesWithLanguageService = (
 export const validateVueTypes = (
     vueContent: string,
     fileName: string,
-    compilerOptions: TypeScript.CompilerOptions,
+    compilerOptions: typescript.CompilerOptions,
 ): TypeCheckResult => {
     return validateTypesWithLanguageService(
         fileName,

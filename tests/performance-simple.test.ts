@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 import { env } from 'node:process';
 import path from 'path';
 import { compileFile } from '../src/compiler/compile';
-import { preCompileTS } from '../src/compiler/typescript';
+import { preCompileTS } from '../src/compiler/typescript-manager';
 import { preCompileVue } from '../src/compiler/vuejs';
 
 // Interfaces para tracking de performance

@@ -488,15 +488,17 @@ function simpleESMResolver(moduleName: string): string | null {
                 const privateImports = Array.from(
                     content.matchAll(/from\s+['"]([#@][^'"]+)['"]/g),
                 );
-
                 if (privateImports.length > 0) {
                     if (env.VERBOSE === 'true')
                         logger.info(
                             `Módulo ${moduleName} usa imports privados:`,
-                            privateImports.map((m: RegExpMatchArray) => m[1]),
+                            (privateImports as RegExpMatchArray[]).map(
+                                m => m[1],
+                            ),
                         );
                     // Si usa imports privados, asegurarnos de que estén disponibles
-                    for (const [, importPath] of privateImports) {
+                    for (const match of privateImports as RegExpMatchArray[]) {
+                        const [, importPath] = match;
                         if (!importMap.has(importPath)) {
                             if (env.VERBOSE === 'true')
                                 logger.warn(
