@@ -7,12 +7,11 @@ describe('Verificación de alias en strings', () => {
         PATH_ALIAS: env.PATH_ALIAS,
         PATH_DIST: env.PATH_DIST,
     };
-
     beforeAll(() => {
         // Configurar variables de entorno para el test
         env.PATH_ALIAS = JSON.stringify({
-            'P@/*': '/public/*',
-            '@/*': '/src/*',
+            'P@/*': ['public/*'],
+            '@/*': ['src/*'],
         });
         env.PATH_DIST = 'dist';
     });
@@ -37,7 +36,7 @@ const loadSwallCss = () => {
         console.log('Código transformado:', result.code);
         expect(result.error).toBeNull();
         expect(result.code).toContain(
-            '/public/vendor/sweetalert2/sweetalert2.dark.min.css',
+            '/dist/public/vendor/sweetalert2/sweetalert2.dark.min.css',
         );
         expect(result.code).not.toContain('P@/vendor');
     });
@@ -52,8 +51,8 @@ const stylePath = '@/styles/main.css';
 
         console.log('Código con @ transformado:', result.code);
         expect(result.error).toBeNull();
-        expect(result.code).toContain('/src/assets/images/logo.png');
-        expect(result.code).toContain('/src/styles/main.css');
+        expect(result.code).toContain('/dist/src/assets/images/logo.png');
+        expect(result.code).toContain('/dist/src/styles/main.css');
         expect(result.code).not.toContain('@/assets');
         expect(result.code).not.toContain('@/styles');
     });
@@ -69,9 +68,9 @@ const backtick = \`P@/vendor/template.html\`;
 
         console.log('Diferentes comillas transformadas:', result.code);
         expect(result.error).toBeNull();
-        expect(result.code).toContain('/public/vendor/style.css');
-        expect(result.code).toContain('/public/vendor/script.js');
-        expect(result.code).toContain('/public/vendor/template.html');
+        expect(result.code).toContain('/dist/public/vendor/style.css');
+        expect(result.code).toContain('/dist/public/vendor/script.js');
+        expect(result.code).toContain('/dist/public/vendor/template.html');
         expect(result.code).not.toContain('P@/vendor');
     });
 
