@@ -779,27 +779,45 @@ export class ModuleResolutionOptimizer {
         const alias = this.findMatchingAlias(path);
         if (!alias || !env.PATH_DIST) {
             return null;
-        }
-
-        const relativePath = path.replace(alias.pattern, '');
+        }        const relativePath = path.replace(alias.pattern, '');
         const targetPath = alias.target[0];
 
         if (!targetPath) {
             return null;
-        }
-
-        // Construir ruta final
+        }        // Construir ruta final
         let finalPath: string;
         const pathDist = env.PATH_DIST.replace('./', '');
-        if (targetPath.startsWith('/')) {
+        
+        // Manejar caso especial: alias exacto sin wildcard (como #config -> config/index.js)
+        if (relativePath === '' && !targetPath.includes('*')) {
+            // Es un alias exacto, usar el target tal como está
+            if (targetPath.startsWith('/')) {
+                finalPath = join('/', pathDist, targetPath.substring(1));
+            } else {
+                const cleanTarget = targetPath.replace('./', '');
+                if (cleanTarget.startsWith('src/')) {
+                    const targetWithoutSrc = cleanTarget.replace('src/', '');
+                    finalPath = join('/', pathDist, targetWithoutSrc);
+                } else {
+                    finalPath = join('/', pathDist, cleanTarget);
+                }
+            }
+        } else if (targetPath.startsWith('/')) {
             // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
-            // Para targets como "/src/*", solo usamos PATH_DIST + relativePath
-            // sin incluir el directorio del target en la ruta final
-            finalPath = join('/', pathDist, relativePath);
+            // Para targets como "/src/*", mapear directamente al PATH_DIST
+            // Remover el primer directorio si es diferente de PATH_DIST
+            const targetWithoutSlash = targetPath.substring(1).replace('/*', '');
+            if (targetWithoutSlash === 'src' || targetWithoutSlash.startsWith('src/')) {
+                // Para "/src/*" mapear directamente a "/pathDist/relativePath"
+                finalPath = join('/', pathDist, relativePath);
+            } else {
+                // Para otros casos como "/examples/*", también mapear directamente
+                finalPath = join('/', pathDist, relativePath);
+            }
         } else {
             // Si es una ruta relativa, construir basándose en el target
             const cleanTarget = targetPath.replace('./', '').replace('/*', '');
-            console.log(cleanTarget, pathDist, relativePath);
+            
             // Si el target ya incluye el directorio de distribución, no duplicar
             if (cleanTarget === pathDist) {
                 finalPath = join('/', pathDist, relativePath);
@@ -807,8 +825,22 @@ export class ModuleResolutionOptimizer {
                 // Si el target ya contiene PATH_DIST como prefijo
                 finalPath = join('/', cleanTarget, relativePath);
             } else {
-                // Caso normal: agregar PATH_DIST como base
-                finalPath = join('/', pathDist, relativePath);
+                // Caso normal: mapear manteniendo la estructura relativa al target
+                if (cleanTarget.startsWith('src/')) {
+                    // Para "src/components/*" -> "/pathDist/components/*"
+                    const targetWithoutSrc = cleanTarget.replace('src/', '');
+                    finalPath = join('/', pathDist, targetWithoutSrc, relativePath);
+                } else {
+                    // Para casos como "examples/*" -> "/pathDist/*"
+                    // No incluir el directorio raíz en la ruta final
+                    const isRootDirectory = ['examples', 'src', 'app', 'lib'].includes(cleanTarget);
+                    if (isRootDirectory) {
+                        finalPath = join('/', pathDist, relativePath);
+                    } else {
+                        // Para subdirectorios específicos, mantener la estructura
+                        finalPath = join('/', pathDist, cleanTarget, relativePath);
+                    }
+                }
             }
         }
 
