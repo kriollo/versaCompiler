@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path'; // Importar el módulo path
-import { env } from 'node:process';
+import process, { env } from 'node:process';
 // Lazy loading optimizations - Only import lightweight modules synchronously
 import { fileURLToPath } from 'node:url';
 
@@ -117,7 +117,7 @@ async function main() {
             type: 'boolean',
             description:
                 'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=true',
-            default: false,
+            default: true,
         })
         .alias('t', 'typeCheck');
 
@@ -273,9 +273,7 @@ async function main() {
         }
         if (argv.file) {
             // Compilar archivo individual
-            logger.info(chalk.yellow(`📄 Compilando archivo: ${argv.file}`));
-
-            // Verificar si el archivo existe
+            logger.info(chalk.yellow(`📄 Compilando archivo: ${argv.file}`)); // Verificar si el archivo existe
             const fs = await import('node:fs/promises');
             const { compileFile } = await loadCompilerModule();
             let absolutePathFile: string;
@@ -289,8 +287,8 @@ async function main() {
                 process.exit(1);
             }
 
-            // Compilar el archivo
-            const result = await compileFile(absolutePathFile);
+            // Compilar el archivo (absolutePathFile está garantizado aquí)
+            const result = await compileFile(absolutePathFile!);
 
             if (result.success) {
                 logger.info(

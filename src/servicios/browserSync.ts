@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { env } from 'node:process';
+import process, { env } from 'node:process';
 
 import browserSync from 'browser-sync';
 import { html } from 'code-tag';

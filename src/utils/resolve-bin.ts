@@ -1,8 +1,12 @@
 import { createRequire } from 'node:module';
-import path from 'node:path';
+import * as path from 'node:path';
+import * as process from 'node:process';
 
 import findRoot from 'find-root';
 import fs from 'fs-extra';
+
+// Para compatibilidad con ES modules
+const require = createRequire(import.meta.url);
 
 export function resolveBin(
     moduleName: string,
@@ -13,10 +17,9 @@ export function resolveBin(
 ): string {
     let rootDir;
     try {
-        const customRequire = createRequire(__filename);
-        const resolved = customRequire.resolve(moduleName, { paths });
+        const resolved = require.resolve(moduleName, { paths });
         rootDir = findRoot(resolved);
-    } catch (e) {
+    } catch {
         const modJson = require.resolve(`${moduleName}/package.json`, {
             paths,
         });

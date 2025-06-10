@@ -1,6 +1,6 @@
 import { readdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { env } from 'node:process';
+import process, { env } from 'node:process';
 
 import * as chokidar from 'chokidar';
 

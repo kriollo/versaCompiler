@@ -466,16 +466,43 @@ export const preCompileTS = async (
 
         // PASO 2: Type checking opcional (solo si está habilitado)
         if (env.typeCheck === 'true') {
+            console.log(
+                '[preCompileTS] 🔍 Type checking habilitado, iniciando worker manager...',
+            );
             try {
                 const workerManager = TypeScriptWorkerManager.getInstance();
+                console.log(
+                    '[preCompileTS] 📊 Stats del worker antes:',
+                    workerManager.getStats(),
+                );
+
                 const serializableOptions =
                     createSerializableCompilerOptions(compilerOptions);
+
+                console.log(
+                    '[preCompileTS] 🚀 Enviando archivo al worker para type checking:',
+                    fileName,
+                );
+                const startWorkerTime = Date.now();
 
                 const typeCheckResult = await workerManager.typeCheck(
                     fileName,
                     data,
                     serializableOptions,
                 );
+
+                const workerTime = Date.now() - startWorkerTime;
+                console.log(
+                    `[preCompileTS] ⏱️ Worker completado en ${workerTime}ms`,
+                );
+                console.log(
+                    '[preCompileTS] 📊 Stats del worker después:',
+                    workerManager.getStats(),
+                );
+                console.log('[preCompileTS] 📝 Resultado del worker:', {
+                    hasErrors: typeCheckResult.hasErrors,
+                    diagnosticsCount: typeCheckResult.diagnostics.length,
+                });
 
                 if (typeCheckResult.hasErrors) {
                     const errorMessage = createUnifiedErrorMessage(
@@ -494,10 +521,14 @@ export const preCompileTS = async (
             } catch (typeCheckError) {
                 // Type checking falla, pero continuar con transpilación
                 console.warn(
-                    '[preCompileTS] Type checking failed:',
+                    '[preCompileTS] ❌ Type checking falló, usando transpilación sin verificación de tipos:',
                     typeCheckError,
                 );
             }
+        } else {
+            console.log(
+                '[preCompileTS] ⚠️ Type checking deshabilitado (env.typeCheck !== "true")',
+            );
         }
 
         // PASO 3: Devolver resultado optimizado
@@ -518,5 +549,3 @@ export const preCompileTS = async (
         };
     }
 };
-
-
