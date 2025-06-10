@@ -623,12 +623,11 @@ export class ModuleResolutionOptimizer {
         // Construir ruta final
         let finalPath: string;
         const pathDist = env.PATH_DIST.replace('./', '');
-
         if (targetPath.startsWith('/')) {
             // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
-            // Necesitamos agregar PATH_DIST como prefijo
-            const cleanTarget = targetPath.replace('/*', '');
-            finalPath = join('/', pathDist, cleanTarget, relativePath);
+            // Para targets como "/src/*", solo usamos PATH_DIST + relativePath
+            // sin incluir el directorio del target en la ruta final
+            finalPath = join('/', pathDist, relativePath);
         } else {
             // Si es una ruta relativa, construir basándose en el target
             const cleanTarget = targetPath.replace('./', '').replace('/*', '');

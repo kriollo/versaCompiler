@@ -578,15 +578,14 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                 // El target puede ser un array de strings o un string
                 const targetArray = Array.isArray(target) ? target : [target];
                 const targetPath = targetArray[0];
-
                 if (targetPath.startsWith('/')) {
                     // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
-                    // Remover /* del final si existe
-                    const cleanTarget = targetPath.replace('/*', '');
-                    newPath = path.join(cleanTarget, relativePath);
+                    // Para targets como "/src/*", solo usamos PATH_DIST + relativePath
+                    // sin incluir el directorio del target en la ruta final
+                    newPath = path.join('/', pathDist, relativePath);
                     if (env.VERBOSE === 'true') {
                         console.log(
-                            `  ✅ Ruta absoluta: cleanTarget="${cleanTarget}", newPath="${newPath}"`,
+                            `  ✅ Ruta absoluta: pathDist="${pathDist}", relativePath="${relativePath}", newPath="${newPath}"`,
                         );
                     }
                 } else {
