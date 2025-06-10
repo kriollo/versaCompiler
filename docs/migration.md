@@ -74,7 +74,8 @@ export default {
 
 - VersaCompiler solo soporta un proxy simple
 - No hay configuración avanzada de servidor
-- HMR básico, no tan robusto como Vite
+- HMR básico pero con TypeScript workers para mejor performance
+- Sin configuración de middleware personalizado
 
 ## 🔧 Migración desde Webpack
 
@@ -113,10 +114,11 @@ export default {
 
 **⚠️ Limitaciones importantes:**
 
-- **No hay sistema de plugins**
+- **No hay sistema de plugins** avanzado
 - **No hay loaders personalizados**
-- **No hay code splitting**
-- **No hay optimizaciones avanzadas**
+- **No hay code splitting** automático
+- **No hay optimizaciones avanzadas** como Webpack
+- **Pero sí tiene**: TypeScript workers, Vue 3.5 completo, dual linting
 
 ## 📝 Scripts NPM
 
@@ -142,7 +144,11 @@ export default {
         "dev": "versacompiler --watch",
         "build": "versacompiler --all --prod",
         "lint": "versacompiler --lint-only",
-        "clean": "versacompiler --clean"
+        "clean": "versacompiler --cleanOutput",
+        "clean:cache": "versacompiler --cleanCache",
+        "typecheck": "versacompiler --typeCheck",
+        "tailwind": "versacompiler --tailwind --watch",
+        "build:clean": "versacompiler --cleanOutput --all --prod"
     }
 }
 ```
@@ -188,6 +194,10 @@ export default {
             configFile: './eslint.config.js',
             fix: false,
             paths: ['src/'],
+            rules: {
+                '@typescript-eslint/no-unused-vars': 'error',
+                'vue/component-definition-name-casing': ['error', 'PascalCase'],
+            },
         },
         {
             name: 'oxlint',
@@ -195,8 +205,14 @@ export default {
             configFile: './.oxlintrc.json',
             fix: false,
             paths: ['src/'],
+            rules: {
+                'no-unused-vars': 'error',
+                'no-console': 'warn',
+            },
         },
     ],
+    // Habilitar TypeScript workers para mejor performance
+    useWorkers: true,
 };
 ```
 
@@ -263,6 +279,15 @@ mi-proyecto/
 ❌ **Asset handling avanzado**
 ❌ **Environment variables automáticas**
 
+✅ **Pero VersaCompiler SÍ incluye:**
+
+- TypeScript workers para mejor performance
+- Vue 3.5 soporte completo
+- Dual linting (ESLint + OxLint)
+- TailwindCSS integrado
+- HMR con preservación de estado
+- CSS Modules/SCSS básico
+
 ### Desde Webpack
 
 ❌ **Sistema de loaders**
@@ -272,12 +297,26 @@ mi-proyecto/
 ❌ **Asset optimization**
 ❌ **Bundle analysis**
 
+✅ **Pero VersaCompiler SÍ incluye:**
+
+- Compilación paralela con workers
+- Minificación con OxcMinify (más rápido)
+- Cache inteligente
+- TypeScript decorators experimentales
+
 ### Desde Rollup
 
 ❌ **Tree shaking avanzado**
 ❌ **Plugin ecosystem**
 ❌ **Multiple output formats**
 ❌ **Configuración fine-tuned**
+
+✅ **Pero VersaCompiler SÍ incluye:**
+
+- Tree shaking básico automático
+- Dead code elimination
+- Optimización de imports ES6
+- Minificación moderna con OxcMinify
 
 ## 🔄 Proceso de Migración Paso a Paso
 
@@ -309,7 +348,12 @@ export default {
         pathsAlias: {
             '@/*': ['src/*'],
         },
+        // Soporte para decoradores experimentales
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
     },
+    // Habilitar TypeScript workers
+    useWorkers: true,
     linter: [
         {
             name: 'eslint',
@@ -319,6 +363,12 @@ export default {
             paths: ['src/'],
         },
     ],
+    // Configuración de TailwindCSS
+    tailwindConfig: {
+        bin: './node_modules/.bin/tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
 };
 ```
 
@@ -334,21 +384,36 @@ versacompiler --all --verbose
 versacompiler --watch
 ```
 
-### 6. Ajustar según Errores
+### 6. Probar TailwindCSS (si aplica)
+
+```bash
+versacompiler --tailwind --watch
+```
+
+### 7. Ajustar según Errores
 
 - Verificar que todos los archivos se compilan
 - Ajustar paths si es necesario
 - Configurar proxy si usas API backend
+- Habilitar workers si tienes muchos archivos TypeScript
 
 ## ⚠️ Consideraciones Importantes
 
 ### Limitaciones Actuales
 
-1. **HMR básico** - No tan robusto como Vite/Webpack
+1. **HMR básico** - Funcional pero no tan robusto como Vite/Webpack
 2. **Sin code splitting** - Todo se compila en archivos separados
-3. **Sin optimizaciones avanzadas** - Solo minificación básica
+3. **Sin optimizaciones avanzadas** - Solo minificación con OxcMinify
 4. **Proxy simple** - Solo un endpoint
-5. **Sin source maps** - Debugging limitado
+5. **Sin source maps** - Debugging limitado en producción
+
+### Ventajas Únicas de VersaCompiler
+
+1. **TypeScript Workers** - Compilación paralela más rápida
+2. **Dual Linting** - ESLint + OxLint simultáneo
+3. **Vue 3.5 completo** - Soporte total para las últimas características
+4. **Cache inteligente** - Builds incrementales eficientes
+5. **TailwindCSS integrado** - Sin configuración adicional
 
 ### Casos No Recomendados
 
@@ -364,10 +429,13 @@ versacompiler --watch
 
 **SÍ usa VersaCompiler si:**
 
-- ✅ Proyecto experimental/pequeño
-- ✅ Configuración simple
-- ✅ Solo Vue + TypeScript básico
-- ✅ Quieres herramienta minimalista
+- ✅ Proyecto experimental/pequeño a mediano
+- ✅ Configuración simple y rápida
+- ✅ Solo Vue + TypeScript básico/intermedio
+- ✅ Quieres herramienta minimalista pero moderna
+- ✅ Necesitas TypeScript workers para mejor performance
+- ✅ Quieres dual linting sin configuración compleja
+- ✅ Proyectos con Vue 3.5 y TypeScript decorators
 
 ## 🆘 Troubleshooting de Migración
 
@@ -392,6 +460,13 @@ export default {
 ```bash
 # Verificar tsconfig.json
 npx tsc --noEmit
+
+# Habilitar workers si tienes muchos archivos
+# En versacompile.config.ts
+export default {
+    useWorkers: true,
+    // ...
+};
 ```
 
 #### "Linter not working"
@@ -399,6 +474,22 @@ npx tsc --noEmit
 ```bash
 # Verificar que están instalados
 npm list eslint oxlint
+
+# Verificar configuración
+versacompiler --linter eslint --verbose
+```
+
+#### "TailwindCSS not compiling"
+
+```typescript
+// Verificar configuración tailwindConfig
+export default {
+    tailwindConfig: {
+        bin: './node_modules/.bin/tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
+};
 ```
 
 ### Rollback Plan

@@ -14,19 +14,27 @@
 
 ### ¿Qué es VersaCompiler?
 
-VersaCompiler es una herramienta experimental de compilación para proyectos Vue.js con TypeScript. Está en desarrollo activo y combina compilación de Vue SFC, TypeScript, linting y minificación básica.
+VersaCompiler es una herramienta avanzada de compilación para proyectos Vue.js con TypeScript. Combina compilación de Vue SFC, TypeScript con workers, sistema de linting dual (ESLint + OxLint), minificación ultra-rápida y Hot Module Replacement.
 
 ### ¿Es VersaCompiler estable para producción?
 
-**VersaCompiler está en desarrollo**. Es un proyecto experimental que puede usarse para proyectos pequeños a medianos, pero recomendamos herramientas maduras como Vite o Webpack para proyectos críticos en producción.
+**VersaCompiler está en desarrollo activo** pero es funcional para proyectos de producción pequeños a medianos. Incluye:
+
+- ✅ **Compilación robusta** con manejo de errores avanzado
+- ✅ **Workers TypeScript** para validación de tipos eficiente
+- ✅ **Sistema de cache** multinivel para performance
+- ✅ **Minificación de producción** con OxcMinify
+- ⚠️ **Para proyectos críticos** considera Vite/Webpack como alternativa madura
 
 ### ¿Qué tipo de proyectos soporta?
 
-- ✅ **Vue 3** Single File Components
-- ✅ **TypeScript** transpilación básica
-- ✅ **JavaScript** moderno
-- ✅ **TailwindCSS** compilación
-- ⚠️ **Proyectos pequeños a medianos** (en desarrollo)
+- ✅ **Vue 3.5** Single File Components con todas las características
+- ✅ **TypeScript avanzado** con decorators, Language Service, workers
+- ✅ **JavaScript moderno** ES2020+ con minificación inteligente
+- ✅ **TailwindCSS** compilación optimizada con purging
+- ✅ **CSS Modules, SCSS** preprocesadores integrados
+- ✅ **Linting dual** ESLint + OxLint con múltiples formatos
+- ✅ **Proyectos enterprise** con configuraciones avanzadas
 
 ### ¿Es VersaCompiler gratuito?
 
@@ -78,19 +86,46 @@ Sí, pero debes configurar manualmente el archivo `versacompile.config.ts` segú
 ### ¿Cómo inicio el modo desarrollo?
 
 ```bash
+# Desarrollo básico con HMR
 versacompiler --watch
-```
 
-Esto compilará los archivos y observará cambios para recompilación automática.
+# Desarrollo con información detallada
+versacompiler --watch --verbose
+
+# Desarrollo con verificación de tipos
+versacompiler --watch --typeCheck
+```
 
 ### ¿Hay HMR (Hot Module Replacement)?
 
-VersaCompiler tiene **HMR básico** usando BrowserSync. Es funcional pero no tan avanzado como Vite o Webpack.
+VersaCompiler tiene **HMR avanzado** con:
+
+- ✅ **Preservación de estado** en componentes Vue
+- ✅ **Actualización instantánea** de estilos CSS/SCSS
+- ✅ **Keys únicos** para identificación de componentes
+- ✅ **BrowserSync integrado** para sincronización cross-device
 
 ### ¿Qué archivos observa?
 
 - Archivos `.vue`, `.ts`, `.js` en el directorio `sourceRoot`
+- Archivos CSS, SCSS cuando está habilitado TailwindCSS
 - Archivos adicionales definidos en `aditionalWatch`
+- Configuraciones de linting (.eslintrc, .oxlintrc)
+
+### ¿Puedo compilar archivos específicos?
+
+Sí, VersaCompiler permite compilación granular:
+
+```bash
+# Compilar archivo específico
+versacompiler --file src/components/Button.vue
+
+# Compilar múltiples archivos
+versacompiler src/main.ts src/App.vue src/router.ts
+
+# Solo verificar tipos en archivo específico
+versacompiler --typeCheck --file src/types/api.ts
+```
 
 ### ¿Puedo usar un proxy para API?
 
@@ -109,13 +144,17 @@ export default {
 
 ### ¿Necesito configurar TypeScript?
 
-VersaCompiler usa tu `tsconfig.json` existente. Si no tienes uno, crea uno básico:
+VersaCompiler usa tu `tsconfig.json` existente y lo optimiza automáticamente. Para soporte completo incluyendo decorators:
 
 ```json
 {
     "compilerOptions": {
         "target": "ES2020",
         "module": "ESNext",
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+        "strict": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
         "baseUrl": ".",
         "paths": {
             "@/*": ["src/*"]
@@ -126,21 +165,52 @@ VersaCompiler usa tu `tsconfig.json` existente. Si no tienes uno, crea uno bási
 
 ### ¿Soporta Vue 3 completamente?
 
-VersaCompiler puede compilar Vue SFC básicos, pero **no todas las características avanzadas** están implementadas. Para proyectos complejos, considera Vite.
+VersaCompiler soporta **Vue 3.5 completamente** incluyendo:
 
-### ¿Puedo usar Composition API?
+- ✅ **Script setup** con Composition API
+- ✅ **CSS Modules** con hashing automático
+- ✅ **Scoped styles** con scope IDs únicos
+- ✅ **SCSS/Sass** preprocesadores
+- ✅ **Custom blocks** en SFC
+- ✅ **Slots avanzados** con fallbacks
+- ✅ **defineProps, defineEmits** y todas las macros
+- ✅ **Archivos virtuales** .vue.ts para validación de tipos
 
-Sí, la Composition API de Vue 3 funciona correctamente.
+### ¿Funcionan los TypeScript workers?
+
+Sí, VersaCompiler incluye un sistema avanzado de workers para TypeScript:
+
+- ✅ **Validación de tipos** en threads separados
+- ✅ **Fallback sincrónico** para entornos de testing
+- ✅ **Cache inteligente** de validaciones
+- ✅ **Language Service Host** optimizado
+- ✅ **Filtrado de errores** específicos de decorators
+
+### ¿Puedo usar decorators de TypeScript?
+
+Absolutamente. VersaCompiler tiene soporte completo para decorators:
+
+```typescript
+// tsconfig.json
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+    }
+}
+```
 
 ### ¿Funcionan los path aliases?
 
-Sí, configúralos en `pathsAlias`:
+Sí, configúralos en `pathsAlias` y también en tu `tsconfig.json`:
 
 ```typescript
 export default {
     compilerOptions: {
         pathsAlias: {
             '@/*': ['src/*'],
+            '@components/*': ['src/components/*'],
+            '@utils/*': ['src/utils/*'],
             '@components/*': ['src/components/*'],
         },
     },
@@ -151,10 +221,12 @@ export default {
 
 ### ¿Qué linters soporta?
 
-- **ESLint** - Linter tradicional de JavaScript/TypeScript
-- **OxLint** - Linter ultrarrápido escrito en Rust
+VersaCompiler incluye un sistema de linting dual de nueva generación:
 
-### ¿Cómo configuro linting?
+- **ESLint** - Análisis profundo con múltiples formatos (json, stylish, compact)
+- **OxLint** - Linter ultra-rápido en Rust con integración TypeScript
+
+### ¿Cómo configuro linting avanzado?
 
 ```typescript
 export default {
@@ -163,20 +235,65 @@ export default {
             name: 'eslint',
             bin: './node_modules/.bin/eslint',
             configFile: './eslint.config.js',
-            fix: false,
+            fix: true,
             paths: ['src/'],
+            eslintConfig: {
+                cache: true,
+                maxWarnings: 0,
+                formats: ['stylish', 'json'],
+                quiet: false,
+                deny: ['no-console', 'no-debugger'],
+                allow: ['no-unused-vars'],
+            },
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: true,
+            paths: ['src/'],
+            oxlintConfig: {
+                tsconfigPath: './tsconfig.json',
+                quiet: true,
+                rules: {
+                    'no-unused-vars': 'error',
+                },
+            },
         },
     ],
 };
 ```
 
-### ¿Puedo usar ambos linters?
+### ¿Puedo usar solo linting sin compilar?
 
-Sí, puedes configurar ESLint y OxLint simultáneamente para máxima cobertura.
+Sí, usa el comando específico:
 
-### ¿Se corrigen errores automáticamente?
+```bash
+# Solo linting
+versacompiler --linter
 
-Configura `fix: true` en la configuración del linter para auto-fix.
+# Linting con información detallada
+versacompiler --linter --verbose
+
+# Linting de archivos específicos
+versacompiler --linter src/components/ tests/
+```
+
+### ¿Qué formatos de salida soporta?
+
+ESLint soporta múltiples formatos:
+
+- `stylish` - Formato colorido para terminal (por defecto)
+- `json` - Salida JSON para herramientas CI/CD
+- `compact` - Formato compacto para revisión rápida
+
+### ¿Funciona con TypeScript estricto?
+
+Sí, el sistema de linting está optimizado para TypeScript estricto e incluye:
+
+- Integración con `tsconfig.json`
+- Filtrado automático de errores de decorators
+- Validación de tipos en archivos Vue (.vue.ts virtuales)
 
 ## 🚀 Producción y Deployment
 

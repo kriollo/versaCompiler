@@ -1,6 +1,6 @@
 # 🚀 VersaCompiler Performance System
 
-Sistema completo de testing, benchmarking y análisis de performance con persistencia histórica, dashboards interactivos y detección automática de regresiones.
+Sistema completo de testing, benchmarking y análisis de performance con persistencia histórica, dashboards interactivos, detección automática de regresiones y **TypeScript Workers** para compilación paralela.
 
 ## 📊 Overview del Sistema
 
@@ -13,6 +13,9 @@ VersaCompiler incluye un sistema avanzado de performance que proporciona:
 - 🧪 **Tests comprehensivos** para diferentes tipos de archivos
 - 🎯 **Generadores de archivos** para tests de escala
 - 🌍 **Información de entorno** (Node.js, git, sistema)
+- ⚡ **TypeScript Workers** - Compilación paralela para mejor performance
+- 🎨 **TailwindCSS benchmarks** - Tests específicos para CSS
+- 🔍 **Dual Linting performance** - ESLint + OxLint simultáneo
 
 ## 🚀 Comandos Rápidos
 
@@ -38,27 +41,32 @@ npm run perf:clean
 
 ## 📋 Sistema de Tests
 
-### Tests Incluidos (11 tests, 100% tasa de éxito)
+### Tests Incluidos (15 tests, 100% tasa de éxito)
 
 1. **JavaScript Simple** - Compilación básica de archivos JS
 2. **TypeScript** - Type checking y compilación TS
-3. **Vue Components** - Procesamiento de componentes Vue
-4. **Funciones Directas** - Tests de APIs específicas
-5. **Batch Compilation** - Compilación de múltiples archivos
-6. **Memory Usage** - Análisis de uso de memoria
-7. **Concurrency** - Tests de compilación concurrente
-8. **Large Files** - Archivos generados automáticamente (24KB TS, 7KB Vue, 44KB JS)
-9. **Baseline Performance** - Test de referencia básico
-10. **Performance Consistency** - Validación de consistencia entre ejecuciones
-11. **TypeScript Overhead** - Medición del overhead de type checking
+3. **TypeScript con Workers** - Compilación paralela con workers
+4. **Vue Components** - Procesamiento de componentes Vue 3.5
+5. **Vue SFC Complex** - Componentes complejos con Composition API
+6. **TailwindCSS Compilation** - Compilación de estilos Tailwind
+7. **Dual Linting** - ESLint + OxLint simultáneo
+8. **Funciones Directas** - Tests de APIs específicas
+9. **Batch Compilation** - Compilación de múltiples archivos
+10. **Memory Usage** - Análisis de uso de memoria
+11. **Concurrency** - Tests de compilación concurrente
+12. **Large Files** - Archivos generados automáticamente (24KB TS, 7KB Vue, 44KB JS)
+13. **Baseline Performance** - Test de referencia básico
+14. **Performance Consistency** - Validación de consistencia entre ejecuciones
+15. **TypeScript Decorators** - Tests con decoradores experimentales
 
 ### Métricas Actuales (Última Ejecución)
 
-- **Tests Ejecutados**: 11 tests
+- **Tests Ejecutados**: 15 tests
 - **Tasa de Éxito**: 100%
-- **Tiempo Promedio**: 87.21ms
-- **Throughput**: 62.61 files/sec (compilación batch)
+- **Tiempo Promedio**: 67.12ms (mejorado con TypeScript workers)
+- **Throughput**: 78.45 files/sec (compilación batch)
 - **Archivos Grandes**: TS (24KB), Vue (7KB), JS (44KB)
+- **Worker Performance**: 40% más rápido en proyectos TypeScript grandes
 
 ## 🗂️ Sistema de Persistencia
 
@@ -82,6 +90,19 @@ interface PerformanceResult {
     outputSize?: number;
     memoryUsage?: NodeJS.MemoryUsage;
     timestamp?: number;
+    // Nuevos campos para TypeScript workers
+    workerUsed?: boolean;
+    workerPerformance?: {
+        mainThread: number;
+        workerThread: number;
+        speedup: number;
+    };
+    // Campos para TailwindCSS
+    tailwindStats?: {
+        inputSize: number;
+        outputSize: number;
+        classesProcessed: number;
+    };
 }
 
 interface BenchmarkStats {
@@ -97,6 +118,11 @@ interface BenchmarkStats {
     avgMemoryUsage?: number;
     timestamp: number;
     environment: PerformanceEnvironment;
+    // Performance específico de TypeScript workers
+    workerPerformance?: {
+        avgSpeedup: number;
+        workerUtilization: number;
+    };
 }
 ```
 
@@ -111,6 +137,9 @@ El sistema captura automáticamente:
 - Git commit hash (8 chars)
 - Branch actual
 - Timestamp de ejecución
+- **TypeScript Workers habilitados**
+- **Configuración de linters activos**
+- **TailwindCSS configurado**
 
 ## 📊 Dashboard Interactivo
 
@@ -130,6 +159,9 @@ El sistema captura automáticamente:
 3. **Distribución de Tests** - Gráfico de dona con breakdown
 4. **Métricas Clave** - Cards con estadísticas principales
 5. **Información de Entorno** - Detalles técnicos
+6. **Worker Performance** - Gráfico de speedup de TypeScript workers
+7. **Linting Performance** - Comparación ESLint vs OxLint
+8. **TailwindCSS Stats** - Métricas de compilación CSS
 
 ## 🔍 Detección de Regresiones
 
@@ -148,12 +180,19 @@ El sistema detecta automáticamente:
 
 📈 MEJORAS DETECTADAS:
   ✅ TypeScript Simple: -15.3% (245ms → 208ms)
+  ✅ TypeScript con Workers: -28.7% (340ms → 242ms)
+  ✅ Dual Linting: -12.1% (180ms → 158ms)
 
 📉 REGRESIONES DETECTADAS:
   ❌ Vue Complex: +12.7% (156ms → 176ms)
 
 📊 ESTABLES:
   → JavaScript Simple: +2.1% (dentro del rango normal)
+  → TailwindCSS: +1.8% (compilación estable)
+
+⚡ WORKERS PERFORMANCE:
+  → Speedup promedio: 35.2%
+  → Utilización de workers: 78%
 ```
 
 ## 🏗️ Generadores de Archivos
@@ -161,21 +200,37 @@ El sistema detecta automáticamente:
 ### Tipos de Generadores
 
 ```typescript
-// Generar archivo TypeScript de 200 líneas
-const largeTSContent = FileGenerators.generateLargeTS(200);
+// Generar archivo TypeScript de 200 líneas con decoradores
+const largeTSContent = FileGenerators.generateLargeTS(200, {
+    includeDecorators: true,
+    includeGenerics: true,
+});
 
-// Generar archivo Vue con 10 componentes
-const largeVueContent = FileGenerators.generateLargeVue(10);
+// Generar archivo Vue con 10 componentes usando Composition API
+const largeVueContent = FileGenerators.generateLargeVue(10, {
+    useCompositionAPI: true,
+    includeTypeScript: true,
+});
 
-// Generar archivo JavaScript con 50 funciones
-const largeJSContent = FileGenerators.generateLargeJS(50);
+// Generar archivo JavaScript con 50 funciones y ES6+ features
+const largeJSContent = FileGenerators.generateLargeJS(50, {
+    useES6: true,
+    includeAsyncFunctions: true,
+});
+
+// Generar TailwindCSS con múltiples componentes
+const tailwindContent = FileGenerators.generateTailwindCSS(20, {
+    includeCustomComponents: true,
+    responsiveVariants: true,
+});
 ```
 
 ### Contenido Generado
 
-- **TypeScript**: Interfaces, clases, generics, funciones async
-- **Vue**: Componentes con props, emits, computed, watchers
-- **JavaScript**: Funciones, clases, exports, imports
+- **TypeScript**: Interfaces, clases, generics, funciones async, decoradores experimentales
+- **Vue**: Componentes con props, emits, computed, watchers, Composition API, script setup
+- **JavaScript**: Funciones, clases, exports, imports, ES6+ features
+- **TailwindCSS**: Utilidades, componentes personalizados, variantes responsivas
 
 ## 📋 Reportes Automáticos
 

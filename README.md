@@ -10,14 +10,16 @@
 
 ## 🌟 Características Principales
 
-- ⚡ **Compilación rápida** - Compilación paralela optimizada para velocidad
-- 🔥 **Hot Module Replacement (HMR)** - Actualizaciones instantáneas durante desarrollo
-- 🧩 **Soporte completo para Vue 3** - Single File Components (SFC)
-- 📝 **TypeScript nativo** - Transpilación integrada sin configuración adicional
-- 🔍 **Linting dual** - ESLint + OxLint para máxima cobertura
-- 🎨 **TailwindCSS integrado** - Compilación automática de estilos
-- 🗜️ **Minificación avanzada** - OxcMinify para builds optimizados
-- 📦 **Bundling inteligente** - Agrupación de módulos configurable
+- ⚡ **Compilación ultra-rápida** - Workers paralelos y cache inteligente
+- 🔥 **Hot Module Replacement (HMR)** - Actualizaciones instantáneas con preservación de estado
+- 🧩 **Soporte completo para Vue 3** - SFC, Composition API, script setup
+- 📝 **TypeScript avanzado** - Language Service, decorators, validación de tipos
+- 🔍 **Sistema de linting dual** - ESLint + OxLint con auto-fix
+- 🎨 **TailwindCSS integrado** - Compilación automática y optimizada
+- 🗜️ **Minificación de última generación** - OxcMinify para builds ultra-optimizados
+- 📦 **Bundling inteligente** - Agrupación configurable de módulos (EN DESARROLLO)
+- 🛠️ **Compilación por archivo** - Granular control de compilación
+- 🧹 **Gestión de caché avanzada** - Cache automático con invalidación inteligente
 
 ## ⚡ Instalación
 
@@ -61,36 +63,60 @@ mi-proyecto/
 ### 3. Comandos básicos
 
 ```bash
-# 🔥 Desarrollo con auto-reload
+# 🔥 Desarrollo con auto-reload y HMR
 versacompiler --watch
+
+# 🔥 Desarrollo con análisis detallado
+versacompiler --watch --verbose
 
 # 🏗️ Compilar todo el proyecto
 versacompiler --all
 
-# 🚀 Build para producción
+# 📄 Compilar archivo específico
+versacompiler --file src/components/MyComponent.vue
+
+# 📝 Compilar múltiples archivos específicos
+versacompiler src/main.ts src/components/App.vue
+
+# 🚀 Build para producción (minificado)
 versacompiler --all --prod
 
-# 🔍 Solo verificar código (linting)
-versacompiler --lint-only
+# 🧹 Limpiar y recompilar todo
+versacompiler --all --cleanOutput --cleanCache
 
-# 🧹 Limpiar y recompilar
-versacompiler --clean --all
+# 🔍 Solo verificar código (linting)
+versacompiler --linter
+
+# 🎨 Solo compilar TailwindCSS
+versacompiler --tailwind
+
+# ⚡ Compilación rápida con confirmación automática
+versacompiler --all --prod --yes
+
+# 🔬 Verificación de tipos específica
+versacompiler --typeCheck --file src/types.ts
 ```
 
 ## 📖 Configuración
 
 ### 🛠️ Comandos CLI Disponibles
 
-| Comando       | Alias | Descripción                      |
-| ------------- | ----- | -------------------------------- |
-| `--watch`     | `-w`  | Modo observación con HMR         |
-| `--all`       |       | Compilar todos los archivos      |
-| `--prod`      | `-p`  | Modo producción con minificación |
-| `--clean`     |       | Limpiar directorio de salida     |
-| `--lint-only` |       | Solo ejecutar linting            |
-| `--verbose`   | `-v`  | Salida detallada                 |
-| `--init`      |       | Inicializar configuración        |
-| `--help`      | `-h`  | Mostrar ayuda                    |
+| Comando            | Alias | Descripción                                    |
+| ------------------ | ----- | ---------------------------------------------- |
+| `--init`           |       | Inicializar configuración del proyecto         |
+| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
+| `--all`            |       | Compilar todos los archivos del proyecto       |
+| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
+| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
+| `--prod`           | `-p`  | Modo producción con minificación               |
+| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
+| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
+| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
+| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
+| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos   |
+| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS |
+| `--linter`         |       | Habilitar/deshabilitar análisis de código      |
+| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
 
 ### 🔧 Archivo de configuración
 
@@ -165,13 +191,23 @@ export default {
 
 #### `linter`
 
-Array de configuraciones de linters:
+Array de configuraciones de linters avanzadas:
 
 - `name`: Nombre del linter (`'eslint'` o `'oxlint'`)
 - `bin`: Ruta al binario del linter
 - `configFile`: Archivo de configuración del linter
-- `fix`: Auto-fix de errores
-- `paths`: Rutas a analizar
+- `fix`: Auto-fix de errores detectados
+- `paths`: Rutas específicas a analizar
+- `eslintConfig`: Configuración específica de ESLint
+    - `cache`: Habilitar cache de ESLint
+    - `maxWarnings`: Máximo número de warnings
+    - `quiet`: Mostrar solo errores
+    - `formats`: Formatos de salida (`'json'`, `'stylish'`, `'compact'`)
+- `oxlintConfig`: Configuración específica de OxLint
+    - `rules`: Reglas personalizadas
+    - `plugins`: Plugins de OxLint
+    - `deny`: Reglas a denegar
+    - `allow`: Reglas a permitir
 
 #### `bundlers`
 
@@ -186,91 +222,296 @@ Array de configuraciones de bundling:
 ### Desarrollo Local
 
 ```bash
-# Iniciar servidor de desarrollo
+# Iniciar servidor de desarrollo con HMR
 versacompiler --watch
 
-# Con verbose para debugging
+# Desarrollo con información detallada
 versacompiler --watch --verbose
 
+# Compilación específica durante desarrollo
+versacompiler --file src/main.ts
+
 # Solo linting durante desarrollo
-versacompiler --lint-only
+versacompiler --linter
+
+# Desarrollo con limpieza de caché
+versacompiler --watch --cleanCache
 ```
 
 ### Compilación para Producción
 
 ```bash
 # Build completo para producción
-versacompiler --all --prod --clean
+versacompiler --all --prod
 
-# Con análisis detallado
+# Build con limpieza previa
+versacompiler --all --prod --cleanOutput --cleanCache
+
+# Build silencioso para CI/CD
+versacompiler --all --prod --yes
+
+# Build con análisis detallado
 versacompiler --all --prod --verbose
+```
+
+### Flujos de Trabajo Específicos
+
+```bash
+# Compilar solo archivos modificados
+versacompiler file1.vue file2.ts file3.js
+
+# Verificación de tipos específica
+versacompiler --typeCheck --file src/types/api.ts
+
+# Solo TailwindCSS
+versacompiler --tailwind
+
+# Compilación híbrida (linting + compilación)
+versacompiler --all --linter --typeCheck
 ```
 
 ### Integración CI/CD
 
 ```bash
-# Pipeline de CI
-versacompiler --lint-only        # Verificar código
-versacompiler --all --prod      # Build para producción
+# Pipeline de CI completo
+versacompiler --linter                    # 1. Verificar código
+versacompiler --typeCheck --all          # 2. Verificar tipos
+versacompiler --all --prod --yes         # 3. Build para producción
+```
+
+## 🧩 Casos de Uso Avanzados
+
+### 🎮 Desarrollo de Componentes Vue
+
+```bash
+# Compilación específica de componente con hot reload
+versacompiler --watch --file src/components/GameBoard.vue
+
+# Desarrollo con validación de tipos estricta
+versacompiler --watch --typeCheck --verbose
+
+# Solo compilar estilos para rapid prototyping
+versacompiler --tailwind --file src/styles/components.css
+```
+
+### 🏢 Proyectos Enterprise
+
+```bash
+# Validación completa antes de commit
+versacompiler --linter --typeCheck --all
+
+# Build optimizado para múltiples entornos
+versacompiler --all --prod --cleanOutput --verbose
+
+# Análisis de bundle para optimización
+versacompiler --all --prod --verbose | grep "Bundle"
+```
+
+### 🧪 Testing y CI/CD
+
+```bash
+# Pre-commit hooks
+versacompiler --linter --typeCheck --cleanCache
+
+# GitHub Actions / CI Pipeline
+versacompiler --all --prod --yes --verbose
+
+# Testing de componentes individuales
+versacompiler --file tests/components/Button.test.ts
+```
+
+### 🎨 Design System Development
+
+```bash
+# Compilación de componentes de design system
+versacompiler --watch src/design-system/components/
+
+# Build de librería de componentes
+versacompiler --all --prod src/design-system/
+
+# Validación de tokens de diseño
+versacompiler --tailwind --verbose
 ```
 
 ## 🏗️ Funcionalidades
 
 ### 🔥 Hot Module Replacement (HMR)
 
-- **Componentes Vue**: Actualizaciones instantáneas preservando estado
-- **TypeScript/JavaScript**: Recarga inteligente de módulos
-- **CSS/TailwindCSS**: Inyección de estilos sin recarga
+- **Componentes Vue**: Actualizaciones instantáneas preservando estado de componentes
+- **TypeScript/JavaScript**: Recarga inteligente de módulos sin perder contexto
+- **CSS/TailwindCSS**: Inyección de estilos en tiempo real
+- **Key-based updates**: Sistema de keys únicos para identificación de componentes
 
-### 🚀 Compilación Paralela
+### 🚀 Sistema de Compilación Avanzado
 
-- **Pool de workers optimizado** basado en CPU cores
-- **Cache inteligente** evita recompilaciones innecesarias
-- **Progress bar visual** con métricas en tiempo real
+- **Worker Threads**: Pool de workers TypeScript optimizado para CPU cores
+- **Cache inteligente**: Sistema de cache por archivos con invalidación automática
+- **Compilación incremental**: Solo recompila archivos modificados
+- **Progress tracking**: Métricas en tiempo real con timing detallado
+- **Lazy loading**: Carga de módulos bajo demanda para máxima eficiencia
 
-### 🔍 Sistema de Linting Dual
+### 🔍 Sistema de Linting Dual de Nueva Generación
 
-- **ESLint**: Análisis de código JavaScript/TypeScript
+- **ESLint**: Análisis profundo de código JavaScript/TypeScript/Vue
+    - Soporte para múltiples formatos de salida (json, stylish, compact)
+    - Cache inteligente para acelerar análisis repetitivos
+    - Auto-fix avanzado con preservación de formato
 - **OxLint**: Linter ultra-rápido escrito en Rust
-- **Auto-fix**: Corrección automática de problemas
+    - Análisis paralelo de archivos
+    - Reglas optimizadas para Vue 3 y TypeScript moderno
+    - Integración con tsconfig.json
 
-### 📦 Minificación Optimizada
+### 📝 TypeScript de Última Generación
 
-- **OxcMinify**: Minificador de última generación
-- **Tree shaking**: Eliminación de código no utilizado
-- **Compresión avanzada**: Optimización de tamaño
+- **Language Service Host**: Validación de tipos completa y optimizada
+- **Soporte para Decorators**: Experimental decorators y emit decorator metadata
+- **Archivos virtuales**: Soporte para archivos .vue como .vue.ts
+- **Worker-based validation**: Validación de tipos en threads separados
+- **Fallback inteligente**: Modo sincrónico para entornos de testing
+- **Error filtering**: Filtrado inteligente de errores específicos de TypeScript
+
+### 🧩 Soporte Vue 3 de Nivel Profesional
+
+- **Vue 3.5 Support**: Soporte completo para las últimas características
+- **Script Setup**: Compilación optimizada de composition API
+- **CSS Modules**: Soporte completo para CSS modules con hashing
+- **Scoped Styles**: Compilación de estilos scoped con scope IDs únicos
+- **SCSS/Sass**: Preprocesadores CSS integrados
+- **Custom Blocks**: Soporte para bloques personalizados en SFC
+- **Slots avanzados**: Compilación optimizada de slots con fallbacks
+
+### 📦 Minificación y Optimización
+
+- **OxcMinify**: Minificador de última generación escrito en Rust
+- **Tree shaking**: Eliminación inteligente de código no utilizado
+- **Variable mangling**: Renombrado de variables para máxima compresión
+- **Dead code elimination**: Eliminación de código muerto
+- **Compresión avanzada**: Algoritmos de compresión optimizados
+- **Source maps**: Generación de source maps en desarrollo
+
+### 🛠️ Gestión de Archivos y Cache
+
+- **Sistema de cache multinivel**: Cache de configuraciones, compilaciones y validaciones
+- **Invalidación inteligente**: Cache invalidation basado en timestamps y dependencias
+- **Compilación granular**: Compilación por archivo individual o en lotes
+- **Gestión de dependencias**: Tracking automático de dependencias entre archivos
+- **Limpieza automática**: Auto-limpieza de archivos obsoletos
+
+### 🎨 TailwindCSS Integrado
+
+- **Compilación automática**: Watch mode integrado para cambios en CSS
+- **Optimización de producción**: Minificación y purging automático
+- **Content scanning**: Escaneo inteligente de archivos para clases utilizadas
+- **Config personalizada**: Soporte para configuraciones personalizadas de Tailwind
 
 ## 🚧 Troubleshooting
 
 ### ❌ Problemas Frecuentes
 
-#### 🔍 Error: "Cannot resolve module"
+#### 🔍 Error: "Cannot resolve module" o problemas de imports
 
 ```bash
-# Verificar configuración de aliases
-versacompiler --verbose
+# Verificar configuración de aliases y paths
+versacompiler --verbose --file problemFile.ts
 
-# Limpiar cache si persiste
-versacompiler --clean
+# Limpiar cache TypeScript si persiste
+versacompiler --cleanCache
+
+# Verificar configuración en tsconfig.json
+cat tsconfig.json | grep -A 10 "paths"
 ```
 
-#### 🔥 HMR no funciona
+#### 🔥 HMR no funciona correctamente
 
 ```typescript
 // Verificar configuración en versacompile.config.ts
 export default {
     proxyConfig: {
-        proxyUrl: '', // Vacío si no usas proxy
+        proxyUrl: '', // Vacío si no usas proxy backend
         assetsOmit: true,
     },
 };
 ```
 
-#### 🐌 Linting muy lento
+```bash
+# Reiniciar con limpieza de cache
+versacompiler --watch --cleanCache
+```
+
+#### 🐌 Compilación o linting muy lento
 
 ```bash
 # Usar solo OxLint para máxima velocidad
-versacompiler --lint-only --verbose
+versacompiler --linter --verbose
+
+# Verificar si worker threads están activos
+versacompiler --verbose --typeCheck
+
+# Limpiar cache si está corrupto
+versacompiler --cleanCache --cleanOutput
+```
+
+#### 🔴 Errores de TypeScript en archivos Vue
+
+```bash
+# Verificar soporte para decorators en tsconfig.json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+
+# Ejecutar solo verificación de tipos
+versacompiler --typeCheck --file Component.vue
+```
+
+#### ⚠️ Warnings de dependencias o módulos
+
+```bash
+# Verificar si las dependencias están instaladas
+npm install
+
+# Revisar configuración de paths en versacompile.config.ts
+versacompiler --verbose --file problematicFile.ts
+```
+
+#### 🎨 TailwindCSS no se actualiza
+
+```bash
+# Verificar configuración de Tailwind
+versacompiler --tailwind --verbose
+
+# Limpiar cache de TailwindCSS
+rm -rf ./node_modules/.cache/tailwindcss
+versacompiler --tailwind --cleanCache
+```
+
+### 🔧 Configuraciones de Debug
+
+#### Habilitar logging detallado
+
+```bash
+# Máximo nivel de detalle
+versacompiler --verbose --all
+
+# Debug específico por archivo
+versacompiler --verbose --file src/problematicFile.vue
+```
+
+#### Verificar configuración activa
+
+```bash
+# Ver configuración cargada
+versacompiler --verbose --init  # Muestra config actual
+```
+
+#### Performance profiling
+
+```bash
+# Analizar performance de compilación
+versacompiler --verbose --all --prod
+# Revisar timings en la salida
 ```
 
 ## 📚 Documentación
@@ -326,25 +567,60 @@ MIT © [Jorge Jara H](https://github.com/kriollo)
 
 ### Compilación de Archivos
 
-- **JavaScript**: Compila archivos `.js` y los coloca en el directorio configurado
-- **TypeScript**: Transpila archivos `.ts` a `.js` utilizando las opciones definidas en `tsconfig.json`
-- **Vue**: Procesa archivos `.vue`, compila sus scripts, plantillas y estilos
+- **JavaScript (.js)**: Procesamiento, transformaciones y optimización con placement inteligente
+- **TypeScript (.ts)**: Transpilación completa usando TypeScript Compiler API con Language Service
+- **Vue SFC (.vue)**: Compilación completa de Single File Components con:
+    - Script compilation (incluyendo script setup)
+    - Template compilation con optimizaciones
+    - Style compilation (CSS, SCSS, CSS Modules, Scoped)
+    - Custom blocks processing
 
-### Minificación
+### Sistema de Workers Avanzado
 
-Si se ejecuta con el parámetro `--prod`, el código se minifica utilizando `OxcMinify`.
+- **TypeScript Worker Threads**: Validación de tipos en procesos separados
+- **Fallback sincrónico**: Detección automática de entorno de testing
+- **Pool de workers**: Optimizado según CPU cores disponibles
+- **Cache de validación**: Resultados de validación persistentes
 
-### Observación de Archivos
+### Minificación de Última Generación
 
-El compilador observa los cambios en los archivos `.js`, `.ts` y `.vue` en el directorio `src` y recompila automáticamente los archivos modificados.
+- **OxcMinify**: Minificador ultra-rápido en Rust para modo `--prod`
+- **Variable mangling**: Renombrado inteligente de variables
+- **Dead code elimination**: Eliminación de código no utilizado
+- **Modern JavaScript**: Preservación de sintaxis ES2020+
+
+### Sistema de Observación de Archivos
+
+- **Chokidar**: Observación eficiente de cambios en archivos
+- **Debounced compilation**: Evita recompilaciones excesivas
+- **Dependency tracking**: Seguimiento de dependencias entre archivos
+- **Hot Module Replacement**: Actualizaciones sin perder estado
+
+### Cache Multinivel
+
+- **Configuration cache**: Cache de tsconfig.json y configuraciones
+- **Compilation cache**: Resultados de compilación por archivo
+- **TypeScript cache**: Cache del Language Service Host
+- **File system cache**: Cache de lecturas de archivos
 
 ### Dependencias Principales
 
-- **VueJS**: API (vue/compiler-sfc) para compilar archivos .vue
-- **TypeScript**: API (transpileModule) para transpilar TypeScript
-- **OxcMinify**: API (minify) para minificar código
-- **Acorn**: API (Parser) para validar sintaxis
-- **BrowserSync**: API (browserSync) para servidor HMR
+- **Vue.js**: `vue/compiler-sfc` para compilación de SFC
+- **TypeScript**: Compiler API completa con Language Service Host
+- **OxcMinify**: Minificación ultra-optimizada
+- **OxLint**: Linting ultra-rápido en Rust
+- **ESLint**: Análisis profundo de código
+- **Chokidar**: Observación de archivos
+- **BrowserSync**: Servidor de desarrollo con HMR
+- **TailwindCSS**: Compilación de utilidades CSS
+
+### Optimizaciones de Performance
+
+- **Lazy loading**: Carga de módulos bajo demanda
+- **Module manager**: Gestión inteligente de dependencias pesadas
+- **Compilation batching**: Agrupación de compilaciones
+- **Progressive compilation**: Compilación incremental
+- **Memory management**: Gestión optimizada de memoria en workers
 
 ---
 

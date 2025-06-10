@@ -29,15 +29,22 @@ export default {
 
 ### Comandos Disponibles
 
-| Comando       | Alias | Descripción                      |
-| ------------- | ----- | -------------------------------- |
-| `--watch`     | `-w`  | Modo observación con HMR         |
-| `--all`       |       | Compilar todos los archivos      |
-| `--prod`      | `-p`  | Modo producción con minificación |
-| `--clean`     |       | Limpiar directorio de salida     |
-| `--lint-only` |       | Solo ejecutar linting            |
-| `--verbose`   | `-v`  | Salida detallada                 |
-| `--help`      | `-h`  | Mostrar ayuda                    |
+| Comando            | Alias | Descripción                                    |
+| ------------------ | ----- | ---------------------------------------------- |
+| `--init`           |       | Inicializar configuración del proyecto         |
+| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
+| `--all`            |       | Compilar todos los archivos del proyecto       |
+| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
+| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
+| `--prod`           | `-p`  | Modo producción con minificación               |
+| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
+| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
+| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
+| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
+| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos   |
+| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS |
+| `--linter`         |       | Habilitar/deshabilitar análisis de código      |
+| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
 
 ### Ejemplos de Uso
 
@@ -48,7 +55,20 @@ versacompiler --watch
 # Build para producción
 versacompiler --all --prod
 
+# Compilar archivo específico
+versacompiler --file src/components/Button.vue
+
+# Compilar múltiples archivos
+versacompiler src/main.ts src/App.vue
+
 # Solo linting
+versacompiler --linter
+
+# Solo verificación de tipos
+versacompiler --typeCheck
+
+# Build con limpieza completa
+versacompiler --all --prod --cleanOutput --cleanCache --yes
 versacompiler --lint-only
 
 # Con salida detallada
@@ -93,8 +113,32 @@ interface LinterConfig {
     name: 'eslint' | 'oxlint'; // Nombre del linter
     bin: string; // Ruta al binario
     configFile: string; // Archivo de configuración
-    fix: boolean; // Auto-fix errores
-    paths: string[]; // Rutas a analizar
+    fix?: boolean; // Auto-fix errores
+    paths?: string[]; // Rutas a analizar
+    // Configuración específica de ESLint
+    eslintConfig?: {
+        cache?: boolean; // Habilitar cache
+        maxWarnings?: number; // Máximo warnings
+        quiet?: boolean; // Solo errores
+        formats?: ('json' | 'stylish' | 'compact')[]; // Formatos salida
+        deny?: string[]; // Reglas a denegar
+        allow?: string[]; // Reglas a permitir
+        noIgnore?: boolean; // Deshabilitar .eslintignore
+        ignorePath?: string; // Archivo ignore personalizado
+        ignorePattern?: string[]; // Patrones a ignorar
+    };
+    // Configuración específica de OxLint
+    oxlintConfig?: {
+        rules?: Record<string, any>; // Reglas personalizadas
+        plugins?: string[]; // Plugins de OxLint
+        deny?: string[]; // Reglas a denegar
+        allow?: string[]; // Reglas a permitir
+        tsconfigPath?: string; // Ruta a tsconfig.json
+        quiet?: boolean; // Solo errores
+        noIgnore?: boolean; // Deshabilitar ignore files
+        ignorePath?: string; // Archivo ignore personalizado
+        ignorePattern?: string[]; // Patrones a ignorar
+    };
 }
 ```
 
@@ -134,15 +178,28 @@ VersaCompiler puede compilar:
 
 ### Características de Desarrollo
 
-- **Watch Mode**: Observación de archivos con auto-recompilación
-- **HMR Support**: Hot Module Replacement básico
+- **Watch Mode**: Observación de archivos con auto-recompilación inteligente
+- **HMR Support**: Hot Module Replacement con preservación de estado
 - **Proxy Support**: Proxy para APIs backend durante desarrollo
+- **TypeScript Workers**: Validación de tipos en threads separados
+- **Cache System**: Sistema de cache multinivel para máximo rendimiento
 
 ### Build y Optimización
 
-- **Minificación**: Usando OxcMinify para producción
-- **Linting**: ESLint y/o OxLint integrados
-- **TailwindCSS**: Compilación automática de estilos
+- **Minificación**: OxcMinify ultra-rápido para producción
+- **Tree Shaking**: Eliminación de código no utilizado
+- **Linting Dual**: ESLint y OxLint con múltiples formatos
+- **TailwindCSS**: Compilación automática con purging
+- **Source Maps**: Generación automática en desarrollo
+
+### Funcionalidades Avanzadas
+
+- **Decorator Support**: Soporte completo para TypeScript decorators
+- **Vue 3.5 Support**: Última versión de Vue con todas sus características
+- **CSS Modules**: Soporte nativo para CSS Modules
+- **SCSS/Sass**: Preprocesadores CSS integrados
+- **Custom Blocks**: Procesamiento de bloques personalizados en Vue SFC
+- **Granular Compilation**: Compilación por archivo individual
 
 ## Integración
 
@@ -152,9 +209,13 @@ VersaCompiler puede compilar:
 {
     "scripts": {
         "dev": "versacompiler --watch",
+        "dev:verbose": "versacompiler --watch --verbose",
         "build": "versacompiler --all --prod",
-        "lint": "versacompiler --lint-only",
-        "clean": "versacompiler --clean"
+        "build:clean": "versacompiler --all --prod --cleanOutput --cleanCache",
+        "lint": "versacompiler --linter",
+        "type-check": "versacompiler --typeCheck --all",
+        "clean": "versacompiler --cleanOutput --cleanCache",
+        "build:component": "versacompiler --file src/components/MyComponent.vue"
     }
 }
 ```
@@ -162,9 +223,36 @@ VersaCompiler puede compilar:
 ### Integración con CI/CD
 
 ```bash
-# Pipeline de verificación
-versacompiler --lint-only    # Verificar código
-versacompiler --all --prod   # Build para producción
+# Pipeline de verificación completo
+versacompiler --linter --typeCheck     # 1. Verificar código y tipos
+versacompiler --all --prod --yes       # 2. Build para producción
+
+# Pipeline específico por etapas
+versacompiler --linter                 # Solo linting
+versacompiler --typeCheck --all        # Solo verificación de tipos
+versacompiler --all --prod --cleanOutput # Build limpio para producción
+
+# GitHub Actions example
+versacompiler --all --prod --verbose --yes  # Build con logging detallado
+```
+
+### Docker Integration
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# Build usando VersaCompiler
+RUN npx versacompiler --all --prod --yes
+
+EXPOSE 3000
+CMD ["npm", "start"]
 ```
 
 ## Archivos de Configuración Relacionados

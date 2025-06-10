@@ -52,17 +52,28 @@ versaCompiler/
 │   │   ├── compile.ts     # Coordinador principal
 │   │   ├── vuejs.ts       # Compilador Vue SFC
 │   │   ├── typescript.ts  # Transpilador TypeScript
-│   │   ├── linter.ts      # Sistema de linting
-│   │   └── minify.ts      # Minificación
+│   │   ├── typescript-worker.ts        # TypeScript workers
+│   │   ├── typescript-worker-thread.cjs # Worker threads
+│   │   ├── linter.ts      # Sistema de linting dual
+│   │   ├── minify.ts      # Minificación con OxcMinify
+│   │   ├── tailwindcss.ts # Compilador TailwindCSS
+│   │   └── error-reporter.ts # Reporte de errores
 │   ├── servicios/         # Servicios del servidor
 │   │   ├── browserSync.ts # Servidor HMR
 │   │   ├── chokidar.ts    # File watcher
 │   │   └── logger.ts      # Sistema de logging
 │   ├── utils/             # Utilidades
-│   └── wrappers/          # Wrappers de herramientas externas
-├── tests/                 # Tests
+│   │   ├── module-resolver.ts # Resolución de módulos
+│   │   └── utils.ts       # Utilidades generales
+│   ├── wrappers/          # Wrappers de herramientas externas
+│   │   ├── eslint-node.ts # Wrapper ESLint
+│   │   ├── oxlint-node.ts # Wrapper OxLint
+│   │   └── tailwind-node.ts # Wrapper TailwindCSS
+│   └── hrm/               # Hot Module Replacement
+├── tests/                 # Tests comprehensivos
 ├── docs/                  # Documentación
 ├── examples/              # Archivos de ejemplo
+├── performance-results/   # Resultados de performance
 └── public/                # Archivos compilados de ejemplo
 ```
 
@@ -126,13 +137,20 @@ Antes de reportar un bug:
 
 [Cómo debería funcionar]
 
+## Compatibilidad
+
+- [ ] ¿Es compatible con TypeScript workers?
+- [ ] ¿Afecta el sistema de dual linting?
+- [ ] ¿Es compatible con Vue 3.5?
+- [ ] ¿Impacta el performance del HMR?
+
 ## Alternativas Consideradas
 
 [Otras opciones que consideraste]
 
 ## Implementación
 
-[Ideas sobre cómo implementarlo]
+[Ideas sobre cómo implementarlo, considerando la arquitectura actual]
 ```
 
 ### 🔧 Contribuir Código
@@ -172,7 +190,7 @@ Antes de reportar un bug:
 
 #### Convenciones de Código
 
-**Naming Conventions:**
+**Convenciones de Código:**
 
 ```typescript
 // Variables y funciones: camelCase
@@ -181,13 +199,22 @@ function compileFile() {}
 
 // Clases: PascalCase
 class VueCompiler {}
+class TypeScriptWorker {}
 
 // Constantes: UPPER_SNAKE_CASE
 const DEFAULT_PORT = 3000;
+const WORKER_POOL_SIZE = 4;
 
 // Interfaces: PascalCase con prefijo 'I' opcional
 interface CompilerConfig {}
 interface IUserSettings {} // Solo si es necesario distinguir
+
+// Workers y tipos específicos
+interface WorkerMessage {
+    id: string;
+    type: 'compile' | 'lint' | 'error';
+    payload: any;
+}
 ```
 
 **Estilo de Código:**
@@ -209,11 +236,24 @@ function processFile(filePath: string): Promise<CompileResult> {
     return { success: true, code, sourceMap };
 }
 
+// Para TypeScript workers
+async function processWithWorker(
+    filePath: string,
+    useWorkers: boolean = true,
+): Promise<CompileResult> {
+    if (useWorkers && isWorkerAvailable()) {
+        return await processInWorker(filePath);
+    }
+
+    return await processInMainThread(filePath);
+}
+
 // Documentar funciones públicas
 /**
- * Compila un archivo Vue SFC
+ * Compila un archivo Vue SFC con soporte para Vue 3.5
  * @param filePath Ruta al archivo .vue
  * @param options Opciones de compilación
+ * @param options.useWorkers Si usar TypeScript workers para mejor performance
  * @returns Resultado de la compilación
  */
 export async function compileVue(
@@ -240,12 +280,9 @@ describe('Compiler', () => {
         <template>
           <div>{{ message }}</div>
         </template>
-        <script>
-        export default {
-          data() {
-            return { message: 'Hello' };
-          }
-        };
+        <script setup lang="ts">
+        import { ref } from 'vue';
+        const message = ref('Hello Vue 3.5');
         </script>
       `;
 
@@ -254,7 +291,32 @@ describe('Compiler', () => {
 
             // Assert
             expect(result.success).toBe(true);
-            expect(result.code).toContain('Hello');
+            expect(result.code).toContain('Hello Vue 3.5');
+        });
+
+        it('should handle TypeScript with decorators', async () => {
+            const tsWithDecorators = `
+        @Component
+        class TestClass {
+          @Prop() message!: string;
+        }
+      `;
+
+            const result = await compileTypeScript(tsWithDecorators, 'test.ts');
+
+            expect(result.success).toBe(true);
+            expect(result.code).toContain('_decorate');
+        });
+
+        it('should use workers when available', async () => {
+            const input = 'const test = "TypeScript";';
+
+            const result = await compileTypeScript(input, 'test.ts', {
+                useWorkers: true,
+            });
+
+            expect(result.success).toBe(true);
+            expect(result.workerUsed).toBe(true);
         });
 
         it('should handle compilation errors', async () => {
@@ -266,6 +328,20 @@ describe('Compiler', () => {
             expect(result.errors).toHaveLength(1);
         });
     });
+
+    describe('linting', () => {
+        it('should run dual linting (ESLint + OxLint)', async () => {
+            const code = 'const unused = "variable";';
+
+            const result = await runLinters(code, 'test.ts', {
+                linters: ['eslint', 'oxlint'],
+            });
+
+            expect(result.eslint.success).toBe(true);
+            expect(result.oxlint.success).toBe(true);
+            expect(result.combined.warnings).toContain('unused');
+        });
+    });
 });
 ```
 
@@ -274,6 +350,9 @@ describe('Compiler', () => {
 - **Unit Tests**: Funciones individuales
 - **Integration Tests**: Flujos completos
 - **E2E Tests**: Casos de uso reales
+- **Performance Tests**: Benchmarks y performance
+- **Worker Tests**: TypeScript workers específicos
+- **Linting Tests**: ESLint y OxLint integration
 
 ### Ejecutar Tests
 
@@ -289,6 +368,12 @@ npm run test:watch
 
 # Coverage
 npm run test:coverage
+
+# Performance tests
+npm run test:performance
+
+# Performance tests con persistencia
+npm run test:performance:persist
 ```
 
 ## 📚 Documentación
@@ -304,19 +389,39 @@ npm run test:coverage
  * @param config - Configuración del compilador
  * @param config.sourceRoot - Directorio de archivos fuente
  * @param config.outDir - Directorio de salida
+ * @param config.useWorkers - Si usar TypeScript workers para mejor performance
+ * @param config.linter - Configuración de linters (ESLint y/o OxLint)
  * @returns Instancia del compilador configurado
  *
  * @example
  * ```typescript
  * const compiler = await configureCompiler({
  *   sourceRoot: './src',
- *   outDir: './dist'
+ *   outDir: './dist',
+ *   useWorkers: true,
+ *   linter: [
+ *     { name: 'eslint', bin: './node_modules/.bin/eslint' },
+ *     { name: 'oxlint', bin: './node_modules/.bin/oxlint' }
+ *   ]
  * });
  * ```
  */
 export async function configureCompiler(
     config: CompilerConfig,
 ): Promise<Compiler> {
+    // ...
+}
+
+/**
+ * Procesa archivo usando TypeScript worker si está disponible
+ * @param filePath - Ruta del archivo a procesar
+ * @param useWorker - Forzar uso de worker
+ * @returns Resultado de compilación con información de performance
+ */
+export async function processWithWorker(
+    filePath: string,
+    useWorker: boolean = true,
+): Promise<CompileResult & { workerUsed: boolean }> {
     // ...
 }
 ````
@@ -525,5 +630,31 @@ Para hacer tu primera contribución más fácil:
 - Busca issues etiquetados como `good first issue`
 - Pregunta en issues si necesitas orientación
 - No tengas miedo de hacer preguntas
+
+### Áreas de Contribución Específicas
+
+**TypeScript Workers**
+
+- Optimización del sistema de workers
+- Mejor distribución de carga entre threads
+- Debugging de workers en diferentes plataformas
+
+**Dual Linting System**
+
+- Mejoras en la integración ESLint + OxLint
+- Configuraciones predefinidas para equipos
+- Performance optimization del linting paralelo
+
+**Vue 3.5 Support**
+
+- Nuevas características del compiler
+- Optimizaciones específicas para Composition API
+- Soporte mejorado para script setup
+
+**TailwindCSS Integration**
+
+- Hot reload optimizations
+- Purge CSS automático
+- Configuraciones predefinidas
 
 ¡Esperamos tu contribución! 🚀

@@ -90,7 +90,7 @@ mi-proyecto/
 versacompiler --watch
 # → Servidor en http://localhost:3000
 # → Auto-compilación al guardar archivos
-# → HMR instantáneo
+# → HMR instantáneo con TypeScript workers
 
 # 🔍 Solo verificar código (rápido)
 versacompiler --lint-only
@@ -102,6 +102,16 @@ versacompiler --lint-only
 versacompiler --all
 # → Compila todos los archivos
 # → Ideal para verificar que todo funciona
+
+# 📁 Compilar archivos específicos
+versacompiler --file src/components/MyComponent.vue
+# → Compila solo el archivo especificado
+# → Útil para testing de componentes individuales
+
+# ✅ Solo verificación de tipos TypeScript
+versacompiler --typeCheck
+# → Ejecuta TypeScript compiler en modo check
+# → Validación de tipos sin compilación
 ```
 
 ### Producción
@@ -114,9 +124,42 @@ versacompiler --all --prod
 # → Listo para deploy
 
 # 🧹 Limpiar y recompilar
-versacompiler --clean --all --prod
+versacompiler --cleanOutput --all --prod
 # → Elimina dist/ primero
 # → Compilación limpia completa
+
+# 🗑️ Limpiar cache
+versacompiler --cleanCache --all
+# → Limpia cache de compilación
+# → Útil cuando hay problemas de cache
+```
+
+### TailwindCSS
+
+```bash
+# 🎨 Compilar con TailwindCSS
+versacompiler --tailwind --watch
+# → Incluye compilación automática de Tailwind
+# → Hot reload de estilos CSS
+
+# 🎨 Solo compilar Tailwind
+versacompiler --tailwind --file src/styles/input.css
+# → Compila solo los estilos de Tailwind
+```
+
+### Linting Avanzado
+
+```bash
+# 🔍 Ejecutar linters específicos
+versacompiler --linter eslint
+# → Solo ejecuta ESLint
+
+versacompiler --linter oxlint
+# → Solo ejecuta OxLint (más rápido)
+
+# 🔧 Auto-fix con linters
+versacompiler --lint-only --yes
+# → Ejecuta linters con auto-fix habilitado
 ```
 
 ### Debugging
@@ -126,11 +169,15 @@ versacompiler --clean --all --prod
 versacompiler --all --verbose
 # → Muestra progreso detallado
 # → Métricas de performance
-# → Useful para debugging
+# → Información de TypeScript workers
 
 # 🔧 Solo verificar configuración
 versacompiler --help
-# → Ver todas las opciones disponibles
+# → Ver todas las 14 opciones CLI disponibles
+
+# 📦 Información de archivos procesados
+versacompiler src/components/ --verbose
+# → Procesa directorio específico con logs detallados
 ```
 
 ## ⚙️ Configuración Básica
@@ -161,6 +208,12 @@ export default {
             paths: ['src/'],
         },
     ],
+    // Configuración de TailwindCSS
+    tailwindConfig: {
+        bin: './node_modules/.bin/tailwindcss',
+        input: './src/css/input.css',
+        output: './public/css/output.css',
+    },
 };
 ```
 
@@ -188,6 +241,11 @@ export default {
             configFile: './eslint.config.js',
             fix: true,
             paths: ['src/'],
+            rules: {
+                '@typescript-eslint/no-unused-vars': 'error',
+                '@typescript-eslint/explicit-function-return-type': 'warn',
+                'vue/component-definition-name-casing': ['error', 'PascalCase'],
+            },
         },
         {
             name: 'oxlint',
@@ -195,6 +253,10 @@ export default {
             configFile: './.oxlintrc.json',
             fix: true,
             paths: ['src/'],
+            rules: {
+                'no-unused-vars': 'error',
+                'no-console': 'warn',
+            },
         },
     ],
 };
@@ -213,6 +275,27 @@ export default {
             paths: ['src/'],
         },
     ],
+};
+```
+
+#### Para proyectos con TypeScript estricto:
+
+```typescript
+export default {
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+            '@components/*': ['src/components/*'],
+            '@utils/*': ['src/utils/*'],
+        },
+        // Habilitar decoradores experimentales
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+    },
+    // Usar workers para TypeScript (mejor performance)
+    useWorkers: true,
 };
 ```
 
@@ -235,10 +318,33 @@ versacompiler --watch
 
 ### Tipos de archivos soportados:
 
-- ✅ **Componentes Vue** - Actualización instantánea preservando estado
-- ✅ **TypeScript/JavaScript** - Recarga inteligente de módulos
+- ✅ **Componentes Vue 3.5** - Actualización instantánea preservando estado
+- ✅ **TypeScript/JavaScript** - Recarga inteligente de módulos con workers
 - ✅ **CSS/TailwindCSS** - Inyección de estilos sin recarga
 - ✅ **Assets** - Actualización automática de recursos
+- ✅ **CSS Modules/SCSS** - Soporte completo con HMR
+
+### TypeScript Workers para HMR
+
+VersaCompiler utiliza **TypeScript Workers** para mejorar la performance del HMR:
+
+```typescript
+// versacompile.config.ts
+export default {
+    // Habilitar workers para mejor performance
+    useWorkers: true,
+    compilerOptions: {
+        // ... otras opciones
+    },
+};
+```
+
+### Funcionalidades avanzadas de HMR:
+
+- 🔄 **Cache inteligente** - Solo recompila archivos modificados
+- ⚡ **Validación en paralelo** - TypeScript workers independientes
+- 🎨 **Hot reload de estilos** - TailwindCSS y CSS Modules
+- 🧩 **Preservación de estado** - Vue Composition API y Options API
 
 ### Si HMR no funciona:
 
@@ -249,7 +355,19 @@ export default {
         proxyUrl: '', // Vacío si no usas proxy
         assetsOmit: true,
     },
+    // Asegurar puerto libre
+    port: 3000, // o cambiar si está ocupado
 };
+```
+
+### Debug de HMR:
+
+```bash
+# Ejecutar con logs detallados
+versacompiler --watch --verbose
+# → Muestra información de archivos recargados
+# → Estado de TypeScript workers
+# → Performance de HMR
 ```
 
 ## 🚀 Build para Producción
@@ -263,7 +381,13 @@ versacompiler --all --prod
 ### Build con Limpieza
 
 ```bash
-versacompiler --clean --all --prod
+versacompiler --cleanOutput --all --prod
+```
+
+### Build con Cache Limpio
+
+```bash
+versacompiler --cleanCache --all --prod
 ```
 
 ### Verificar Build
@@ -274,6 +398,9 @@ ls -la dist/
 
 # Verificar tamaño de archivos
 du -sh dist/*
+
+# Verificar tipos TypeScript
+versacompiler --typeCheck --prod
 ```
 
 ### Optimizaciones Automáticas Incluidas:
@@ -283,6 +410,22 @@ du -sh dist/*
 - ✅ **Dead Code Elimination**
 - ✅ **Optimización de imports**
 - ✅ **Compresión de assets**
+- ✅ **Vue 3.5 optimizations** - Mejores optimizaciones del compiler
+- ✅ **TypeScript decorators** - Soporte completo en producción
+- ✅ **CSS Modules optimization** - Eliminación de CSS no usado
+
+### Builds Específicos
+
+```bash
+# Solo compilar archivos específicos para producción
+versacompiler --file src/main.ts --prod
+
+# Build con TailwindCSS optimizado
+versacompiler --all --tailwind --prod
+
+# Build con validación estricta
+versacompiler --all --typeCheck --lint-only --prod
+```
 
 ## 📚 Próximos Pasos
 
@@ -295,11 +438,15 @@ du -sh dist/*
 
 ### Funcionalidades Avanzadas a Explorar
 
-- 🎨 **TailwindCSS** integrado
-- 🔍 **Linting dual** (ESLint + OxLint)
-- 🏗️ **Compilación paralela**
-- 📊 **Métricas de performance**
-- 🔄 **Cache inteligente**
+- 🎨 **TailwindCSS** integrado con hot reload
+- 🔍 **Linting dual** (ESLint + OxLint) con auto-fix
+- 🏗️ **Compilación paralela** con TypeScript workers
+- 📊 **Métricas de performance** en tiempo real
+- 🔄 **Cache inteligente** para builds incrementales
+- 🎭 **Vue 3.5 completo** - Composition API, script setup, TypeScript
+- 🎯 **TypeScript decorators** - Soporte experimental completo
+- 📦 **CSS Modules/SCSS** - Preprocesadores integrados
+- ⚡ **HMR avanzado** - Preservación de estado y recarga selectiva
 
 ### Integración con Herramientas
 
@@ -323,6 +470,9 @@ du -sh dist/*
 1. **Error de módulos** → `versacompiler --verbose`
 2. **HMR no funciona** → Verificar puerto 3000 libre
 3. **Linting lento** → Usar solo `oxlint: true`
+4. **TypeScript lento** → Habilitar `useWorkers: true`
+5. **Cache corrupto** → `versacompiler --cleanCache`
+6. **Tailwind no compila** → Verificar configuración `tailwindConfig`
 
 ### Recursos Útiles
 
