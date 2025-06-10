@@ -2,8 +2,8 @@
 export default {
     tsconfig: './tsconfig.json',
     compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
+        sourceRoot: './examples',
+        outDir: './public',
         pathsAlias: {
             '@/*': ['examples/*'],
             'P@/*': ['public/*'],

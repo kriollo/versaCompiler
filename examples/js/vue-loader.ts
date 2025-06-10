@@ -6,7 +6,7 @@ import {
     handleError,
     isValidModuleName,
     sanitizeModulePath,
-} from 'e@/js/devUtils';
+} from '@/js/devUtils';
 
 const debug = ref(false);
 const $contenedor = ref<HTMLElement | null>(null);

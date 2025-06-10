@@ -1,27 +1,37 @@
 {
+  "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\Component.vue": {
+    "contentHash": "0ba61b0e5f044f2d7017aa16bf025a7833295511c29700ee044b1f5e9ccff060",
+    "mtime": 1749594244271.5535,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/Component.js",
+    "lastUsed": 1749594244684,
+    "size": 784
+  },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\simple.js": {
-    "hash": "",
-    "mtime": 1749576957728.7952,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js"
+    "contentHash": "72d6770798ea5556530b407e870cc7afcc5985735ead0c700493e8d2a550327b",
+    "mtime": 1749594244267.5334,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js",
+    "lastUsed": 1749594244684,
+    "size": 192
   },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\AdvancedComponent.vue": {
-    "hash": "",
-    "mtime": 1749576957736.0774,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/AdvancedComponent.js"
+    "contentHash": "747a369c90515864114aaf5e4b7fb19551782b96187e8a12bec9d990e4a52bda",
+    "mtime": 1749594244271.5535,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/AdvancedComponent.js",
+    "lastUsed": 1749594244684,
+    "size": 7096
   },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\simple.ts": {
-    "hash": "",
-    "mtime": 1749576957730.803,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js"
-  },
-  "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\Component.vue": {
-    "hash": "",
-    "mtime": 1749576957731.8247,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/Component.js"
+    "contentHash": "dff4c1af3a65d4b8f2152102445404523e6e1408de62a097fa3a88bfbd4cfbb2",
+    "mtime": 1749594244271.5535,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/simple.js",
+    "lastUsed": 1749594244684,
+    "size": 612
   },
   "C:\\Users\\jjara\\Desktop\\proyectos\\versaCompiler\\tests\\temp-performance\\src\\complex.ts": {
-    "hash": "",
-    "mtime": 1749576957733.8901,
-    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/complex.js"
+    "contentHash": "18caccd938d8967bfd7716ab41e5b8d569ab17381c310855188a943aff27e16b",
+    "mtime": 1749594244271.5535,
+    "outputPath": "C:/Users/jjara/Desktop/proyectos/versaCompiler/tests/temp-performance/dist/complex.js",
+    "lastUsed": 1749594244684,
+    "size": 2022
   }
 }

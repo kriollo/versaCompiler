@@ -21,6 +21,9 @@
                 v-model="message"
                 class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
         </div>
+        <div class="w-full mx-2">
+            
+        </div>
         <div class="w-full">
             <operacionesMatematicas :message="message"></operacionesMatematicas>
         </div>
