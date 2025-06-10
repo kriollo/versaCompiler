@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
     glob,
     mkdir,
@@ -310,14 +311,211 @@ type CompilationResult = {
 const compilationErrors: CompilationError[] = [];
 const compilationResults: CompilationResult[] = [];
 
-// 🚀 Sistema de Cache para Compilación
-interface CacheEntry {
-    hash: string;
-    mtime: number;
-    outputPath: string;
+// 🚀 Sistema de Cache Inteligente para Compilación
+interface SmartCacheEntry {
+    contentHash: string;           // SHA-256 del contenido
+    dependencyHashes?: string[];   // Hashes de dependencias (futuro)
+    mtime: number;                 // Tiempo de modificación
+    outputPath: string;            // Ruta del archivo compilado
+    lastUsed: number;              // Para LRU
+    size: number;                  // Control de memoria
 }
 
-const compilationCache = new Map<string, CacheEntry>();
+class SmartCompilationCache {
+    private cache = new Map<string, SmartCacheEntry>();
+    private readonly maxEntries = 500;     // Máximo archivos en cache
+    private readonly maxMemory = 100 * 1024 * 1024; // 100MB límite
+    private currentMemoryUsage = 0;
+
+    /**
+     * Genera hash SHA-256 del contenido del archivo
+     */
+    async generateContentHash(filePath: string): Promise<string> {
+        try {
+            const content = await readFile(filePath, 'utf8');
+            return createHash('sha256').update(content).digest('hex');
+        } catch (error) {
+            // Si no se puede leer el archivo, generar hash único basado en la ruta y timestamp
+            const fallback = `${filePath}-${Date.now()}`;
+            return createHash('sha256').update(fallback).digest('hex');
+        }
+    }
+
+    /**
+     * Verifica si una entrada de cache es válida
+     */
+    async isValid(filePath: string): Promise<boolean> {
+        const entry = this.cache.get(filePath);
+        if (!entry) return false;
+
+        try {
+            // Verificar si el archivo de salida existe
+            await stat(entry.outputPath);
+            
+            // Verificar si el contenido ha cambiado
+            const currentHash = await this.generateContentHash(filePath);
+            if (entry.contentHash !== currentHash) {
+                this.cache.delete(filePath);
+                return false;
+            }
+
+            // Verificar tiempo de modificación como backup
+            const stats = await stat(filePath);
+            if (stats.mtimeMs > entry.mtime) {
+                this.cache.delete(filePath);
+                return false;
+            }
+
+            // Actualizar tiempo de uso para LRU
+            entry.lastUsed = Date.now();
+            return true;
+        } catch {
+            // Si hay error verificando, eliminar del cache
+            this.cache.delete(filePath);
+            return false;
+        }
+    }
+
+    /**
+     * Añade una entrada al cache
+     */
+    async set(filePath: string, outputPath: string): Promise<void> {
+        try {
+            const stats = await stat(filePath);
+            const contentHash = await this.generateContentHash(filePath);
+            
+            const entry: SmartCacheEntry = {
+                contentHash,
+                mtime: stats.mtimeMs,
+                outputPath,
+                lastUsed: Date.now(),
+                size: stats.size
+            };
+
+            // Aplicar límites de memoria y entradas antes de agregar
+            this.evictIfNeeded(entry.size);
+            
+            this.cache.set(filePath, entry);
+            this.currentMemoryUsage += entry.size;
+        } catch (error) {
+            // Si hay error, no cachear
+            console.warn(`Warning: No se pudo cachear ${filePath}:`, error);
+        }
+    }
+
+    /**
+     * Aplica política LRU para liberar espacio
+     */
+    private evictIfNeeded(newEntrySize: number): void {
+        // Verificar límite de entradas
+        while (this.cache.size >= this.maxEntries) {
+            this.evictLRU();
+        }
+
+        // Verificar límite de memoria
+        while (this.currentMemoryUsage + newEntrySize > this.maxMemory && this.cache.size > 0) {
+            this.evictLRU();
+        }
+    }
+
+    /**
+     * Elimina la entrada menos recientemente usada
+     */
+    private evictLRU(): void {
+        let oldestKey = '';
+        let oldestTime = Infinity;
+
+        for (const [key, entry] of this.cache) {
+            if (entry.lastUsed < oldestTime) {
+                oldestTime = entry.lastUsed;
+                oldestKey = key;
+            }
+        }
+
+        if (oldestKey) {
+            const entry = this.cache.get(oldestKey);
+            if (entry) {
+                this.currentMemoryUsage -= entry.size;
+                this.cache.delete(oldestKey);
+            }
+        }
+    }
+
+    /**
+     * Carga el cache desde disco
+     */
+    async load(cacheFile: string): Promise<void> {
+        try {
+            if (env.cleanCache === 'true') {
+                this.cache.clear();
+                this.currentMemoryUsage = 0;
+                try {
+                    await unlink(cacheFile);
+                } catch {
+                    // Ignorar errores al eliminar el archivo
+                }
+                return;
+            }
+
+            const cacheData = await readFile(cacheFile, 'utf-8');
+            const parsed = JSON.parse(cacheData);
+            
+            // Validar y cargar entradas del cache
+            for (const [key, value] of Object.entries(parsed)) {
+                const entry = value as SmartCacheEntry;
+                if (entry.contentHash && entry.outputPath && entry.mtime) {
+                    this.cache.set(key, entry);
+                    this.currentMemoryUsage += entry.size || 0;
+                }
+            }
+        } catch {
+            // Cache file doesn't exist or is invalid, start fresh
+            this.cache.clear();
+            this.currentMemoryUsage = 0;
+        }
+    }
+
+    /**
+     * Guarda el cache a disco
+     */
+    async save(cacheFile: string, cacheDir: string): Promise<void> {
+        try {
+            await mkdir(cacheDir, { recursive: true });
+            const cacheData = Object.fromEntries(this.cache);
+            await writeFile(cacheFile, JSON.stringify(cacheData, null, 2));
+        } catch (error) {
+            console.warn('Warning: No se pudo guardar el cache:', error);
+        }
+    }
+
+    /**
+     * Limpia completamente el cache
+     */
+    clear(): void {
+        this.cache.clear();
+        this.currentMemoryUsage = 0;
+    }    /**
+     * Obtiene la ruta de salida para un archivo cacheado
+     */
+    getOutputPath(filePath: string): string {
+        const entry = this.cache.get(filePath);
+        return entry?.outputPath || '';
+    }
+
+    /**
+     * Obtiene estadísticas del cache
+     */
+    getStats(): { entries: number; memoryUsage: number; hitRate: number } {
+        return {
+            entries: this.cache.size,
+            memoryUsage: this.currentMemoryUsage,
+            hitRate: 0 // Se calculará externamente
+        };
+    }
+}
+
+// Instancia global del cache inteligente
+const smartCache = new SmartCompilationCache();
 const CACHE_DIR = path.join(
     path.resolve(env.PATH_PROY || cwd(), 'compiler'),
     '.cache',
@@ -325,34 +523,11 @@ const CACHE_DIR = path.join(
 const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {
-    try {
-        if (env.cleanCache === 'true') {
-            compilationCache.clear();
-            try {
-                await unlink(CACHE_FILE);
-            } catch {
-                // Ignorar errores al eliminar el archivo
-            }
-        }
-
-        const cacheData = await readFile(CACHE_FILE, 'utf-8');
-        const parsed = JSON.parse(cacheData);
-        for (const [key, value] of Object.entries(parsed)) {
-            compilationCache.set(key, value as CacheEntry);
-        }
-    } catch {
-        // Cache file doesn't exist or is invalid, start fresh
-    }
+    await smartCache.load(CACHE_FILE);
 }
 
 async function saveCache() {
-    try {
-        await mkdir(CACHE_DIR, { recursive: true });
-        const cacheData = Object.fromEntries(compilationCache);
-        await writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
-    } catch {
-        // Ignore save errors
-    }
+    await smartCache.save(CACHE_FILE, CACHE_DIR);
 }
 
 // 🎯 Funciones del Sistema Unificado de Manejo de Errores
@@ -1336,29 +1511,7 @@ function createProgressBar(
 
 // Función helper para verificar si un archivo debe ser omitido por cache
 async function shouldSkipFile(filePath: string): Promise<boolean> {
-    try {
-        const stats = await stat(filePath);
-        const cacheEntry = compilationCache.get(filePath);
-
-        if (!cacheEntry) {
-            return false; // No hay entrada en cache, debe compilarse
-        }
-
-        // Verificar si el archivo no ha cambiado desde la última compilación
-        if (stats.mtimeMs <= cacheEntry.mtime) {
-            // Verificar si el archivo de salida existe
-            try {
-                await stat(cacheEntry.outputPath);
-                return true; // Archivo existe y no ha cambiado, se puede omitir
-            } catch {
-                return false; // Archivo de salida no existe, debe recompilarse
-            }
-        }
-
-        return false; // Archivo ha cambiado, debe recompilarse
-    } catch {
-        return false; // Error al verificar, compilar por seguridad
-    }
+    return await smartCache.isValid(filePath);
 }
 
 // Función para compilar archivos con límite de concurrencia
@@ -1397,20 +1550,13 @@ async function compileWithConcurrencyLimit(
                     return {
                         success: true,
                         cached: true,
-                        output: compilationCache.get(file)?.outputPath || '',
+                        output: smartCache.getOutputPath(file),
                     };
                 }
 
-                const result = await initCompile(file, false, 'batch');
-
-                // Actualizar cache si la compilación fue exitosa
+                const result = await initCompile(file, false, 'batch');                // Actualizar cache si la compilación fue exitosa
                 if (result.success && result.output) {
-                    const stats = await stat(file);
-                    compilationCache.set(file, {
-                        hash: '', // Se podría implementar hash del contenido si es necesario
-                        mtime: stats.mtimeMs,
-                        outputPath: result.output,
-                    });
+                    await smartCache.set(file, result.output);
                 }
 
                 completed++;
