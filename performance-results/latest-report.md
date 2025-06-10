@@ -1,14 +1,14 @@
 # VersaCompiler Performance Report
 
-Generated: 9/6/2025
+Generated: 10/6/2025
 
 ## 📊 Summary
 
 - **Total Tests**: 11
 - **Passed Tests**: 11
 - **Success Rate**: 100.0%
-- **Average Performance**: 73.45ms
-- **Total Time**: 807.95ms
+- **Average Performance**: 67.56ms
+- **Total Time**: 743.14ms
 
 ## 🖥️ Environment
 
@@ -20,39 +20,41 @@ Generated: 9/6/2025
 
 ## 🚀 Performance Highlights
 
-**Fastest Test**: Performance Baseline (3.49ms)
+**Fastest Test**: Performance Baseline (4.09ms)
 
-**Slowest Test**: JavaScript Simple (255.34ms)
+**Slowest Test**: Large File Compilation (371.47ms)
 
 ## 📈 Changes Since Last Run
 
 ### ⚠️ Regressions
-- **JavaScript Simple**: +96.3% (130.08ms → 255.34ms)
-- **TypeScript Simple**: +31.5% (81.39ms → 106.99ms)
-- **Vue Simple**: +266.0% (19.74ms → 72.25ms)
-- **Memory Usage**: +217.0% (9.92ms → 31.46ms)
-- **Concurrent Compilation**: +41.0% (23.94ms → 33.77ms)
-- **Performance Consistency**: +68.5% (7.54ms → 12.70ms)
+- **Concurrent Compilation**: +11.2% (26.37ms → 29.32ms)
+- **Large File Compilation**: +258.8% (103.54ms → 371.47ms)
 
 ### 🎯 Improvements
-- **preCompileTS Direct**: 15.3% faster (17.72ms → 15.00ms)
-- **Batch Compilation**: 74.0% faster (364.48ms → 94.83ms)
+- **JavaScript Simple**: 91.0% faster (329.13ms → 29.73ms)
+- **TypeScript Simple**: 81.8% faster (521.41ms → 94.71ms)
+- **Vue Simple**: 23.4% faster (62.61ms → 47.96ms)
+- **preCompileTS Direct**: 13.2% faster (22.12ms → 19.19ms)
+- **Batch Compilation**: 65.2% faster (342.06ms → 119.20ms)
+- **Memory Usage**: 64.0% faster (31.06ms → 11.17ms)
+- **Performance Baseline**: 11.5% faster (4.63ms → 4.09ms)
+- **Performance Consistency**: 43.1% faster (11.68ms → 6.64ms)
 
 ## 📋 Detailed Results
 
 | Test Name | Avg (ms) | Min (ms) | Max (ms) | Success Rate |
 |-----------|----------|----------|----------|--------------|
-| JavaScript Simple | 255.34 | 255.34 | 255.34 | 100.0% |
-| TypeScript Simple | 106.99 | 106.99 | 106.99 | 100.0% |
-| Vue Simple | 72.25 | 72.25 | 72.25 | 100.0% |
-| preCompileVue Direct | 7.42 | 7.42 | 7.42 | 100.0% |
-| preCompileTS Direct | 15.00 | 15.00 | 15.00 | 100.0% |
-| Batch Compilation | 94.83 | 94.83 | 94.83 | 100.0% |
-| Memory Usage | 31.46 | 31.46 | 31.46 | 100.0% |
-| Concurrent Compilation | 33.77 | 33.77 | 33.77 | 100.0% |
-| Large File Compilation | 174.70 | 174.70 | 174.70 | 100.0% |
-| Performance Baseline | 3.49 | 3.49 | 3.49 | 100.0% |
-| Performance Consistency | 12.70 | 12.70 | 12.70 | 100.0% |
+| JavaScript Simple | 29.73 | 29.73 | 29.73 | 100.0% |
+| TypeScript Simple | 94.71 | 94.71 | 94.71 | 100.0% |
+| Vue Simple | 47.96 | 47.96 | 47.96 | 100.0% |
+| preCompileVue Direct | 9.66 | 9.66 | 9.66 | 100.0% |
+| preCompileTS Direct | 19.19 | 19.19 | 19.19 | 100.0% |
+| Batch Compilation | 119.20 | 119.20 | 119.20 | 100.0% |
+| Memory Usage | 11.17 | 11.17 | 11.17 | 100.0% |
+| Concurrent Compilation | 29.32 | 29.32 | 29.32 | 100.0% |
+| Large File Compilation | 371.47 | 371.47 | 371.47 | 100.0% |
+| Performance Baseline | 4.09 | 4.09 | 4.09 | 100.0% |
+| Performance Consistency | 6.64 | 6.64 | 6.64 | 100.0% |
 
 ---
 

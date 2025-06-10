@@ -1,12 +1,29 @@
-import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import * as process from 'node:process';
 
 import findRoot from 'find-root';
 import fs from 'fs-extra';
 
-// Para compatibilidad con ES modules
-const require = createRequire(import.meta.url);
+// Función helper para resolver módulos sin createRequire
+function resolveModule(moduleName: string, paths: string[]): string {
+    for (const searchPath of paths) {
+        try {
+            const nodeModulesPath = path.join(
+                searchPath,
+                'node_modules',
+                moduleName,
+            );
+            if (fs.existsSync(nodeModulesPath)) {
+                return nodeModulesPath;
+            }
+        } catch {
+            // Continuar con el siguiente path
+        }
+    }
+    throw new Error(
+        `Cannot resolve module ${moduleName} from paths: ${paths.join(', ')}`,
+    );
+}
 
 export function resolveBin(
     moduleName: string,
@@ -17,13 +34,22 @@ export function resolveBin(
 ): string {
     let rootDir;
     try {
-        const resolved = require.resolve(moduleName, { paths });
+        const resolved = resolveModule(moduleName, paths);
         rootDir = findRoot(resolved);
     } catch {
-        const modJson = require.resolve(`${moduleName}/package.json`, {
-            paths,
-        });
-        rootDir = path.dirname(modJson);
+        // Intentar resolver package.json directamente
+        const basePath = paths[0] || process.cwd();
+        const packagePath = path.join(
+            basePath,
+            'node_modules',
+            moduleName,
+            'package.json',
+        );
+        if (fs.existsSync(packagePath)) {
+            rootDir = path.dirname(packagePath);
+        } else {
+            throw new Error(`Cannot resolve module ${moduleName}`);
+        }
     }
     const packageJsonPath = path.join(rootDir, 'package.json');
 
