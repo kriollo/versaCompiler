@@ -1,5 +1,4 @@
-import * as process from 'node:process';
-import { stdin as input, stdout as output } from 'node:process';
+import process, { stdin as input, stdout as output } from 'node:process';
 import * as readline from 'node:readline/promises';
 
 import { logger } from '../servicios/logger';
