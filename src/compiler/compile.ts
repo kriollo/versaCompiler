@@ -755,12 +755,12 @@ class WatchModeOptimizer {
                     if (cached && cached.mtime >= stats.mtimeMs) {
                         resolve({ success: true, cached: true });
                         return;
-                    } // Configurar worker para modo watch
-                    const { TypeScriptWorkerManager } = await import(
-                        './typescript-worker'
+                    } // Configurar worker pool para modo watch
+                    const { TypeScriptWorkerPool } = await import(
+                        './typescript-worker-pool'
                     );
-                    const workerManager = TypeScriptWorkerManager.getInstance();
-                    workerManager.setMode('watch');
+                    const workerPool = TypeScriptWorkerPool.getInstance();
+                    workerPool.setMode('watch');
                     const result = await compileFn(filePath);
                     this.fileSystemCache.set(filePath, {
                         mtime: stats.mtimeMs,
@@ -1511,10 +1511,18 @@ export async function initCompileAll() {
         } else {
             maxConcurrency = Math.min(cpuCount * 2, 16);
         }
-
         logger.info(
             `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
-        );
+        ); // Configurar worker pool para modo batch
+        try {
+            const { TypeScriptWorkerPool } = await import(
+                './typescript-worker-pool'
+            );
+            const workerPool = TypeScriptWorkerPool.getInstance();
+            workerPool.setMode('batch');
+        } catch {
+            // Error silencioso en configuración del pool
+        }
 
         await compileWithConcurrencyLimit(filesToCompile, maxConcurrency);
 
