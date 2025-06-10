@@ -497,10 +497,6 @@ export const preCompileTS = async (
                     typeCheckError,
                 );
             }
-        } else {
-            console.log(
-                '[preCompileTS] ⚠️ Type checking deshabilitado (env.typeCheck !== "true")',
-            );
         }
 
         // PASO 3: Devolver resultado optimizado

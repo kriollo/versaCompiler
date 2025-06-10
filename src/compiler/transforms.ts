@@ -533,11 +533,6 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                             normalizedPathDist,
                             relativePath,
                         );
-                        if (env.VERBOSE === 'true') {
-                            console.log(
-                                `  ✅ Sin duplicación: newPath="${newPath}"`,
-                            );
-                        }
                     } else {
                         // Si es diferente, usar PATH_DIST como base
                         newPath = path.join(
