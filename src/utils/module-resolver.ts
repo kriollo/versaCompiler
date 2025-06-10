@@ -1,7 +1,7 @@
 // Opción con librería 'resolve' (npm install resolve)
 import fs, { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { env } from 'node:process';
+import { cwd, env } from 'node:process';
 
 // import pkg from 'enhanced-resolve';
 // import resolve from 'resolve';
@@ -144,11 +144,6 @@ function findOptimalESMVersion(
         for (const pattern of priorityPatterns) {
             if (files.includes(pattern)) {
                 const optimizedPath = join(dir, pattern).replace(/\\/g, '/');
-                if (env.VERBOSE === 'true') {
-                    logger.info(
-                        `Versión optimizada encontrada: ${optimizedPath}`,
-                    );
-                }
                 return optimizedPath;
             }
         } // Buscar archivos que contengan patrones ESM/browser dinámicamente
@@ -185,11 +180,6 @@ function findOptimalESMVersion(
                         /\\/g,
                         '/',
                     );
-                    if (env.VERBOSE === 'true') {
-                        logger.info(
-                            `Versión ESM-Browser dev encontrada: ${optimizedPath}`,
-                        );
-                    }
                     return optimizedPath;
                 }
 
@@ -369,7 +359,7 @@ function findOptimalESMVersion(
 // Función mejorada para detectar automáticamente entry points browser-compatible
 function simpleESMResolver(moduleName: string): string | null {
     try {
-        const nodeModulesPath = join(process.cwd(), 'node_modules', moduleName);
+        const nodeModulesPath = join(cwd(), 'node_modules', moduleName);
         let packagePath: string;
         let packageJson: any;
 
@@ -573,7 +563,7 @@ function getNodeModulesRelativePath(
     }
 
     // Para rutas que no están en node_modules, convertir a ruta absoluta desde la raíz
-    let rel = relative(process.cwd(), fullPath).replace(/\\/g, '/');
+    let rel = relative(cwd(), fullPath).replace(/\\/g, '/');
     if (!rel) rel = '.';
 
     // Convertir a ruta absoluta desde la raíz
@@ -623,11 +613,7 @@ export function getModuleSubPath(
         }
 
         try {
-            const nodeModulesPath = join(
-                process.cwd(),
-                'node_modules',
-                packageName,
-            );
+            const nodeModulesPath = join(cwd(), 'node_modules', packageName);
             const packagePath = join(nodeModulesPath, 'package.json');
 
             if (!fs.existsSync(packagePath)) {

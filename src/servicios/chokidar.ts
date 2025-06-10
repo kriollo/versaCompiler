@@ -1,4 +1,4 @@
-import { readdir, rmdir, stat, unlink } from 'node:fs/promises';
+import { readdir, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from 'node:process';
 
@@ -67,7 +67,7 @@ export async function cleanOutputDir(
                 const itemPath = path.join(outputDir, item);
                 const itemStat = await stat(itemPath);
                 if (itemStat.isDirectory()) {
-                    await rmdir(itemPath, { recursive: true });
+                    await rm(itemPath, { recursive: true });
                 } else {
                     await unlink(itemPath);
                 }
@@ -122,7 +122,14 @@ export async function initChokidar(bs: any) {
 
         //TODO: agregar watch para CSS
         const watchAditional = JSON.parse(env.aditionalWatch || '[]');
-        let fileWatch = [watchJS, watchVue, watchTS, watchCJS, watchMJS, ...watchAditional];
+        let fileWatch = [
+            watchJS,
+            watchVue,
+            watchTS,
+            watchCJS,
+            watchMJS,
+            ...watchAditional,
+        ];
 
         //extraer sólo las extesniones  de fileWatch
         const accionExtension = {
