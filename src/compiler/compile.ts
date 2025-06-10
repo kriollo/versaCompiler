@@ -728,7 +728,8 @@ export function getOutputPath(ruta: string) {
 class WatchModeOptimizer {
     private static instance: WatchModeOptimizer;
     private fileSystemCache: Map<string, { mtime: number }> = new Map();
-    private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private debounceTimers: Map<string, ReturnType<typeof setTimeout>> =
+        new Map();
     private readonly DEBOUNCE_DELAY = 100; // 100ms debounce
 
     static getInstance(): WatchModeOptimizer {
