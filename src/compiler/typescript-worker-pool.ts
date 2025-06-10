@@ -74,12 +74,11 @@ export class TypeScriptWorkerPool {
     private poolSize: number;
     private workerPath: string;
     private initPromise: Promise<void> | null = null;
-    private isInitialized: boolean = false;
-
-    // Configuración optimizada
+    private isInitialized: boolean = false; // Configuración optimizada con reciclaje de workers
     private readonly TASK_TIMEOUT = 10000; // 10 segundos por tarea
     private readonly WORKER_INIT_TIMEOUT = 5000; // 5 segundos para inicializar
-    private readonly MAX_TASKS_PER_WORKER = 50; // Máximo de tareas por worker antes de rotación
+    private readonly MAX_TASKS_PER_WORKER = 50; // Máximo de tareas por worker antes de reciclaje
+    private readonly WORKER_MEMORY_CHECK_INTERVAL = 100; // Verificar cada 100 tareas
 
     // Métricas de rendimiento
     private totalTasks: number = 0;
@@ -277,47 +276,107 @@ export class TypeScriptWorkerPool {
                 // Error silencioso - no imprimir cada error
             }
         });
-        worker.on('error', error => {
-            this.handleWorkerError(poolWorker, error);
+        worker.on('error', async error => {
+            await this.handleWorkerError(poolWorker, error);
         });
 
-        worker.on('exit', code => {
-            this.handleWorkerExit(poolWorker, code);
+        worker.on('exit', async code => {
+            await this.handleWorkerExit(poolWorker, code);
         });
     }
-
     /**
-     * Maneja errores de un worker específico
-     */ private handleWorkerError(poolWorker: PoolWorker, error: Error): void {
-        // Rechazar todas las tareas pendientes de este worker
+     * Maneja errores de un worker específico con cleanup completo
+     */ private async handleWorkerError(
+        poolWorker: PoolWorker,
+        error: Error,
+    ): Promise<void> {
+        console.warn(
+            `[WorkerPool] Manejando error del worker ${poolWorker.id}:`,
+            error.message,
+        );
+
+        // 1. Rechazar todas las tareas pendientes con cleanup de timeouts
         poolWorker.pendingTasks.forEach(task => {
             clearTimeout(task.timeout);
             this.failedTasks++;
-            task.reject(new Error(`Worker error: ${error.message}`));
+            task.reject(
+                new Error(`Worker ${poolWorker.id} failed: ${error.message}`),
+            );
+        });
+        poolWorker.pendingTasks.clear();
+
+        // 2. Terminar worker correctamente para evitar memory leaks
+        try {
+            poolWorker.worker.removeAllListeners();
+            await poolWorker.worker.terminate();
+        } catch (terminateError) {
+            console.error(
+                `[WorkerPool] Error terminando worker ${poolWorker.id}:`,
+                terminateError,
+            );
+        }
+
+        // 3. Marcar como no disponible
+        poolWorker.busy = false;
+
+        // 4. Recrear worker si el pool está activo
+        if (this.isInitialized && this.workers.length > 0) {
+            try {
+                const newWorker = await this.createWorker(poolWorker.id);
+                const index = this.workers.findIndex(
+                    w => w.id === poolWorker.id,
+                );
+                if (index !== -1) {
+                    this.workers[index] = newWorker;
+                }
+            } catch (recreateError) {
+                console.error(
+                    `[WorkerPool] No se pudo recrear worker ${poolWorker.id}:`,
+                    recreateError,
+                );
+            }
+        }
+    } /**
+     * Maneja la salida inesperada de un worker con cleanup completo
+     */
+    private async handleWorkerExit(
+        poolWorker: PoolWorker,
+        code: number,
+    ): Promise<void> {
+        console.warn(
+            `[WorkerPool] Worker ${poolWorker.id} salió con código ${code}`,
+        );
+
+        // 1. Rechazar tareas pendientes con cleanup
+        poolWorker.pendingTasks.forEach(task => {
+            clearTimeout(task.timeout);
+            this.failedTasks++;
+            task.reject(
+                new Error(`Worker ${poolWorker.id} exited with code ${code}`),
+            );
         });
         poolWorker.pendingTasks.clear();
         poolWorker.busy = false;
-    }
 
-    /**
-     * Maneja la salida inesperada de un worker
-     */
-    private handleWorkerExit(poolWorker: PoolWorker, code: number): void {
-        // Rechazar tareas pendientes
-        poolWorker.pendingTasks.forEach(task => {
-            clearTimeout(task.timeout);
-            this.failedTasks++;
-            task.reject(new Error(`Worker exited with code ${code}`));
-        });
-        poolWorker.pendingTasks.clear();
-        poolWorker.busy = false; // Intentar recrear el worker si es necesario
-        if (this.isInitialized) {
-            this.recreateWorker(poolWorker).catch(() => {
-                // Error silencioso en recreación
-            });
+        // 2. Limpiar listeners para evitar memory leaks
+        try {
+            poolWorker.worker.removeAllListeners();
+        } catch {
+            // Error silencioso en cleanup
+        }
+
+        // 3. Recrear worker si es necesario y el pool está activo
+        if (this.isInitialized && this.workers.length > 0) {
+            try {
+                await this.recreateWorker(poolWorker);
+            } catch (recreateError) {
+                console.error(
+                    `[WorkerPool] Error recreando worker ${poolWorker.id}:`,
+                    recreateError,
+                );
+            }
         }
     }
-
     /**
      * Recrea un worker que falló
      */ private async recreateWorker(failedWorker: PoolWorker): Promise<void> {
@@ -331,6 +390,60 @@ export class TypeScriptWorkerPool {
             }
         } catch {
             // Error silencioso en recreación
+        }
+    }
+
+    /**
+     * Recicla un worker para prevenir memory leaks
+     */
+    private async recycleWorker(poolWorker: PoolWorker): Promise<void> {
+        try {
+            console.log(
+                `[WorkerPool] Reciclando worker ${poolWorker.id} después de ${poolWorker.taskCounter} tareas`,
+            ); // 1. Esperar a que termine tareas pendientes (timeout corto)
+            const maxWait = 2000; // 2 segundos máximo
+            const startTime = Date.now();
+
+            await new Promise<void>(resolve => {
+                const checkPending = () => {
+                    if (
+                        poolWorker.pendingTasks.size === 0 ||
+                        Date.now() - startTime >= maxWait
+                    ) {
+                        resolve();
+                    } else {
+                        setTimeout(checkPending, 100);
+                    }
+                };
+                checkPending();
+            });
+
+            // 2. Si aún hay tareas pendientes, rechazarlas
+            if (poolWorker.pendingTasks.size > 0) {
+                poolWorker.pendingTasks.forEach(task => {
+                    clearTimeout(task.timeout);
+                    task.reject(new Error('Worker being recycled'));
+                });
+                poolWorker.pendingTasks.clear();
+            }
+
+            // 3. Terminar worker actual
+            poolWorker.worker.removeAllListeners();
+            await poolWorker.worker.terminate();
+
+            // 4. Crear nuevo worker
+            const newWorker = await this.createWorker(poolWorker.id);
+
+            // 5. Reemplazar en el array
+            const index = this.workers.findIndex(w => w.id === poolWorker.id);
+            if (index !== -1) {
+                this.workers[index] = newWorker;
+            }
+        } catch (error) {
+            console.error(
+                `[WorkerPool] Error reciclando worker ${poolWorker.id}:`,
+                error,
+            );
         }
     }
 
@@ -404,10 +517,8 @@ export class TypeScriptWorkerPool {
                 compilerOptions,
             );
         }
-    }
-
-    /**
-     * Realiza type checking usando un worker específico
+    } /**
+     * Realiza type checking usando un worker específico con reciclaje automático
      */
     private async typeCheckWithWorker(
         poolWorker: PoolWorker,
@@ -415,6 +526,11 @@ export class TypeScriptWorkerPool {
         content: string,
         compilerOptions: any,
     ): Promise<TypeCheckResult> {
+        // Verificar si el worker necesita reciclaje por número de tareas
+        if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
+            await this.recycleWorker(poolWorker);
+        }
+
         return new Promise<TypeCheckResult>((resolve, reject) => {
             const taskId = `task-${poolWorker.id}-${++poolWorker.taskCounter}-${Date.now()}`;
 
@@ -483,29 +599,56 @@ export class TypeScriptWorkerPool {
             };
         }
     }
-
     /**
-     * Cierra todos los workers del pool
+     * Cierra todos los workers del pool con cleanup completo
      */ async terminate(): Promise<void> {
-        // Rechazar todas las tareas pendientes
+        console.log('[WorkerPool] Cerrando pool de workers...');
+
+        // 1. Rechazar todas las tareas pendientes con cleanup
+        let totalPendingTasks = 0;
         for (const poolWorker of this.workers) {
+            totalPendingTasks += poolWorker.pendingTasks.size;
+
             poolWorker.pendingTasks.forEach(task => {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker pool cerrado'));
             });
             poolWorker.pendingTasks.clear();
+
+            // Limpiar listeners para evitar memory leaks
+            try {
+                poolWorker.worker.removeAllListeners();
+            } catch {
+                // Error silencioso en cleanup
+            }
         }
 
-        // Cerrar todos los workers
-        const terminatePromises = this.workers.map(poolWorker =>
-            poolWorker.worker.terminate(),
-        );
+        if (totalPendingTasks > 0) {
+            console.log(
+                `[WorkerPool] Se cancelaron ${totalPendingTasks} tareas pendientes`,
+            );
+        } // 2. Cerrar todos los workers con manejo de errores
+        const terminatePromises = this.workers.map(async poolWorker => {
+            try {
+                await poolWorker.worker.terminate();
+            } catch (error) {
+                console.warn(
+                    `[WorkerPool] Error terminando worker ${poolWorker.id}:`,
+                    error,
+                );
+            }
+        });
 
-        await Promise.all(terminatePromises);
+        await Promise.allSettled(terminatePromises);
 
+        // 3. Limpiar estado
         this.workers = [];
         this.isInitialized = false;
         this.initPromise = null;
+
+        console.log(
+            `[WorkerPool] Pool cerrado. Estadísticas finales: ${this.completedTasks} completadas, ${this.failedTasks} fallidas`,
+        );
     }
 
     /**

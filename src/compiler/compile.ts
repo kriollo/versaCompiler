@@ -28,173 +28,286 @@ let estandarizaCode: any;
 let preCompileTS: any;
 let preCompileVue: any;
 
-// 🚀 Sistema de Carga Inteligente de Módulos - VERSIÓN OPTIMIZADA
-class ModuleManager {
-    private static instance: ModuleManager;
+// 🚀 Importar optimizador de transformaciones
+let TransformOptimizer: any;
+
+// 🚀 Sistema de Carga Inteligente de Módulos - VERSIÓN OPTIMIZADA V2
+class OptimizedModuleManager {
+    private static instance: OptimizedModuleManager;
     private isInitialized: boolean = false;
-    private initializationPromise: Promise<void> | null = null;
     private loadedModules: Set<string> = new Set();
 
-    // NUEVOS: Gestión de modo y precarga
-    private currentMode: 'individual' | 'batch' | 'watch' | null = null;
-    private preloadPromises: Map<string, Promise<any>> = new Map();
-    private moduleCache: Map<string, any> = new Map();
+    // ✨ NUEVAS OPTIMIZACIONES
+    private modulePool: Map<string, any> = new Map(); // Pool de instancias reutilizables
+    private loadingPromises: Map<string, Promise<any>> = new Map(); // Prevenir cargas duplicadas
+    private usageStats: Map<string, number> = new Map(); // Estadísticas de uso
+    private preloadQueue: Set<string> = new Set(); // Cola de precarga
+    private backgroundLoader: Promise<void> | null = null; // Cargador en background
 
-    private constructor() {}
+    // Módulos críticos que siempre se precargan
+    private readonly HOT_MODULES = ['chalk', 'parser'];
 
-    static getInstance(): ModuleManager {
-        if (!ModuleManager.instance) {
-            ModuleManager.instance = new ModuleManager();
+    // Contexto actual para optimizar cargas
+    private currentContext: 'individual' | 'batch' | 'watch' | null = null;
+
+    private constructor() {
+        // Iniciar precarga en background inmediatamente
+        this.startBackgroundPreloading();
+    }
+
+    static getInstance(): OptimizedModuleManager {
+        if (!OptimizedModuleManager.instance) {
+            OptimizedModuleManager.instance = new OptimizedModuleManager();
         }
-        return ModuleManager.instance;
+        return OptimizedModuleManager.instance;
     }
 
     /**
-     * NUEVO: Precarga estratégica para modo watch
+     * ✨ NUEVO: Precarga en background para módulos críticos
      */
-    async preloadForWatchMode(): Promise<void> {
-        const essentialModules = ['chalk', 'parser', 'transforms'];
-
-        const preloadPromises = essentialModules.map(async moduleName => {
-            if (!this.loadedModules.has(moduleName)) {
-                switch (moduleName) {
-                    case 'chalk':
-                        return this._loadModule('chalk', loadChalk);
-                    case 'parser':
-                        return this._loadModule('parser', loadParser);
-                    case 'transforms':
-                        return this._loadModule('transforms', loadTransforms);
-                }
-            }
-        });
-
-        await Promise.all(preloadPromises);
-        // console.log('[ModuleManager] Precarga completada para modo watch');
-    } /**
-     * MEJORADO: Inicializa los módulos necesarios según el contexto de compilación
-     * @param context Contexto de compilación: 'individual', 'batch', 'watch'
-     * @param fileExtensions Extensiones de archivos a compilar para optimizar la carga
-     */
-    async initializeModules(
-        context: 'individual' | 'batch' | 'watch' = 'individual',
-        fileExtensions: Set<string> = new Set(),
-    ): Promise<void> {
-        // Si cambia el contexto, reinicializar
-        if (this.currentMode !== context) {
-            this.currentMode = context;
-
-            // En modo watch, precargar módulos esenciales
-            if (context === 'watch') {
-                await this.preloadForWatchMode();
-            }
-        }
-
-        if (this.initializationPromise) {
-            return this.initializationPromise;
-        }
-
-        if (this.isInitialized && context !== 'individual') {
-            return;
-        }
-
-        this.initializationPromise = this._performInitialization(
-            context,
-            fileExtensions,
-        );
-        await this.initializationPromise;
-        this.initializationPromise = null;
+    private startBackgroundPreloading(): void {
+        this.backgroundLoader = this.preloadCriticalModules();
     }
 
-    private async _performInitialization(
+    /**
+     * ✨ NUEVO: Precarga módulos críticos en background
+     */
+    private async preloadCriticalModules(): Promise<void> {
+        try {
+            // Precargar módulos críticos de forma asíncrona
+            const preloadPromises = this.HOT_MODULES.map(moduleName =>
+                this.ensureModuleLoaded(moduleName).catch(() => {
+                    // Silenciar errores de precarga, se intentará cargar después
+                }),
+            );
+
+            await Promise.allSettled(preloadPromises);
+        } catch {
+            // Fallos en precarga no deben afectar la funcionalidad principal
+        }
+    }
+
+    /**
+     * ✨ MEJORADO: Precarga contextual basada en tipos de archivo
+     */
+    async preloadForContext(
         context: 'individual' | 'batch' | 'watch',
-        fileExtensions: Set<string>,
+        fileTypes: Set<string> = new Set(),
     ): Promise<void> {
-        const modulesToLoad: Promise<void>[] = [];
+        this.currentContext = context;
 
-        // Módulos siempre necesarios
-        if (!this.loadedModules.has('chalk')) {
-            modulesToLoad.push(this._loadModule('chalk', loadChalk));
-        }
-        if (!this.loadedModules.has('parser')) {
-            modulesToLoad.push(this._loadModule('parser', loadParser));
-        }
-        if (!this.loadedModules.has('transforms')) {
-            modulesToLoad.push(this._loadModule('transforms', loadTransforms));
+        // Esperar que termine la precarga crítica si está en progreso
+        if (this.backgroundLoader) {
+            await this.backgroundLoader;
         }
 
-        // Carga contextual según el tipo de compilación
+        const toPreload: string[] = [];
+
+        // Precarga basada en contexto
         if (context === 'batch' || context === 'watch') {
-            // En modo batch/watch, precargar todos los módulos necesarios
-            if (!this.loadedModules.has('vue')) {
-                modulesToLoad.push(this._loadModule('vue', loadVue));
-            }
-            if (!this.loadedModules.has('typescript')) {
-                modulesToLoad.push(
-                    this._loadModule('typescript', loadTypeScript),
-                );
-            }
-            if (!this.loadedModules.has('minify')) {
-                modulesToLoad.push(this._loadModule('minify', loadMinify));
-            }
+            // En batch/watch, precargar todos los módulos comunes
+            toPreload.push('transforms', 'vue', 'typescript');
         } else {
-            // En modo individual, cargar solo según las extensiones necesarias
-            if (fileExtensions.has('.vue') && !this.loadedModules.has('vue')) {
-                modulesToLoad.push(this._loadModule('vue', loadVue));
-            }
-            if (
-                (fileExtensions.has('.ts') || fileExtensions.has('.vue')) &&
-                !this.loadedModules.has('typescript')
-            ) {
-                modulesToLoad.push(
-                    this._loadModule('typescript', loadTypeScript),
-                );
-            }
-            if (env.isPROD === 'true' && !this.loadedModules.has('minify')) {
-                modulesToLoad.push(this._loadModule('minify', loadMinify));
-            }
+            // En individual, cargar solo según tipos de archivo detectados
+            if (fileTypes.has('.vue')) toPreload.push('vue');
+            if (fileTypes.has('.ts') || fileTypes.has('.vue'))
+                toPreload.push('typescript');
+            if (!this.loadedModules.has('transforms'))
+                toPreload.push('transforms');
         }
 
-        // Cargar módulos en paralelo
-        await Promise.all(modulesToLoad);
-        this.isInitialized = true;
+        // Precargar en paralelo
+        const preloadPromises = toPreload.map(moduleName =>
+            this.ensureModuleLoaded(moduleName).catch(() => {
+                // Log warning pero no fallar
+                console.warn(
+                    `Warning: No se pudo precargar módulo ${moduleName}`,
+                );
+            }),
+        );
+
+        await Promise.allSettled(preloadPromises);
     }
 
-    private async _loadModule(
-        name: string,
-        loadFunction: () => Promise<any>,
-    ): Promise<void> {
-        if (!this.loadedModules.has(name)) {
-            await loadFunction();
-            this.loadedModules.add(name);
+    /**
+     * ✨ MEJORADO: Carga inteligente con pooling y deduplicación
+     */
+    async ensureModuleLoaded(moduleName: string): Promise<any> {
+        // 1. Verificar pool de módulos primero
+        if (this.modulePool.has(moduleName)) {
+            this.updateUsageStats(moduleName);
+            return this.modulePool.get(moduleName);
+        }
+
+        // 2. Verificar si ya está cargando (deduplicación)
+        if (this.loadingPromises.has(moduleName)) {
+            return this.loadingPromises.get(moduleName);
+        }
+
+        // 3. Iniciar carga
+        const loadPromise = this.loadModuleInternal(moduleName);
+        this.loadingPromises.set(moduleName, loadPromise);
+
+        try {
+            const moduleInstance = await loadPromise;
+
+            // 4. Almacenar en pool y estadísticas
+            this.modulePool.set(moduleName, moduleInstance);
+            this.loadedModules.add(moduleName);
+            this.updateUsageStats(moduleName);
+
+            return moduleInstance;
+        } finally {
+            // 5. Limpiar promesa de carga
+            this.loadingPromises.delete(moduleName);
         }
     }
 
     /**
-     * Carga un módulo específico bajo demanda (lazy loading)
+     * ✨ NUEVO: Actualiza estadísticas de uso para optimizaciones futuras
      */
-    async ensureModuleLoaded(moduleName: string): Promise<void> {
-        if (this.loadedModules.has(moduleName)) {
-            return;
-        }
+    private updateUsageStats(moduleName: string): void {
+        const currentCount = this.usageStats.get(moduleName) || 0;
+        this.usageStats.set(moduleName, currentCount + 1);
+    }
 
+    /**
+     * ✨ MEJORADO: Carga interna de módulos con mejor manejo de errores
+     */
+    private async loadModuleInternal(moduleName: string): Promise<any> {
         switch (moduleName) {
+            case 'chalk':
+                return this.loadChalk();
+            case 'parser':
+                return this.loadParser();
+            case 'transforms':
+                return this.loadTransforms();
             case 'vue':
-                await this._loadModule('vue', loadVue);
-                break;
+                return this.loadVue();
             case 'typescript':
-                await this._loadModule('typescript', loadTypeScript);
-                break;
+                return this.loadTypeScript();
             case 'minify':
-                await this._loadModule('minify', loadMinify);
-                break;
+                return this.loadMinify();
             case 'tailwind':
-                await this._loadModule('tailwind', loadTailwind);
-                break;
+                return this.loadTailwind();
             case 'linter':
-                await this._loadModule('linter', loadLinter);
-                break;
+                return this.loadLinter();
             default:
                 throw new Error(`Módulo desconocido: ${moduleName}`);
+        }
+    }
+
+    // ✨ Métodos de carga específicos optimizados
+    private async loadChalk(): Promise<any> {
+        if (!chalk) {
+            chalk = (await import('chalk')).default;
+        }
+        return chalk;
+    }
+
+    private async loadParser(): Promise<any> {
+        if (!getCodeFile) {
+            const parserModule = await import('./parser');
+            getCodeFile = parserModule.getCodeFile;
+        }
+        return getCodeFile;
+    }
+
+    private async loadTransforms(): Promise<any> {
+        if (!estandarizaCode) {
+            const transformsModule = await import('./transforms');
+            estandarizaCode = transformsModule.estandarizaCode;
+        }
+        return estandarizaCode;
+    }
+
+    private async loadVue(): Promise<any> {
+        if (!preCompileVue) {
+            const vueModule = await import('./vuejs');
+            preCompileVue = vueModule.preCompileVue;
+        }
+        return preCompileVue;
+    }
+
+    private async loadTypeScript(): Promise<any> {
+        if (!preCompileTS) {
+            const typescriptModule = await import('./typescript-manager');
+            preCompileTS = typescriptModule.preCompileTS;
+        }
+        return preCompileTS;
+    }
+
+    private async loadMinify(): Promise<any> {
+        if (!minifyJS) {
+            const minifyModule = await import('./minify');
+            minifyJS = minifyModule.minifyJS;
+        }
+        return minifyJS;
+    }
+
+    private async loadTailwind(): Promise<any> {
+        if (!generateTailwindCSS) {
+            const tailwindModule = await import('./tailwindcss');
+            generateTailwindCSS = tailwindModule.generateTailwindCSS;
+        }
+        return generateTailwindCSS;
+    }
+    private async loadLinter(): Promise<any> {
+        if (!ESLint || !OxLint) {
+            const linterModule = await import('./linter');
+            ESLint = linterModule.ESLint;
+            OxLint = linterModule.OxLint;
+        }
+        return { ESLint, OxLint };
+    }
+    private async loadTransformOptimizer(): Promise<any> {
+        if (!TransformOptimizer) {
+            const transformModule = await import('./transform-optimizer');
+            TransformOptimizer =
+                transformModule.TransformOptimizer.getInstance();
+        }
+        return TransformOptimizer;
+    }
+
+    /**
+     * ✨ NUEVO: Obtiene estadísticas de performance del manager
+     */
+    getPerformanceStats(): {
+        loadedModules: string[];
+        usageStats: Record<string, number>;
+        poolSize: number;
+        loadingInProgress: string[];
+        mostUsedModules: string[];
+    } {
+        const sortedByUsage = Array.from(this.usageStats.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([name]) => name);
+
+        return {
+            loadedModules: Array.from(this.loadedModules),
+            usageStats: Object.fromEntries(this.usageStats),
+            poolSize: this.modulePool.size,
+            loadingInProgress: Array.from(this.loadingPromises.keys()),
+            mostUsedModules: sortedByUsage,
+        };
+    }
+
+    /**
+     * ✨ NUEVO: Limpia módulos no utilizados para liberar memoria
+     */
+    cleanupUnusedModules(): void {
+        const threshold = 1; // Mínimo de usos para mantener en pool
+
+        for (const [moduleName, usageCount] of this.usageStats) {
+            if (
+                usageCount < threshold &&
+                !this.HOT_MODULES.includes(moduleName)
+            ) {
+                this.modulePool.delete(moduleName);
+                this.loadedModules.delete(moduleName);
+                this.usageStats.delete(moduleName);
+            }
         }
     }
 
@@ -203,18 +316,16 @@ class ModuleManager {
      */
     reset(): void {
         this.isInitialized = false;
-        this.initializationPromise = null;
         this.loadedModules.clear();
-    }
+        this.modulePool.clear();
+        this.loadingPromises.clear();
+        this.usageStats.clear();
+        this.preloadQueue.clear();
+        this.currentContext = null;
+        this.backgroundLoader = null;
 
-    /**
-     * Obtiene estadísticas de módulos cargados
-     */
-    getStats(): { loaded: string[]; initialized: boolean } {
-        return {
-            loaded: Array.from(this.loadedModules),
-            initialized: this.isInitialized,
-        };
+        // Reiniciar precarga crítica
+        this.startBackgroundPreloading();
     }
 }
 
@@ -313,28 +424,27 @@ const compilationResults: CompilationResult[] = [];
 
 // 🚀 Sistema de Cache Inteligente para Compilación
 interface SmartCacheEntry {
-    contentHash: string;           // SHA-256 del contenido
-    dependencyHashes?: string[];   // Hashes de dependencias (futuro)
-    mtime: number;                 // Tiempo de modificación
-    outputPath: string;            // Ruta del archivo compilado
-    lastUsed: number;              // Para LRU
-    size: number;                  // Control de memoria
+    contentHash: string; // SHA-256 del contenido
+    dependencyHashes?: string[]; // Hashes de dependencias (futuro)
+    mtime: number; // Tiempo de modificación
+    outputPath: string; // Ruta del archivo compilado
+    lastUsed: number; // Para LRU
+    size: number; // Control de memoria
 }
 
 class SmartCompilationCache {
     private cache = new Map<string, SmartCacheEntry>();
-    private readonly maxEntries = 500;     // Máximo archivos en cache
+    private readonly maxEntries = 500; // Máximo archivos en cache
     private readonly maxMemory = 100 * 1024 * 1024; // 100MB límite
     private currentMemoryUsage = 0;
 
     /**
      * Genera hash SHA-256 del contenido del archivo
-     */
-    async generateContentHash(filePath: string): Promise<string> {
+     */ async generateContentHash(filePath: string): Promise<string> {
         try {
             const content = await readFile(filePath, 'utf8');
             return createHash('sha256').update(content).digest('hex');
-        } catch (error) {
+        } catch {
             // Si no se puede leer el archivo, generar hash único basado en la ruta y timestamp
             const fallback = `${filePath}-${Date.now()}`;
             return createHash('sha256').update(fallback).digest('hex');
@@ -351,7 +461,7 @@ class SmartCompilationCache {
         try {
             // Verificar si el archivo de salida existe
             await stat(entry.outputPath);
-            
+
             // Verificar si el contenido ha cambiado
             const currentHash = await this.generateContentHash(filePath);
             if (entry.contentHash !== currentHash) {
@@ -383,18 +493,18 @@ class SmartCompilationCache {
         try {
             const stats = await stat(filePath);
             const contentHash = await this.generateContentHash(filePath);
-            
+
             const entry: SmartCacheEntry = {
                 contentHash,
                 mtime: stats.mtimeMs,
                 outputPath,
                 lastUsed: Date.now(),
-                size: stats.size
+                size: stats.size,
             };
 
             // Aplicar límites de memoria y entradas antes de agregar
             this.evictIfNeeded(entry.size);
-            
+
             this.cache.set(filePath, entry);
             this.currentMemoryUsage += entry.size;
         } catch (error) {
@@ -413,7 +523,10 @@ class SmartCompilationCache {
         }
 
         // Verificar límite de memoria
-        while (this.currentMemoryUsage + newEntrySize > this.maxMemory && this.cache.size > 0) {
+        while (
+            this.currentMemoryUsage + newEntrySize > this.maxMemory &&
+            this.cache.size > 0
+        ) {
             this.evictLRU();
         }
     }
@@ -459,7 +572,7 @@ class SmartCompilationCache {
 
             const cacheData = await readFile(cacheFile, 'utf-8');
             const parsed = JSON.parse(cacheData);
-            
+
             // Validar y cargar entradas del cache
             for (const [key, value] of Object.entries(parsed)) {
                 const entry = value as SmartCacheEntry;
@@ -494,7 +607,7 @@ class SmartCompilationCache {
     clear(): void {
         this.cache.clear();
         this.currentMemoryUsage = 0;
-    }    /**
+    } /**
      * Obtiene la ruta de salida para un archivo cacheado
      */
     getOutputPath(filePath: string): string {
@@ -509,7 +622,7 @@ class SmartCompilationCache {
         return {
             entries: this.cache.size,
             memoryUsage: this.currentMemoryUsage,
-            hitRate: 0 // Se calculará externamente
+            hitRate: 0, // Se calculará externamente
         };
     }
 }
@@ -967,10 +1080,8 @@ async function compileJS(
     // Si la ruta ya es absoluta, no la resolvamos de nuevo
     inPath = path.isAbsolute(inPath)
         ? normalizeRuta(inPath)
-        : normalizeRuta(path.resolve(inPath));
-
-    // 🚀 Usar ModuleManager para carga optimizada
-    const moduleManager = ModuleManager.getInstance();
+        : normalizeRuta(path.resolve(inPath)); // 🚀 Usar OptimizedModuleManager para carga optimizada
+    const moduleManager = OptimizedModuleManager.getInstance();
 
     // Timing de lectura
     let start = Date.now();
@@ -1230,12 +1341,12 @@ export async function initCompile(
 ) {
     try {
         // 🚀 Sistema de Carga Inteligente de Módulos
-        const moduleManager = ModuleManager.getInstance();
+        const moduleManager = OptimizedModuleManager.getInstance();
         const fileExtension = path.extname(ruta);
         const fileExtensions = new Set([fileExtension]);
 
         // Inicializar módulos según el contexto
-        await moduleManager.initializeModules(
+        await moduleManager.preloadForContext(
             mode === 'all' ? 'batch' : mode,
             fileExtensions,
         );
@@ -1554,7 +1665,7 @@ async function compileWithConcurrencyLimit(
                     };
                 }
 
-                const result = await initCompile(file, false, 'batch');                // Actualizar cache si la compilación fue exitosa
+                const result = await initCompile(file, false, 'batch'); // Actualizar cache si la compilación fue exitosa
                 if (result.success && result.output) {
                     await smartCache.set(file, result.output);
                 }
