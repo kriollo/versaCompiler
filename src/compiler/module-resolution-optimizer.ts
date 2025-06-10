@@ -787,7 +787,7 @@ export class ModuleResolutionOptimizer {
         }        // Construir ruta final
         let finalPath: string;
         const pathDist = env.PATH_DIST.replace('./', '');
-        
+
         // Manejar caso especial: alias exacto sin wildcard (como #config -> config/index.js)
         if (relativePath === '' && !targetPath.includes('*')) {
             // Es un alias exacto, usar el target tal como está
@@ -817,7 +817,7 @@ export class ModuleResolutionOptimizer {
         } else {
             // Si es una ruta relativa, construir basándose en el target
             const cleanTarget = targetPath.replace('./', '').replace('/*', '');
-            
+
             // Si el target ya incluye el directorio de distribución, no duplicar
             if (cleanTarget === pathDist) {
                 finalPath = join('/', pathDist, relativePath);
