@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 import * as vCompiler from 'vue/compiler-sfc';
@@ -15,6 +16,162 @@ async function loadChalk() {
     return chalk;
 }
 
+// ✨ NUEVA OPTIMIZACIÓN: Sistema de cache para inyecciones HMR
+interface HMRInjectionCacheEntry {
+    contentHash: string;
+    injectedCode: string;
+    hasRefImport: boolean;
+    timestamp: number;
+}
+
+class VueHMRInjectionCache {
+    private static instance: VueHMRInjectionCache;
+    private cache = new Map<string, HMRInjectionCacheEntry>();
+    private readonly MAX_CACHE_SIZE = 100;
+    private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+    static getInstance(): VueHMRInjectionCache {
+        if (!VueHMRInjectionCache.instance) {
+            VueHMRInjectionCache.instance = new VueHMRInjectionCache();
+        }
+        return VueHMRInjectionCache.instance;
+    }
+
+    /**
+     * Genera un hash del contenido original para detectar cambios
+     */
+    private generateContentHash(data: string): string {
+        return createHash('md5').update(data).digest('hex');
+    }
+
+    /**
+     * Obtiene código HMR inyectado desde cache o lo genera
+     */
+    getOrGenerateHMRInjection(
+        originalData: string,
+        fileName: string,
+    ): {
+        injectedData: string;
+        cached: boolean;
+    } {
+        const contentHash = this.generateContentHash(originalData);
+        const cacheKey = `${fileName}:${contentHash}`;
+
+        // Verificar cache
+        const cached = this.cache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+            return {
+                injectedData: cached.injectedCode,
+                cached: true,
+            };
+        }
+
+        // Generar nueva inyección HMR
+        const vueImportPattern =
+            /import\s*\{[^}]*\bref\b[^}]*\}\s*from\s*['"]vue['"]/;
+        const hasRefImport = vueImportPattern.test(originalData);
+
+        const varContent = `
+            ${hasRefImport ? '' : 'import { ref } from "vue";'}
+            const versaComponentKey = ref(0);
+            `;
+
+        let injectedData: string;
+        const ifExistScript = originalData.includes('<script');
+
+        if (!ifExistScript) {
+            injectedData =
+                `<script setup lang="ts">${varContent}</script>/n` +
+                originalData;
+        } else {
+            injectedData = originalData.replace(
+                /(<script.*?>)/,
+                `$1${varContent}`,
+            );
+        }
+
+        // Inyectar :key en el template
+        injectedData = injectedData.replace(
+            /(<template[^>]*>[\s\S]*?)(<(\w+)([^>]*?))(\/?>)/,
+            (match, p1, p2, p3, p4, p5) => {
+                if (p4.includes(':key=') || p4.includes('key=')) {
+                    return match;
+                }
+
+                const isSelfClosing = p5 === '/>';
+                if (isSelfClosing) {
+                    return `${p1}<${p3}${p4} :key="versaComponentKey" />`;
+                } else {
+                    return `${p1}<${p3}${p4} :key="versaComponentKey">`;
+                }
+            },
+        );
+
+        // Cachear resultado
+        this.cache.set(cacheKey, {
+            contentHash,
+            injectedCode: injectedData,
+            hasRefImport,
+            timestamp: Date.now(),
+        });
+
+        // Limpiar cache si es necesario
+        this.evictIfNeeded();
+
+        return {
+            injectedData,
+            cached: false,
+        };
+    }
+
+    /**
+     * Limpia entradas de cache cuando se excede el límite
+     */
+    private evictIfNeeded(): void {
+        if (this.cache.size <= this.MAX_CACHE_SIZE) return;
+
+        const entries = Array.from(this.cache.entries());
+        entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+        // Eliminar las entradas más antiguas
+        const toDelete = entries.slice(0, entries.length - this.MAX_CACHE_SIZE);
+        toDelete.forEach(([key]) => this.cache.delete(key));
+    }
+
+    /**
+     * Limpia entradas expiradas
+     */
+    cleanExpired(): void {
+        const now = Date.now();
+        for (const [key, entry] of this.cache.entries()) {
+            if (now - entry.timestamp > this.CACHE_TTL) {
+                this.cache.delete(key);
+            }
+        }
+    }
+
+    /**
+     * Obtiene estadísticas del cache
+     */
+    getStats() {
+        return {
+            size: this.cache.size,
+            maxSize: this.MAX_CACHE_SIZE,
+            ttl: this.CACHE_TTL,
+        };
+    }
+
+    /**
+     * Limpia todo el cache
+     */
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
+// Instancia global del cache HMR
+const hmrInjectionCache = VueHMRInjectionCache.getInstance();
+
 const getComponentsVueMap = async (ast: any): Promise<string[]> => {
     let components: string[] = [];
     const importsStatic = ast?.module?.staticImports;
@@ -29,16 +186,6 @@ const getComponentsVueMap = async (ast: any): Promise<string[]> => {
     }
     return components;
 };
-
-/**
- * Compila un bloque personalizado.
- * @param {Object} block - El bloque personalizado a compilar.
- * @param {string} source - La fuente del bloque.
- */
-const _compileCustomBlock = async (
-    _block: any,
-    _source: any,
-): Promise<void> => {};
 
 /**
  * Precompila un componente Vue.
@@ -67,41 +214,9 @@ export const preCompileVue = async (
         }
 
         if (!isProd) {
-            // Verificar si ya existe una importación de ref desde vue de manera más precisa
-            const vueImportPattern =
-                /import\s*\{[^}]*\bref\b[^}]*\}\s*from\s*['"]vue['"]/;
-            const hasRefImport = vueImportPattern.test(data);
-
-            // esto es para HMR re re forzado
-            const varContent = `
-            ${hasRefImport ? '' : 'import { ref } from "vue";'}
-            const versaComponentKey = ref(0);
-            `;
-            const ifExistScript = data.includes('<script');
-            if (!ifExistScript) {
-                data =
-                    `<script setup lang="ts">${varContent}</script>/n` + data;
-            } else {
-                data = data.replace(/(<script.*?>)/, `$1${varContent}`);
-            }
-            data = data.replace(
-                /(<template[^>]*>[\s\S]*?)(<(\w+)([^>]*?))(\/?>)/,
-                (match, p1, p2, p3, p4, p5) => {
-                    // Si ya tiene :key, no agregarlo de nuevo
-                    if (p4.includes(':key=') || p4.includes('key=')) {
-                        return match;
-                    }
-
-                    // Si es self-closing (termina con '/>'), manejar diferente
-                    const isSelfClosing = p5 === '/>';
-
-                    if (isSelfClosing) {
-                        return `${p1}<${p3}${p4} :key="versaComponentKey" />`;
-                    } else {
-                        return `${p1}<${p3}${p4} :key="versaComponentKey">`;
-                    }
-                },
-            );
+            const { injectedData } =
+                hmrInjectionCache.getOrGenerateHMRInjection(data, fileName);
+            data = injectedData;
         }
 
         const { descriptor, errors } = vCompiler.parse(data, {
@@ -176,7 +291,7 @@ export const preCompileVue = async (
         if (ast?.errors.length > 0) {
             throw new Error(
                 `Error al analizar el script del componente Vue ${source}:\n${ast.errors
-                    .map(e => e.message)
+                    .map((e: any) => e.message)
                     .join('\n')}`,
             );
         }
@@ -390,4 +505,17 @@ export const preCompileVue = async (
             data: null,
         };
     }
+};
+
+// ✨ NUEVA FUNCIÓN: Exportar funcionalidades del cache HMR para uso externo
+export const getVueHMRCacheStats = () => {
+    return hmrInjectionCache.getStats();
+};
+
+export const clearVueHMRCache = () => {
+    hmrInjectionCache.clear();
+};
+
+export const cleanExpiredVueHMRCache = () => {
+    hmrInjectionCache.cleanExpired();
 };

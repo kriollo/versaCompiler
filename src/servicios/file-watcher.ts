@@ -19,6 +19,211 @@ async function loadChalk() {
     return chalk;
 }
 
+// ✨ NUEVO: Sistema de debouncing optimizado para watch mode
+interface PendingChange {
+    filePath: string;
+    action: 'add' | 'change' | 'unlink';
+    timestamp: number;
+    extensionAction: string;
+}
+
+class WatchDebouncer {
+    private pendingChanges = new Map<string, PendingChange>();
+    private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private readonly DEBOUNCE_DELAY = 300; // 300ms debounce
+    private readonly BATCH_SIZE = 10; // Máximo archivos por batch
+    private isProcessing = false;
+    private browserSyncInstance: any = null; // ✨ Almacenar referencia a browserSync
+
+    /**
+     * Establece la instancia de browserSync
+     */
+    setBrowserSyncInstance(bs: any): void {
+        this.browserSyncInstance = bs;
+    }
+
+    /**
+     * Añade un cambio al sistema de debouncing
+     */
+    addChange(
+        filePath: string,
+        action: 'add' | 'change' | 'unlink',
+        extensionAction: string,
+    ): void {
+        // Normalizar ruta para evitar duplicados
+        const normalizedPath = normalizeRuta(filePath);
+
+        // Agregar o actualizar el cambio pendiente
+        this.pendingChanges.set(normalizedPath, {
+            filePath: normalizedPath,
+            action,
+            timestamp: Date.now(),
+            extensionAction,
+        });
+
+        // Reiniciar el timer de debounce
+        this.resetDebounceTimer();
+    }
+
+    /**
+     * Reinicia el timer de debounce
+     */
+    private resetDebounceTimer(): void {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+
+        this.debounceTimer = setTimeout(() => {
+            this.processPendingChanges();
+        }, this.DEBOUNCE_DELAY);
+    }
+
+    /**
+     * Procesa todos los cambios pendientes en batch
+     */
+    private async processPendingChanges(): Promise<void> {
+        if (this.isProcessing || this.pendingChanges.size === 0) {
+            return;
+        }
+
+        this.isProcessing = true;
+        const changes = Array.from(this.pendingChanges.values());
+        this.pendingChanges.clear();
+
+        try {
+            // Agrupar por tipo de acción para optimización
+            const deleteChanges = changes.filter(c => c.action === 'unlink');
+            const compileChanges = changes.filter(
+                c => c.action === 'add' || c.action === 'change',
+            );
+
+            // Procesar eliminaciones primero
+            if (deleteChanges.length > 0) {
+                await this.processDeleteChanges(deleteChanges);
+            }
+
+            // Procesar compilaciones en batches
+            if (compileChanges.length > 0) {
+                await this.processCompileChanges(compileChanges);
+            }
+        } catch (error) {
+            const chalkInstance = await loadChalk();
+            logger.error(
+                chalkInstance.red(
+                    `🚩 Error procesando cambios en batch: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+        } finally {
+            this.isProcessing = false;
+
+            // Si hay más cambios pendientes, procesarlos
+            if (this.pendingChanges.size > 0) {
+                this.resetDebounceTimer();
+            }
+        }
+    }
+
+    /**
+     * Procesa cambios de eliminación
+     */
+    private async processDeleteChanges(
+        deleteChanges: PendingChange[],
+    ): Promise<void> {
+        for (const change of deleteChanges) {
+            logger.info(`\n🗑️ eliminando archivo: ${change.filePath}`);
+            const result = await deleteFile(getOutputPath(change.filePath));
+            if (result) {
+                logger.info(`Archivo eliminado: ${change.filePath}`);
+                emitirCambios(
+                    this.browserSyncInstance,
+                    'reloadFull',
+                    change.filePath,
+                );
+            }
+        }
+    }
+
+    /**
+     * Procesa cambios de compilación en paralelo con límite de concurrencia
+     */
+    private async processCompileChanges(
+        compileChanges: PendingChange[],
+    ): Promise<void> {
+        const chalkInstance = await loadChalk();
+
+        // Procesar en batches para evitar sobrecarga
+        for (let i = 0; i < compileChanges.length; i += this.BATCH_SIZE) {
+            const batch = compileChanges.slice(i, i + this.BATCH_SIZE);
+
+            // Mostrar información del batch
+            if (batch.length > 1) {
+                logger.info(
+                    chalkInstance.cyan(
+                        `📦 Procesando batch de ${batch.length} archivos (${i + 1}-${Math.min(i + this.BATCH_SIZE, compileChanges.length)} de ${compileChanges.length})`,
+                    ),
+                );
+            }
+
+            // Procesar batch en paralelo con límite de concurrencia
+            const promises = batch.map(change => this.compileFile(change));
+            await Promise.allSettled(promises);
+        }
+
+        // Emitir cambio global al final del batch
+        if (compileChanges.length > 1) {
+            logger.info(
+                chalkInstance.green(
+                    `✅ Batch completado: ${compileChanges.length} archivos procesados`,
+                ),
+            );
+        }
+    }
+
+    /**
+     * Compila un archivo individual
+     */
+    private async compileFile(change: PendingChange): Promise<void> {
+        try {
+            const result = await initCompile(change.filePath, true, 'watch');
+            if (result.success) {
+                let accion = result.action || change.extensionAction;
+                accion =
+                    accion === 'extension' ? change.extensionAction : accion;
+                emitirCambios(
+                    this.browserSyncInstance,
+                    accion || 'reloadFull',
+                    result.output,
+                );
+            }
+        } catch (error) {
+            const chalkInstance = await loadChalk();
+            logger.error(
+                chalkInstance.red(
+                    `🚩 Error compilando ${change.filePath}: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+        }
+    }
+
+    /**
+     * Obtiene estadísticas del debouncer
+     */
+    getStats(): {
+        pendingChanges: number;
+        isProcessing: boolean;
+        hasTimer: boolean;
+    } {
+        return {
+            pendingChanges: this.pendingChanges.size,
+            isProcessing: this.isProcessing,
+            hasTimer: this.debounceTimer !== null,
+        };
+    }
+}
+
+// Instancia global del debouncer
+const watchDebouncer = new WatchDebouncer();
+
 // const cacheImportMap = new Map<string, string[]>();
 // const cacheComponentMap = new Map<string, string[]>();
 
@@ -188,7 +393,10 @@ export async function initChokidar(bs: any) {
             );
         });
 
-        // Evento cuando se añade un archivo
+        // ✨ CONFIGURAR: Establecer la instancia de browserSync en el debouncer
+        watchDebouncer.setBrowserSyncInstance(bs);
+
+        // ✨ OPTIMIZADO: Evento cuando se añade un archivo - Con debouncing
         watcher.on('add', async ruta => {
             const action = getAction(
                 ruta,
@@ -197,15 +405,12 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
-            const result = await initCompile(ruta, true, 'watch');
-            if (result.success) {
-                let accion = result.action || action;
-                accion = accion == 'extension' ? action : accion;
-                emitirCambios(bs, accion || 'reloadFull', result.output);
-            }
+
+            // Usar sistema de debouncing en lugar de compilación inmediata
+            watchDebouncer.addChange(ruta, 'add', action);
         });
 
-        // Evento cuando se modifica un archivo
+        // ✨ OPTIMIZADO: Evento cuando se modifica un archivo - Con debouncing
         watcher.on('change', async ruta => {
             const action = getAction(
                 ruta,
@@ -214,22 +419,23 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
-            const result = await initCompile(ruta, true, 'watch');
-            if (result.success) {
-                let accion = result.action || action;
-                accion = accion == 'extension' ? action : accion;
-                emitirCambios(bs, accion || 'reloadFull', result.output);
-            }
+
+            // Usar sistema de debouncing en lugar de compilación inmediata
+            watchDebouncer.addChange(ruta, 'change', action);
         });
 
-        // Evento cuando se elimina un archivo
+        // ✨ OPTIMIZADO: Evento cuando se elimina un archivo - Con debouncing
         watcher.on('unlink', async ruta => {
-            logger.info(`\n🗑️ eliminando archivo: ${ruta}`);
-            const result = await deleteFile(getOutputPath(normalizeRuta(ruta)));
-            if (result) {
-                logger.info(`Archivo eliminado: ${ruta}`);
-                emitirCambios(bs, 'reloadFull', ruta);
-            }
+            const action = getAction(
+                ruta,
+                extendsionWatch.filter(
+                    (item): item is { ext: string; action: string } =>
+                        item !== undefined,
+                ),
+            );
+
+            // Usar sistema de debouncing para eliminaciones también
+            watchDebouncer.addChange(ruta, 'unlink', action);
         });
         return watcher;
     } catch (error) {

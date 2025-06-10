@@ -141,7 +141,6 @@ export async function replaceAliasImportStatic(
     for (const match of matches) {
         const [, moduleRequest] = match;
         if (!moduleRequest) continue; // Skip if moduleRequest is undefined
-
         let newPath: string | null = null;
         let transformed = false; // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
@@ -191,7 +190,6 @@ export async function replaceAliasImportStatic(
                 } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
                     newImportPath += '.js';
                 }
-
                 newPath = newImportPath;
                 transformed = true;
             } else {
@@ -266,7 +264,6 @@ export async function replaceAliasImportStatic(
             resultCode = resultCode.replace(pathRegex, `$1${newPath}$1`);
         }
     }
-
     return resultCode;
 }
 

@@ -241,7 +241,7 @@ export class ModuleResolutionOptimizer {
                             modules.push(moduleData);
                         }
                     }
-                } catch (error) {
+                } catch {
                     // Ignorar módulos que no se puedan analizar
                     continue;
                 }
@@ -296,42 +296,210 @@ export class ModuleResolutionOptimizer {
                 optimizedEntry,
                 lastModified: stats.mtime.getTime(),
             };
-        } catch (error) {
+        } catch {
             return null;
         }
-    }
-
-    /**
+    } /**
      * Determina el entry point óptimo basado en package.json
      */
     private determineOptimalEntryPoint(packageJson: any): string | null {
         // Prioridad: module > exports > browser > main
-        if (packageJson.module) {
-            return packageJson.module;
-        }
+        let entryPoint: string | null = null;
 
-        if (packageJson.exports) {
+        if (packageJson.module) {
+            entryPoint = packageJson.module;
+        } else if (packageJson.exports) {
             if (typeof packageJson.exports === 'string') {
-                return packageJson.exports;
+                entryPoint = packageJson.exports;
             } else if (packageJson.exports['.']) {
                 const dotExport = packageJson.exports['.'];
                 if (typeof dotExport === 'string') {
-                    return dotExport;
+                    entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    return (
+                    entryPoint =
                         dotExport.import ||
                         dotExport.browser ||
-                        dotExport.default
+                        dotExport.default;
+                }
+            }
+        } else if (
+            packageJson.browser &&
+            typeof packageJson.browser === 'string'
+        ) {
+            entryPoint = packageJson.browser;
+        } else {
+            entryPoint = packageJson.main || null;
+        }
+
+        // ✨ NUEVA VALIDACIÓN POST-RESOLUCIÓN
+        // Verificar si el archivo resuelto cumple con criterios de desarrollo
+        if (entryPoint) {
+            entryPoint = this.validateAndOptimizeEntryPoint(
+                entryPoint,
+                packageJson,
+            );
+        }
+
+        return entryPoint;
+    }
+
+    /**
+     * ✨ NUEVA FUNCIÓN: Valida y optimiza el entry point basado en criterios de desarrollo
+     */
+    private validateAndOptimizeEntryPoint(
+        entryPoint: string,
+        packageJson: any,
+    ): string {
+        const isProd = env.isProd === 'true';
+        const fileName = entryPoint.toLowerCase();
+
+        // Si estamos en desarrollo, evitar archivos .min o .prod
+        if (
+            !isProd &&
+            (fileName.includes('.min.') || fileName.includes('.prod.'))
+        ) {
+            // Buscar alternativas mejores en el package.json
+            const alternatives = this.findDevelopmentAlternatives(
+                entryPoint,
+                packageJson,
+            );
+            if (alternatives) {
+                if (env.VERBOSE === 'true') {
+                    logger.info(
+                        `🔄 Cambiando ${entryPoint} por ${alternatives} (modo desarrollo)`,
                     );
+                }
+                return alternatives;
+            }
+        }
+
+        // Priorizar versiones browser y esm para mejor compatibilidad
+        if (fileName.includes('runtime') && !fileName.includes('browser')) {
+            const browserAlternative = this.findBrowserAlternative(
+                entryPoint,
+                packageJson,
+            );
+            if (browserAlternative) {
+                if (env.VERBOSE === 'true') {
+                    logger.info(
+                        `🌐 Cambiando ${entryPoint} por ${browserAlternative} (versión browser)`,
+                    );
+                }
+                return browserAlternative;
+            }
+        }
+
+        return entryPoint;
+    } /**
+     * ✨ NUEVA FUNCIÓN: Busca alternativas de desarrollo (no minificadas)
+     */
+    private findDevelopmentAlternatives(
+        entryPoint: string,
+        packageJson: any,
+    ): string | null {
+        // Crear versión de desarrollo basada en el entry point actual
+        let devVersion = entryPoint
+            .replace('.min.', '.')
+            .replace('.prod.', '.');
+
+        // Si hay exports, buscar en diferentes condiciones
+        if (packageJson.exports && typeof packageJson.exports === 'object') {
+            const dotExport = packageJson.exports['.'];
+            if (dotExport && typeof dotExport === 'object') {
+                // Buscar versiones development, import, browser
+                const candidates = [
+                    dotExport.development,
+                    dotExport.import,
+                    dotExport.browser,
+                    dotExport.default,
+                ].filter(Boolean);
+
+                for (const candidate of candidates) {
+                    if (
+                        typeof candidate === 'string' &&
+                        !candidate.includes('.min.') &&
+                        !candidate.includes('.prod.')
+                    ) {
+                        return candidate;
+                    }
+                }
+            }
+        } // Si browser field es un objeto, buscar alternativas
+        if (packageJson.browser && typeof packageJson.browser === 'object') {
+            for (const value of Object.values(packageJson.browser)) {
+                if (
+                    typeof value === 'string' &&
+                    !value.includes('.min.') &&
+                    !value.includes('.prod.') &&
+                    (value.includes('browser') || value.includes('esm'))
+                ) {
+                    return value;
                 }
             }
         }
 
-        if (packageJson.browser && typeof packageJson.browser === 'string') {
-            return packageJson.browser;
+        return devVersion !== entryPoint ? devVersion : null;
+    }
+
+    /**
+     * ✨ NUEVA FUNCIÓN: Busca alternativas browser para versiones runtime
+     */
+    private findBrowserAlternative(
+        entryPoint: string,
+        packageJson: any,
+    ): string | null {
+        // Primero intentar con exports
+        if (packageJson.exports && typeof packageJson.exports === 'object') {
+            const dotExport = packageJson.exports['.'];
+            if (dotExport && typeof dotExport === 'object') {
+                // Buscar specific browser+esm combinations
+                const browserKeys = Object.keys(dotExport).filter(
+                    key =>
+                        key.includes('browser') &&
+                        (key.includes('esm') || key.includes('module')),
+                );
+                if (browserKeys.length > 0) {
+                    const firstBrowserKey = browserKeys[0];
+                    if (
+                        firstBrowserKey &&
+                        typeof dotExport[firstBrowserKey] === 'string'
+                    ) {
+                        return dotExport[firstBrowserKey];
+                    }
+                }
+
+                // Fallback a browser general
+                if (
+                    dotExport.browser &&
+                    typeof dotExport.browser === 'string'
+                ) {
+                    return dotExport.browser;
+                }
+            }
         }
 
-        return packageJson.main || null;
+        // Buscar en directorio dist versiones browser
+        const baseName = entryPoint.replace(/\.[^/.]+$/, '');
+        const browserCandidates = [
+            baseName.replace('runtime', 'esm-browser'),
+            baseName.replace('runtime', 'browser'),
+            baseName.replace('runtime.esm-bundler', 'esm-browser'),
+            entryPoint.replace('runtime', 'esm-browser'),
+            entryPoint.replace('runtime', 'browser'),
+        ];
+
+        // Para Vue específicamente
+        if (entryPoint.includes('vue.runtime.esm-bundler')) {
+            browserCandidates.unshift(
+                'dist/vue.esm-browser.js',
+                'dist/vue.browser.esm.js',
+            );
+        }
+
+        return (
+            browserCandidates.find(candidate => candidate !== entryPoint) ||
+            null
+        );
     }
 
     /**
@@ -367,7 +535,7 @@ export class ModuleResolutionOptimizer {
                     return join(dir, pattern);
                 }
             }
-        } catch (error) {
+        } catch {
             // Ignorar errores de filesystem
         }
 
@@ -584,7 +752,7 @@ export class ModuleResolutionOptimizer {
                 this.metrics.filesystemAccess++;
                 return finalPath;
             }
-        } catch (error) {
+        } catch {
             // Ignorar errores
         }
 
@@ -631,7 +799,7 @@ export class ModuleResolutionOptimizer {
         } else {
             // Si es una ruta relativa, construir basándose en el target
             const cleanTarget = targetPath.replace('./', '').replace('/*', '');
-
+            console.log(cleanTarget, pathDist, relativePath);
             // Si el target ya incluye el directorio de distribución, no duplicar
             if (cleanTarget === pathDist) {
                 finalPath = join('/', pathDist, relativePath);
@@ -640,7 +808,7 @@ export class ModuleResolutionOptimizer {
                 finalPath = join('/', cleanTarget, relativePath);
             } else {
                 // Caso normal: agregar PATH_DIST como base
-                finalPath = join('/', pathDist, cleanTarget, relativePath);
+                finalPath = join('/', pathDist, relativePath);
             }
         }
 
