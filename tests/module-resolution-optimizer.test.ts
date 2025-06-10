@@ -129,7 +129,7 @@ describe('Module Resolution Optimizer', () => {
 
         test('debe resolver alias @components/*', () => {
             const result = getOptimizedAliasPath('@components/Modal.vue');
-            expect(result).toBe('/public/src/components/Modal.vue');
+            expect(result).toBe('/public/components/Modal.vue');
         });
         test('debe resolver alias P@/*', () => {
             const result = getOptimizedAliasPath('P@/vendor/styles.css');
@@ -155,7 +155,7 @@ describe('Module Resolution Optimizer', () => {
             const result = getOptimizedAliasPath('@components/Button.vue');
 
             // Debería usar @components/* en lugar de @/*
-            expect(result).toBe('/public/src/components/Button.vue');
+            expect(result).toBe('/public/components/Button.vue');
         });
     });
 

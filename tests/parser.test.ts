@@ -55,14 +55,12 @@ export default useCounter;
 
             expect(result).toBeDefined();
             expect(result.program).toBeDefined();
-            expect(result.program.body).toBeInstanceOf(Array);
-
-            // Verificar que encuentra los imports/exports
+            expect(result.program.body).toBeInstanceOf(Array);            // Verificar que encuentra los imports/exports
             const imports = result.program.body.filter(
-                node => node.type === 'ImportDeclaration',
+                (node: any) => node.type === 'ImportDeclaration',
             );
             const exports = result.program.body.filter(
-                node =>
+                (node: any) =>
                     node.type === 'ExportNamedDeclaration' ||
                     node.type === 'ExportDefaultDeclaration',
             );
