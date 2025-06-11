@@ -36,6 +36,7 @@ const EXCLUDED_MODULES = new Set([
     'execa',
     'find-root',
     'fs-extra',
+    'minimatch'
 ]);
 
 // function resolveESMWithLibrary(moduleName: string): string | null {

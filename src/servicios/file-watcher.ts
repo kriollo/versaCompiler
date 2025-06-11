@@ -3,6 +3,7 @@ import path from 'node:path';
 import process, { env } from 'node:process';
 
 import * as chokidar from 'chokidar';
+import { minimatch } from 'minimatch';
 
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser.js';
@@ -25,6 +26,7 @@ interface PendingChange {
     action: 'add' | 'change' | 'unlink';
     timestamp: number;
     extensionAction: string;
+    isAdditionalFile: boolean; // ✨ NUEVO: Indica si es un archivo adicional (no compilable)
 }
 
 class WatchDebouncer {
@@ -49,6 +51,7 @@ class WatchDebouncer {
         filePath: string,
         action: 'add' | 'change' | 'unlink',
         extensionAction: string,
+        isAdditionalFile: boolean = false,
     ): void {
         // Normalizar ruta para evitar duplicados
         const normalizedPath = normalizeRuta(filePath);
@@ -59,6 +62,7 @@ class WatchDebouncer {
             action,
             timestamp: Date.now(),
             extensionAction,
+            isAdditionalFile,
         });
 
         // Reiniciar el timer de debounce
@@ -121,24 +125,37 @@ class WatchDebouncer {
                 this.resetDebounceTimer();
             }
         }
-    }
-
-    /**
+    } /**
      * Procesa cambios de eliminación
      */
     private async processDeleteChanges(
         deleteChanges: PendingChange[],
     ): Promise<void> {
         for (const change of deleteChanges) {
-            logger.info(`\n🗑️ eliminando archivo: ${change.filePath}`);
-            const result = await deleteFile(getOutputPath(change.filePath));
-            if (result) {
-                logger.info(`Archivo eliminado: ${change.filePath}`);
+            if (change.isAdditionalFile) {
+                // ✨ Archivos adicionales: solo reload, sin eliminar del output
+                logger.info(
+                    `\n🗑️ Archivo adicional eliminado: ${change.filePath}`,
+                );
                 emitirCambios(
                     this.browserSyncInstance,
                     'reloadFull',
                     change.filePath,
                 );
+            } else {
+                // Archivos compilables: eliminar del output
+                logger.info(
+                    `\n🗑️ Eliminando archivo compilado: ${change.filePath}`,
+                );
+                const result = await deleteFile(getOutputPath(change.filePath));
+                if (result) {
+                    logger.info(`Archivo eliminado: ${change.filePath}`);
+                    emitirCambios(
+                        this.browserSyncInstance,
+                        'reloadFull',
+                        change.filePath,
+                    );
+                }
             }
         }
     }
@@ -149,32 +166,75 @@ class WatchDebouncer {
     private async processCompileChanges(
         compileChanges: PendingChange[],
     ): Promise<void> {
+        // ✨ NUEVO: Separar archivos adicionales de archivos compilables
+        const additionalFiles = compileChanges.filter(c => c.isAdditionalFile);
+        const compilableFiles = compileChanges.filter(c => !c.isAdditionalFile);
+
+        // ✨ Procesar archivos adicionales (solo reload, sin compilación)
+
+        if (additionalFiles.length > 0) {
+            await this.processAdditionalFiles(additionalFiles);
+        }
+        // Procesar archivos compilables normalmente
+        if (compilableFiles.length > 0) {
+            await this.processCompilableFiles(compilableFiles);
+        }
+    }
+
+    /**
+     * ✨ RENOMBRADO: Procesa archivos compilables
+     */
+    async processCompilableFiles(
+        compilableFiles: PendingChange[],
+    ): Promise<void> {
         const chalkInstance = await loadChalk();
 
         // Procesar en batches para evitar sobrecarga
-        for (let i = 0; i < compileChanges.length; i += this.BATCH_SIZE) {
-            const batch = compileChanges.slice(i, i + this.BATCH_SIZE);
+        for (let i = 0; i < compilableFiles.length; i += this.BATCH_SIZE) {
+            const batch = compilableFiles.slice(i, i + this.BATCH_SIZE);
 
-            // Mostrar información del batch
             if (batch.length > 1) {
                 logger.info(
                     chalkInstance.cyan(
-                        `📦 Procesando batch de ${batch.length} archivos (${i + 1}-${Math.min(i + this.BATCH_SIZE, compileChanges.length)} de ${compileChanges.length})`,
+                        `📦 Procesando batch de ${batch.length} archivos compilables (${i + 1}-${Math.min(i + this.BATCH_SIZE, compilableFiles.length)} de ${compilableFiles.length})`,
                     ),
                 );
             }
 
-            // Procesar batch en paralelo con límite de concurrencia
             const promises = batch.map(change => this.compileFile(change));
             await Promise.allSettled(promises);
         }
 
-        // Emitir cambio global al final del batch
-        if (compileChanges.length > 1) {
+        if (compilableFiles.length > 1) {
             logger.info(
                 chalkInstance.green(
-                    `✅ Batch completado: ${compileChanges.length} archivos procesados`,
+                    `✅ Batch completado: ${compilableFiles.length} archivos compilados`,
                 ),
+            );
+        }
+    }
+
+    /**
+     * ✨ NUEVO: Procesa archivos adicionales (solo reloadFull)
+     */
+    async processAdditionalFiles(
+        additionalFiles: PendingChange[],
+    ): Promise<void> {
+        const chalkInstance = await loadChalk();
+
+        logger.info(
+            chalkInstance.blue(
+                `🔄 Recargando ${additionalFiles.length} archivo(s) adicional(es) (sin compilación)`,
+            ),
+        );
+
+        for (const change of additionalFiles) {
+            logger.info(`📄 Archivo adicional modificado: ${change.filePath}`);
+            // Solo hacer reloadFull, sin compilación
+            emitirCambios(
+                this.browserSyncInstance,
+                'reloadFull',
+                change.filePath,
             );
         }
     }
@@ -311,6 +371,26 @@ function getAction(
     return action || 'reloadFull';
 }
 
+/**
+ * Verifica si un archivo pertenece a las rutas adicionales (no compilables)
+ */
+function isAdditionalWatchFile(
+    filePath: string,
+    additionalPatterns: string[],
+): boolean {
+    if (!additionalPatterns || additionalPatterns.length === 0) {
+        return false;
+    }
+
+    const normalizedPath = normalizeRuta(filePath);
+
+    return additionalPatterns.some(pattern => {
+        // Normalizar el patrón también
+        const normalizedPattern = pattern.replace(/\\/g, '/');
+        return minimatch(normalizedPath, normalizedPattern);
+    });
+}
+
 export async function initChokidar(bs: any) {
     try {
         if (!env.PATH_SOURCE) {
@@ -398,6 +478,7 @@ export async function initChokidar(bs: any) {
 
         // ✨ OPTIMIZADO: Evento cuando se añade un archivo - Con debouncing
         watcher.on('add', async ruta => {
+            const isAdditional = isAdditionalWatchFile(ruta, watchAditional);
             const action = getAction(
                 ruta,
                 extendsionWatch.filter(
@@ -407,11 +488,12 @@ export async function initChokidar(bs: any) {
             );
 
             // Usar sistema de debouncing en lugar de compilación inmediata
-            watchDebouncer.addChange(ruta, 'add', action);
+            watchDebouncer.addChange(ruta, 'add', action, isAdditional);
         });
 
         // ✨ OPTIMIZADO: Evento cuando se modifica un archivo - Con debouncing
         watcher.on('change', async ruta => {
+            const isAdditional = isAdditionalWatchFile(ruta, watchAditional);
             const action = getAction(
                 ruta,
                 extendsionWatch.filter(
@@ -421,7 +503,7 @@ export async function initChokidar(bs: any) {
             );
 
             // Usar sistema de debouncing en lugar de compilación inmediata
-            watchDebouncer.addChange(ruta, 'change', action);
+            watchDebouncer.addChange(ruta, 'change', action, isAdditional);
         });
 
         // ✨ OPTIMIZADO: Evento cuando se elimina un archivo - Con debouncing
@@ -433,9 +515,10 @@ export async function initChokidar(bs: any) {
                         item !== undefined,
                 ),
             );
+            const isAdditional = isAdditionalWatchFile(ruta, watchAditional);
 
             // Usar sistema de debouncing para eliminaciones también
-            watchDebouncer.addChange(ruta, 'unlink', action);
+            watchDebouncer.addChange(ruta, 'unlink', action, isAdditional);
         });
         return watcher;
     } catch (error) {
