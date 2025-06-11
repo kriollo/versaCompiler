@@ -40,6 +40,12 @@ interface WorkerResponse {
     hasErrors?: boolean;
     error?: string;
     message?: string;
+    type?: string; // ✨ ISSUE #4: Para manejo de mensajes especiales
+    memoryUsage?: {
+        heapUsed: number;
+        heapTotal: number;
+        rss: number;
+    };
 }
 
 /**
@@ -54,7 +60,7 @@ interface PendingTask {
 }
 
 /**
- * Worker individual en el pool
+ * Worker individual en el pool con controles de memoria
  */
 interface PoolWorker {
     worker: Worker;
@@ -62,6 +68,12 @@ interface PoolWorker {
     busy: boolean;
     pendingTasks: Map<string, PendingTask>;
     taskCounter: number;
+    // ✨ ISSUE #4: Controles de memoria y performance
+    memoryUsage: number;
+    lastMemoryCheck: number;
+    tasksProcessed: number;
+    creationTime: number;
+    lastActivityTime: number;
 }
 
 /**
@@ -94,6 +106,177 @@ export class TypeScriptWorkerPool {
             'compiler',
             'typescript-worker-thread.cjs',
         );
+
+        // ✨ ISSUE #4: Configurar monitoreo de memoria automático
+        this.startMemoryMonitoring();
+    }
+
+    // ✨ ISSUE #4: Métodos de control de memoria y timeouts
+
+    /**
+     * Inicia el monitoreo automático de memoria de workers
+     */
+    private startMemoryMonitoring(): void {
+        // Monitoreo cada 30 segundos
+        setInterval(() => {
+            this.checkWorkersMemory();
+        }, 30000);
+
+        // Limpieza de workers inactivos cada 5 minutos
+        setInterval(() => {
+            this.cleanupInactiveWorkers();
+        }, 300000);
+    }
+
+    /**
+     * Verifica el uso de memoria de todos los workers con medición real
+     */
+    private async checkWorkersMemory(): Promise<void> {
+        const now = Date.now();
+
+        for (const poolWorker of this.workers) {
+            // Actualizar tiempo de última verificación
+            poolWorker.lastMemoryCheck = now;
+
+            try {
+                // ✨ ISSUE #4: Obtener memoria real del worker
+                const memoryInfo = await this.getWorkerMemoryUsage(poolWorker);
+                poolWorker.memoryUsage = memoryInfo.heapUsed;
+
+                // Verificar límites de memoria y reciclaje automático
+                if (this.shouldRecycleWorker(poolWorker)) {
+                    const reason = this.getRecycleReason(poolWorker);
+                    console.warn(
+                        `[WorkerPool] Worker ${poolWorker.id} requiere reciclaje: ${reason}`,
+                    );
+                    await this.recycleWorker(poolWorker);
+                }
+            } catch (error) {
+                console.warn(
+                    `[WorkerPool] Error verificando memoria del worker ${poolWorker.id}:`,
+                    error,
+                );
+            }
+        }
+    }
+
+    /**
+     * Obtiene el uso real de memoria de un worker
+     */
+    private async getWorkerMemoryUsage(
+        poolWorker: PoolWorker,
+    ): Promise<{ heapUsed: number; heapTotal: number; rss: number }> {
+        return new Promise(resolve => {
+            const timeout = setTimeout(() => {
+                // Fallback con estimación si no hay respuesta
+                resolve({
+                    heapUsed: poolWorker.tasksProcessed * 2048, // 2KB por tarea
+                    heapTotal: poolWorker.tasksProcessed * 3072, // 3KB total estimado
+                    rss: poolWorker.tasksProcessed * 4096, // 4KB RSS estimado
+                });
+            }, 1000);
+
+            // Solicitar memoria real del worker
+            const memoryRequestId = `memory-${poolWorker.id}-${Date.now()}`;
+
+            const handler = (response: any) => {
+                if (
+                    response.id === memoryRequestId &&
+                    response.type === 'memory-usage'
+                ) {
+                    clearTimeout(timeout);
+                    poolWorker.worker.off('message', handler);
+                    resolve({
+                        heapUsed:
+                            response.memoryUsage?.heapUsed ||
+                            poolWorker.tasksProcessed * 2048,
+                        heapTotal:
+                            response.memoryUsage?.heapTotal ||
+                            poolWorker.tasksProcessed * 3072,
+                        rss:
+                            response.memoryUsage?.rss ||
+                            poolWorker.tasksProcessed * 4096,
+                    });
+                }
+            };
+
+            poolWorker.worker.on('message', handler);
+            poolWorker.worker.postMessage({
+                type: 'get-memory-usage',
+                id: memoryRequestId,
+            });
+        });
+    }
+
+    /**
+     * Obtiene la razón por la cual un worker debe ser reciclado
+     */
+    private getRecycleReason(poolWorker: PoolWorker): string {
+        const now = Date.now();
+        const MEMORY_LIMIT = 50 * 1024 * 1024; // 50MB
+        const TIME_LIMIT = 30 * 60 * 1000; // 30 minutos
+        const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
+
+        const reasons: string[] = [];
+
+        if (poolWorker.memoryUsage > MEMORY_LIMIT) {
+            reasons.push(
+                `memoria excede ${Math.round(MEMORY_LIMIT / 1024 / 1024)}MB (actual: ${Math.round(poolWorker.memoryUsage / 1024 / 1024)}MB)`,
+            );
+        }
+
+        if (now - poolWorker.creationTime > TIME_LIMIT) {
+            reasons.push(
+                `tiempo de vida excede ${Math.round(TIME_LIMIT / 60000)} minutos`,
+            );
+        }
+
+        if (poolWorker.tasksProcessed >= TASK_LIMIT) {
+            reasons.push(
+                `tareas procesadas exceden ${TASK_LIMIT} (actual: ${poolWorker.tasksProcessed})`,
+            );
+        }
+
+        return reasons.join(', ');
+    }
+
+    /**
+     * Limpia workers que han estado inactivos por mucho tiempo
+     */
+    private async cleanupInactiveWorkers(): Promise<void> {
+        const now = Date.now();
+        const INACTIVE_TIMEOUT = 10 * 60 * 1000; // 10 minutos
+
+        for (const poolWorker of this.workers) {
+            const timeSinceLastActivity = now - poolWorker.lastActivityTime;
+
+            if (
+                timeSinceLastActivity > INACTIVE_TIMEOUT &&
+                !poolWorker.busy &&
+                poolWorker.pendingTasks.size === 0
+            ) {
+                console.info(
+                    `[WorkerPool] Worker ${poolWorker.id} inactivo por ${Math.round(timeSinceLastActivity / 60000)} minutos, reciclando...`,
+                );
+                await this.recycleWorker(poolWorker);
+            }
+        }
+    }
+
+    /**
+     * Verifica si un worker debe ser reciclado por límites de memoria/tiempo
+     */
+    private shouldRecycleWorker(poolWorker: PoolWorker): boolean {
+        const now = Date.now();
+        const MEMORY_LIMIT = 50 * 1024 * 1024; // 50MB
+        const TIME_LIMIT = 30 * 60 * 1000; // 30 minutos
+        const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
+
+        return (
+            poolWorker.memoryUsage > MEMORY_LIMIT ||
+            now - poolWorker.creationTime > TIME_LIMIT ||
+            poolWorker.tasksProcessed >= TASK_LIMIT
+        );
     }
 
     /**
@@ -104,7 +287,9 @@ export class TypeScriptWorkerPool {
             TypeScriptWorkerPool.instance = new TypeScriptWorkerPool();
         }
         return TypeScriptWorkerPool.instance;
-    } /**
+    }
+
+    /**
      * Configura el modo de operación del pool
      */
     setMode(mode: 'individual' | 'batch' | 'watch'): void {
@@ -139,7 +324,8 @@ export class TypeScriptWorkerPool {
 
     /**
      * Realiza la inicialización del pool de workers
-     */ private async _performPoolInitialization(): Promise<void> {
+     */
+    private async _performPoolInitialization(): Promise<void> {
         try {
             // Verificar que el archivo del worker existe
             const fs = await import('node:fs');
@@ -166,7 +352,8 @@ export class TypeScriptWorkerPool {
 
     /**
      * Crea un worker individual
-     */ private async createWorker(workerId: number): Promise<PoolWorker> {
+     */
+    private async createWorker(workerId: number): Promise<PoolWorker> {
         return new Promise((resolve, reject) => {
             try {
                 const worker = new Worker(this.workerPath, {
@@ -183,6 +370,12 @@ export class TypeScriptWorkerPool {
                     busy: false,
                     pendingTasks: new Map(),
                     taskCounter: 0,
+                    // ✨ ISSUE #4: Inicializar controles de memoria
+                    memoryUsage: 0,
+                    lastMemoryCheck: Date.now(),
+                    tasksProcessed: 0,
+                    creationTime: Date.now(),
+                    lastActivityTime: Date.now(),
                 };
 
                 // Configurar listeners
@@ -229,7 +422,8 @@ export class TypeScriptWorkerPool {
 
     /**
      * Configura los listeners para un worker individual
-     */ private setupWorkerListeners(poolWorker: PoolWorker): void {
+     */
+    private setupWorkerListeners(poolWorker: PoolWorker): void {
         const { worker } = poolWorker;
 
         worker.on('message', (response: WorkerResponse) => {
@@ -240,7 +434,14 @@ export class TypeScriptWorkerPool {
                     response.message === 'pong'
                 ) {
                     return;
-                } // Buscar la tarea pendiente
+                }
+
+                // ✨ ISSUE #4: Manejar reportes de memoria del worker
+                if (response.type === 'memory-usage') {
+                    return; // Ya manejado en getWorkerMemoryUsage
+                }
+
+                // Buscar la tarea pendiente
                 const pendingTask = poolWorker.pendingTasks.get(response.id);
                 if (!pendingTask) {
                     return;
@@ -255,27 +456,45 @@ export class TypeScriptWorkerPool {
                     poolWorker.busy = false;
                 }
 
-                // Procesar respuesta
+                // Actualizar actividad del worker
+                poolWorker.lastActivityTime = Date.now();
+
+                // ✨ ISSUE #4: Manejo mejorado de errores de TypeScript
                 if (
                     response.success &&
                     response.diagnostics !== undefined &&
                     response.hasErrors !== undefined
                 ) {
                     this.completedTasks++;
-                    pendingTask.resolve({
-                        diagnostics: response.diagnostics,
-                        hasErrors: response.hasErrors,
-                    });
+
+                    // Analizar y categorizar errores de TypeScript
+                    const categorizedResult = this.categorizeTypeScriptErrors(
+                        {
+                            diagnostics: response.diagnostics,
+                            hasErrors: response.hasErrors,
+                        },
+                        pendingTask.fileName,
+                    );
+
+                    pendingTask.resolve(categorizedResult);
                 } else {
                     this.failedTasks++;
                     const errorMessage =
                         response.error || 'Error desconocido del worker';
-                    pendingTask.reject(new Error(errorMessage));
+
+                    // ✨ Crear error categorizado
+                    const categorizedError = this.createCategorizedError(
+                        errorMessage,
+                        pendingTask.fileName,
+                        response,
+                    );
+                    pendingTask.reject(categorizedError);
                 }
             } catch {
                 // Error silencioso - no imprimir cada error
             }
         });
+
         worker.on('error', async error => {
             await this.handleWorkerError(poolWorker, error);
         });
@@ -284,9 +503,11 @@ export class TypeScriptWorkerPool {
             await this.handleWorkerExit(poolWorker, code);
         });
     }
+
     /**
      * Maneja errores de un worker específico con cleanup completo
-     */ private async handleWorkerError(
+     */
+    private async handleWorkerError(
         poolWorker: PoolWorker,
         error: Error,
     ): Promise<void> {
@@ -336,7 +557,9 @@ export class TypeScriptWorkerPool {
                 );
             }
         }
-    } /**
+    }
+
+    /**
      * Maneja la salida inesperada de un worker con cleanup completo
      */
     private async handleWorkerExit(
@@ -377,9 +600,11 @@ export class TypeScriptWorkerPool {
             }
         }
     }
+
     /**
      * Recrea un worker que falló
-     */ private async recreateWorker(failedWorker: PoolWorker): Promise<void> {
+     */
+    private async recreateWorker(failedWorker: PoolWorker): Promise<void> {
         try {
             const newWorker = await this.createWorker(failedWorker.id);
 
@@ -400,7 +625,9 @@ export class TypeScriptWorkerPool {
         try {
             console.log(
                 `[WorkerPool] Reciclando worker ${poolWorker.id} después de ${poolWorker.taskCounter} tareas`,
-            ); // 1. Esperar a que termine tareas pendientes (timeout corto)
+            );
+
+            // 1. Esperar a que termine tareas pendientes (timeout corto)
             const maxWait = 2000; // 2 segundos máximo
             const startTime = Date.now();
 
@@ -502,6 +729,7 @@ export class TypeScriptWorkerPool {
                 compilerOptions,
             );
         }
+
         try {
             this.totalTasks++;
             return await this.typeCheckWithWorker(
@@ -517,7 +745,9 @@ export class TypeScriptWorkerPool {
                 compilerOptions,
             );
         }
-    } /**
+    }
+
+    /**
      * Realiza type checking usando un worker específico con reciclaje automático
      */
     private async typeCheckWithWorker(
@@ -534,8 +764,17 @@ export class TypeScriptWorkerPool {
         return new Promise<TypeCheckResult>((resolve, reject) => {
             const taskId = `task-${poolWorker.id}-${++poolWorker.taskCounter}-${Date.now()}`;
 
-            // Marcar worker como ocupado
+            // Marcar worker como ocupado y actualizar actividad
             poolWorker.busy = true;
+            poolWorker.lastActivityTime = Date.now();
+            poolWorker.tasksProcessed++;
+
+            // ✨ ISSUE #4: Timeout dinámico basado en complejidad del archivo
+            const dynamicTimeout = this.calculateDynamicTimeout(
+                fileName,
+                content,
+                compilerOptions,
+            );
 
             // Configurar timeout para la tarea
             const timeout = setTimeout(() => {
@@ -543,8 +782,12 @@ export class TypeScriptWorkerPool {
                 if (poolWorker.pendingTasks.size === 0) {
                     poolWorker.busy = false;
                 }
-                reject(new Error(`Timeout en type checking para ${fileName}`));
-            }, this.TASK_TIMEOUT);
+                reject(
+                    new Error(
+                        `Timeout (${dynamicTimeout}ms) en type checking para ${fileName} - archivo complejo detectado`,
+                    ),
+                );
+            }, dynamicTimeout);
 
             // Agregar tarea a la lista de pendientes del worker
             poolWorker.pendingTasks.set(taskId, {
@@ -556,12 +799,16 @@ export class TypeScriptWorkerPool {
             });
 
             try {
-                // Crear mensaje para el worker
+                // Crear mensaje para el worker con configuración de timeout
                 const message: WorkerMessage = {
                     id: taskId,
                     fileName,
                     content,
-                    compilerOptions,
+                    compilerOptions: {
+                        ...compilerOptions,
+                        // ✨ Añadir timeout al worker para manejo interno
+                        _workerTimeout: dynamicTimeout - 1000, // 1 segundo menos para cleanup interno
+                    },
                 };
 
                 // Enviar mensaje al worker
@@ -576,6 +823,75 @@ export class TypeScriptWorkerPool {
                 reject(error);
             }
         });
+    }
+
+    /**
+     * Calcula un timeout dinámico basado en la complejidad del archivo TypeScript
+     */
+    private calculateDynamicTimeout(
+        fileName: string,
+        content: string,
+        compilerOptions: any,
+    ): number {
+        const baseTimeout = this.TASK_TIMEOUT; // 10 segundos base
+        let complexityMultiplier = 1;
+
+        // Factor 1: Tamaño del archivo
+        const contentLength = content.length;
+        if (contentLength > 100000) {
+            // Archivos > 100KB
+            complexityMultiplier += 1.5;
+        } else if (contentLength > 50000) {
+            // Archivos > 50KB
+            complexityMultiplier += 1;
+        } else if (contentLength > 20000) {
+            // Archivos > 20KB
+            complexityMultiplier += 0.5;
+        }
+
+        // Factor 2: Complejidad sintáctica
+        const importCount = (content.match(/^import\s+/gm) || []).length;
+        const typeCount = (content.match(/\btype\s+\w+/g) || []).length;
+        const interfaceCount = (content.match(/\binterface\s+\w+/g) || [])
+            .length;
+        const genericCount = (content.match(/<[^>]*>/g) || []).length;
+        const complexConstructs =
+            importCount + typeCount + interfaceCount + genericCount * 0.5;
+
+        if (complexConstructs > 100) {
+            complexityMultiplier += 2;
+        } else if (complexConstructs > 50) {
+            complexityMultiplier += 1;
+        } else if (complexConstructs > 20) {
+            complexityMultiplier += 0.5;
+        }
+
+        // Factor 3: Configuración de TypeScript estricta
+        if (compilerOptions?.strict || compilerOptions?.noImplicitAny) {
+            complexityMultiplier += 0.3;
+        }
+
+        // Factor 4: Extensión de archivo compleja (.d.ts, .vue.ts, etc.)
+        if (fileName.includes('.d.ts')) {
+            complexityMultiplier += 1; // Los archivos de definición son más complejos
+        } else if (fileName.includes('.vue')) {
+            complexityMultiplier += 0.5; // Los archivos Vue requieren procesamiento adicional
+        }
+
+        // Aplicar límites razonables
+        complexityMultiplier = Math.min(complexityMultiplier, 5); // Máximo 5x el timeout base
+        complexityMultiplier = Math.max(complexityMultiplier, 0.5); // Mínimo 0.5x el timeout base
+
+        const finalTimeout = Math.round(baseTimeout * complexityMultiplier);
+
+        // Log para debugging en archivos complejos
+        if (complexityMultiplier > 2) {
+            console.log(
+                `[WorkerPool] Archivo complejo detectado: ${fileName}, timeout: ${finalTimeout}ms (multiplicador: ${complexityMultiplier.toFixed(2)})`,
+            );
+        }
+
+        return Math.min(finalTimeout, 60000); // Máximo absoluto de 60 segundos
     }
 
     /**
@@ -599,9 +915,11 @@ export class TypeScriptWorkerPool {
             };
         }
     }
+
     /**
      * Cierra todos los workers del pool con cleanup completo
-     */ async terminate(): Promise<void> {
+     */
+    async terminate(): Promise<void> {
         console.log('[WorkerPool] Cerrando pool de workers...');
 
         // 1. Rechazar todas las tareas pendientes con cleanup
@@ -627,7 +945,9 @@ export class TypeScriptWorkerPool {
             console.log(
                 `[WorkerPool] Se cancelaron ${totalPendingTasks} tareas pendientes`,
             );
-        } // 2. Cerrar todos los workers con manejo de errores
+        }
+
+        // 2. Cerrar todos los workers con manejo de errores
         const terminatePromises = this.workers.map(async poolWorker => {
             try {
                 await poolWorker.worker.terminate();
@@ -682,5 +1002,190 @@ export class TypeScriptWorkerPool {
             failedTasks: this.failedTasks,
             successRate,
         };
+    }
+
+    // ✨ ISSUE #4: Métodos de categorización de errores de TypeScript
+
+    /**
+     * Categoriza y mejora los errores de TypeScript para mejor debugging
+     */
+    private categorizeTypeScriptErrors(
+        result: TypeCheckResult,
+        fileName: string,
+    ): TypeCheckResult {
+        if (!result.hasErrors || !result.diagnostics?.length) {
+            return result;
+        }
+
+        const categorizedDiagnostics = result.diagnostics.map(diagnostic => {
+            // Añadir metadatos útiles para debugging
+            const enhanced = {
+                ...diagnostic,
+                _category: this.getErrorCategory(diagnostic),
+                _severity: this.getErrorSeverity(diagnostic),
+                _fileName: fileName,
+                _timestamp: Date.now(),
+            };
+
+            return enhanced;
+        });
+
+        return {
+            ...result,
+            diagnostics: categorizedDiagnostics,
+            // Añadir estadísticas de errores
+            _errorStats: this.calculateErrorStats(categorizedDiagnostics),
+        } as any;
+    } /**
+     * Determina la categoría de un error de TypeScript
+     */
+    private getErrorCategory(diagnostic: any): string {
+        const code = diagnostic.code;
+
+        // Categorización basada en códigos de error comunes
+        if ([2304, 2339, 2346].includes(code)) {
+            return 'MISSING_DECLARATION'; // No puede encontrar nombre/propiedad
+        } else if ([2322, 2322, 2345].includes(code)) {
+            return 'TYPE_MISMATCH'; // Error de tipos
+        } else if ([2307, 2317].includes(code)) {
+            return 'MODULE_RESOLUTION'; // Error de resolución de módulos
+        } else if ([2552, 2551].includes(code)) {
+            return 'PROPERTY_ACCESS'; // Error de acceso a propiedades
+        } else if (code >= 1000 && code < 2000) {
+            return 'SYNTAX_ERROR'; // Errores de sintaxis
+        } else if (code >= 2000 && code < 3000) {
+            return 'SEMANTIC_ERROR'; // Errores semánticos
+        } else if (code >= 4000) {
+            return 'CONFIG_ERROR'; // Errores de configuración
+        }
+
+        return 'OTHER';
+    }
+
+    /**
+     * Determina la severidad de un error de TypeScript
+     */
+    private getErrorSeverity(diagnostic: any): 'ERROR' | 'WARNING' | 'INFO' {
+        const category = diagnostic.category;
+
+        switch (category) {
+            case 1:
+                return 'ERROR'; // typescript.DiagnosticCategory.Error
+            case 2:
+                return 'WARNING'; // typescript.DiagnosticCategory.Warning
+            case 3:
+                return 'INFO'; // typescript.DiagnosticCategory.Message
+            default:
+                return 'ERROR';
+        }
+    }
+
+    /**
+     * Calcula estadísticas de errores para análisis
+     */
+    private calculateErrorStats(diagnostics: any[]): object {
+        const stats = {
+            totalErrors: diagnostics.length,
+            errorsByCategory: {} as Record<string, number>,
+            errorsBySeverity: {} as Record<string, number>,
+            mostCommonError: null as any,
+        };
+
+        // Contar por categoría y severidad
+        diagnostics.forEach(diag => {
+            const category = diag._category || 'OTHER';
+            const severity = diag._severity || 'ERROR';
+
+            stats.errorsByCategory[category] =
+                (stats.errorsByCategory[category] || 0) + 1;
+            stats.errorsBySeverity[severity] =
+                (stats.errorsBySeverity[severity] || 0) + 1;
+        }); // Encontrar el error más común
+        const errorCounts = {} as Record<string, number>;
+        diagnostics.forEach(diag => {
+            const code = String(diag.code);
+            errorCounts[code] = (errorCounts[code] || 0) + 1;
+        });
+        const errorCountKeys = Object.keys(errorCounts);
+        if (errorCountKeys.length > 0) {
+            const mostCommonCode = errorCountKeys.reduce((a, b) =>
+                (errorCounts[a] || 0) > (errorCounts[b] || 0) ? a : b,
+            );
+
+            stats.mostCommonError = {
+                code: mostCommonCode,
+                count: errorCounts[mostCommonCode],
+                message: diagnostics.find(
+                    d => String(d.code) === mostCommonCode,
+                )?.messageText,
+            };
+        }
+
+        return stats;
+    }
+
+    /**
+     * Crea un error categorizado con información de contexto
+     */
+    private createCategorizedError(
+        errorMessage: string,
+        fileName: string,
+        response: WorkerResponse,
+    ): Error {
+        const error = new Error(errorMessage) as any;
+
+        // Añadir metadatos del error
+        error.fileName = fileName;
+        error.timestamp = Date.now();
+        error.workerResponse = response;
+        error.category = this.categorizeGenericError(errorMessage);
+        error.isRecoverable = this.isRecoverableError(errorMessage);
+
+        return error;
+    }
+
+    /**
+     * Categoriza errores genéricos del worker
+     */
+    private categorizeGenericError(errorMessage: string): string {
+        if (
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('Timeout')
+        ) {
+            return 'TIMEOUT';
+        } else if (
+            errorMessage.includes('memory') ||
+            errorMessage.includes('Memory')
+        ) {
+            return 'MEMORY';
+        } else if (
+            errorMessage.includes('Worker') &&
+            errorMessage.includes('exited')
+        ) {
+            return 'WORKER_CRASH';
+        } else if (
+            errorMessage.includes('initialization') ||
+            errorMessage.includes('init')
+        ) {
+            return 'INITIALIZATION';
+        }
+
+        return 'UNKNOWN';
+    }
+
+    /**
+     * Determina si un error es recuperable
+     */
+    private isRecoverableError(errorMessage: string): boolean {
+        const recoverablePatterns = [
+            'timeout',
+            'Worker being recycled',
+            'Worker pool cerrado',
+            'temporary',
+        ];
+
+        return recoverablePatterns.some(pattern =>
+            errorMessage.toLowerCase().includes(pattern.toLowerCase()),
+        );
     }
 }

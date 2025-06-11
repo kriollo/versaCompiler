@@ -445,12 +445,28 @@ const compilationResults: CompilationResult[] = [];
 // 🚀 Sistema de Cache Inteligente para Compilación
 interface SmartCacheEntry {
     contentHash: string; // SHA-256 del contenido
-    dependencyHashes?: string[]; // Hashes de dependencias (futuro)
+    configHash: string; // Hash de la configuración del compilador
+    envHash: string; // Hash de variables de entorno relevantes
+    dependencyHash: string; // Hash de dependencias (package.json)
     mtime: number; // Tiempo de modificación
     outputPath: string; // Ruta del archivo compilado
     lastUsed: number; // Para LRU
     size: number; // Control de memoria
 }
+
+// Variables de entorno relevantes para compilación
+const COMPILATION_ENV_VARS = [
+    'NODE_ENV',
+    'isPROD',
+    'TAILWIND',
+    'ENABLE_LINTER',
+    'VERBOSE',
+    'typeCheck',
+    'PATH_ALIAS',
+    'tailwindcss',
+    'linter',
+    'tsconfigFile',
+] as const;
 
 class SmartCompilationCache {
     private cache = new Map<string, SmartCacheEntry>();
@@ -458,6 +474,13 @@ class SmartCompilationCache {
     private readonly maxMemory = 100 * 1024 * 1024; // 100MB límite
     private currentMemoryUsage = 0;
 
+    // ✨ ISSUE #3: Sistema de vigilancia de dependencias
+    private fileWatchers = new Map<string, any>(); // chokidar watchers
+    private dependencyGraph = new Map<string, Set<string>>(); // archivo -> dependencias
+    private reverseDependencyGraph = new Map<string, Set<string>>(); // dependencia -> archivos que la usan
+    private packageJsonPath = path.join(process.cwd(), 'package.json');
+    private nodeModulesPath = path.join(process.cwd(), 'node_modules');
+    private isWatchingDependencies = false;
     /**
      * Genera hash SHA-256 del contenido del archivo
      */ async generateContentHash(filePath: string): Promise<string> {
@@ -472,6 +495,157 @@ class SmartCompilationCache {
     }
 
     /**
+     * Genera hash de la configuración del compilador
+     */
+    private generateConfigHash(): string {
+        try {
+            // Recopilar configuración relevante de variables de entorno
+            const config = {
+                isPROD: env.isPROD || 'false',
+                TAILWIND: env.TAILWIND || 'false',
+                ENABLE_LINTER: env.ENABLE_LINTER || 'false',
+                PATH_ALIAS: env.PATH_ALIAS || '{}',
+                tailwindcss: env.tailwindcss || 'false',
+                linter: env.linter || 'false',
+                tsconfigFile: env.tsconfigFile || './tsconfig.json',
+            };
+
+            const configStr = JSON.stringify(
+                config,
+                Object.keys(config).sort(),
+            );
+            return createHash('sha256')
+                .update(configStr)
+                .digest('hex')
+                .substring(0, 12);
+        } catch {
+            return 'no-config';
+        }
+    }
+
+    /**
+     * Genera hash de variables de entorno relevantes
+     */
+    private generateEnvHash(): string {
+        try {
+            const envVars = COMPILATION_ENV_VARS.map(
+                key => `${key}=${env[key] || ''}`,
+            ).join('|');
+            return createHash('sha256')
+                .update(envVars)
+                .digest('hex')
+                .substring(0, 12);
+        } catch {
+            return 'no-env';
+        }
+    } /**
+     * ✨ ISSUE #3: Genera hash avanzado de dependencias del proyecto
+     * Incluye vigilancia de package.json, node_modules y versiones instaladas
+     */
+    private async generateDependencyHash(): Promise<string> {
+        try {
+            const hash = createHash('sha256');
+
+            // 1. Hash del package.json con versiones
+            const packagePath = path.join(process.cwd(), 'package.json');
+            const packageContent = await readFile(packagePath, 'utf8');
+            const pkg = JSON.parse(packageContent);
+
+            const deps = {
+                ...pkg.dependencies,
+                ...pkg.devDependencies,
+            };
+
+            const depsStr = JSON.stringify(deps, Object.keys(deps).sort());
+            hash.update(`package:${depsStr}`);
+
+            // 2. Hash del package-lock.json si existe (versiones exactas instaladas)
+            try {
+                const lockPath = path.join(process.cwd(), 'package-lock.json');
+                const lockContent = await readFile(lockPath, 'utf8');
+                const lockData = JSON.parse(lockContent);
+
+                // Solo incluir las versiones instaladas, no todo el lockfile
+                const installedVersions: Record<string, string> = {};
+                if (lockData.packages) {
+                    for (const [pkgPath, pkgInfo] of Object.entries(
+                        lockData.packages,
+                    )) {
+                        if (
+                            pkgPath &&
+                            pkgPath !== '' &&
+                            typeof pkgInfo === 'object' &&
+                            pkgInfo !== null
+                        ) {
+                            const pkgName = pkgPath.replace(
+                                'node_modules/',
+                                '',
+                            );
+                            if ((pkgInfo as any).version) {
+                                installedVersions[pkgName] = (
+                                    pkgInfo as any
+                                ).version;
+                            }
+                        }
+                    }
+                }
+                hash.update(
+                    `lock:${JSON.stringify(installedVersions, Object.keys(installedVersions).sort())}`,
+                );
+            } catch {
+                // Ignorar si no existe package-lock.json
+            }
+
+            // 3. ✨ NUEVO: Hash de timestamps críticos de node_modules
+            try {
+                const nodeModulesPath = path.join(
+                    process.cwd(),
+                    'node_modules',
+                );
+                const nodeModulesStat = await stat(nodeModulesPath);
+                hash.update(`nmtime:${nodeModulesStat.mtimeMs}`);
+
+                // Verificar timestamps de dependencias críticas instaladas
+                const criticalDeps = Object.keys(deps).slice(0, 10); // Top 10 para performance
+                for (const dep of criticalDeps) {
+                    try {
+                        const depPath = path.join(nodeModulesPath, dep);
+                        const depStat = await stat(depPath);
+                        hash.update(`${dep}:${depStat.mtimeMs}`);
+                    } catch {
+                        // Dependencia no instalada o error
+                        hash.update(`${dep}:missing`);
+                    }
+                }
+            } catch {
+                // node_modules no existe
+                hash.update('nmtime:none');
+            }
+
+            return hash.digest('hex').substring(0, 16);
+        } catch (error) {
+            // Incluir información del error en el hash para debugging
+            return createHash('sha256')
+                .update(
+                    `error:${error instanceof Error ? error.message : 'unknown'}`,
+                )
+                .digest('hex')
+                .substring(0, 16);
+        }
+    }
+
+    /**
+     * Genera clave de cache granular que incluye todos los factores
+     */
+    private async generateCacheKey(filePath: string): Promise<string> {
+        const contentHash = await this.generateContentHash(filePath);
+        const configHash = this.generateConfigHash();
+        const envHash = this.generateEnvHash();
+        const dependencyHash = await this.generateDependencyHash();
+
+        // Usar | como separador para evitar problemas con rutas de Windows
+        return `${filePath}|${contentHash.substring(0, 12)}|${configHash}|${envHash}|${dependencyHash}`;
+    } /**
      * Verifica si una entrada de cache es válida
      */
     async isValid(filePath: string): Promise<boolean> {
@@ -483,8 +657,29 @@ class SmartCompilationCache {
             await stat(entry.outputPath);
 
             // Verificar si el contenido ha cambiado
-            const currentHash = await this.generateContentHash(filePath);
-            if (entry.contentHash !== currentHash) {
+            const currentContentHash = await this.generateContentHash(filePath);
+            if (entry.contentHash !== currentContentHash) {
+                this.cache.delete(filePath);
+                return false;
+            }
+
+            // Verificar si la configuración ha cambiado
+            const currentConfigHash = this.generateConfigHash();
+            if (entry.configHash !== currentConfigHash) {
+                this.cache.delete(filePath);
+                return false;
+            }
+
+            // Verificar si las variables de entorno han cambiado
+            const currentEnvHash = this.generateEnvHash();
+            if (entry.envHash !== currentEnvHash) {
+                this.cache.delete(filePath);
+                return false;
+            }
+
+            // Verificar si las dependencias han cambiado
+            const currentDependencyHash = await this.generateDependencyHash();
+            if (entry.dependencyHash !== currentDependencyHash) {
                 this.cache.delete(filePath);
                 return false;
             }
@@ -504,18 +699,22 @@ class SmartCompilationCache {
             this.cache.delete(filePath);
             return false;
         }
-    }
-
-    /**
+    } /**
      * Añade una entrada al cache
      */
     async set(filePath: string, outputPath: string): Promise<void> {
         try {
             const stats = await stat(filePath);
             const contentHash = await this.generateContentHash(filePath);
+            const configHash = this.generateConfigHash();
+            const envHash = this.generateEnvHash();
+            const dependencyHash = await this.generateDependencyHash();
 
             const entry: SmartCacheEntry = {
                 contentHash,
+                configHash,
+                envHash,
+                dependencyHash,
                 mtime: stats.mtimeMs,
                 outputPath,
                 lastUsed: Date.now(),
@@ -633,9 +832,7 @@ class SmartCompilationCache {
     getOutputPath(filePath: string): string {
         const entry = this.cache.get(filePath);
         return entry?.outputPath || '';
-    }
-
-    /**
+    } /**
      * Obtiene estadísticas del cache
      */
     getStats(): { entries: number; memoryUsage: number; hitRate: number } {
@@ -643,6 +840,216 @@ class SmartCompilationCache {
             entries: this.cache.size,
             memoryUsage: this.currentMemoryUsage,
             hitRate: 0, // Se calculará externamente
+        };
+    }
+
+    // ✨ ISSUE #3: Métodos de vigilancia y invalidación cascada
+
+    /**
+     * Inicializa vigilancia de package.json y node_modules
+     */
+    async startDependencyWatching(): Promise<void> {
+        if (this.isWatchingDependencies) return;
+
+        try {
+            // Lazy load chokidar para evitar problemas de importación
+            const chokidar = await import('chokidar');
+
+            // Vigilar package.json
+            if (await this.fileExists(this.packageJsonPath)) {
+                const packageWatcher = chokidar.watch(this.packageJsonPath, {
+                    persistent: false, // No mantener el proceso vivo
+                    ignoreInitial: true,
+                });
+
+                packageWatcher.on('change', () => {
+                    logger.info(
+                        '📦 package.json modificado - invalidando cache de dependencias',
+                    );
+                    this.invalidateByDependencyChange();
+                });
+
+                this.fileWatchers.set('package.json', packageWatcher);
+            }
+
+            // Vigilar node_modules (solo cambios en el directorio raíz para performance)
+            if (await this.fileExists(this.nodeModulesPath)) {
+                const nodeModulesWatcher = chokidar.watch(
+                    this.nodeModulesPath,
+                    {
+                        persistent: false,
+                        ignoreInitial: true,
+                        depth: 1, // Solo primer nivel para performance
+                        ignored: /(^|[\/\\])\../, // Ignorar archivos ocultos
+                    },
+                );
+                nodeModulesWatcher.on('addDir', (path: string) => {
+                    logger.info(
+                        `📦 Nueva dependencia instalada: ${path.split(/[/\\]/).pop()}`,
+                    );
+                    this.invalidateByDependencyChange();
+                });
+
+                nodeModulesWatcher.on('unlinkDir', (path: string) => {
+                    logger.info(
+                        `📦 Dependencia eliminada: ${path.split(/[/\\]/).pop()}`,
+                    );
+                    this.invalidateByDependencyChange();
+                });
+
+                this.fileWatchers.set('node_modules', nodeModulesWatcher);
+            }
+
+            this.isWatchingDependencies = true;
+            logger.info('🔍 Vigilancia de dependencias iniciada');
+        } catch (error) {
+            logger.warn(
+                '⚠️ No se pudo iniciar vigilancia de dependencias:',
+                error,
+            );
+        }
+    }
+
+    /**
+     * Detiene la vigilancia de dependencias
+     */
+    async stopDependencyWatching(): Promise<void> {
+        for (const [name, watcher] of this.fileWatchers) {
+            try {
+                await watcher.close();
+                logger.info(`🛑 Vigilancia detenida: ${name}`);
+            } catch (error) {
+                logger.warn(`⚠️ Error cerrando watcher ${name}:`, error);
+            }
+        }
+        this.fileWatchers.clear();
+        this.isWatchingDependencies = false;
+    }
+
+    /**
+     * Registra dependencias de un archivo para invalidación cascada
+     */
+    registerDependencies(filePath: string, dependencies: string[]): void {
+        // Limpiar dependencias anteriores
+        const oldDeps = this.dependencyGraph.get(filePath);
+        if (oldDeps) {
+            for (const dep of oldDeps) {
+                const reverseDeps = this.reverseDependencyGraph.get(dep);
+                if (reverseDeps) {
+                    reverseDeps.delete(filePath);
+                    if (reverseDeps.size === 0) {
+                        this.reverseDependencyGraph.delete(dep);
+                    }
+                }
+            }
+        }
+
+        // Registrar nuevas dependencias
+        const newDeps = new Set(dependencies);
+        this.dependencyGraph.set(filePath, newDeps);
+
+        for (const dep of newDeps) {
+            if (!this.reverseDependencyGraph.has(dep)) {
+                this.reverseDependencyGraph.set(dep, new Set());
+            }
+            this.reverseDependencyGraph.get(dep)!.add(filePath);
+        }
+    }
+
+    /**
+     * Invalida cache por cambios en dependencias
+     */
+    private invalidateByDependencyChange(): void {
+        let invalidatedCount = 0;
+
+        // Invalidar todos los archivos que dependen de dependencias externas
+        for (const [filePath] of this.cache) {
+            this.cache.delete(filePath);
+            invalidatedCount++;
+        }
+
+        // Limpiar grafos de dependencias
+        this.dependencyGraph.clear();
+        this.reverseDependencyGraph.clear();
+        this.currentMemoryUsage = 0;
+
+        logger.info(
+            `🗑️ Cache invalidado: ${invalidatedCount} archivos (cambio en dependencias)`,
+        );
+    }
+
+    /**
+     * Invalida cascada cuando un archivo específico cambia
+     */
+    invalidateCascade(changedFile: string): string[] {
+        const invalidated: string[] = [];
+        const toInvalidate = new Set<string>([changedFile]);
+
+        // BFS para encontrar todos los archivos afectados
+        const queue = [changedFile];
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const dependents = this.reverseDependencyGraph.get(current);
+
+            if (dependents) {
+                for (const dependent of dependents) {
+                    if (!toInvalidate.has(dependent)) {
+                        toInvalidate.add(dependent);
+                        queue.push(dependent);
+                    }
+                }
+            }
+        }
+
+        // Invalidar archivos
+        for (const filePath of toInvalidate) {
+            if (this.cache.has(filePath)) {
+                const entry = this.cache.get(filePath)!;
+                this.currentMemoryUsage -= entry.size;
+                this.cache.delete(filePath);
+                invalidated.push(filePath);
+            }
+        }
+
+        if (invalidated.length > 0) {
+            logger.info(
+                `🔄 Invalidación cascada: ${invalidated.length} archivos afectados por ${changedFile}`,
+            );
+        }
+
+        return invalidated;
+    }
+
+    /**
+     * Verifica si un archivo existe
+     */
+    private async fileExists(filePath: string): Promise<boolean> {
+        try {
+            await stat(filePath);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Obtiene estadísticas avanzadas del cache
+     */
+    getAdvancedStats(): {
+        entries: number;
+        memoryUsage: number;
+        hitRate: number;
+        dependencyNodes: number;
+        watchingDependencies: boolean;
+        activeWatchers: number;
+    } {
+        return {
+            entries: this.cache.size,
+            memoryUsage: this.currentMemoryUsage,
+            hitRate: 0,
+            dependencyNodes: this.dependencyGraph.size,
+            watchingDependencies: this.isWatchingDependencies,
+            activeWatchers: this.fileWatchers.size,
         };
     }
 }
@@ -657,6 +1064,15 @@ const CACHE_FILE = path.join(CACHE_DIR, 'versacompile-cache.json');
 
 async function loadCache() {
     await smartCache.load(CACHE_FILE);
+
+    // ✨ ISSUE #3: Iniciar vigilancia de dependencias en modo watch
+    if (
+        env.WATCH_MODE === 'true' ||
+        process.argv.includes('--watch') ||
+        process.argv.includes('-w')
+    ) {
+        await smartCache.startDependencyWatching();
+    }
 }
 
 async function saveCache() {
