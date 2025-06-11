@@ -281,6 +281,8 @@ const handleClick = () => {
             const content = createSampleFiles.simpleJS();
             const filePath = path.join(pathSource, 'simple.js');
 
+            // Asegurar que el directorio existe
+            await fs.mkdir(pathSource, { recursive: true });
             await fs.writeFile(filePath, content);
 
             const results = await measurePerformance(async () => {
