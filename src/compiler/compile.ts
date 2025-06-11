@@ -9,13 +9,16 @@ import {
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { argv, cwd, env, stdout } from 'node:process';
+import process, { argv, cwd, env } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
-import { logger } from '../servicios/logger';
+import { logger, setProgressManagerGetter } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
+
+// Configurar el getter del ProgressManager para el logger
+setProgressManagerGetter(() => ProgressManager.getInstance());
 
 // Heavy dependencies will be loaded dynamically when needed
 let chalk: any;
@@ -1550,17 +1553,15 @@ async function compileJS(
             env.VERBOSE === 'true',
         );
         throw new Error('El archivo está vacío o no se pudo leer.');
-    }
-
-    // Logs detallados solo en modo verbose + all
-    const shouldShowDetailedLogs = env.VERBOSE === 'true' && mode === 'all';
-
-    // Compilación de Vue
+    } // Logs detallados en modo verbose
+    const shouldShowDetailedLogs = env.VERBOSE === 'true'; // Compilación de Vue
     let vueResult;
     if (extension === '.vue') {
         start = Date.now();
         if (shouldShowDetailedLogs) {
-            logger.info(chalk!.green(`💚 Precompilando VUE: ${inPath}`));
+            logger.info(
+                chalk!.green(`💚 Precompilando VUE: ${path.basename(inPath)}`),
+            );
         }
 
         // Asegurar que el módulo Vue esté cargado
@@ -1616,7 +1617,9 @@ async function compileJS(
     if (extension === '.ts' || vueResult?.lang === 'ts') {
         start = Date.now();
         if (shouldShowDetailedLogs) {
-            logger.info(chalk!.blue(`🔄️ Precompilando TS: ${inPath}`));
+            logger.info(
+                chalk!.blue(`🔄️ Precompilando TS: ${path.basename(inPath)}`),
+            );
         }
 
         // Asegurar que el módulo TypeScript esté cargado
@@ -1676,11 +1679,11 @@ async function compileJS(
             env.VERBOSE === 'true',
         );
         throw new Error('El código TypeScript compilado está vacío.');
-    }
-
-    // Estandarización
+    } // Estandarización
     if (shouldShowDetailedLogs) {
-        logger.info(chalk!.yellow(`💛 Estandarizando: ${inPath}`));
+        logger.info(
+            chalk!.yellow(`💛 Estandarizando: ${path.basename(inPath)}`),
+        );
     }
     start = Date.now();
 
@@ -1722,7 +1725,7 @@ async function compileJS(
     if (env.isPROD === 'true') {
         start = Date.now();
         if (shouldShowDetailedLogs) {
-            logger.info(chalk!.red(`🤖 Minificando: ${inPath}`));
+            logger.info(chalk!.red(`🤖 Minificando: ${path.basename(inPath)}`));
         }
 
         // Asegurar que el módulo de minificación esté cargado
@@ -1754,12 +1757,38 @@ async function compileJS(
         }
         registerCompilationSuccess(inPath, 'minification');
         code = resultMinify.code;
-    }
-
-    // Escribir archivo final
+    } // Escribir archivo final
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
     await writeFile(outPath, code, 'utf-8');
+
+    // Logs de timing detallados en modo verbose
+    if (shouldShowDetailedLogs) {
+        const totalTime = Object.values(timings).reduce(
+            (sum, time) => sum + time,
+            0,
+        );
+        logger.info(chalk!.cyan(`⏱️ Timing para ${path.basename(inPath)}:`));
+        if (timings.fileRead)
+            logger.info(chalk!.cyan(`  📖 Lectura: ${timings.fileRead}ms`));
+        if (timings.vueCompile)
+            logger.info(chalk!.cyan(`  💚 Vue: ${timings.vueCompile}ms`));
+        if (timings.tsCompile)
+            logger.info(
+                chalk!.cyan(`  🔄️ TypeScript: ${timings.tsCompile}ms`),
+            );
+        if (timings.standardization)
+            logger.info(
+                chalk!.cyan(
+                    `  💛 Estandarización: ${timings.standardization}ms`,
+                ),
+            );
+        if (timings.minification)
+            logger.info(
+                chalk!.cyan(`  🤖 Minificación: ${timings.minification}ms`),
+            );
+        logger.info(chalk!.cyan(`  🏁 Total: ${totalTime}ms`));
+    }
 
     return {
         error: null,
@@ -1855,6 +1884,157 @@ export async function initCompile(
 
 // Variable para el último progreso mostrado (evitar spam)
 let lastProgressUpdate = 0;
+
+// Sistema de gestión de progreso persistente (como Jest)
+class ProgressManager {
+    private static instance: ProgressManager;
+    private progressActive = false;
+    private lastProgressLine = '';
+    private logBuffer: string[] = [];
+    private originalConsoleLog: typeof console.log;
+    private originalConsoleError: typeof console.error;
+    private originalConsoleWarn: typeof console.warn;
+    private hasProgressLine = false;
+
+    constructor() {
+        // Guardar referencias originales
+        this.originalConsoleLog = console.log;
+        this.originalConsoleError = console.error;
+        this.originalConsoleWarn = console.warn;
+    }
+
+    static getInstance(): ProgressManager {
+        if (!ProgressManager.instance) {
+            ProgressManager.instance = new ProgressManager();
+        }
+        return ProgressManager.instance;
+    }
+
+    private interceptConsole(): void {
+        // Interceptar console.log y similares
+        console.log = (...args: any[]) => {
+            this.addLog(args.map(arg => String(arg)).join(' '));
+        };
+
+        console.error = (...args: any[]) => {
+            this.addLog(args.map(arg => String(arg)).join(' '));
+        };
+
+        console.warn = (...args: any[]) => {
+            this.addLog(args.map(arg => String(arg)).join(' '));
+        };
+    }
+
+    private restoreConsole(): void {
+        console.log = this.originalConsoleLog;
+        console.error = this.originalConsoleError;
+        console.warn = this.originalConsoleWarn;
+    }
+    startProgress(): void {
+        this.progressActive = true;
+        this.logBuffer = [];
+        this.hasProgressLine = false;
+        this.interceptConsole();
+
+        // Escribir separador inicial para marcar el inicio del progreso
+        process.stdout.write('\n\x1b[36m' + '='.repeat(60) + '\x1b[0m\n');
+        process.stdout.write('\x1b[36m🚀 INICIANDO COMPILACIÓN\x1b[0m\n');
+        process.stdout.write('\x1b[36m' + '='.repeat(60) + '\x1b[0m\n');
+    }
+
+    updateProgress(progressText: string): void {
+        if (!this.progressActive) return;
+
+        // Si hay logs pendientes, mostrarlos primero
+        if (this.logBuffer.length > 0) {
+            // Si ya hay una línea de progreso, limpiarla primero
+            if (this.hasProgressLine) {
+                process.stdout.write('\r\x1b[K');
+            }
+
+            // Escribir todos los logs pendientes
+            for (const log of this.logBuffer) {
+                process.stdout.write(
+                    (this.hasProgressLine ? '\n' : '') + log + '\n',
+                );
+                this.hasProgressLine = false;
+            }
+            this.logBuffer = [];
+        }
+
+        // Escribir separador antes del progreso para mayor visibilidad
+        if (this.hasProgressLine) {
+            process.stdout.write('\r\x1b[K');
+        } else {
+            process.stdout.write('\n\x1b[33m' + '-'.repeat(50) + '\x1b[0m\n');
+        }
+
+        // Barra de progreso con mayor visibilidad
+        const progressBar = '█'.repeat(3);
+        const enhancedProgress = `\x1b[44m\x1b[97m ${progressBar} ${progressText} ${progressBar} \x1b[0m`;
+        process.stdout.write(enhancedProgress);
+
+        this.hasProgressLine = true;
+        this.lastProgressLine = progressText;
+    }
+
+    addLog(message: string): void {
+        if (this.progressActive) {
+            this.logBuffer.push(message);
+        } else {
+            this.originalConsoleLog(message);
+        }
+    }
+
+    addImmediateLog(message: string): void {
+        if (this.progressActive) {
+            if (this.hasProgressLine) {
+                process.stdout.write('\r\x1b[K');
+            }
+
+            // Añadir un punto de separación visual para logs inmediatos
+            process.stdout.write('\x1b[90m│\x1b[0m ' + message + '\n');
+            this.hasProgressLine = false;
+        } else {
+            this.originalConsoleLog(message);
+        }
+    }
+    endProgress(): void {
+        if (this.progressActive) {
+            if (this.hasProgressLine) {
+                process.stdout.write('\n');
+            }
+
+            // Mostrar barra de progreso final completa antes del separador
+            process.stdout.write('\n\x1b[33m' + '-'.repeat(50) + '\x1b[0m\n');
+            const finalProgressBar = '█'.repeat(3);
+            const finalProgress = `\x1b[42m\x1b[30m ${finalProgressBar} ✅ PROCESO COMPLETADO 100% ${finalProgressBar} \x1b[0m`;
+            process.stdout.write(finalProgress + '\n');
+
+            // Separador final muy visible
+            process.stdout.write('\x1b[32m' + '='.repeat(60) + '\x1b[0m\n');
+            process.stdout.write('\x1b[32m✅ COMPILACIÓN COMPLETADA\x1b[0m\n');
+            process.stdout.write('\x1b[32m' + '='.repeat(60) + '\x1b[0m\n\n');
+
+            // Escribir logs finales pendientes
+            if (this.logBuffer.length > 0) {
+                for (const log of this.logBuffer) {
+                    process.stdout.write(log + '\n');
+                }
+            }
+        }
+
+        this.restoreConsole();
+        this.progressActive = false;
+        this.lastProgressLine = '';
+        this.logBuffer = [];
+        this.hasProgressLine = false;
+    }
+
+    isActive(): boolean {
+        return this.progressActive;
+    }
+}
 
 // Función para ejecutar el linter antes de la compilación
 export async function runLinter(showResult: boolean = false): Promise<boolean> {
@@ -2068,28 +2248,57 @@ async function compileWithConcurrencyLimit(
     const total = files.length;
     let completed = 0;
     let skipped = 0;
-    let failed = 0; // Función para mostrar progreso
+    let failed = 0;
+
+    // Usar el gestor de progreso existente (ya iniciado en initCompileAll)
+    const progressManager = ProgressManager.getInstance();
+
+    // Variable para controlar el progreso inicial
+    let hasShownInitialProgress = false;
+
+    // Función para mostrar progreso
     function showProgress() {
         const currentTotal = completed + skipped + failed;
         const progressBar = createProgressBar(currentTotal, total);
         const progressPercent = Math.round((currentTotal / total) * 100);
 
+        // Mostrar progreso inicial cuando se inicie O cuando haya progreso real
         if (
-            progressPercent > lastProgressUpdate + 1 ||
+            (currentTotal === 0 && !hasShownInitialProgress) ||
+            (progressPercent > lastProgressUpdate + 1 && currentTotal > 0) ||
             currentTotal === total
         ) {
-            stdout.write(
-                `\r🚀 ${progressBar} [✅ ${completed} | ⏭️ ${skipped} | ❌ ${failed}]`,
-            );
+            const progressText = `🚀 ${progressBar} [✅ ${completed} | ⏭️ ${skipped} | ❌ ${failed}]`;
+            progressManager.updateProgress(progressText);
+
+            if (currentTotal === 0) {
+                hasShownInitialProgress = true;
+            }
+
             lastProgressUpdate = progressPercent;
+
+            // NO terminar el progreso aquí - se termina en initCompileAll
         }
     }
+
+    // Mostrar progreso inicial
+    showProgress();
     for (const file of files) {
         const promise = (async () => {
             try {
+                // Log verbose: Iniciando compilación del archivo
+                if (env.VERBOSE === 'true') {
+                    logger.info(`🔄 Compilando: ${path.basename(file)}`);
+                }
+
                 // Verificar cache antes de compilar
                 if (await shouldSkipFile(file)) {
                     skipped++;
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `⏭️ Archivo omitido (cache): ${path.basename(file)}`,
+                        );
+                    }
                     showProgress();
                     return {
                         success: true,
@@ -2098,9 +2307,18 @@ async function compileWithConcurrencyLimit(
                     };
                 }
 
-                const result = await initCompile(file, false, 'batch'); // Actualizar cache si la compilación fue exitosa
+                const result = await initCompile(file, false, 'batch');
+
+                // Actualizar cache si la compilación fue exitosa
                 if (result.success && result.output) {
                     await smartCache.set(file, result.output);
+                    if (env.VERBOSE === 'true') {
+                        logger.info(
+                            `✅ Completado: ${path.basename(file)} → ${path.basename(result.output)}`,
+                        );
+                    }
+                } else if (env.VERBOSE === 'true') {
+                    logger.info(`❌ Error en: ${path.basename(file)}`);
                 }
 
                 completed++;
@@ -2108,6 +2326,13 @@ async function compileWithConcurrencyLimit(
                 return result;
             } catch (error) {
                 failed++;
+                if (env.VERBOSE === 'true') {
+                    const errorMsg =
+                        error instanceof Error ? error.message : String(error);
+                    logger.error(
+                        `💥 Falló: ${path.basename(file)} - ${errorMsg}`,
+                    );
+                }
                 showProgress();
                 return {
                     success: false,
@@ -2128,22 +2353,34 @@ async function compileWithConcurrencyLimit(
             );
         }
     }
-
     await Promise.all(results);
-    console.log('\n'); // Nueva línea después de la barra de progreso
+
+    // El progreso ya se termina automáticamente en showProgress() cuando se completa
 }
 
 export async function initCompileAll() {
     try {
+        // Inicializar el gestor de progreso desde el inicio
+        const progressManager = ProgressManager.getInstance();
+        progressManager.startProgress();
+
+        // Fase 1: Preparación inicial
+        progressManager.updateProgress('🚀 Iniciando compilación...');
+
         // Limpiar estado de compilación anterior
         clearCompilationState();
 
         // Cargar cache al inicio
+        progressManager.updateProgress('📦 Cargando cache...');
         await loadCache();
         lastProgressUpdate = 0;
+
+        // Fase 2: Linting
+        progressManager.updateProgress('🔍 Ejecutando linter...');
         const shouldContinue = await runLinter();
         if (!shouldContinue) {
             // await displayCompilationSummary(env.VERBOSE === 'true');
+            progressManager.endProgress();
             return;
         }
 
@@ -2163,7 +2400,10 @@ export async function initCompileAll() {
 
         logger.info(`📝 Compilando todos los archivos...`);
         logger.info(`🔜 Fuente: ${rawPathSource}`);
-        logger.info(`🔚 Destino: ${pathDist}\n`); // Generar TailwindCSS
+        logger.info(`🔚 Destino: ${pathDist}\n`);
+
+        // Fase 3: TailwindCSS
+        progressManager.updateProgress('🎨 Generando TailwindCSS...');
         const generateTailwindCSS = await loadTailwind();
         const resultTW = await generateTailwindCSS();
         if (typeof resultTW !== 'boolean') {
@@ -2180,7 +2420,10 @@ export async function initCompileAll() {
                     env.VERBOSE === 'true',
                 );
             }
-        } // Recopilar todos los archivos
+        }
+
+        // Fase 4: Recopilando archivos
+        progressManager.updateProgress('📁 Recopilando archivos...');
         const filesToCompile: string[] = [];
         for await (const file of glob(patterns)) {
             if (file.endsWith('.d.ts')) {
@@ -2202,9 +2445,14 @@ export async function initCompileAll() {
         } else {
             maxConcurrency = Math.min(cpuCount * 2, 16);
         }
+
+        // Fase 5: Configurando workers
+        progressManager.updateProgress('⚙️ Configurando workers...');
         logger.info(
             `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
-        ); // Configurar worker pool para modo batch
+        );
+
+        // Configurar worker pool para modo batch
         try {
             const { TypeScriptWorkerPool } = await import(
                 './typescript-worker-pool'
@@ -2213,18 +2461,32 @@ export async function initCompileAll() {
             workerPool.setMode('batch');
         } catch {
             // Error silencioso en configuración del pool
-        }
-
-        await compileWithConcurrencyLimit(filesToCompile, maxConcurrency);
-
-        // Guardar cache al final
+        } // Fase 6: Compilación (el progreso continúa en compileWithConcurrencyLimit)
+        progressManager.updateProgress(
+            `🚀 Iniciando compilación de ${fileCount} archivos...`,
+        );
+        await compileWithConcurrencyLimit(filesToCompile, maxConcurrency); // Guardar cache al final
+        progressManager.updateProgress('💾 Guardando cache...');
         await saveCache();
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime);
-        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`); // Mostrar resumen de compilación
+
+        // Finalizar progreso
+        progressManager.endProgress();
+
+        // Importante: Todos los logs finales van DESPUÉS del progreso
+        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`);
+
+        // Mostrar resumen de compilación
         await displayCompilationSummary(env.VERBOSE === 'true');
     } catch (error) {
+        // Asegurar que el progreso termine en caso de error
+        const progressManager = ProgressManager.getInstance();
+        if (progressManager.isActive()) {
+            progressManager.endProgress();
+        }
+
         const errorMessage =
             error instanceof Error ? error.message : String(error);
         logger.error(
