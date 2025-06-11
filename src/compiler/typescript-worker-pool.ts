@@ -884,13 +884,6 @@ export class TypeScriptWorkerPool {
 
         const finalTimeout = Math.round(baseTimeout * complexityMultiplier);
 
-        // Log para debugging en archivos complejos
-        if (complexityMultiplier > 2) {
-            console.log(
-                `[WorkerPool] Archivo complejo detectado: ${fileName}, timeout: ${finalTimeout}ms (multiplicador: ${complexityMultiplier.toFixed(2)})`,
-            );
-        }
-
         return Math.min(finalTimeout, 60000); // Máximo absoluto de 60 segundos
     }
 

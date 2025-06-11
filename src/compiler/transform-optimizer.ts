@@ -3,6 +3,7 @@
  * Implementa procesamiento paralelo y caching inteligente para transformaciones
  */
 
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import * as os from 'node:os';
 import { Worker } from 'node:worker_threads';

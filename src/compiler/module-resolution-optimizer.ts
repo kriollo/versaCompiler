@@ -339,11 +339,6 @@ export class ModuleResolutionOptimizer {
                 packageJson,
             );
             if (alternatives) {
-                if (env.VERBOSE === 'true') {
-                    logger.info(
-                        `🔄 Cambiando ${entryPoint} por ${alternatives} (modo desarrollo)`,
-                    );
-                }
                 return alternatives;
             }
         }
@@ -355,11 +350,6 @@ export class ModuleResolutionOptimizer {
                 packageJson,
             );
             if (browserAlternative) {
-                if (env.VERBOSE === 'true') {
-                    logger.info(
-                        `🌐 Cambiando ${entryPoint} por ${browserAlternative} (versión browser)`,
-                    );
-                }
                 return browserAlternative;
             }
         }

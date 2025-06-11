@@ -9,7 +9,7 @@ import {
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { cwd, env, stdout } from 'node:process';
+import { argv, cwd, env, stdout } from 'node:process';
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
@@ -478,8 +478,8 @@ class SmartCompilationCache {
     private fileWatchers = new Map<string, any>(); // chokidar watchers
     private dependencyGraph = new Map<string, Set<string>>(); // archivo -> dependencias
     private reverseDependencyGraph = new Map<string, Set<string>>(); // dependencia -> archivos que la usan
-    private packageJsonPath = path.join(process.cwd(), 'package.json');
-    private nodeModulesPath = path.join(process.cwd(), 'node_modules');
+    private packageJsonPath = path.join(cwd(), 'package.json');
+    private nodeModulesPath = path.join(cwd(), 'node_modules');
     private isWatchingDependencies = false;
     /**
      * Genera hash SHA-256 del contenido del archivo
@@ -547,7 +547,7 @@ class SmartCompilationCache {
             const hash = createHash('sha256');
 
             // 1. Hash del package.json con versiones
-            const packagePath = path.join(process.cwd(), 'package.json');
+            const packagePath = path.join(cwd(), 'package.json');
             const packageContent = await readFile(packagePath, 'utf8');
             const pkg = JSON.parse(packageContent);
 
@@ -561,7 +561,7 @@ class SmartCompilationCache {
 
             // 2. Hash del package-lock.json si existe (versiones exactas instaladas)
             try {
-                const lockPath = path.join(process.cwd(), 'package-lock.json');
+                const lockPath = path.join(cwd(), 'package-lock.json');
                 const lockContent = await readFile(lockPath, 'utf8');
                 const lockData = JSON.parse(lockContent);
 
@@ -598,10 +598,7 @@ class SmartCompilationCache {
 
             // 3. ✨ NUEVO: Hash de timestamps críticos de node_modules
             try {
-                const nodeModulesPath = path.join(
-                    process.cwd(),
-                    'node_modules',
-                );
+                const nodeModulesPath = path.join(cwd(), 'node_modules');
                 const nodeModulesStat = await stat(nodeModulesPath);
                 hash.update(`nmtime:${nodeModulesStat.mtimeMs}`);
 
@@ -1068,8 +1065,8 @@ async function loadCache() {
     // ✨ ISSUE #3: Iniciar vigilancia de dependencias en modo watch
     if (
         env.WATCH_MODE === 'true' ||
-        process.argv.includes('--watch') ||
-        process.argv.includes('-w')
+        argv.includes('--watch') ||
+        argv.includes('-w')
     ) {
         await smartCache.startDependencyWatching();
     }
