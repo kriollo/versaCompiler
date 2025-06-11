@@ -1,6 +1,6 @@
 {
     "name": "versacompiler",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "Una herramienta para compilar y minificar archivos .vue, .js y .ts para proyectos de Vue 3 con soporte para TypeScript.",
     "main": "dist/main.js",
     "bin": {
@@ -52,6 +52,7 @@
         "find-root": "^1.1.0",
         "fs-extra": "^11.3.0",
         "get-port": "^7.1.0",
+        "minimatch": "^10.0.1",
         "oxc-minify": "^0.72.3",
         "oxc-parser": "^0.72.3",
         "oxc-transform": "^0.72.3",
