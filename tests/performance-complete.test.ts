@@ -772,10 +772,12 @@ onMounted(() => {
                 successRate: `${(stats.successRate * 100).toFixed(1)}%`,
             });
         }, 60000);
-
         test('TypeScript complejo - con tipos avanzados', async () => {
             const content = createSampleFiles.complexTS();
             const filePath = path.join(env.PATH_SOURCE!, 'complex.ts');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, content);
 
             // Enable type checking for complex types

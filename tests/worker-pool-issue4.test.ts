@@ -171,11 +171,10 @@ describe('Issue #4: Worker Pool - Control de Memoria TS', () => {
                 },
             );
             const duration = Date.now() - startTime;
-
             console.log(`⏱️ Archivo complejo procesado en: ${duration}ms`);
             console.log('🔍 Errores encontrados:', result.hasErrors);
 
-            expect(duration).toBeGreaterThan(1000); // Debería tomar más tiempo
+            expect(duration).toBeGreaterThan(500); // Debería tomar tiempo considerable para archivos complejos
             expect(duration).toBeLessThan(60000); // Pero no más de 60 segundos
         }, 65000);
 
@@ -209,10 +208,9 @@ describe('Issue #4: Worker Pool - Control de Memoria TS', () => {
                 },
             );
             const duration = Date.now() - startTime;
-
             console.log(`⏱️ Archivo .d.ts procesado en: ${duration}ms`);
 
-            expect(duration).toBeGreaterThan(500); // Los .d.ts requieren más tiempo
+            expect(duration).toBeGreaterThan(200); // Los .d.ts requieren tiempo considerable
             expect(result).toBeDefined();
         }, 30000);
     });

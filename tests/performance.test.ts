@@ -1118,6 +1118,9 @@ button:hover {
         test('JavaScript simple', async () => {
             const content = createSampleFiles.simpleJS();
             const filePath = path.join(env.PATH_SOURCE!, 'simple.js');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, content);
 
             const results = await measurePerformance(async () => {
@@ -1133,10 +1136,12 @@ button:hover {
                 successRate: `${(stats.successRate * 100).toFixed(1)}%`,
             });
         }, 90000);
-
         test('TypeScript simple', async () => {
             const content = createSampleFiles.simpleTS();
             const filePath = path.join(env.PATH_SOURCE!, 'simple.ts');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, content);
 
             env.typeCheck = 'false';
@@ -1154,10 +1159,12 @@ button:hover {
                 successRate: `${(stats.successRate * 100).toFixed(1)}%`,
             });
         }, 90000);
-
         test('Vue simple', async () => {
             const content = createSampleFiles.simpleVue();
             const filePath = path.join(env.PATH_SOURCE!, 'Simple.vue');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, content);
 
             const results = await measurePerformance(async () => {
@@ -1224,6 +1231,8 @@ button:hover {
                 const tsFile = path.join(env.PATH_SOURCE!, `batch-${i}.ts`);
                 const vueFile = path.join(env.PATH_SOURCE!, `Batch${i}.vue`);
 
+                // Ensure directory exists before writing files
+                await fs.mkdir(path.dirname(jsFile), { recursive: true });
                 await fs.writeFile(jsFile, createSampleFiles.simpleJS());
                 await fs.writeFile(tsFile, createSampleFiles.simpleTS());
                 await fs.writeFile(vueFile, createSampleFiles.simpleVue());
@@ -1260,11 +1269,13 @@ button:hover {
                 createSampleFiles.simpleTS() +
                 '\n'.repeat(100) +
                 '// Large file padding for memory analysis\n'.repeat(50);
-
             const filePath = path.join(
                 env.PATH_SOURCE!,
                 'large-memory-test.ts',
             );
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, largeFileContent);
 
             const results = await measurePerformance(async () => {
@@ -1295,14 +1306,15 @@ button:hover {
 
         test('Concurrent compilation stress test', async () => {
             const concurrentFiles: string[] = [];
-            const concurrentSize = 3; // Reducido para evitar problemas
-
-            // Crear archivos concurrentes
+            const concurrentSize = 3; // Reducido para evitar problemas            // Crear archivos concurrentes
             for (let i = 0; i < concurrentSize; i++) {
                 const filePath = path.join(
                     env.PATH_SOURCE!,
                     `concurrent-${i}.ts`,
                 );
+
+                // Ensure directory exists before writing file
+                await fs.mkdir(path.dirname(filePath), { recursive: true });
                 await fs.writeFile(filePath, createSampleFiles.simpleTS());
                 concurrentFiles.push(filePath);
             }
@@ -1354,6 +1366,8 @@ button:hover {
                 'large-generated.js',
             );
 
+            // Ensure directory exists before writing files
+            await fs.mkdir(path.dirname(tsFilePath), { recursive: true });
             await fs.writeFile(tsFilePath, largeTS);
             await fs.writeFile(vueFilePath, largeVue);
             await fs.writeFile(jsFilePath, largeJS);
@@ -1391,6 +1405,9 @@ button:hover {
         test('Performance baseline comparison', async () => {
             const baselineContent = createSampleFiles.simpleJS();
             const filePath = path.join(env.PATH_SOURCE!, 'baseline.js');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, baselineContent);
 
             const results = await measurePerformance(async () => {
@@ -1412,10 +1429,12 @@ button:hover {
                 baselineMet: stats.avg < 500 && stats.successRate === 1,
             });
         }, 90000);
-
         test('Performance consistency check', async () => {
             const consistencyIterations = 1; // Reducido de 3 a 1 para evitar timeout
             const filePath = path.join(env.PATH_SOURCE!, 'consistency.ts');
+
+            // Ensure directory exists before writing file
+            await fs.mkdir(path.dirname(filePath), { recursive: true });
             await fs.writeFile(filePath, createSampleFiles.simpleTS());
 
             const results = await measurePerformance(async () => {
