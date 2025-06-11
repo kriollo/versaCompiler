@@ -8,36 +8,7 @@ import { cwd, env } from 'node:process';
 
 import { logger } from '../servicios/logger';
 
-// Lista de módulos que deben ser excluidos de la resolución automática de rutas
-// Estos módulos se mantienen con su importación original sin transformar
-const EXCLUDED_MODULES = new Set([
-    'vue/compiler-sfc',
-    'vue/dist/vue.runtime.esm-bundler',
-    '@vue/compiler-sfc',
-    '@vue/compiler-dom',
-    '@vue/runtime-core',
-    '@vue/runtime-dom', // Módulos de oxc-parser que tienen dependencias específicas de WASM
-    'oxc-parser',
-    'oxc-parser/wasm',
-    'oxc-minify',
-    'oxc-minify/browser',
-    '@oxc-parser/binding-wasm32-wasi',
-    '@oxc-minify/binding-wasm32-wasi',
-    // Módulos de TypeScript que pueden tener resoluciones complejas
-    'typescript',
-    // Agregar más módulos problemáticos aquí según sea necesario
-    'yargs',
-    'yargs/helpers',
-    'yargs-parser',
-    'chalk',
-    'browser-sync',
-    'chokidar',
-    'get-port',
-    'execa',
-    'find-root',
-    'fs-extra',
-    'minimatch'
-]);
+import { EXCLUDED_MODULES } from './excluded-modules';
 
 // function resolveESMWithLibrary(moduleName: string): string | null {
 //     try {

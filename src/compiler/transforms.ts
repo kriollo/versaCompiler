@@ -2,6 +2,7 @@ import path from 'node:path';
 import { env } from 'node:process';
 
 import { logger } from '../servicios/logger';
+import { EXCLUDED_MODULES } from '../utils/excluded-modules';
 import { getModuleSubPath } from '../utils/module-resolver';
 
 import { analyzeAndFormatMultipleErrors } from './error-reporter';
@@ -83,21 +84,6 @@ function isExternalModule(
     } // NUEVA LÓGICA: Verificar PRIMERO si es un módulo excluido antes de verificar alias
     // Esto es importante porque algunos módulos excluidos pueden tener nombres que
     // coinciden con patrones de alias (como @vue/compiler-sfc con @/*)
-    const EXCLUDED_MODULES = new Set([
-        'vue/compiler-sfc',
-        'vue/dist/vue.runtime.esm-bundler',
-        '@vue/compiler-sfc',
-        '@vue/compiler-dom',
-        '@vue/runtime-core',
-        '@vue/runtime-dom',
-        'oxc-parser',
-        'oxc-parser/wasm',
-        'oxc-minify',
-        'oxc-minify/browser',
-        '@oxc-parser/binding-wasm32-wasi',
-        '@oxc-minify/binding-wasm32-wasi',
-        'typescript/lib/typescript',
-    ]);
     if (EXCLUDED_MODULES.has(moduleRequest)) {
         return true;
     } // Descartar alias conocidos
@@ -546,27 +532,13 @@ async function replaceAliasInStrings(code: string): Promise<string> {
                 // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
                 if (isExternalModule(stringContent, pathAlias)) {
                     // Para strings que parecen ser módulos externos, verificar si están excluidos
-                    const EXCLUDED_MODULES = new Set([
-                        'vue/compiler-sfc',
-                        'vue/dist/vue.runtime.esm-bundler',
-                        '@vue/compiler-sfc',
-                        '@vue/compiler-dom',
-                        '@vue/runtime-core',
-                        '@vue/runtime-dom',
-                        'oxc-parser',
-                        'oxc-parser/wasm',
-                        'oxc-minify',
-                        'oxc-minify/browser',
-                        '@oxc-parser/binding-wasm32-wasi',
-                        '@oxc-minify/binding-wasm32-wasi',
-                        'typescript/lib/typescript',
-                    ]);
-
                     if (EXCLUDED_MODULES.has(stringContent)) {
                         // Es un módulo excluido, no transformar
                         continue;
                     }
-                } // Reemplazar el alias con la ruta del target
+                }
+
+                // Reemplazar el alias con la ruta del target
                 const relativePath = stringContent.replace(aliasPattern, '');
 
                 // Construir la nueva ruta basada en la configuración del target

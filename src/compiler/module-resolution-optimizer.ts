@@ -15,6 +15,7 @@ import { dirname, join, relative } from 'node:path';
 import { cwd, env } from 'node:process';
 
 import { logger } from '../servicios/logger';
+import { EXCLUDED_MODULES } from '../utils/excluded-modules';
 
 interface ModuleInfo {
     fullPath: string;
@@ -91,34 +92,8 @@ export class ModuleResolutionOptimizer {
     // Configuración
     private readonly maxCacheSize = 500;
     private readonly cacheMaxAge = 5 * 60 * 1000; // 5 minutos
-    private readonly indexRefreshInterval = 10 * 60 * 1000; // 10 minutos
-
-    // Lista de módulos excluidos (copiada del module-resolver)
-    private readonly excludedModules = new Set([
-        'vue/compiler-sfc',
-        'vue/dist/vue.runtime.esm-bundler',
-        '@vue/compiler-sfc',
-        '@vue/compiler-dom',
-        '@vue/runtime-core',
-        '@vue/runtime-dom',
-        'oxc-parser',
-        'oxc-parser/wasm',
-        'oxc-minify',
-        'oxc-minify/browser',
-        '@oxc-parser/binding-wasm32-wasi',
-        '@oxc-minify/binding-wasm32-wasi',
-        'typescript',
-        'yargs',
-        'yargs/helpers',
-        'yargs-parser',
-        'chalk',
-        'browser-sync',
-        'chokidar',
-        'get-port',
-        'execa',
-        'find-root',
-        'fs-extra',
-    ]);
+    private readonly indexRefreshInterval = 10 * 60 * 1000; // 10 minutos    // Lista de módulos excluidos - usar la lista centralizada
+    private readonly excludedModules = EXCLUDED_MODULES;
 
     private lastIndexUpdate = 0;
 
@@ -779,12 +754,13 @@ export class ModuleResolutionOptimizer {
         const alias = this.findMatchingAlias(path);
         if (!alias || !env.PATH_DIST) {
             return null;
-        }        const relativePath = path.replace(alias.pattern, '');
+        }
+        const relativePath = path.replace(alias.pattern, '');
         const targetPath = alias.target[0];
 
         if (!targetPath) {
             return null;
-        }        // Construir ruta final
+        } // Construir ruta final
         let finalPath: string;
         const pathDist = env.PATH_DIST.replace('./', '');
 
@@ -806,8 +782,13 @@ export class ModuleResolutionOptimizer {
             // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
             // Para targets como "/src/*", mapear directamente al PATH_DIST
             // Remover el primer directorio si es diferente de PATH_DIST
-            const targetWithoutSlash = targetPath.substring(1).replace('/*', '');
-            if (targetWithoutSlash === 'src' || targetWithoutSlash.startsWith('src/')) {
+            const targetWithoutSlash = targetPath
+                .substring(1)
+                .replace('/*', '');
+            if (
+                targetWithoutSlash === 'src' ||
+                targetWithoutSlash.startsWith('src/')
+            ) {
                 // Para "/src/*" mapear directamente a "/pathDist/relativePath"
                 finalPath = join('/', pathDist, relativePath);
             } else {
@@ -829,16 +810,31 @@ export class ModuleResolutionOptimizer {
                 if (cleanTarget.startsWith('src/')) {
                     // Para "src/components/*" -> "/pathDist/components/*"
                     const targetWithoutSrc = cleanTarget.replace('src/', '');
-                    finalPath = join('/', pathDist, targetWithoutSrc, relativePath);
+                    finalPath = join(
+                        '/',
+                        pathDist,
+                        targetWithoutSrc,
+                        relativePath,
+                    );
                 } else {
                     // Para casos como "examples/*" -> "/pathDist/*"
                     // No incluir el directorio raíz en la ruta final
-                    const isRootDirectory = ['examples', 'src', 'app', 'lib'].includes(cleanTarget);
+                    const isRootDirectory = [
+                        'examples',
+                        'src',
+                        'app',
+                        'lib',
+                    ].includes(cleanTarget);
                     if (isRootDirectory) {
                         finalPath = join('/', pathDist, relativePath);
                     } else {
                         // Para subdirectorios específicos, mantener la estructura
-                        finalPath = join('/', pathDist, cleanTarget, relativePath);
+                        finalPath = join(
+                            '/',
+                            pathDist,
+                            cleanTarget,
+                            relativePath,
+                        );
                     }
                 }
             }
