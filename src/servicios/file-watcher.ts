@@ -6,10 +6,10 @@ import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
 
 import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
-import { promptUser } from '../utils/promptUser.js';
+import { promptUser } from '../utils/promptUser';
 
-import { emitirCambios } from './browserSync.js';
-import { logger } from './logger.js';
+import { emitirCambios } from './browserSync';
+import { logger } from './logger';
 
 // Lazy loading para chalk
 let chalk: any;
