@@ -906,7 +906,7 @@ class SmartCompilationCache {
                         persistent: false,
                         ignoreInitial: true,
                         depth: 1, // Solo primer nivel para performance
-                        ignored: /(^|[\/\\])\../, // Ignorar archivos ocultos
+                        ignored: /(^|[/\\])\../, // Ignorar archivos ocultos
                     },
                 );
                 nodeModulesWatcher.on('addDir', (path: string) => {
@@ -1405,10 +1405,16 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
         logger.info(chalk.cyan(`\n📄 ${baseName}`));
 
         fileErrors.forEach(error => {
-            const icon = error.severity === 'error' ? '❌' : '⚠️';
+            const icon = error.severity === 'error' ? '❌ ' : '⚠️ ';
             logger.info(`${icon} ${error.message}`);
             if (error.help) {
-                logger.info(`   └─ ${error.help}`);
+                logger.info(`   |`);
+                logger.info(`   └ Linter: ${error.from}`);
+                logger.info(`   |`);
+
+                logger.info(`   └ Linea: ${error.line}`);
+                logger.info(`   |`);
+                logger.info(`   └─ ${error.help}\n`);
             }
         });
     });
@@ -2105,6 +2111,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                         eslintResult.json.forEach(
                                             (result: any) => {
                                                 linterErrors.push({
+                                                    from: 'eslint',
+                                                    line: result.line,
                                                     file:
                                                         result.filePath ||
                                                         'archivo no especificado',
@@ -2134,6 +2142,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                                     fileResult.messages.forEach(
                                                         (msg: any) => {
                                                             linterErrors.push({
+                                                                from: 'eslint',
+                                                                line: fileResult.line,
                                                                 file:
                                                                     fileResult.filePath ||
                                                                     'archivo no especificado',
@@ -2176,11 +2186,17 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                 if (
                                     oxlintResult &&
                                     oxlintResult['json'] &&
-                                    Array.isArray(oxlintResult['json'])
+                                    Array.isArray(
+                                        oxlintResult['json']['diagnostics'],
+                                    )
                                 ) {
-                                    oxlintResult['json'].forEach(
+                                    oxlintResult['json']['diagnostics'].forEach(
                                         (result: any) => {
                                             linterErrors.push({
+                                                from: 'oxlint',
+                                                line:
+                                                    result.labels[0].span
+                                                        ?.line ?? '',
                                                 file:
                                                     result.filename ||
                                                     result.file ||
@@ -2193,8 +2209,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                                         : 'error',
                                                 help:
                                                     result.help ||
-                                                    (result.rule_id
-                                                        ? `Regla Oxlint: ${result.rule_id}`
+                                                    (result.code
+                                                        ? `Regla Oxlint: ${result.code}`
                                                         : undefined),
                                             });
                                         },
