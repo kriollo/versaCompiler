@@ -218,26 +218,30 @@ async function main() {
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
         env.ENABLE_LINTER = String(argv.linter);
         env.VERBOSE = argv.verbose ? 'true' : 'false'; // 🎯 Configuración moderna y organizada
-        logger.info(chalk.bold.blue('⚙️  Configuration'));
-        logger.info(chalk.gray('   ┌─ Execution mode'));
+        logger.info(chalk.bold.blue('⚙️  Configuración'));
+        logger.info(chalk.gray('   ┌─ Modo de ejecución'));
 
         const modes = [
-            { label: 'Watch', value: argv.watch, icon: '👀' },
-            { label: 'All Files', value: env.isALL === 'true', icon: '📁' },
-            { label: 'Single File', value: !!argv.file, icon: '📄' },
-            { label: 'Production', value: env.isPROD === 'true', icon: '🏭' },
+            { label: 'Observar', value: argv.watch, icon: '👀' },
+            {
+                label: 'Todos los archivos',
+                value: env.isALL === 'true',
+                icon: '📁',
+            },
+            { label: 'Archivo único', value: !!argv.file, icon: '📄' },
+            { label: 'Producción', value: env.isPROD === 'true', icon: '🏭' },
         ];
 
         const features = [
             { label: 'Tailwind', value: env.TAILWIND === 'true', icon: '🎨' },
-            { label: 'Minification', value: env.isPROD === 'true', icon: '🗜️' },
+            { label: 'Minificación', value: env.isPROD === 'true', icon: '🗜️' },
             {
                 label: 'Linter',
                 value: env.ENABLE_LINTER === 'true',
                 icon: '🔍',
             },
-            { label: 'Type Check', value: argv.typeCheck, icon: '📘' },
-            { label: 'Verbose', value: env.VERBOSE === 'true', icon: '📝' },
+            { label: 'Verificar tipos', value: argv.typeCheck, icon: '📘' },
+            { label: 'Detallado', value: env.VERBOSE === 'true', icon: '📝' },
         ];
 
         modes.forEach(mode => {
@@ -249,8 +253,7 @@ async function main() {
                 chalk.gray('   │  ') + status + ` ${mode.icon} ${label}`,
             );
         });
-
-        logger.info(chalk.gray('   ├─ Features'));
+        logger.info(chalk.gray('   ├─ Características'));
         features.forEach(feature => {
             const status = feature.value ? chalk.green('●') : chalk.gray('○');
             const label = feature.value
@@ -262,20 +265,24 @@ async function main() {
         });
 
         if (argv.file) {
-            logger.info(chalk.gray('   ├─ Target'));
+            logger.info(chalk.gray('   ├─ Objetivo'));
             logger.info(chalk.gray('   │  ') + chalk.blue('📄 ') + argv.file);
         }
 
         if (argv.cleanOutput) {
-            logger.info(chalk.gray('   ├─ Cleanup'));
-            logger.info(chalk.gray('   │  ') + chalk.yellow('🧹 Clean Output'));
+            logger.info(chalk.gray('   ├─ Limpieza'));
+            logger.info(
+                chalk.gray('   │  ') + chalk.yellow('🧹 Limpiar salida'),
+            );
         }
 
         if (argv.cleanCache) {
-            logger.info(chalk.gray('   │  ') + chalk.yellow('🗑️  Clean Cache'));
+            logger.info(
+                chalk.gray('   │  ') + chalk.yellow('🗑️  Limpiar caché'),
+            );
         }
 
-        logger.info(chalk.gray('   └─ Ready to compile!'));
+        logger.info(chalk.gray('   └─ ¡Listo para compilar!'));
         logger.log('');
         env.typeCheck = argv.typeCheck ? 'true' : 'false';
 

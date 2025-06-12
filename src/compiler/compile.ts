@@ -1250,14 +1250,14 @@ async function displayCompilationSummary(
     // 🎨 Header moderno del resumen
     const summaryLine = '━'.repeat(40);
     logger.info('');
-    logger.info(chalk.bold.cyan('📊 Compilation Summary'));
+    logger.info(chalk.bold.cyan('📊 Resumen de Compilación'));
     logger.info(chalk.gray(summaryLine)); // ⏱️ Tiempo total con formato elegante
     if (totalTime) {
-        logger.info(chalk.bold(`⏱️  Total Time: ${chalk.green(totalTime)}`));
+        logger.info(chalk.bold(`⏱️  Tiempo Total: ${chalk.green(totalTime)}`));
         logger.info('');
     } // 🔧 Estadísticas por etapa con mejor formato
     if (compilationResults.length > 0) {
-        logger.info(chalk.bold.blue('🔧 Stage Statistics:'));
+        logger.info(chalk.bold.blue('🔧 Estadísticas por Etapa:'));
 
         for (const result of compilationResults) {
             const totalFiles = result.success + result.errors;
@@ -1273,16 +1273,15 @@ async function displayCompilationSummary(
                 successRate,
                 20,
             );
-
             logger.info(`   ${stageIcon} ${chalk.bold(result.stage)}`);
             logger.info(
-                `     ${statusColor('●')} ${result.success}/${totalFiles} files ${statusColor(`(${successRate}%)`)}`,
+                `     ${statusColor('●')} ${result.success}/${totalFiles} archivos ${statusColor(`(${successRate}%)`)}`,
             );
             logger.info(`     ${progressBar}`);
 
             if (result.errors > 0) {
                 logger.info(
-                    `     ${chalk.red('⚠')} ${result.errors} ${result.errors === 1 ? 'error' : 'errors'}`,
+                    `     ${chalk.red('⚠')} ${result.errors} ${result.errors === 1 ? 'error' : 'errores'}`,
                 );
             }
             logger.info('');
@@ -1361,38 +1360,50 @@ async function displayCompilationSummary(
         const statLine = '═'.repeat(50);
         logger.info('');
         logger.info(chalk.bold.cyan(statLine));
-        logger.info(chalk.bold.cyan('                📊 FINAL SUMMARY'));
+        logger.info(chalk.bold.cyan('                📊 RESUMEN FINAL'));
         logger.info(chalk.bold.cyan(statLine));
 
         // Estadísticas con iconos y colores modernos
         logger.info('');
-        logger.info(chalk.bold('🎯 Results:'));
-        logger.info(`   📁 Files affected: ${chalk.cyan.bold(totalFiles)}`);
+        logger.info(chalk.bold('🎯 Resultados:'));
+        logger.info(`   📁 Archivos afectados: ${chalk.cyan.bold(totalFiles)}`);
         logger.info(
-            `   ${totalErrors > 0 ? chalk.red('●') : chalk.green('○')} Errors: ${totalErrors > 0 ? chalk.red.bold(totalErrors) : chalk.green.bold('0')}`,
+            `   ${totalErrors > 0 ? chalk.red('●') : chalk.green('○')} Errores: ${totalErrors > 0 ? chalk.red.bold(totalErrors) : chalk.green.bold('0')}`,
         );
         logger.info(
-            `   ${totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○')} Warnings: ${totalWarnings > 0 ? chalk.yellow.bold(totalWarnings) : chalk.green.bold('0')}`,
+            `   ${totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○')} Advertencias: ${totalWarnings > 0 ? chalk.yellow.bold(totalWarnings) : chalk.green.bold('0')}`,
         );
 
         logger.info('');
 
         // Estado final con diseño visual atractivo
         if (totalErrors > 0) {
-            logger.info(chalk.red.bold('🚨 COMPILATION COMPLETED WITH ERRORS'));
             logger.info(
-                chalk.red('   Please review and fix the issues above.'),
+                chalk.red.bold('🚨 COMPILACIÓN COMPLETADA CON ERRORES'),
+            );
+            logger.info(
+                chalk.red(
+                    '   Por favor revisa y corrige los problemas anteriores.',
+                ),
             );
         } else if (totalWarnings > 0) {
             logger.info(
-                chalk.yellow.bold('⚠️  COMPILATION COMPLETED WITH WARNINGS'),
+                chalk.yellow.bold(
+                    '⚠️  COMPILACIÓN COMPLETADA CON ADVERTENCIAS',
+                ),
             );
             logger.info(
-                chalk.yellow('   Consider reviewing the warnings above.'),
+                chalk.yellow(
+                    '   Considera revisar las advertencias anteriores.',
+                ),
             );
         } else {
-            logger.info(chalk.green.bold('✅ COMPILATION SUCCESSFUL'));
-            logger.info(chalk.green('   All files compiled without issues!'));
+            logger.info(chalk.green.bold('✅ COMPILACIÓN EXITOSA'));
+            logger.info(
+                chalk.green(
+                    '   ¡Todos los archivos se compilaron sin problemas!',
+                ),
+            );
         }
 
         logger.info('');
@@ -1402,11 +1413,13 @@ async function displayCompilationSummary(
         const successLine = '═'.repeat(50);
         logger.info('');
         logger.info(chalk.bold.green(successLine));
-        logger.info(chalk.bold.green('                ✨ SUCCESS'));
+        logger.info(chalk.bold.green('                ✨ ÉXITO'));
         logger.info(chalk.bold.green(successLine));
         logger.info('');
-        logger.info(chalk.green.bold('🎉 COMPILATION COMPLETED SUCCESSFULLY'));
-        logger.info(chalk.green('   No errors or warnings found!'));
+        logger.info(chalk.green.bold('🎉 COMPILACIÓN COMPLETADA EXITOSAMENTE'));
+        logger.info(
+            chalk.green('   ¡No se encontraron errores ni advertencias!'),
+        );
         logger.info('');
         logger.info(chalk.bold.green(successLine));
     }
@@ -2347,7 +2360,7 @@ class ProgressManager {
         const headerLine = '━'.repeat(48);
         process.stdout.write('\n\x1b[96m' + headerLine + '\x1b[0m\n');
         process.stdout.write(
-            '\x1b[96m│ \x1b[97m\x1b[1m🚀 Starting Compilation\x1b[0m\x1b[96m' +
+            '\x1b[96m│ \x1b[97m\x1b[1m🚀 Iniciando Compilación\x1b[0m\x1b[96m' +
                 ' '.repeat(22) +
                 '│\x1b[0m\n',
         );
@@ -2427,7 +2440,7 @@ class ProgressManager {
             const footerLine = '━'.repeat(48);
             process.stdout.write('\x1b[92m' + footerLine + '\x1b[0m\n');
             process.stdout.write(
-                '\x1b[92m│ \x1b[97m\x1b[1m✅ Compilation Complete!\x1b[0m\x1b[92m' +
+                '\x1b[92m│ \x1b[97m\x1b[1m✅ ¡Compilación Completada!\x1b[0m\x1b[92m' +
                     ' '.repeat(23) +
                     '│\x1b[0m\n',
             );
