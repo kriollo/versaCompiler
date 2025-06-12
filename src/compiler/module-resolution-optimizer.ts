@@ -247,10 +247,8 @@ export class ModuleResolutionOptimizer {
             this.metrics.filesystemAccess++;
 
             const isESM = packageJson.type === 'module';
-            const hasExports = !!packageJson.exports;
-
-            // Determinar entry point optimizado
-            let entryPoint = this.determineOptimalEntryPoint(packageJson);
+            const hasExports = !!packageJson.exports; // Determinar entry point optimizado
+            const entryPoint = this.determineOptimalEntryPoint(packageJson);
             let optimizedEntry: string | undefined;
 
             // Buscar versión ESM/browser optimizada
@@ -363,7 +361,7 @@ export class ModuleResolutionOptimizer {
         packageJson: any,
     ): string | null {
         // Crear versión de desarrollo basada en el entry point actual
-        let devVersion = entryPoint
+        const devVersion = entryPoint
             .replace('.min.', '.')
             .replace('.prod.', '.');
 

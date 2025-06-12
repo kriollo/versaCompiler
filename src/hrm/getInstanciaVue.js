@@ -56,7 +56,7 @@ function getVueInstanceFromElement(selector = '#app') {
 function findVueInstanceInDOM() {
     const allElements = document.querySelectorAll('*');
 
-    for (let element of allElements) {
+    for (const element of allElements) {
         // Vue 3
         if (element.__vue_app__) {
             return element.__vue_app__;

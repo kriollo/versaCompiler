@@ -112,7 +112,7 @@ function enhanceErrorMessage(
                   '\n',
               );
 
-    let enhancedMessage = cleanErrorMessage(message); // Información de ubicación
+    const enhancedMessage = cleanErrorMessage(message); // Información de ubicación
     let location = `Código TS${diagnostic.code}`;
     let codeContext = '';
 

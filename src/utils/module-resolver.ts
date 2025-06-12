@@ -333,7 +333,6 @@ function simpleESMResolver(moduleName: string): string | null {
     try {
         const nodeModulesPath = join(cwd(), 'node_modules', moduleName);
         let packagePath: string;
-        let packageJson: any;
 
         try {
             packagePath = join(nodeModulesPath, 'package.json');
@@ -346,7 +345,7 @@ function simpleESMResolver(moduleName: string): string | null {
             return null;
         }
 
-        packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+        const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
         const moduleDir = dirname(packagePath);
         const isESM = packageJson.type === 'module'; // Determinar el entry point ESM/Browser optimizado
         let entryPoint: string | null = null;
@@ -524,7 +523,7 @@ function getNodeModulesRelativePath(
     const idx = fullPath.indexOf('node_modules');
     if (idx !== -1) {
         // Extraer solo la parte desde node_modules en adelante
-        let relativePath = fullPath.substring(idx).replace(/\\/g, '/');
+        const relativePath = fullPath.substring(idx).replace(/\\/g, '/');
 
         // Devolver ruta absoluta desde la raíz del proyecto (sin ../)
         // Esto permite que los archivos compilados accedan directamente a node_modules
@@ -590,7 +589,7 @@ export function getModuleSubPath(
                 typeof packageJson.exports === 'object'
             ) {
                 const exportKey = `./${subPath}`;
-                let exportPath = packageJson.exports[exportKey];
+                const exportPath = packageJson.exports[exportKey];
 
                 if (exportPath) {
                     if (typeof exportPath === 'string') {

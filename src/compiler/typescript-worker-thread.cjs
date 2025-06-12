@@ -158,9 +158,8 @@ class WorkerTypeScriptLanguageServiceHost {
  */
 function validateTypesInWorker(fileName, content, compilerOptions) {
     let actualFileName = fileName;
-
     try {
-        let scriptContent = content;
+        const scriptContent = content;
 
         // Si el script está vacío o es solo espacios en blanco, no validar
         if (!scriptContent.trim()) {

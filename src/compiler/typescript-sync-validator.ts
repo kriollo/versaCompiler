@@ -114,7 +114,7 @@ export const validateTypesWithLanguageService = (
     let actualFileName = fileName; // Declarar aquí para acceso en catch
 
     try {
-        let scriptContent = content;
+        const scriptContent = content;
 
         // Si el script está vacío o es solo espacios en blanco, no validar
         if (!scriptContent.trim()) {

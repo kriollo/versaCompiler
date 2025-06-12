@@ -10,7 +10,7 @@
  */
 
 import { hideErrorOverlay, showErrorOverlay } from './errorScreen.js';
-import obtenerInstanciaVue from './getInstanciaVue.js';
+import { obtenerInstanciaVue } from './getInstanciaVue.js';
 import { reloadComponent } from './VueHRM.js';
 
 /**

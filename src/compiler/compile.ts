@@ -1567,12 +1567,12 @@ async function compileJS(
     // Timing de lectura
     let start = Date.now();
 
-    const extension = path.extname(inPath);
-
-    // Asegurar que el parser esté cargado
+    const extension = path.extname(inPath); // Asegurar que el parser esté cargado
     await moduleManager.ensureModuleLoaded('parser');
     const getCodeFile = await loadParser();
-    let { code, error } = await getCodeFile(inPath);
+    const result = await getCodeFile(inPath);
+    let code = result.code;
+    const error = result.error;
     timings.fileRead = Date.now() - start;
     if (error) {
         await handleCompilationError(

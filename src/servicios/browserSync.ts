@@ -342,7 +342,7 @@ const loadChalk = async () => {
 export async function browserSyncServer(): Promise<any> {
     try {
         let bs: any = null;
-        const AssetsOmit = env.AssetsOmit === 'true' ? true : false;
+        const AssetsOmit = env.AssetsOmit === 'true';
         let proxy: {
             proxy?: string;
             server?: string;
