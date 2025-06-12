@@ -1247,20 +1247,17 @@ async function displayCompilationSummary(
         return;
     }
 
-    logger.info(chalk.bold('\n--- 📊 RESUMEN DE COMPILACIÓN ---'));
-
-    // Mostrar tiempo total prominentemente al inicio si está disponible
+    // 🎨 Header moderno del resumen
+    const summaryLine = '━'.repeat(40);
+    logger.info('');
+    logger.info(chalk.bold.cyan('📊 Compilation Summary'));
+    logger.info(chalk.gray(summaryLine)); // ⏱️ Tiempo total con formato elegante
     if (totalTime) {
-        logger.info(
-            chalk.bold(
-                chalk.cyan(`⏱️ TIEMPO TOTAL DE COMPILACIÓN: ${totalTime}\n`),
-            ),
-        );
-    }
-
-    // Mostrar estadísticas por etapa
+        logger.info(chalk.bold(`⏱️  Total Time: ${chalk.green(totalTime)}`));
+        logger.info('');
+    } // 🔧 Estadísticas por etapa con mejor formato
     if (compilationResults.length > 0) {
-        logger.info(chalk.blue('\n🔍 Estadísticas por etapa:'));
+        logger.info(chalk.blue('� Stage Statistics:'));
 
         for (const result of compilationResults) {
             const totalFiles = result.success + result.errors;
@@ -1268,17 +1265,27 @@ async function displayCompilationSummary(
                 totalFiles > 0
                     ? Math.round((result.success / totalFiles) * 100)
                     : 0;
-            const statusIcon = result.errors === 0 ? '✅' : '❌';
-            const stageColor = await getStageColor(result.stage);
-            const statusText = `${result.success} éxitos, ${result.errors} errores`;
-            const coloredStatusText =
-                result.errors === 0
-                    ? chalk.green(statusText)
-                    : chalk.red(statusText);
 
-            logger.info(
-                `${statusIcon} ${stageColor(result.stage)}: ${coloredStatusText} (${successRate}% éxito)`,
+            // Iconos y colores dinámicos por etapa
+            const stageIcon = getStageIcon(result.stage);
+            const statusColor = result.errors === 0 ? chalk.green : chalk.red;
+            const progressBar = createProgressBarWithPercentage(
+                successRate,
+                20,
             );
+
+            logger.info(`   ${stageIcon} ${chalk.bold(result.stage)}`);
+            logger.info(
+                `     ${statusColor('●')} ${result.success}/${totalFiles} files ${statusColor(`(${successRate}%)`)}`,
+            );
+            logger.info(`     ${progressBar}`);
+
+            if (result.errors > 0) {
+                logger.info(
+                    `     ${chalk.red('⚠')} ${result.errors} ${result.errors === 1 ? 'error' : 'errors'}`,
+                );
+            }
+            logger.info('');
         }
     }
 
@@ -1341,9 +1348,7 @@ async function displayCompilationSummary(
             }
 
             fileIndex++;
-        }
-
-        // Mostrar totales finales
+        } // 📊 Mostrar totales finales con diseño moderno
         const totalErrors = compilationErrors.filter(
             e => e.severity === 'error',
         ).length;
@@ -1351,37 +1356,71 @@ async function displayCompilationSummary(
             e => e.severity === 'warning',
         ).length;
         const totalFiles = errorsByFile.size;
-        logger.info(chalk.bold('\n--- 📈 ESTADÍSTICAS FINALES ---'));
-        logger.info(`📁 Archivos con errores: ${totalFiles}`);
-        logger.info(`❌ Total de errores: ${totalErrors}`);
-        logger.info(`⚠️ Total de advertencias: ${totalWarnings}`);
+
+        // Header elegante para estadísticas finales
+        const statLine = '═'.repeat(50);
+        logger.info('');
+        logger.info(chalk.bold.cyan(statLine));
+        logger.info(chalk.bold.cyan('                📊 FINAL SUMMARY'));
+        logger.info(chalk.bold.cyan(statLine));
+
+        // Estadísticas con iconos y colores modernos
+        logger.info('');
+        logger.info(chalk.bold('🎯 Results:'));
+        logger.info(`   📁 Files affected: ${chalk.cyan.bold(totalFiles)}`);
+        logger.info(
+            `   ${totalErrors > 0 ? chalk.red('●') : chalk.green('○')} Errors: ${totalErrors > 0 ? chalk.red.bold(totalErrors) : chalk.green.bold('0')}`,
+        );
+        logger.info(
+            `   ${totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○')} Warnings: ${totalWarnings > 0 ? chalk.yellow.bold(totalWarnings) : chalk.green.bold('0')}`,
+        );
+
+        logger.info('');
+
+        // Estado final con diseño visual atractivo
         if (totalErrors > 0) {
+            logger.info(chalk.red.bold('🚨 COMPILATION COMPLETED WITH ERRORS'));
             logger.info(
-                chalk.red(
-                    '🚨 Compilación completada con errores que requieren atención.',
-                ),
+                chalk.red('   Please review and fix the issues above.'),
+            );
+        } else if (totalWarnings > 0) {
+            logger.info(
+                chalk.yellow.bold('⚠️  COMPILATION COMPLETED WITH WARNINGS'),
+            );
+            logger.info(
+                chalk.yellow('   Consider reviewing the warnings above.'),
             );
         } else {
-            logger.info(
-                chalk.yellow(
-                    '✅ Compilación completada con solo advertencias.',
-                ),
-            );
+            logger.info(chalk.green.bold('✅ COMPILATION SUCCESSFUL'));
+            logger.info(chalk.green('   All files compiled without issues!'));
         }
+
+        logger.info('');
+        logger.info(chalk.bold.cyan(statLine));
     } else {
-        logger.info(chalk.green('✅ ¡Compilación exitosa sin errores!'));
+        // Caso exitoso sin errores
+        const successLine = '═'.repeat(50);
+        logger.info('');
+        logger.info(chalk.bold.green(successLine));
+        logger.info(chalk.bold.green('                ✨ SUCCESS'));
+        logger.info(chalk.bold.green(successLine));
+        logger.info('');
+        logger.info(chalk.green.bold('🎉 COMPILATION COMPLETED SUCCESSFULLY'));
+        logger.info(chalk.green('   No errors or warnings found!'));
+        logger.info('');
+        logger.info(chalk.bold.green(successLine));
     }
 
-    logger.info(chalk.bold('--- FIN DEL RESUMEN ---\n'));
+    logger.info('');
 }
 
 /**
- * Muestra errores del linter de forma detallada
+ * Muestra errores del linter con formato visual moderno y profesional
  */
 async function displayLinterErrors(errors: any[]): Promise<void> {
     const chalk = await loadChalk();
-    logger.info(chalk.bold('--- Errores y Advertencias de Linting ---'));
 
+    // Agrupar errores por archivo
     const errorsByFile = new Map<string, any[]>();
     errors.forEach(error => {
         if (!errorsByFile.has(error.file)) {
@@ -1394,32 +1433,355 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
     const totalWarnings = errors.filter(e => e.severity === 'warning').length;
     const totalFiles = errorsByFile.size;
 
+    // Header estilo moderno con gradiente visual
     logger.info(
-        chalk.yellow(
-            `📊 Resumen: ${totalErrors} errores, ${totalWarnings} advertencias en ${totalFiles} archivos\n`,
-        ),
+        chalk.bold.rgb(
+            255,
+            120,
+            120,
+        )('╭─────────────────────────────────────────────────────────────╮'),
+    );
+    logger.info(
+        chalk.bold.rgb(255, 120, 120)('│                    ') +
+            chalk.bold.white('🔍 LINTER REPORT') +
+            chalk.bold.rgb(255, 120, 120)('                    │'),
+    );
+    logger.info(
+        chalk.bold.rgb(
+            255,
+            120,
+            120,
+        )('╰─────────────────────────────────────────────────────────────╯'),
     );
 
-    errorsByFile.forEach((fileErrors, filePath) => {
-        const baseName = path.basename(filePath);
-        logger.info(chalk.cyan(`\n📄 ${baseName}`));
+    // Resumen con iconos profesionales
+    const errorIcon = totalErrors > 0 ? chalk.red('●') : chalk.green('○');
+    const warningIcon =
+        totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○');
 
-        fileErrors.forEach(error => {
-            const icon = error.severity === 'error' ? '❌ ' : '⚠️ ';
-            logger.info(`${icon} ${error.message}`);
-            if (error.help) {
-                logger.info(`   |`);
-                logger.info(`   └ Linter: ${error.from}`);
-                logger.info(`   |`);
+    logger.info('');
+    logger.info(chalk.bold('📊 Summary:'));
+    logger.info(
+        `   ${errorIcon} ${chalk.bold(totalErrors)} ${chalk.red('errors')}`,
+    );
+    logger.info(
+        `   ${warningIcon} ${chalk.bold(totalWarnings)} ${chalk.yellow('warnings')}`,
+    );
+    logger.info(`   📁 ${chalk.bold(totalFiles)} ${chalk.cyan('files')}`);
+    logger.info('');
 
-                logger.info(`   └ Linea: ${error.line}`);
-                logger.info(`   |`);
-                logger.info(`   └─ ${error.help}\n`);
+    if (totalErrors === 0 && totalWarnings === 0) {
+        logger.info(chalk.green.bold('✨ All checks passed! No issues found.'));
+        return;
+    }
+
+    // Mostrar errores por archivo con formato elegante
+    let fileIndex = 1;
+    for (const [filePath, fileErrors] of errorsByFile) {
+        await displayFileErrorsGroup(
+            filePath,
+            fileErrors,
+            fileIndex,
+            totalFiles,
+        );
+        fileIndex++;
+
+        if (fileIndex <= totalFiles) {
+            logger.info(chalk.gray('─'.repeat(80))); // Separador entre archivos
+        }
+    }
+
+    // Footer con estadísticas
+    logger.info('');
+    logger.info(
+        chalk.bold.rgb(
+            255,
+            120,
+            120,
+        )('╭─────────────────────────────────────────────────────────────╮'),
+    );
+    logger.info(
+        chalk.bold.rgb(255, 120, 120)('│  ') +
+            chalk.bold.white(
+                `Found ${totalErrors + totalWarnings} issues in ${totalFiles} files`,
+            ) +
+            ' '.repeat(
+                Math.max(
+                    0,
+                    52 -
+                        `Found ${totalErrors + totalWarnings} issues in ${totalFiles} files`
+                            .length,
+                ),
+            ) +
+            chalk.bold.rgb(255, 120, 120)('  │'),
+    );
+    logger.info(
+        chalk.bold.rgb(
+            255,
+            120,
+            120,
+        )('╰─────────────────────────────────────────────────────────────╯'),
+    );
+}
+
+/**
+ * Muestra un grupo de errores para un archivo específico con formato moderno
+ */
+async function displayFileErrorsGroup(
+    filePath: string,
+    fileErrors: any[],
+    _fileIndex: number,
+    _totalFiles: number,
+): Promise<void> {
+    const chalk = await loadChalk();
+
+    // Header del archivo con iconos de estado
+    const errorCount = fileErrors.filter(e => e.severity === 'error').length;
+    const warningCount = fileErrors.filter(
+        e => e.severity === 'warning',
+    ).length;
+
+    const statusIcon = errorCount > 0 ? chalk.red('✕') : chalk.yellow('⚠');
+    const fileIcon = filePath.endsWith('.vue')
+        ? '🎨'
+        : filePath.endsWith('.ts')
+          ? '📘'
+          : filePath.endsWith('.js')
+            ? '📜'
+            : '📄';
+
+    logger.info('');
+    logger.info(
+        chalk.bold(
+            `${statusIcon} ${fileIcon} ${chalk.cyan(path.relative(process.cwd(), filePath))}`,
+        ),
+    );
+    logger.info(
+        chalk.gray(`   ${errorCount} errors, ${warningCount} warnings`),
+    );
+    logger.info('');
+
+    // Mostrar cada error con formato elegante
+    for (let i = 0; i < fileErrors.length; i++) {
+        const error = fileErrors[i];
+        await displayModernLinterError(
+            error,
+            filePath,
+            i + 1,
+            fileErrors.length,
+        );
+    }
+}
+
+/**
+ * Muestra un error individual con formato visual moderno tipo ESLint/Prettier
+ */
+async function displayModernLinterError(
+    error: any,
+    filePath: string,
+    errorIndex: number,
+    totalErrorsInFile: number,
+): Promise<void> {
+    const chalk = await loadChalk();
+    const fs = await import('node:fs/promises');
+
+    // Determinar tipo y color del error
+    const isError = error.severity === 'error';
+    const typeColor = isError ? chalk.red : chalk.yellow;
+    const typeIcon = isError ? '✕' : '⚠';
+
+    const line = error.line || 1;
+    const column = error.column || 1;
+    const ruleId = error.ruleId || error.from || 'unknown';
+
+    // Línea principal del error con formato moderno
+    const errorHeader = `  ${typeColor(typeIcon)} ${chalk.bold(error.message)}`;
+    const ruleInfo = `${chalk.gray(ruleId)}`;
+    const locationInfo = `${chalk.blue(`${line}:${column}`)}`;
+
+    logger.info(errorHeader);
+    logger.info(
+        `    ${chalk.gray('at')} ${locationInfo} ${chalk.gray('·')} ${ruleInfo}`,
+    );
+
+    // Mostrar código con contexto
+    try {
+        const absolutePath = path.resolve(filePath);
+        const fileContent = await fs.readFile(absolutePath, 'utf-8');
+        const lines = fileContent.split('\n');
+        const lineNum = parseInt(line.toString()) - 1;
+
+        if (lineNum >= 0 && lineNum < lines.length) {
+            logger.info('');
+
+            // Mostrar líneas de contexto con numeración elegante
+            const startLine = Math.max(0, lineNum - 1);
+            const endLine = Math.min(lines.length - 1, lineNum + 1);
+            const maxLineNumWidth = (endLine + 1).toString().length;
+
+            for (let i = startLine; i <= endLine; i++) {
+                const currentLineNum = i + 1;
+                const currentLine = lines[i] || '';
+                const lineNumStr = currentLineNum
+                    .toString()
+                    .padStart(maxLineNumWidth, ' ');
+                const isErrorLine = i === lineNum;
+
+                if (isErrorLine) {
+                    // Línea con el error - destacada
+                    logger.info(
+                        `    ${chalk.red('>')} ${chalk.gray(lineNumStr)} ${chalk.gray('│')} ${currentLine}`,
+                    );
+
+                    // Indicador de posición del error
+                    const pointer =
+                        ' '.repeat(Math.max(0, column - 1)) + typeColor('^');
+                    logger.info(
+                        `    ${chalk.gray(' ')} ${chalk.gray(' '.repeat(maxLineNumWidth))} ${chalk.gray('│')} ${pointer}`,
+                    );
+                } else {
+                    // Líneas de contexto
+                    logger.info(
+                        `    ${chalk.gray(' ')} ${chalk.gray(lineNumStr)} ${chalk.gray('│')} ${chalk.gray(currentLine)}`,
+                    );
+                }
             }
-        });
-    });
+        }
+    } catch {
+        // Si no se puede leer el archivo, mostrar formato simplificado
+        logger.info(
+            `    ${chalk.gray('│')} ${chalk.gray('(Unable to read file content)')}`,
+        );
+    }
 
-    logger.info(chalk.bold('--- Fin de Errores y Advertencias ---\n'));
+    // Mostrar ayuda si está disponible
+    if (error.help) {
+        logger.info('');
+        const helpText = error.help.replace(/^Regla \w+: /, '').trim();
+        logger.info(
+            `    ${chalk.blue('💡')} ${chalk.blue('Help:')} ${chalk.gray(helpText)}`,
+        );
+    }
+
+    // Separador entre errores (solo si no es el último)
+    if (errorIndex < totalErrorsInFile) {
+        logger.info('');
+    }
+}
+
+/**
+ * Muestra un solo error del linter con formato visual mejorado
+ * @deprecated Use displayModernLinterError instead
+ */
+async function _displaySingleLinterError(
+    error: any,
+    filePath: string,
+): Promise<void> {
+    const chalk = await loadChalk();
+    const fs = await import('node:fs/promises');
+
+    const icon = error.severity === 'error' ? '×' : '⚠';
+    const ruleInfo = error.help || '';
+    const line = error.line || 'N/A';
+    const column = error.column || 10; // Columna por defecto si no está disponible
+
+    // Línea principal del error
+    const mainErrorLine = `${chalk.red(icon)} ${chalk.cyan(`${error.from}(${ruleInfo.replace(/^Regla \w+: /, '')})`)}: ${error.message}`;
+    logger.info(mainErrorLine);
+
+    // Intentar leer el contenido del archivo para mostrar contexto
+    try {
+        const absolutePath = path.resolve(filePath);
+        const fileContent = await fs.readFile(absolutePath, 'utf-8');
+        const lines = fileContent.split('\n');
+        const lineNum = parseInt(line.toString()) - 1; // Convertir a índice 0-based
+
+        if (lineNum >= 0 && lineNum < lines.length) {
+            // Mostrar ubicación
+            logger.info(chalk.blue(`    ╭─[${filePath}:${line}:${column}]`));
+
+            // Mostrar líneas de contexto
+            const startLine = Math.max(0, lineNum - 1);
+            const endLine = Math.min(lines.length - 1, lineNum + 1);
+
+            for (let i = startLine; i <= endLine; i++) {
+                const currentLineNum = i + 1;
+                const currentLine = lines[i] || '';
+                const prefix = currentLineNum.toString().padStart(2, ' ');
+
+                if (i === lineNum) {
+                    // Línea con el error
+                    logger.info(chalk.blue(` ${prefix} │ `) + currentLine);
+
+                    // Mostrar el indicador de error
+                    const indent = ' '.repeat(prefix.length + 3); // Espacios para alinear
+                    const pointer =
+                        ' '.repeat(Math.max(0, (column || 1) - 1)) +
+                        chalk.red('───────┬──────');
+                    logger.info(chalk.blue(indent + '·') + pointer);
+
+                    // Mensaje de ubicación específica
+                    const messageIndent = ' '.repeat(
+                        Math.max(0, (column || 1) + 6),
+                    );
+                    logger.info(
+                        chalk.blue(indent + '·') +
+                            messageIndent +
+                            chalk.red('╰── ') +
+                            chalk.gray(getErrorLocationMessage(error)),
+                    );
+                } else {
+                    // Líneas de contexto
+                    logger.info(
+                        chalk.blue(` ${prefix} │ `) + chalk.gray(currentLine),
+                    );
+                }
+            }
+
+            logger.info(chalk.blue('    ╰────'));
+        }
+    } catch {
+        // Si no se puede leer el archivo, mostrar formato simplificado
+        logger.info(chalk.blue(`    ╭─[${filePath}:${line}:${column}]`));
+        logger.info(
+            chalk.blue('    │ ') +
+                chalk.gray('(No se pudo leer el contenido del archivo)'),
+        );
+        logger.info(chalk.blue('    ╰────'));
+    }
+
+    // Mostrar ayuda si está disponible
+    if (error.help) {
+        const helpMessage = error.help.replace(/^Regla \w+: /, '');
+        logger.info(chalk.blue('  help: ') + chalk.yellow(helpMessage));
+    }
+
+    logger.info(''); // Espacio entre errores
+}
+
+/**
+ * Genera un mensaje descriptivo para la ubicación específica del error
+ */
+function getErrorLocationMessage(error: any): string {
+    if (error.message.includes('declared but never used')) {
+        const match = error.message.match(/'([^']+)'/);
+        if (match) {
+            return `'${match[1]}' is declared here`;
+        }
+    }
+
+    if (error.message.includes('Unexpected var')) {
+        return 'var declaration found here';
+    }
+
+    if (error.message.includes('never reassigned')) {
+        const match = error.message.match(/'([^']+)'/);
+        if (match) {
+            return `'${match[1]}' is assigned here`;
+        }
+    }
+
+    return 'error location';
 }
 
 /**
@@ -1981,10 +2343,15 @@ class ProgressManager {
         this.hasProgressLine = false;
         this.interceptConsole();
 
-        // Escribir separador inicial para marcar el inicio del progreso
-        process.stdout.write('\n\x1b[36m' + '='.repeat(60) + '\x1b[0m\n');
-        process.stdout.write('\x1b[36m🚀 INICIANDO COMPILACIÓN\x1b[0m\n');
-        process.stdout.write('\x1b[36m' + '='.repeat(60) + '\x1b[0m\n');
+        // 🎨 Header moderno de inicio de compilación
+        const headerLine = '━'.repeat(48);
+        process.stdout.write('\n\x1b[96m' + headerLine + '\x1b[0m\n');
+        process.stdout.write(
+            '\x1b[96m│ \x1b[97m\x1b[1m🚀 Starting Compilation\x1b[0m\x1b[96m' +
+                ' '.repeat(22) +
+                '│\x1b[0m\n',
+        );
+        process.stdout.write('\x1b[96m' + headerLine + '\x1b[0m\n');
     }
 
     updateProgress(progressText: string): void {
@@ -2005,18 +2372,18 @@ class ProgressManager {
                 this.hasProgressLine = false;
             }
             this.logBuffer = [];
-        }
-
-        // Escribir separador antes del progreso para mayor visibilidad
+        } // Escribir separador elegante antes del progreso
         if (this.hasProgressLine) {
             process.stdout.write('\r\x1b[K');
         } else {
-            process.stdout.write('\n\x1b[33m' + '-'.repeat(50) + '\x1b[0m\n');
+            process.stdout.write('\n\x1b[96m' + '▔'.repeat(50) + '\x1b[0m\n');
         }
 
-        // Barra de progreso con mayor visibilidad
+        // 🎨 Barra de progreso con colores dinámicos
+        const stage = this.getStageFromText(progressText);
+        const { bgColor, textColor, icon } = this.getProgressColors(stage);
         const progressBar = '█'.repeat(3);
-        const enhancedProgress = `\x1b[44m\x1b[97m ${progressBar} ${progressText} ${progressBar} \x1b[0m`;
+        const enhancedProgress = `\x1b[${bgColor}m\x1b[${textColor}m ${progressBar} ${icon} ${progressText} ${progressBar} \x1b[0m`;
         process.stdout.write(enhancedProgress);
 
         this.hasProgressLine = true;
@@ -2056,10 +2423,15 @@ class ProgressManager {
             const finalProgress = `\x1b[42m\x1b[30m ${finalProgressBar} ✅ PROCESO COMPLETADO 100% ${finalProgressBar} \x1b[0m`;
             process.stdout.write(finalProgress + '\n');
 
-            // Separador final muy visible
-            process.stdout.write('\x1b[32m' + '='.repeat(60) + '\x1b[0m\n');
-            process.stdout.write('\x1b[32m✅ COMPILACIÓN COMPLETADA\x1b[0m\n');
-            process.stdout.write('\x1b[32m' + '='.repeat(60) + '\x1b[0m\n\n');
+            // 🎨 Footer moderno de finalización
+            const footerLine = '━'.repeat(48);
+            process.stdout.write('\x1b[92m' + footerLine + '\x1b[0m\n');
+            process.stdout.write(
+                '\x1b[92m│ \x1b[97m\x1b[1m✅ Compilation Complete!\x1b[0m\x1b[92m' +
+                    ' '.repeat(23) +
+                    '│\x1b[0m\n',
+            );
+            process.stdout.write('\x1b[92m' + footerLine + '\x1b[0m\n\n');
 
             // Escribir logs finales pendientes
             if (this.logBuffer.length > 0) {
@@ -2075,9 +2447,58 @@ class ProgressManager {
         this.logBuffer = [];
         this.hasProgressLine = false;
     }
-
     isActive(): boolean {
         return this.progressActive;
+    }
+
+    /**
+     * 🎨 Determina la etapa del progreso basándose en el texto
+     */
+    private getStageFromText(text: string): string {
+        if (text.includes('Iniciando') || text.includes('Starting'))
+            return 'start';
+        if (text.includes('Tailwind') || text.includes('CSS'))
+            return 'tailwind';
+        if (
+            text.includes('Recopilando') ||
+            text.includes('archivos') ||
+            text.includes('files')
+        )
+            return 'files';
+        if (text.includes('Compilando') || text.includes('workers'))
+            return 'compile';
+        if (text.includes('cache') || text.includes('Guardando'))
+            return 'cache';
+        if (text.includes('linter') || text.includes('Linter')) return 'linter';
+        if (text.includes('completado') || text.includes('Complete'))
+            return 'complete';
+        return 'default';
+    }
+
+    /**
+     * 🌈 Obtiene colores dinámicos para cada etapa
+     */
+    private getProgressColors(stage: string): {
+        bgColor: string;
+        textColor: string;
+        icon: string;
+    } {
+        const colorSchemes: Record<
+            string,
+            { bgColor: string; textColor: string; icon: string }
+        > = {
+            start: { bgColor: '45', textColor: '97', icon: '🚀' }, // Cyan brillante
+            tailwind: { bgColor: '105', textColor: '97', icon: '🎨' }, // Magenta
+            files: { bgColor: '43', textColor: '30', icon: '📁' }, // Amarillo
+            compile: { bgColor: '42', textColor: '30', icon: '⚙️' }, // Verde
+            cache: { bgColor: '44', textColor: '97', icon: '💾' }, // Azul
+            linter: { bgColor: '101', textColor: '97', icon: '🔍' }, // Rojo claro
+            complete: { bgColor: '102', textColor: '30', icon: '✅' }, // Verde claro
+            default: { bgColor: '100', textColor: '30', icon: '⏳' }, // Gris claro
+        };
+
+        const defaultColors = { bgColor: '100', textColor: '30', icon: '⏳' };
+        return colorSchemes[stage] || defaultColors;
     }
 }
 
@@ -2110,12 +2531,15 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                     if (Array.isArray(eslintResult.json)) {
                                         eslintResult.json.forEach(
                                             (result: any) => {
+                                                const filePath =
+                                                    result.filePath ||
+                                                    result.file ||
+                                                    'archivo no especificado';
                                                 linterErrors.push({
                                                     from: 'eslint',
-                                                    line: result.line,
-                                                    file:
-                                                        result.filePath ||
-                                                        'archivo no especificado',
+                                                    line: result.line || 'N/A',
+                                                    column: result.column || 1,
+                                                    file: filePath,
                                                     message: result.message,
                                                     severity:
                                                         result.severity === 2
@@ -2141,12 +2565,19 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                                 ) {
                                                     fileResult.messages.forEach(
                                                         (msg: any) => {
+                                                            const filePath =
+                                                                fileResult.filePath ||
+                                                                fileResult.file ||
+                                                                'archivo no especificado';
                                                             linterErrors.push({
                                                                 from: 'eslint',
-                                                                line: fileResult.line,
-                                                                file:
-                                                                    fileResult.filePath ||
-                                                                    'archivo no especificado',
+                                                                line:
+                                                                    msg.line ||
+                                                                    'N/A',
+                                                                column:
+                                                                    msg.column ||
+                                                                    1,
+                                                                file: filePath,
                                                                 message:
                                                                     msg.message,
                                                                 severity:
@@ -2192,15 +2623,34 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                                 ) {
                                     oxlintResult['json']['diagnostics'].forEach(
                                         (result: any) => {
+                                            const filePath =
+                                                result.filename ||
+                                                result.file ||
+                                                'archivo no especificado';
+                                            const lineNumber =
+                                                result.labels &&
+                                                result.labels[0] &&
+                                                result.labels[0].span
+                                                    ? result.labels[0].span
+                                                          .line ||
+                                                      result.labels[0].span
+                                                          .start?.line
+                                                    : 'N/A';
+                                            const columnNumber =
+                                                result.labels &&
+                                                result.labels[0] &&
+                                                result.labels[0].span
+                                                    ? result.labels[0].span
+                                                          .column ||
+                                                      result.labels[0].span
+                                                          .start?.column
+                                                    : 1;
+
                                             linterErrors.push({
                                                 from: 'oxlint',
-                                                line:
-                                                    result.labels[0].span
-                                                        ?.line ?? '',
-                                                file:
-                                                    result.filename ||
-                                                    result.file ||
-                                                    'archivo no especificado',
+                                                line: lineNumber,
+                                                column: columnNumber,
+                                                file: filePath,
                                                 message: result.message,
                                                 severity:
                                                     typeof result.severity ===
@@ -2237,8 +2687,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             }
 
             await Promise.all(linterPromises);
-
             if (showResult) {
+                // Modo --linter: Solo mostrar resultados sin preguntar
                 if (linterErrors.length > 0) {
                     await displayLinterErrors(linterErrors);
                 } else {
@@ -2249,27 +2699,30 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                         ),
                     );
                 }
+            } else {
+                // Modo compilación: Mostrar errores si los hay y preguntar al usuario
+                if (linterErrors.length > 0) {
+                    await displayLinterErrors(linterErrors);
+                    logger.warn(
+                        '🚨 Se encontraron errores o advertencias durante el linting.',
+                    );
+                    if (env.yes === 'false') {
+                        const result = await promptUser(
+                            '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
+                        );
+                        if (result.toLowerCase() !== 's') {
+                            logger.info(
+                                '🛑 Compilación cancelada por el usuario.',
+                            );
+                            proceedWithCompilation = false;
+                        }
+                    }
+                }
             }
         } catch (parseError) {
             logger.warn(
                 `Error parseando configuración de linter: ${parseError instanceof Error ? parseError.message : 'Error desconocido'}, omitiendo...`,
             );
-        }
-
-        if (!showResult && linterErrors.length > 0) {
-            await displayLinterErrors(linterErrors);
-            logger.warn(
-                '🚨 Se encontraron errores o advertencias durante el linting.',
-            );
-            if (env.yes === 'false') {
-                const result = await promptUser(
-                    '¿Deseas continuar con la compilación a pesar de los errores de linting? (s/N): ',
-                );
-                if (result.toLowerCase() !== 's') {
-                    logger.info('🛑 Compilación cancelada por el usuario.');
-                    proceedWithCompilation = false;
-                }
-            }
         }
     }
 
@@ -2464,11 +2917,9 @@ export async function initCompileAll() {
         // Cargar cache al inicio
         progressManager.updateProgress('📦 Cargando cache...');
         await loadCache();
-        lastProgressUpdate = 0;
-
-        // Fase 2: Linting
+        lastProgressUpdate = 0; // Fase 2: Linting
         progressManager.updateProgress('🔍 Ejecutando linter...');
-        const shouldContinue = await runLinter();
+        const shouldContinue = await runLinter(false); // false = mostrar errores y preguntar si hay errores
         if (!shouldContinue) {
             // await displayCompilationSummary(env.VERBOSE === 'true');
             progressManager.endProgress();
@@ -2593,6 +3044,39 @@ export async function initCompileAll() {
         ); // Mostrar resumen incluso si hay errores generales
         await displayCompilationSummary(env.VERBOSE === 'true');
     }
+}
+
+/**
+ * 🎨 Obtiene icono apropiado para cada etapa
+ */
+function getStageIcon(stage: string): string {
+    const icons: Record<string, string> = {
+        vue: '🎨',
+        typescript: '📘',
+        standardization: '💛',
+        minification: '🗜️',
+        tailwind: '🎨',
+        'file-read': '📖',
+        default: '⚙️',
+    };
+
+    return icons[stage] || icons.default;
+}
+
+/**
+ *  Crea una barra de progreso visual con porcentaje
+ */
+function createProgressBarWithPercentage(
+    percentage: number,
+    width: number,
+): string {
+    const filled = Math.round((percentage / 100) * width);
+    const empty = width - filled;
+
+    // Usar código directo para evitar problemas de importación
+    const greenBar = '\x1b[32m' + '█'.repeat(filled) + '\x1b[0m';
+    const grayBar = '\x1b[90m' + '░'.repeat(empty) + '\x1b[0m';
+    return `${greenBar}${grayBar} ${percentage}%`;
 }
 
 // Función wrapper para compatibilidad con tests

@@ -497,7 +497,7 @@ export async function readConfig(): Promise<boolean> {
             env.tsConfig = safeJsonStringify(tsConfig, '{}');
         }
 
-        logger.info('Configuración cargada y validada exitosamente');
+        logger.info('✅ Configuration loaded and validated successfully');
         return true;
     } catch (error) {
         logger.error(
