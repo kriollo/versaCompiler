@@ -2254,18 +2254,38 @@ export async function initCompile(
                 }
             }
         }
-
         const startTime = Date.now();
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
 
+        // 🚀 Verificar cache antes de compilar (especialmente importante en modo watch)
+        if (mode === 'watch' || mode === 'individual') {
+            if (await shouldSkipFile(file)) {
+                if (env.VERBOSE === 'true') {
+                    logger.info(
+                        `⏭️ Archivo omitido (cache): ${path.basename(file)}`,
+                    );
+                }
+                return {
+                    success: true,
+                    cached: true,
+                    output: smartCache.getOutputPath(file) || outFile,
+                    action: 'cached',
+                };
+            }
+        }
+
         if (mode === 'individual' && env.VERBOSE === 'true') {
             logger.info(`🔜 Fuente: ${file}`);
         }
-
         const result = await compileJS(file, outFile, mode);
         if (result.error) {
             throw new Error(result.error);
+        }
+
+        // 🚀 Actualizar cache después de compilación exitosa (especialmente en modo watch)
+        if (mode === 'watch' || mode === 'individual') {
+            await smartCache.set(file, outFile);
         }
 
         const endTime = Date.now();
@@ -3073,7 +3093,7 @@ function getStageIcon(stage: string): string {
         default: '⚙️',
     };
 
-    return icons[stage] || icons.default;
+    return icons[stage] ?? '⚙️';
 }
 
 /**
