@@ -1257,7 +1257,7 @@ async function displayCompilationSummary(
         logger.info('');
     } // 🔧 Estadísticas por etapa con mejor formato
     if (compilationResults.length > 0) {
-        logger.info(chalk.blue('� Stage Statistics:'));
+        logger.info(chalk.bold.blue('🔧 Stage Statistics:'));
 
         for (const result of compilationResults) {
             const totalFiles = result.success + result.errors;
