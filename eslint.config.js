@@ -2,8 +2,6 @@ import pluginTs from '@typescript-eslint/eslint-plugin';
 import parserTs from '@typescript-eslint/parser';
 import pluginImport from 'eslint-plugin-import';
 import oxlint from 'eslint-plugin-oxlint';
-import pluginPromise from 'eslint-plugin-promise';
-import pluginUnicorn from 'eslint-plugin-unicorn';
 import pluginVue from 'eslint-plugin-vue';
 import parserVue from 'vue-eslint-parser';
 
@@ -16,9 +14,12 @@ export default [
         ignores: [
             'public/**/*',
             'node_modules/**/*',
-            'vite/dist/**/*',
+            'dist/**/*',
+            'temp/**/*',
             '*.d.ts',
             'eslint.config.*.js',
+            'performance-results/**/*',
+            'versacompiler-*.tgz',
         ],
     },
 
@@ -29,7 +30,7 @@ export default [
             parser: parserVue,
             parserOptions: {
                 parser: parserTs,
-                ecmaVersion: 2020,
+                ecmaVersion: 2022,
                 sourceType: 'module',
                 project: './tsconfig.json',
                 extraFileExtensions: ['.vue'],
@@ -39,96 +40,62 @@ export default [
             vue: pluginVue,
             '@typescript-eslint': pluginTs,
             import: pluginImport,
-            promise: pluginPromise,
-            unicorn: pluginUnicorn,
         },
         rules: {
-            // Reglas específicas para Vue 3
+            // Reglas esenciales para Vue 3 - Solo las críticas para un compilador
             'vue/jsx-uses-vars': 'error',
-            'vue/no-unused-vars': 'warn',
-            'vue/multi-word-component-names': 'off',
-            'vue/require-default-prop': 'warn',
-            'vue/component-definition-name-casing': ['error', 'PascalCase'],
-            'vue/attribute-hyphenation': [
-                'warn',
-                'always',
-                {
-                    ignore: ['showModal', 'idModal'],
-                },
-            ],
-            'vue/v-on-event-hyphenation': 'error',
-            'vue/block-order': [
-                'error',
-                {
-                    order: ['script', 'template', 'style'],
-                },
-            ],
-            'vue/no-v-html': 'warn',
+            'vue/no-unused-vars': 'error',
+            'vue/multi-word-component-names': 'off', // No necesario para un compilador
             'vue/require-v-for-key': 'error',
             'vue/no-use-v-if-with-v-for': 'error',
-            'vue/html-indent': ['error', 4],
-            'vue/max-attributes-per-line': [
+            'vue/no-template-key': 'error',
+            'vue/valid-template-root': 'error',
+            'vue/valid-v-for': 'error',
+            'vue/valid-v-if': 'error',
+            'vue/valid-v-model': 'error',
+            // TypeScript - Reglas críticas para correctness
+            '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
-                    singleline: 3,
-                    multiline: 1,
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
                 },
-            ], // Reglas de TypeScript
-            '@typescript-eslint/no-unused-vars': [
-                'warn',
-                { argsIgnorePattern: '^_' },
             ],
-            '@typescript-eslint/explicit-module-boundary-types': 'off', // Reglas de importación
-            'import/no-unresolved': 'off', // Mantenemos off por rutas complejas
+            '@typescript-eslint/no-explicit-any': 'off', // Necesario en compiladores
+            '@typescript-eslint/no-non-null-assertion': 'off', // Útil cuando sabemos el tipo
+            '@typescript-eslint/prefer-as-const': 'error',
+            '@typescript-eslint/no-inferrable-types': 'off', // Útil en compiladores para claridad
+
+            // Imports - Crítico para un compilador
+            'import/no-unresolved': 'off', // Desactivado por configuración compleja de rutas
+            'import/no-duplicates': 'error',
+            'import/no-cycle': 'error',
             'import/order': [
                 'warn',
                 {
                     groups: [
-                        'builtin', // Node.js built-ins
-                        'external', // npm packages
-                        'internal', // Internal modules (@ paths)
-                        'parent', // ../
-                        'sibling', // ./
-                        'index', // ./index
+                        'builtin',
+                        'external',
+                        'internal',
+                        'parent',
+                        'sibling',
+                        'index',
                     ],
                     'newlines-between': 'always',
-                    alphabetize: {
-                        order: 'asc',
-                        caseInsensitive: true,
-                    },
+                    alphabetize: { order: 'asc', caseInsensitive: true },
                 },
             ],
-            'import/extensions': 'off',
+        },
+    },
 
-            // Reglas de promesas
-            'promise/always-return': 'warn',
-            'promise/no-return-wrap': 'warn', // Reglas de unicorn
-            'unicorn/prefer-node-protocol': 'warn',
-            'unicorn/no-array-reduce': 'off',
-        },
-        settings: {
-            'import/resolver': {
-                typescript: {
-                    project: './tsconfig.json',
-                    extensions: ['.ts', '.vue', '.js'],
-                },
-                alias: {
-                    map: [
-                        ['@', './src'],
-                        ['P@', './public'],
-                    ],
-                    extensions: ['.ts', '.vue', '.js'],
-                },
-            },
-            'import/extensions': ['.js', '.ts', '.vue'],
-        },
-    }, // Configuración para archivos TypeScript
+    // Configuración para archivos TypeScript
     {
-        files: ['src/**/*.ts', 'src/**/*.tsx', 'vite/**/*.ts'],
+        files: ['src/**/*.ts', 'src/**/*.tsx', '**/*.ts'],
         languageOptions: {
             parser: parserTs,
             parserOptions: {
-                ecmaVersion: 2020,
+                ecmaVersion: 2022,
                 sourceType: 'module',
                 project: './tsconfig.json',
                 tsconfigRootDir: '.',
@@ -137,97 +104,117 @@ export default [
         plugins: {
             '@typescript-eslint': pluginTs,
             import: pluginImport,
-            promise: pluginPromise,
-            unicorn: pluginUnicorn,
         },
         rules: {
-            // Reglas de TypeScript
+            // Reglas TypeScript críticas para un compilador
             '@typescript-eslint/no-unused-vars': [
-                'warn',
-                { argsIgnorePattern: '^_' },
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                },
             ],
-            '@typescript-eslint/explicit-module-boundary-types': 'off', // Reglas de importación
-            'import/no-unresolved': 'off', // Mantenemos off por configuración compleja
+            '@typescript-eslint/no-explicit-any': 'off', // Necesario en compiladores
+            '@typescript-eslint/no-non-null-assertion': 'off', // Útil cuando sabemos el tipo
+            '@typescript-eslint/prefer-as-const': 'error',
+            '@typescript-eslint/no-inferrable-types': 'off',
+            '@typescript-eslint/ban-ts-comment': [
+                'error',
+                {
+                    'ts-expect-error': 'allow-with-description',
+                    'ts-ignore': 'allow-with-description',
+                    'ts-nocheck': false,
+                },
+            ],
+            '@typescript-eslint/no-unsafe-assignment': 'off', // Puede ser necesario en compiladores
+            '@typescript-eslint/no-unsafe-member-access': 'off',
+            '@typescript-eslint/no-unsafe-call': 'off',
+            '@typescript-eslint/no-unsafe-return': 'off',
+
+            // Reglas de importación críticas
+            'import/no-unresolved': 'off',
+            'import/no-duplicates': 'error',
+            'import/no-cycle': 'error',
             'import/order': [
                 'warn',
                 {
                     groups: [
-                        'builtin', // Node.js built-ins
-                        'external', // npm packages
-                        'internal', // Internal modules (@ paths)
-                        'parent', // ../
-                        'sibling', // ./
-                        'index', // ./index
+                        'builtin',
+                        'external',
+                        'internal',
+                        'parent',
+                        'sibling',
+                        'index',
                     ],
                     'newlines-between': 'always',
-                    alphabetize: {
-                        order: 'asc',
-                        caseInsensitive: true,
-                    },
+                    alphabetize: { order: 'asc', caseInsensitive: true },
                 },
             ],
 
-            // Reglas de promesas
-            'promise/always-return': 'warn',
-            'promise/no-return-wrap': 'warn',
+            // Reglas básicas de JavaScript/TypeScript
+            'no-console': 'off', // Necesario para logging en compilador
+            'no-debugger': 'error',
+            'no-unused-expressions': 'error',
+            'no-unreachable': 'error',
+            'no-undef': 'off', // TypeScript se encarga de esto
+            'prefer-const': 'error',
+            'no-var': 'error',
+        },
+    },
 
-            // Reglas de unicorn
-            'unicorn/prefer-node-protocol': 'warn',
-            'unicorn/no-array-reduce': 'off',
-        },
-        settings: {
-            'import/resolver': {
-                typescript: {
-                    project: './tsconfig.json',
-                },
-            },
-        },
-    }, // Configuración para archivos JavaScript
+    // Configuración para archivos JavaScript
     {
         files: [
             'src/**/*.js',
             'src/**/*.jsx',
             'tests/**/*.js',
             'examples/**/*.js',
+            '**/*.cjs',
+            '**/*.mjs',
         ],
         languageOptions: {
-            ecmaVersion: 2020,
+            ecmaVersion: 2022,
             sourceType: 'module',
         },
         plugins: {
             import: pluginImport,
-            promise: pluginPromise,
-            unicorn: pluginUnicorn,
         },
         rules: {
-            // Reglas de importación
-            'import/no-unresolved': 'off', // Mantenemos off para archivos de ejemplo
+            // Reglas básicas de JavaScript
+            'no-console': 'off', // Necesario para logging
+            'no-debugger': 'error',
+            'no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                },
+            ],
+            'no-unused-expressions': 'error',
+            'no-unreachable': 'error',
+            'prefer-const': 'error',
+            'no-var': 'error',
+
+            // Importaciones
+            'import/no-unresolved': 'off',
+            'import/no-duplicates': 'error',
             'import/order': [
                 'warn',
                 {
                     groups: [
-                        'builtin', // Node.js built-ins
-                        'external', // npm packages
-                        'internal', // Internal modules (@ paths)
-                        'parent', // ../
-                        'sibling', // ./
-                        'index', // ./index
+                        'builtin',
+                        'external',
+                        'internal',
+                        'parent',
+                        'sibling',
+                        'index',
                     ],
                     'newlines-between': 'always',
-                    alphabetize: {
-                        order: 'asc',
-                        caseInsensitive: true,
-                    },
+                    alphabetize: { order: 'asc', caseInsensitive: true },
                 },
             ],
-
-            // Reglas de promesas
-            'promise/always-return': 'warn',
-            'promise/no-return-wrap': 'warn',
-
-            // Reglas de unicorn
-            'unicorn/prefer-node-protocol': 'warn',
-            'unicorn/no-array-reduce': 'off',
         },
     },
 ];
