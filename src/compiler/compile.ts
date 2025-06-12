@@ -473,8 +473,8 @@ const COMPILATION_ENV_VARS = [
 
 class SmartCompilationCache {
     private cache = new Map<string, SmartCacheEntry>();
-    private readonly maxEntries = 500; // Máximo archivos en cache
-    private readonly maxMemory = 100 * 1024 * 1024; // 100MB límite
+    private readonly maxEntries = 200; // Reducido para tests de estrés
+    private readonly maxMemory = 50 * 1024 * 1024; // 50MB límite (reducido)
     private currentMemoryUsage = 0;
 
     // ✨ ISSUE #3: Sistema de vigilancia de dependencias
@@ -730,27 +730,36 @@ class SmartCompilationCache {
             // Si hay error, no cachear
             console.warn(`Warning: No se pudo cachear ${filePath}:`, error);
         }
-    }
-
-    /**
+    } /**
      * Aplica política LRU para liberar espacio
      */
     private evictIfNeeded(newEntrySize: number): void {
-        // Verificar límite de entradas
-        while (this.cache.size >= this.maxEntries) {
+        // Verificar límite de entradas más agresivamente
+        while (this.cache.size >= this.maxEntries * 0.8) {
+            // Limpiar cuando llegue al 80%
             this.evictLRU();
         }
 
-        // Verificar límite de memoria
+        // Verificar límite de memoria más agresivamente
         while (
-            this.currentMemoryUsage + newEntrySize > this.maxMemory &&
+            this.currentMemoryUsage + newEntrySize > this.maxMemory * 0.8 && // Limpiar cuando llegue al 80%
             this.cache.size > 0
         ) {
             this.evictLRU();
         }
-    }
 
-    /**
+        // Eviction adicional si la memoria total del proceso es alta
+        const memUsage = process.memoryUsage();
+        const heapUsedMB = memUsage.heapUsed / (1024 * 1024);
+
+        if (heapUsedMB > 200 && this.cache.size > 50) {
+            // Si heap > 200MB, limpiar más agresivamente
+            const entriesToRemove = Math.min(this.cache.size - 50, 10);
+            for (let i = 0; i < entriesToRemove; i++) {
+                this.evictLRU();
+            }
+        }
+    } /**
      * Elimina la entrada menos recientemente usada
      */
     private evictLRU(): void {
@@ -771,6 +780,23 @@ class SmartCompilationCache {
                 this.cache.delete(oldestKey);
             }
         }
+    }
+
+    /**
+     * Método público para limpiar entradas del cache cuando sea necesario
+     */
+    public cleanOldEntries(maxEntriesToRemove: number = 20): number {
+        let removedCount = 0;
+        for (let i = 0; i < maxEntriesToRemove && this.cache.size > 0; i++) {
+            const sizeBefore = this.cache.size;
+            this.evictLRU();
+            if (this.cache.size < sizeBefore) {
+                removedCount++;
+            } else {
+                break; // No se pudo remover más entradas
+            }
+        }
+        return removedCount;
     }
 
     /**
@@ -1206,17 +1232,31 @@ function clearCompilationState(): void {
  */
 async function displayCompilationSummary(
     isVerbose: boolean = false,
+    totalTime?: string,
 ): Promise<void> {
     const chalk = await loadChalk();
-
     if (compilationErrors.length === 0 && compilationResults.length === 0) {
         logger.info(
             chalk.green('✅ No hay errores de compilación para mostrar.'),
         );
+        if (totalTime) {
+            logger.info(
+                chalk.bold(`\n⏱️ TIEMPO TOTAL DE COMPILACIÓN: ${totalTime}`),
+            );
+        }
         return;
     }
 
     logger.info(chalk.bold('\n--- 📊 RESUMEN DE COMPILACIÓN ---'));
+
+    // Mostrar tiempo total prominentemente al inicio si está disponible
+    if (totalTime) {
+        logger.info(
+            chalk.bold(
+                chalk.cyan(`⏱️ TIEMPO TOTAL DE COMPILACIÓN: ${totalTime}\n`),
+            ),
+        );
+    }
 
     // Mostrar estadísticas por etapa
     if (compilationResults.length > 0) {
@@ -1315,7 +1355,6 @@ async function displayCompilationSummary(
         logger.info(`📁 Archivos con errores: ${totalFiles}`);
         logger.info(`❌ Total de errores: ${totalErrors}`);
         logger.info(`⚠️ Total de advertencias: ${totalWarnings}`);
-
         if (totalErrors > 0) {
             logger.info(
                 chalk.red(
@@ -1481,9 +1520,9 @@ class WatchModeOptimizer {
                         resolve({ success: true, cached: true });
                         return;
                     } // Configurar worker pool para modo watch
-                    const { TypeScriptWorkerPool } = await import(
+                    const { TypeScriptWorkerPool } = (await import(
                         './typescript-worker-pool'
-                    );
+                    )) as { TypeScriptWorkerPool: any };
                     const workerPool = TypeScriptWorkerPool.getInstance();
                     workerPool.setMode('watch');
                     const result = await compileFn(filePath);
@@ -2256,6 +2295,10 @@ async function compileWithConcurrencyLimit(
     // Variable para controlar el progreso inicial
     let hasShownInitialProgress = false;
 
+    // Contador para limpieza periódica de memoria
+    let compilationCounter = 0;
+    const CLEANUP_INTERVAL = 20; // Limpiar cada 20 compilaciones
+
     // Función para mostrar progreso
     function showProgress() {
         const currentTotal = completed + skipped + failed;
@@ -2306,7 +2349,6 @@ async function compileWithConcurrencyLimit(
                         output: smartCache.getOutputPath(file),
                     };
                 }
-
                 const result = await initCompile(file, false, 'batch');
 
                 // Actualizar cache si la compilación fue exitosa
@@ -2322,6 +2364,39 @@ async function compileWithConcurrencyLimit(
                 }
 
                 completed++;
+                compilationCounter++; // Limpieza periódica de memoria
+                if (compilationCounter % CLEANUP_INTERVAL === 0) {
+                    // Forzar garbage collection si está disponible
+                    try {
+                        if (typeof (globalThis as any).gc === 'function') {
+                            (globalThis as any).gc();
+                        }
+                    } catch {
+                        // gc no disponible, continuar normalmente
+                    }
+
+                    // Limpiar cache si la memoria es alta
+                    const memUsage = process.memoryUsage();
+                    const heapUsedMB = memUsage.heapUsed / (1024 * 1024);
+                    if (heapUsedMB > 300) {
+                        // Si el heap supera 300MB
+                        const cacheEntries = smartCache.getStats().entries;
+                        if (cacheEntries > 50) {
+                            console.log(
+                                `[Memory] Heap alto (${heapUsedMB.toFixed(1)}MB), limpiando cache...`,
+                            );
+                            // Limpiar entradas más antiguas del cache
+                            const removedEntries =
+                                smartCache.cleanOldEntries(20);
+                            if (removedEntries > 0) {
+                                console.log(
+                                    `[Memory] Se removieron ${removedEntries} entradas del cache`,
+                                );
+                            }
+                        }
+                    }
+                }
+
                 showProgress();
                 return result;
             } catch (error) {
@@ -2431,32 +2506,36 @@ export async function initCompileAll() {
             }
             // Usar la ruta tal como viene de glob, sin modificar
             filesToCompile.push(file);
-        }
-
-        // Determinar concurrencia óptima
+        } // Determinar concurrencia óptima considerando memoria disponible
         const cpuCount = os.cpus().length;
         const fileCount = filesToCompile.length;
+        const memUsage = process.memoryUsage();
+        const availableMemoryMB =
+            (memUsage.heapTotal - memUsage.heapUsed) / (1024 * 1024);
 
         let maxConcurrency: number;
-        if (fileCount < 10) {
-            maxConcurrency = Math.min(fileCount, cpuCount);
+
+        // Ajustar concurrencia basado en memoria disponible y archivos
+        if (availableMemoryMB < 100) {
+            // Poca memoria disponible
+            maxConcurrency = Math.min(2, cpuCount);
+        } else if (fileCount < 10) {
+            maxConcurrency = Math.min(fileCount, Math.min(cpuCount, 4));
         } else if (fileCount < 50) {
-            maxConcurrency = Math.min(cpuCount * 2, 12);
+            maxConcurrency = Math.min(cpuCount, 6); // Reducido
         } else {
-            maxConcurrency = Math.min(cpuCount * 2, 16);
+            maxConcurrency = Math.min(cpuCount, 8); // Reducido
         }
 
         // Fase 5: Configurando workers
         progressManager.updateProgress('⚙️ Configurando workers...');
         logger.info(
             `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
-        );
-
-        // Configurar worker pool para modo batch
+        ); // Configurar worker pool para modo batch
         try {
-            const { TypeScriptWorkerPool } = await import(
+            const { TypeScriptWorkerPool } = (await import(
                 './typescript-worker-pool'
-            );
+            )) as { TypeScriptWorkerPool: any };
             const workerPool = TypeScriptWorkerPool.getInstance();
             workerPool.setMode('batch');
         } catch {
@@ -2470,16 +2549,11 @@ export async function initCompileAll() {
         await saveCache();
 
         const endTime = Date.now();
-        const elapsedTime = showTimingForHumans(endTime - startTime);
-
-        // Finalizar progreso
+        const elapsedTime = showTimingForHumans(endTime - startTime); // Finalizar progreso
         progressManager.endProgress();
 
-        // Importante: Todos los logs finales van DESPUÉS del progreso
-        logger.info(`⏱️ Tiempo total de compilación: ${elapsedTime}\n`);
-
-        // Mostrar resumen de compilación
-        await displayCompilationSummary(env.VERBOSE === 'true');
+        // Mostrar resumen de compilación con tiempo total
+        await displayCompilationSummary(env.VERBOSE === 'true', elapsedTime);
     } catch (error) {
         // Asegurar que el progreso termine en caso de error
         const progressManager = ProgressManager.getInstance();
@@ -2500,9 +2574,7 @@ export async function initCompileAll() {
             'all',
             'all',
             env.VERBOSE === 'true',
-        );
-
-        // Mostrar resumen incluso si hay errores generales
+        ); // Mostrar resumen incluso si hay errores generales
         await displayCompilationSummary(env.VERBOSE === 'true');
     }
 }

@@ -87,10 +87,10 @@ export class TypeScriptWorkerPool {
     private workerPath: string;
     private initPromise: Promise<void> | null = null;
     private isInitialized: boolean = false; // Configuración optimizada con reciclaje de workers
-    private readonly TASK_TIMEOUT = 10000; // 10 segundos por tarea
+    private readonly TASK_TIMEOUT = 15000; // 15 segundos por tarea (aumentado)
     private readonly WORKER_INIT_TIMEOUT = 5000; // 5 segundos para inicializar
-    private readonly MAX_TASKS_PER_WORKER = 50; // Máximo de tareas por worker antes de reciclaje
-    private readonly WORKER_MEMORY_CHECK_INTERVAL = 100; // Verificar cada 100 tareas
+    private readonly MAX_TASKS_PER_WORKER = 25; // Reducido para liberar memoria más frecuentemente
+    private readonly WORKER_MEMORY_CHECK_INTERVAL = 50; // Verificar cada 50 tareas (más frecuente)
 
     // Métricas de rendimiento
     private totalTasks: number = 0;
@@ -107,8 +107,7 @@ export class TypeScriptWorkerPool {
             'typescript-worker-thread.cjs',
         );
 
-        // ✨ ISSUE #4: Configurar monitoreo de memoria automático
-        this.startMemoryMonitoring();
+        // ✨ ISSUE #4: Configurar monitoreo de memoria automático        this.startMemoryMonitoring();
     }
 
     // ✨ ISSUE #4: Métodos de control de memoria y timeouts
@@ -117,15 +116,15 @@ export class TypeScriptWorkerPool {
      * Inicia el monitoreo automático de memoria de workers
      */
     private startMemoryMonitoring(): void {
-        // Monitoreo cada 30 segundos
+        // Monitoreo cada 15 segundos (más frecuente)
         setInterval(() => {
             this.checkWorkersMemory();
-        }, 30000);
+        }, 15000);
 
-        // Limpieza de workers inactivos cada 5 minutos
+        // Limpieza de workers inactivos cada 2 minutos (más frecuente)
         setInterval(() => {
             this.cleanupInactiveWorkers();
-        }, 300000);
+        }, 120000);
     }
 
     /**
@@ -238,14 +237,12 @@ export class TypeScriptWorkerPool {
         }
 
         return reasons.join(', ');
-    }
-
-    /**
+    } /**
      * Limpia workers que han estado inactivos por mucho tiempo
      */
     private async cleanupInactiveWorkers(): Promise<void> {
         const now = Date.now();
-        const INACTIVE_TIMEOUT = 10 * 60 * 1000; // 10 minutos
+        const INACTIVE_TIMEOUT = 5 * 60 * 1000; // 5 minutos (reducido)
 
         for (const poolWorker of this.workers) {
             const timeSinceLastActivity = now - poolWorker.lastActivityTime;
@@ -261,15 +258,13 @@ export class TypeScriptWorkerPool {
                 await this.recycleWorker(poolWorker);
             }
         }
-    }
-
-    /**
+    } /**
      * Verifica si un worker debe ser reciclado por límites de memoria/tiempo
      */
     private shouldRecycleWorker(poolWorker: PoolWorker): boolean {
         const now = Date.now();
-        const MEMORY_LIMIT = 50 * 1024 * 1024; // 50MB
-        const TIME_LIMIT = 30 * 60 * 1000; // 30 minutos
+        const MEMORY_LIMIT = 30 * 1024 * 1024; // 30MB (reducido)
+        const TIME_LIMIT = 15 * 60 * 1000; // 15 minutos (reducido)
         const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
 
         return (
