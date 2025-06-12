@@ -185,11 +185,14 @@ async function main() {
         )
         .parse()) as CompileArgs;
 
-    try {
+    try {        // 🎨 Header moderno y elegante
+        const headerLine = '━'.repeat(60);
         logger.log(
-            `\n\n` +
-                chalk.blue('VersaCompiler') +
-                ' - Servidor de Desarrollo HRM y compilador de archivos Vue/ts/js\n\n',
+            `\n` +
+            chalk.cyan(headerLine) + `\n` +
+            chalk.bold.cyan('  ⚡ VersaCompiler ') + chalk.gray('v2.0.3') + `\n` +
+            chalk.gray('  Vue · TypeScript · JavaScript Compiler') + `\n` +
+            chalk.cyan(headerLine) + `\n`,
         );
 
         if (argv.init) {
@@ -208,20 +211,54 @@ async function main() {
         env.TAILWIND =
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
         env.ENABLE_LINTER = String(argv.linter);
-        env.VERBOSE = argv.verbose ? 'true' : 'false';
-        logger.info(chalk.green('Configuración de VersaCompiler:'));
-        logger.info(chalk.green(`Watch: ${argv.watch}`));
-        logger.info(chalk.green(`All: ${env.isALL}`));
-        logger.info(chalk.green(`File: ${argv.file || 'N/A'}`));
-        logger.info(chalk.green(`Prod: ${env.isPROD}`));
-        logger.info(chalk.green(`Tailwind: ${env.TAILWIND}`));
-        logger.info(chalk.green(`Minification: ${env.isPROD}`));
-        logger.info(chalk.green(`Linter: ${env.ENABLE_LINTER}`));
-        logger.info(chalk.green(`Verbose: ${env.VERBOSE}`));
-        logger.info(chalk.green(`Clean Output: ${argv.cleanOutput}`));
-        logger.info(chalk.green(`Clean Cache: ${argv.cleanCache}`));
-        logger.info(chalk.green(`Type Check: ${argv.typeCheck}`));
-        logger.log(`\n`);
+        env.VERBOSE = argv.verbose ? 'true' : 'false';        // 🎯 Configuración moderna y organizada
+        logger.info(chalk.bold.blue('⚙️  Configuration'));
+        logger.info(chalk.gray('   ┌─ Execution mode'));
+        
+        const modes = [
+            { label: 'Watch', value: argv.watch, icon: '👀' },
+            { label: 'All Files', value: env.isALL === 'true', icon: '📁' },
+            { label: 'Single File', value: !!argv.file, icon: '📄' },
+            { label: 'Production', value: env.isPROD === 'true', icon: '🏭' }
+        ];
+
+        const features = [
+            { label: 'Tailwind', value: env.TAILWIND === 'true', icon: '🎨' },
+            { label: 'Minification', value: env.isPROD === 'true', icon: '🗜️' },
+            { label: 'Linter', value: env.ENABLE_LINTER === 'true', icon: '🔍' },
+            { label: 'Type Check', value: argv.typeCheck, icon: '📘' },
+            { label: 'Verbose', value: env.VERBOSE === 'true', icon: '📝' }
+        ];
+
+        modes.forEach(mode => {
+            const status = mode.value ? chalk.green('●') : chalk.gray('○');
+            const label = mode.value ? chalk.green(mode.label) : chalk.gray(mode.label);
+            logger.info(chalk.gray('   │  ') + status + ` ${mode.icon} ${label}`);
+        });
+
+        logger.info(chalk.gray('   ├─ Features'));
+        features.forEach(feature => {
+            const status = feature.value ? chalk.green('●') : chalk.gray('○');
+            const label = feature.value ? chalk.green(feature.label) : chalk.gray(feature.label);
+            logger.info(chalk.gray('   │  ') + status + ` ${feature.icon} ${label}`);
+        });
+
+        if (argv.file) {
+            logger.info(chalk.gray('   ├─ Target'));
+            logger.info(chalk.gray('   │  ') + chalk.blue('📄 ') + argv.file);
+        }
+
+        if (argv.cleanOutput) {
+            logger.info(chalk.gray('   ├─ Cleanup'));
+            logger.info(chalk.gray('   │  ') + chalk.yellow('🧹 Clean Output'));
+        }
+
+        if (argv.cleanCache) {
+            logger.info(chalk.gray('   │  ') + chalk.yellow('🗑️  Clean Cache'));
+        }
+
+        logger.info(chalk.gray('   └─ Ready to compile!'));
+        logger.log('');
         env.typeCheck = argv.typeCheck ? 'true' : 'false';
 
         env.cleanCache = argv.cleanCache ? 'true' : 'false';
