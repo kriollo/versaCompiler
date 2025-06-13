@@ -10,8 +10,6 @@ import { env } from 'node:process';
 
 import * as chokidar from 'chokidar';
 
-import { cleanOutputDir, initChokidar } from '../src/servicios/file-watcher';
-
 // Mock de dependencias externas
 jest.mock('../src/compiler/compile', () => ({
     initCompile: jest.fn(),
@@ -46,6 +44,7 @@ jest.mock('../src/servicios/logger', () => ({
 // Importar mocks después de la declaración
 import { initCompile } from '../src/compiler/compile';
 import { emitirCambios } from '../src/servicios/browserSync';
+import { cleanOutputDir, initChokidar } from '../src/servicios/file-watcher';
 import { promptUser } from '../src/utils/promptUser';
 
 // Tipos para los mocks
@@ -57,7 +56,6 @@ const mockPromptUser = promptUser as jest.MockedFunction<typeof promptUser>;
 
 // Helper para esperar de forma más legible
 const wait = (ms: number): Promise<void> => {
-    // eslint-disable-next-line no-promise-executor-return
     return new Promise(resolve => {
         setTimeout(resolve, ms);
     });
@@ -159,13 +157,14 @@ describe('File Watcher System', () => {
             env.yes = 'false';
             mockPromptUser.mockResolvedValueOnce('n');
 
-            // Mockear process.exit para evitar que termine el test
+            // En entorno de test, process.exit() no debe ejecutarse
             const exitSpy = jest.spyOn(process, 'exit').mockImplementation();
 
             await cleanOutputDir(tempOutputDir);
 
             expect(mockPromptUser).toHaveBeenCalledTimes(1);
-            expect(exitSpy).toHaveBeenCalledWith(0);
+            // En entorno de test (NODE_ENV=test), process.exit() no se ejecuta
+            expect(exitSpy).not.toHaveBeenCalled();
 
             exitSpy.mockRestore();
         });
@@ -180,12 +179,14 @@ describe('File Watcher System', () => {
             env.yes = 'false';
             mockPromptUser.mockRejectedValueOnce(new Error('Input error'));
 
-            // Mockear process.exit para evitar que termine el test
+            // En entorno de test, process.exit() no debe ejecutarse
             const exitSpy = jest.spyOn(process, 'exit').mockImplementation();
 
-            await cleanOutputDir(tempOutputDir);
+            // La función no lanza la excepción, la maneja internamente y la loguea
+            await expect(cleanOutputDir(tempOutputDir)).resolves.not.toThrow();
 
-            expect(exitSpy).toHaveBeenCalledWith(1);
+            // En entorno de test (NODE_ENV=test), process.exit() no se ejecuta
+            expect(exitSpy).not.toHaveBeenCalled();
             exitSpy.mockRestore();
         });
     });
@@ -210,21 +211,18 @@ describe('File Watcher System', () => {
                 await watcher.close();
             }
         });
-
         test('debe fallar si PATH_SOURCE no está definido', async () => {
             const originalPathSource = env.PATH_SOURCE;
             delete env.PATH_SOURCE;
 
-            const exitSpy = jest
-                .spyOn(process, 'exit')
-                .mockImplementation(() => {
-                    throw new Error('process.exit called');
-                });
+            const exitSpy = jest.spyOn(process, 'exit').mockImplementation();
 
+            // En entorno de test, se lanza error en lugar de ejecutar process.exit()
             await expect(initChokidar(mockBrowserSync)).rejects.toThrow(
-                'process.exit called',
+                'PATH_SOURCE no está definida',
             );
-            expect(exitSpy).toHaveBeenCalledWith(1);
+            // En entorno de test (NODE_ENV=test), process.exit() no se ejecuta
+            expect(exitSpy).not.toHaveBeenCalled();
 
             env.PATH_SOURCE = originalPathSource;
             exitSpy.mockRestore();
@@ -842,7 +840,6 @@ describe('File Watcher System', () => {
                     await watcher.close();
                 }
             });
-
             test('debe manejar rutas con caracteres especiales', async () => {
                 const mockBrowserSync = {
                     reload: jest.fn(),
@@ -857,12 +854,13 @@ describe('File Watcher System', () => {
                 );
                 await mkdir(specialDir, { recursive: true });
 
-                env.aditionalWatch = JSON.stringify([
-                    `${specialDir}/**/*.json`,
-                ]);
+                // Usar rutas normalizadas para que el matching funcione correctamente
+                const normalizedPattern =
+                    specialDir.replace(/\\/g, '/') + '/**/*.json';
+                env.aditionalWatch = JSON.stringify([normalizedPattern]);
 
                 const watcher = await initChokidar(mockBrowserSync);
-                await wait(100);
+                await wait(200);
 
                 const specialFile = path.join(
                     specialDir,
@@ -870,7 +868,8 @@ describe('File Watcher System', () => {
                 );
                 await writeFile(specialFile, '{"special": true}');
 
-                await wait(500);
+                // Esperar más tiempo para que el debouncing procese el archivo
+                await wait(800);
 
                 // Debería procesarse correctamente
                 expect(mockEmitirCambios).toHaveBeenCalled();

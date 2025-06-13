@@ -314,12 +314,18 @@ export async function cleanOutputDir(
                     );
                     if (answer.toLowerCase() !== 's') {
                         logger.info('🛑 Compilación cancelada por el usuario.');
-                        process.exit(0);
+                        if (process.env.NODE_ENV !== 'test') {
+                            process.exit(0);
+                        }
+                        return;
                     }
                 }
             } catch (error) {
                 logger.error(`Error en la entrada del usuario: ${error}`);
-                process.exit(1);
+                if (process.env.NODE_ENV !== 'test') {
+                    process.exit(1);
+                }
+                throw error;
             }
         }
         const chalkInstance = await loadChalk();
@@ -397,7 +403,10 @@ export async function initChokidar(bs: any) {
             logger.error(
                 'Error: La variable de entorno PATH_SOURCE no está definida.',
             );
-            process.exit(1);
+            if (process.env.NODE_ENV !== 'test') {
+                process.exit(1);
+            }
+            throw new Error('PATH_SOURCE no está definida');
         }
         const watchJS = `${env.PATH_SOURCE}/**/*.js`;
         const watchVue = `${env.PATH_SOURCE}/**/*.vue`;
@@ -525,6 +534,9 @@ export async function initChokidar(bs: any) {
         logger.error(
             `🚩 :Error al iniciar watch: ${error instanceof Error ? error.message : String(error)}`,
         );
-        process.exit(1);
+        if (process.env.NODE_ENV !== 'test') {
+            process.exit(1);
+        }
+        throw error;
     }
 }

@@ -39,6 +39,14 @@
     ],
     "author": "Jorge Jara H (kriollone@gmail.com)",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kriollo/versaCompiler.git"
+    },
+    "bugs": {
+        "url": "https://github.com/kriollo/versaCompiler/issues"
+    },
+    "homepage": "https://github.com/kriollo/versaCompiler#readme",
     "dependencies": {
         "@vue/compiler-dom": "^3.5.16",
         "@vue/reactivity": "^3.5.16",

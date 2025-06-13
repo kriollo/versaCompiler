@@ -1,41 +1,60 @@
 // Mock para chalk compatible con lazy loading
-const createChalkFunction = (_color: string) => {
-    const chalkFn = (text: any) => text;
-    // Agregar métodos encadenables
-    chalkFn.bold = (text: any) => text;
-    chalkFn.dim = (text: any) => text;
-    chalkFn.italic = (text: any) => text;
-    chalkFn.underline = (text: any) => text;
-    chalkFn.strikethrough = (text: any) => text;
-    chalkFn.inverse = (text: any) => text;
+const createChalkFunction = (_color: string): any => {
+    const chalkFn: any = (text: any) => text;
+
+    // Lista de colores y estilos disponibles
+    const colors = [
+        'red',
+        'green',
+        'blue',
+        'yellow',
+        'gray',
+        'cyan',
+        'magenta',
+        'white',
+        'black',
+    ];
+    const styles = [
+        'bold',
+        'dim',
+        'italic',
+        'underline',
+        'strikethrough',
+        'inverse',
+    ];
+    const bgColors = [
+        'bgRed',
+        'bgGreen',
+        'bgBlue',
+        'bgYellow',
+        'bgCyan',
+        'bgMagenta',
+        'bgWhite',
+        'bgBlack',
+    ];
+
+    // Evitar recursión infinita - solo agregar propiedades una vez
+    if (!chalkFn._initialized) {
+        chalkFn._initialized = true;
+
+        // Agregar todos los colores
+        colors.forEach(color => {
+            chalkFn[color] = chalkFn;
+        });
+
+        // Agregar todos los estilos
+        styles.forEach(style => {
+            chalkFn[style] = chalkFn;
+        });
+
+        // Agregar todos los colores de fondo
+        bgColors.forEach(bgColor => {
+            chalkFn[bgColor] = chalkFn;
+        });
+    }
+
     return chalkFn;
 };
-
-// Interfaz para chalk con firma de índice
-interface ChalkMock {
-    (text: any): any;
-    [key: string]: any;
-    red: any;
-    green: any;
-    blue: any;
-    yellow: any;
-    gray: any;
-    cyan: any;
-    bold: any;
-    underline: any;
-    dim: any;
-    strikethrough: any;
-    inverse: any;
-    italic: any;
-    bgRed: any;
-    bgGreen: any;
-    bgBlue: any;
-    bgYellow: any;
-    bgCyan: any;
-    bgMagenta: any;
-    bgWhite: any;
-    bgBlack: any;
-}
 
 const chalk = {
     red: createChalkFunction('red'),
@@ -44,11 +63,15 @@ const chalk = {
     yellow: createChalkFunction('yellow'),
     gray: createChalkFunction('gray'),
     cyan: createChalkFunction('cyan'),
+    magenta: createChalkFunction('magenta'),
+    white: createChalkFunction('white'),
+    black: createChalkFunction('black'),
     bold: createChalkFunction('bold'),
     underline: createChalkFunction('underline'),
     dim: createChalkFunction('dim'),
     strikethrough: createChalkFunction('strikethrough'),
     inverse: createChalkFunction('inverse'),
+    italic: createChalkFunction('italic'),
     bgRed: createChalkFunction('bgRed'),
     bgGreen: createChalkFunction('bgGreen'),
     bgBlue: createChalkFunction('bgBlue'),
@@ -60,20 +83,12 @@ const chalk = {
 };
 
 // Función principal que soporta encadenamiento
-const chalkDefault = ((text: any) => text) as ChalkMock;
+const chalkDefault = createChalkFunction('default');
 
 // Agregar todos los métodos a la función principal para soportar chalk.red.bold()
 Object.keys(chalk).forEach(color => {
     (chalkDefault as any)[color] = (chalk as any)[color];
 });
-
-// Soportar métodos encadenables en la función principal
-chalkDefault.bold = chalk.bold;
-chalkDefault.dim = chalk.dim;
-chalkDefault.italic = createChalkFunction('italic');
-chalkDefault.underline = chalk.underline;
-chalkDefault.strikethrough = chalk.strikethrough;
-chalkDefault.inverse = chalk.inverse;
 
 module.exports = chalkDefault;
 module.exports.default = chalkDefault;
