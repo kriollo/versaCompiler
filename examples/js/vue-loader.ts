@@ -15,7 +15,7 @@ async function loadModule() {
     const url = new URL(import.meta.url);
     const urlParams = url.search;
     const searchParams = new URLSearchParams(urlParams);
-    let module = searchParams.get('m');
+    const module = searchParams.get('m');
     let validatedModule = 'unknown'; // Declarar fuera para uso en catch
 
     try {

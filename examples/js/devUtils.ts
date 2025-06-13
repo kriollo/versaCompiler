@@ -1,6 +1,6 @@
 import { html } from 'code-tag';
 
-const loadSwallCss = () => {
+const _loadSwallCss = () => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'P@/vendor/sweetalert2/sweetalert2.dark.min.css';

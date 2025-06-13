@@ -7,9 +7,7 @@ import parserVue from 'vue-eslint-parser';
 
 export default [
     // Extiende las configuraciones recomendadas de Oxlint
-    ...oxlint.configs['flat/recommended'],
-
-    // Ignorar archivos compilados y de distribución
+    ...oxlint.configs['flat/recommended'], // Ignorar archivos compilados y de distribución
     {
         ignores: [
             'public/**/*',
@@ -20,6 +18,7 @@ export default [
             'eslint.config.*.js',
             'performance-results/**/*',
             'versacompiler-*.tgz',
+            'examples/js/examples/test-errors.js', // Archivo de ejemplo de errores
         ],
     },
 

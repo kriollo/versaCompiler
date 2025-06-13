@@ -18,8 +18,8 @@ function unusedFunction() {
 }
 
 // Error: variable redeclarada
-var redeclaredVar = 1;
-var redeclaredVar = 2;
+const redeclaredVar = 1;
+const redeclaredVar = 2;
 
 // Error: missing semicolon (si está configurado)
 const missingSemicolon = "test"
