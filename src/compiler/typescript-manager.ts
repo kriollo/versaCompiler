@@ -60,18 +60,8 @@ export const loadTypeScriptConfig = (
                     config,
                     typescript.sys,
                     path.dirname(configPath),
-                );
-                compilerOptions = {
-                    ...parsedConfig.options,
-                    // Asegurar opciones básicas necesarias
-                    allowJs: parsedConfig.options.allowJs !== false,
-                    esModuleInterop:
-                        parsedConfig.options.esModuleInterop !== false,
-                    allowSyntheticDefaultImports:
-                        parsedConfig.options.allowSyntheticDefaultImports !==
-                        false,
-                    skipLibCheck: parsedConfig.options.skipLibCheck !== false,
-                };
+                );                // Usar exactamente la configuración del tsconfig.json del usuario
+                compilerOptions = parsedConfig.options;
             } else {
                 throw new Error(
                     `Error al leer tsconfig.json: ${configError.messageText}`,
@@ -118,35 +108,15 @@ const getDefaultCompilerOptions = (): typescript.CompilerOptions => ({
 const createSerializableCompilerOptions = (
     options: typescript.CompilerOptions,
 ): Record<string, any> => {
-    // Usar las opciones del tsconfig.json pero con optimizaciones para el worker
-    const {
-        target = typescript.ScriptTarget.ES2020,
-        module = typescript.ModuleKind.ES2020,
-        lib = ['es2020', 'dom', 'dom.iterable'],
-        allowJs = true,
-        jsx,
-        strict = false,
-        skipLibCheck = true,
-        esModuleInterop = true,
-        allowSyntheticDefaultImports = true,
-        isolatedModules = true,
-    } = options;
-
+    // Respetar exactamente las opciones del tsconfig.json del usuario
+    // Solo agregar opciones mínimas necesarias para el worker si no están presentes
     return {
-        target,
-        module,
-        lib: Array.isArray(lib) ? lib : ['es2020', 'dom', 'dom.iterable'],
-        allowJs,
-        jsx,
-        strict,
-        skipLibCheck,
-        skipDefaultLibCheck: true,
-        esModuleInterop,
-        allowSyntheticDefaultImports,
-        isolatedModules,
-        noEmitOnError: false,
-        declaration: false,
-        sourceMap: false,
+        ...options,
+        // Solo estas opciones son absolutamente necesarias para el funcionamiento del worker
+        noEmitOnError: false, // Necesario para que el worker no falle en errores
+        declaration: false,   // No necesitamos declaraciones en el worker
+        sourceMap: false,     // No necesitamos source maps en el worker
+        skipDefaultLibCheck: options.skipDefaultLibCheck ?? options.skipLibCheck ?? true, // Optimización para el worker
     };
 };
 
