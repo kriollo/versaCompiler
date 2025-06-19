@@ -6,3 +6,4 @@ public
 coverage
 dist
 src/compiler/.cache
+examples/dashboard

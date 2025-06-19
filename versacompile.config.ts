@@ -1,4 +1,3 @@
-// Archivo de configuración de VersaCompiler
 export default {
     tsconfig: './tsconfig.json',
     compilerOptions: {

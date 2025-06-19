@@ -17,7 +17,7 @@
         "noUncheckedIndexedAccess": true,
         "moduleDetection": "force",
         "allowJs": true,
-        "checkJs": false,
+        "checkJs": true,
         "allowImportingTsExtensions": true,
         "noEmit": true,
         "module": "esnext",
@@ -33,7 +33,11 @@
             "P@/*": ["public/*"],
             "e@/*": ["examples/*"]
         },
-        "typeRoots": ["./node_modules/@types", "./examples/types"],
+        "typeRoots": [
+            "./node_modules/@types",
+            "./examples/types",
+            "./src/types"
+        ],
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "bundler",
@@ -52,6 +56,7 @@
     "include": [
         "src/**/*",
         "src/**/*.ts",
+        "src/types/**/*.d.ts",
         "tests/**/*.ts",
         "examples/**/*",
         "examples/**/*.vue",

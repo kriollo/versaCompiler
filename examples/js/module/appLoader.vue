@@ -19,6 +19,41 @@
         showLocalModal.value = false;
     };
 
+    const test: any = 'test';
+
+    // Estos DEBERÍAN generar errores de noImplicitAny:
+
+    // 1. Función con parámetro sin tipo (debería dar error)
+    const funcSinTipo = function (param) {
+        return param;
+    };
+
+    // 2. Variable sin inicialización ni tipo (debería dar error)
+    let variableSinTipo;
+
+    // 3. Función con return any implícito (debería dar error)
+    const funcionRetornoImplicito = function () {
+        const x = arguments[0];
+        return x;
+    };
+
+    // ejemplo de funcion con de typo any EXPLÍCITO (NO debería dar error)
+    const exampleFunction = (param: any) => {
+        console.log('This is an example function with any type:', param);
+    };
+
+    // Ejemplos que DEBERÍAN generar errores TS7053:
+
+    // 4. Acceso a propiedades con índices dinámicos (debería dar error TS7053)
+    const testObj = { name: 'test', age: 25 };
+    const dynamicKey = 'unknownProperty';
+    const dynamicValue = testObj[dynamicKey]; // TS7053
+
+    // 5. Acceso a array con string index (debería dar error TS7015)
+    const testArray = [1, 2, 3];
+    const stringIdx = 'invalidIndex';
+    const arrayItem = testArray[stringIdx]; // TS7015/TS7053
+
     // Helper to apply theme and update reactive state
     const applyThemeAndIcons = (newIsDark: boolean) => {
         document.documentElement.classList.toggle('dark', newIsDark);
