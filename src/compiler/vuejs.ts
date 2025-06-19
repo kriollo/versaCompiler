@@ -3,6 +3,9 @@ import path from 'node:path';
 
 import * as vCompiler from 'vue/compiler-sfc';
 
+// Type casting para evitar problemas de tipos con Vue SFC
+const vueCompiler = vCompiler as any;
+
 import { logger } from '../servicios/logger';
 
 import { parser } from './parser';
@@ -219,7 +222,7 @@ export const preCompileVue = async (
             data = injectedData;
         }
 
-        const { descriptor, errors } = vCompiler.parse(data, {
+        const { descriptor, errors } = vueCompiler.parse(data, {
             filename: fileName,
             sourceMap: !isProd,
             sourceRoot: path.dirname(source),
@@ -227,25 +230,25 @@ export const preCompileVue = async (
 
         if (errors.length) {
             throw new Error(
-                `Error al analizar el componente Vue ${source}:\n${errors.map(e => e.message).join('\n')}`,
+                `Error al analizar el componente Vue ${source}:\n${errors.map((e: any) => e.message).join('\n')}`,
             );
         }
         const id = Math.random().toString(36).slice(2, 12);
-        const scopeId = descriptor.styles.some(s => s.scoped)
+        const scopeId = descriptor.styles.some((s: any) => s.scoped)
             ? `data-v-${id}`
             : null;
 
         // --- 1. Compilación del Script ---
         let scriptContent: string;
         let scriptLang: 'ts' | 'js' = 'js';
-        let scriptBindings: vCompiler.BindingMetadata | undefined;
+        let scriptBindings: any | undefined;
         let scriptType: 'script' | 'scriptSetup' | undefined;
         if (descriptor.script || descriptor.scriptSetup) {
             scriptType = descriptor.script ? 'script' : 'scriptSetup';
             const scriptToCompile =
                 descriptor.script || descriptor.scriptSetup!;
 
-            const scriptCompileOptions: vCompiler.SFCScriptCompileOptions = {
+            const scriptCompileOptions: any = {
                 id,
                 isProd,
                 sourceMap: !isProd,
@@ -265,7 +268,7 @@ export const preCompileVue = async (
                 },
                 customElement: false,
             };
-            const compiledScriptResult = vCompiler.compileScript(
+            const compiledScriptResult = vueCompiler.compileScript(
                 descriptor,
                 scriptCompileOptions,
             );
@@ -306,30 +309,29 @@ export const preCompileVue = async (
         } // --- 2. Compilación de la Plantilla (CORREGIDA) ---
         let templateCode = '';
         if (descriptor.template) {
-            const templateCompileOptions: vCompiler.SFCTemplateCompileOptions =
-                {
-                    source: descriptor.template.content,
-                    filename: `${fileName}.vue`,
-                    id,
-                    scoped: !!scopeId,
-                    slotted: descriptor.slotted,
-                    isProd,
-                    compilerOptions: {
-                        scopeId,
-                        mode: 'module',
-                        bindingMetadata: scriptBindings,
-                        prefixIdentifiers: true,
-                        hoistStatic: isProd,
-                        cacheHandlers: isProd,
-                        runtimeGlobalName: 'Vue',
-                        runtimeModuleName: 'vue',
-                        whitespace: 'condense',
-                        ssr: false,
-                        nodeTransforms: [],
-                        directiveTransforms: {},
-                    },
-                };
-            const compiledTemplateResult = vCompiler.compileTemplate(
+            const templateCompileOptions: any = {
+                source: descriptor.template.content,
+                filename: `${fileName}.vue`,
+                id,
+                scoped: !!scopeId,
+                slotted: descriptor.slotted,
+                isProd,
+                compilerOptions: {
+                    scopeId,
+                    mode: 'module',
+                    bindingMetadata: scriptBindings,
+                    prefixIdentifiers: true,
+                    hoistStatic: isProd,
+                    cacheHandlers: isProd,
+                    runtimeGlobalName: 'Vue',
+                    runtimeModuleName: 'vue',
+                    whitespace: 'condense',
+                    ssr: false,
+                    nodeTransforms: [],
+                    directiveTransforms: {},
+                },
+            };
+            const compiledTemplateResult = vueCompiler.compileTemplate(
                 templateCompileOptions,
             );
 
@@ -365,7 +367,7 @@ export const preCompileVue = async (
         }
 
         // Compile styles
-        const compiledStyles = descriptor.styles.map(style => {
+        const compiledStyles = descriptor.styles.map((style: any) => {
             const lang = style.lang?.toLowerCase();
             let currentPreprocessLang:
                 | 'less'
@@ -385,7 +387,7 @@ export const preCompileVue = async (
                 currentPreprocessLang = lang;
             }
 
-            return vCompiler.compileStyle({
+            return vueCompiler.compileStyle({
                 id,
                 source: style.content,
                 scoped: style.scoped,
@@ -400,7 +402,7 @@ export const preCompileVue = async (
             ? `(function(){
                     let styleTag = document.createElement('style');
                     styleTag.setAttribute('data-v-${id}', '');
-                    styleTag.innerHTML = \`${compiledStyles.map(s => s.code).join('\n')}\`;
+                    styleTag.innerHTML = \`${compiledStyles.map((s: any) => s.code).join('\n')}\`;
                     document.head.appendChild(styleTag);
                 })();`
             : '';

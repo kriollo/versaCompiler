@@ -34,42 +34,43 @@ class WorkerTypeScriptLanguageServiceHost {
     createUltraCleanCompilerOptions(options) {
         // Usar las opciones del tsconfig.json pasadas desde el hilo principal
         const cleanOptions = {
-            target: options.target || ts.ScriptTarget.ES2020,
-            module: options.module || ts.ModuleKind.ES2020,
-            strict: Boolean(options.strict),
-            noEmitOnError: Boolean(options.noEmitOnError),
-            skipLibCheck: Boolean(options.skipLibCheck !== false), // true por defecto
-            skipDefaultLibCheck: Boolean(options.skipDefaultLibCheck !== false), // true por defecto
-            allowJs: Boolean(options.allowJs !== false), // true por defecto
-            esModuleInterop: Boolean(options.esModuleInterop !== false), // true por defecto
-            allowSyntheticDefaultImports: Boolean(
-                options.allowSyntheticDefaultImports !== false,
-            ), // true por defecto
-            declaration: Boolean(options.declaration),
-            sourceMap: Boolean(options.sourceMap),
-            noImplicitAny: Boolean(options.noImplicitAny),
-            noImplicitReturns: Boolean(options.noImplicitReturns),
-            noImplicitThis: Boolean(options.noImplicitThis),
-            noUnusedLocals: Boolean(options.noUnusedLocals),
-            noUnusedParameters: Boolean(options.noUnusedParameters),
-            isolatedModules: Boolean(options.isolatedModules !== false), // true por defecto            // Usar las librerías especificadas en el tsconfig.json
-            lib: Array.isArray(options.lib)
-                ? options.lib
-                : ['es2020', 'dom', 'dom.iterable'],
+            // target: options.target || ts.ScriptTarget.ES2020,
+            // module: options.module || ts.ModuleKind.ES2020,
+            // strict: Boolean(options.strict),
+            // noEmitOnError: Boolean(options.noEmitOnError),
+            // skipLibCheck: Boolean(options.skipLibCheck !== false), // true por defecto
+            // skipDefaultLibCheck: Boolean(options.skipDefaultLibCheck !== false), // true por defecto
+            // allowJs: Boolean(options.allowJs !== false), // true por defecto
+            // esModuleInterop: Boolean(options.esModuleInterop !== false), // true por defecto
+            // allowSyntheticDefaultImports: Boolean(
+            //     options.allowSyntheticDefaultImports !== false,
+            // ), // true por defecto
+            // declaration: Boolean(options.declaration),
+            // sourceMap: Boolean(options.sourceMap),
+            // noImplicitAny: Boolean(options.noImplicitAny),
+            // noImplicitReturns: Boolean(options.noImplicitReturns),
+            // noImplicitThis: Boolean(options.noImplicitThis),
+            // noUnusedLocals: Boolean(options.noUnusedLocals),
+            // noUnusedParameters: Boolean(options.noUnusedParameters),
+            // isolatedModules: Boolean(options.isolatedModules !== false), // true por defecto            // Usar las librerías especificadas en el tsconfig.json
+            // lib: Array.isArray(options.lib)
+            //     ? options.lib
+            //     : ['es2020', 'dom', 'dom.iterable'],
 
-            // Soporte para decorators
-            experimentalDecorators: Boolean(
-                options.experimentalDecorators !== false,
-            ),
-            emitDecoratorMetadata: Boolean(
-                options.emitDecoratorMetadata !== false,
-            ),
+            // // Soporte para decorators
+            // experimentalDecorators: Boolean(
+            //     options.experimentalDecorators !== false,
+            // ),
+            // emitDecoratorMetadata: Boolean(
+            //     options.emitDecoratorMetadata !== false,
+            // ),
 
-            // Opciones críticas para el worker pero manteniendo compatibilidad
-            noLib: false, // Permitir librerías para APIs básicas (DOM, Promise, etc.)
-            noResolve: true, // Evitar resolución de módulos compleja pero mantener tipos globales
-            suppressOutputPathCheck: true,
-            allowNonTsExtensions: true,
+            // // Opciones críticas para el worker pero manteniendo compatibilidad
+            // noLib: false, // Permitir librerías para APIs básicas (DOM, Promise, etc.)
+            // noResolve: true, // Evitar resolución de módulos compleja pero mantener tipos globales
+            // suppressOutputPathCheck: true,
+            // allowNonTsExtensions: true,
+            ...options,
         };
 
         // console.log(
@@ -200,6 +201,13 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     function defineComponent<T>(options: T): T;
                     function defineProps<T = {}>(): T;
                     function defineEmits<T = {}>(): T;
+                    function defineExpose<T = {}>(exposed: T): void;
+                    function mergeModels<T>(models: T): T;
+                    function provide<T>(key: string | symbol, value: T): void;
+                    function inject<T>(key: string | symbol, defaultValue?: T): T | undefined;
+                    function useSlots(): { [key: string]: (...args: any[]) => any };
+                    function useAttrs(): { [key: string]: any };
+                    function useModel<T>(modelName: string): { value: T };
                     function onMounted(fn: () => void): void;
                     function onUnmounted(fn: () => void): void;
                     function watch<T>(source: () => T, callback: (newValue: T, oldValue: T) => void): void;
@@ -283,6 +291,9 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     !messageText.includes('Cannot find module') &&
                     !messageText.includes('Could not find source file') &&
                     !messageText.includes(
+                        "has no exported member 'mergeModels'",
+                    ) &&
+                    !messageText.includes(
                         "Parameter '$props' implicitly has an 'any' type",
                     ) &&
                     !messageText.includes(
@@ -310,10 +321,9 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     !messageText.includes(
                         'The runtime will invoke the decorator with',
                     ) &&
-                    // Ignorar errores TS7031 (binding element implicitly has any type)
-                    diag.code !== 7031 &&
-                    // Ignorar errores TS7006 (parameter implicitly has any type)
-                    diag.code !== 7006 &&
+                    // NO ignorar errores TS7031 y TS7006 de forma general, solo para parámetros específicos de Vue
+                    // diag.code !== 7031 &&
+                    // diag.code !== 7006 &&
                     // Ignorar errores TS1241 (decorator signature mismatch) durante desarrollo
                     diag.code !== 1241 &&
                     !(
