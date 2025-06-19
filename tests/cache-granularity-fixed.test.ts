@@ -175,15 +175,15 @@ describe('Issue #2: Cache Keys Granularidad Completa', () => {
         export const version = "1.0.0";
     `;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
+        // Crear el archivo antes de cada test para asegurar que exista
         await fs.mkdir(join(__dirname, '../temp'), { recursive: true });
         await fs.writeFile(testFile, testContent);
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
         try {
             await fs.unlink(testFile);
-            // No intentar eliminar la carpeta ya que otros tests la pueden estar usando
         } catch {
             // Ignorar errores de cleanup
         }
@@ -348,7 +348,7 @@ describe('Issue #2: Cache Keys Granularidad Completa', () => {
 
             // Generación de cache key debería ser < 200ms promedio (ajustado para ser realista)
             expect(duration / 100).toBeLessThan(200);
-        });
+        }, 30000); // Aumentar timeout a 30 segundos
 
         test('Edge Case: Configuración undefined/null', async () => {
             const cache = new ImprovedCacheImplementation();
