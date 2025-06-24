@@ -4,26 +4,6 @@
     "results": [
       {
         "name": "JavaScript Simple",
-        "avg": 100.6552,
-        "min": 100.6552,
-        "max": 100.6552,
-        "median": 100.6552,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 2635680,
-        "timestamp": 1749667770340,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
-      {
-        "name": "JavaScript Simple",
         "avg": 682.533,
         "min": 682.533,
         "max": 682.533,
@@ -999,31 +979,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "JavaScript Simple",
+        "avg": 243.8734,
+        "min": 243.8734,
+        "max": 243.8734,
+        "median": 243.8734,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 2300328,
+        "timestamp": 1750343828952,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "TypeScript Simple",
     "results": [
-      {
-        "name": "TypeScript Simple",
-        "avg": 312.1543,
-        "min": 312.1543,
-        "max": 312.1543,
-        "median": 312.1543,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "timestamp": 1749667452041,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "TypeScript Simple",
         "avg": 360.7348,
@@ -1975,32 +1956,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "TypeScript Simple",
+        "avg": 335.9827,
+        "min": 335.9827,
+        "max": 335.9827,
+        "median": 335.9827,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 9147296,
+        "timestamp": 1750343832441,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Vue Simple",
     "results": [
-      {
-        "name": "Vue Simple",
-        "avg": 205.4491,
-        "min": 205.4491,
-        "max": 205.4491,
-        "median": 205.4491,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 1876568,
-        "timestamp": 1749667772520,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Vue Simple",
         "avg": 182.1137,
@@ -2979,32 +2960,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Vue Simple",
+        "avg": 236.9615,
+        "min": 236.9615,
+        "max": 236.9615,
+        "median": 236.9615,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 1980392,
+        "timestamp": 1750343836480,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "preCompileVue Direct",
     "results": [
-      {
-        "name": "preCompileVue Direct",
-        "avg": 15.4341,
-        "min": 15.4341,
-        "max": 15.4341,
-        "median": 15.4341,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 764616,
-        "timestamp": 1749667773588,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "preCompileVue Direct",
         "avg": 11.3721,
@@ -3983,32 +3964,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "preCompileVue Direct",
+        "avg": 10.8147,
+        "min": 10.8147,
+        "max": 10.8147,
+        "median": 10.8147,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 743400,
+        "timestamp": 1750343838849,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "preCompileTS Direct",
     "results": [
-      {
-        "name": "preCompileTS Direct",
-        "avg": 40.4714,
-        "min": 40.4714,
-        "max": 40.4714,
-        "median": 40.4714,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 1657592,
-        "timestamp": 1749667774225,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "preCompileTS Direct",
         "avg": 26.7878,
@@ -4988,31 +4969,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "preCompileTS Direct",
+        "avg": 12.6158,
+        "min": 12.6158,
+        "max": 12.6158,
+        "median": 12.6158,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 817336,
+        "timestamp": 1750343839845,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Batch Compilation",
     "results": [
-      {
-        "name": "Batch Compilation",
-        "avg": 345.5202,
-        "min": 345.5202,
-        "max": 345.5202,
-        "median": 345.5202,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "timestamp": 1749667775846,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Batch Compilation",
         "avg": 463.2782,
@@ -5953,32 +5935,31 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Batch Compilation",
+        "avg": 178.0281,
+        "min": 178.0281,
+        "max": 178.0281,
+        "median": 178.0281,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "timestamp": 1750343841227,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Memory Usage",
     "results": [
-      {
-        "name": "Memory Usage",
-        "avg": 23.6889,
-        "min": 23.6889,
-        "max": 23.6889,
-        "median": 23.6889,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 755872,
-        "timestamp": 1749667456705,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Memory Usage",
         "avg": 19.9736,
@@ -6956,32 +6937,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Memory Usage",
+        "avg": 39.4105,
+        "min": 39.4105,
+        "max": 39.4105,
+        "median": 39.4105,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 849752,
+        "timestamp": 1750343842050,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Concurrent Compilation",
     "results": [
-      {
-        "name": "Concurrent Compilation",
-        "avg": 55.4504,
-        "min": 55.4504,
-        "max": 55.4504,
-        "median": 55.4504,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 2766408,
-        "timestamp": 1749667778025,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Concurrent Compilation",
         "avg": 36.5907,
@@ -7956,32 +7937,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Concurrent Compilation",
+        "avg": 36.5308,
+        "min": 36.5308,
+        "max": 36.5308,
+        "median": 36.5308,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 3039096,
+        "timestamp": 1750343843562,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Large File Compilation",
     "results": [
-      {
-        "name": "Large File Compilation",
-        "avg": 824.8983,
-        "min": 824.8983,
-        "max": 824.8983,
-        "median": 824.8983,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 5417024,
-        "timestamp": 1749667779721,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Large File Compilation",
         "avg": 227.7291,
@@ -8958,32 +8939,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Large File Compilation",
+        "avg": 344.5071,
+        "min": 344.5071,
+        "max": 344.5071,
+        "median": 344.5071,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 5003296,
+        "timestamp": 1750343846889,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Performance Baseline",
     "results": [
-      {
-        "name": "Performance Baseline",
-        "avg": 6.9672,
-        "min": 6.9672,
-        "max": 6.9672,
-        "median": 6.9672,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 64336,
-        "timestamp": 1749667780796,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Performance Baseline",
         "avg": 5.4391,
@@ -9963,32 +9944,32 @@
           "gitCommit": "dd6b7c26",
           "branch": "master"
         }
+      },
+      {
+        "name": "Performance Baseline",
+        "avg": 132.6316,
+        "min": 132.6316,
+        "max": 132.6316,
+        "median": 132.6316,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "avgMemoryUsage": 187000,
+        "timestamp": 1750343853227,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
+          "branch": "master"
+        }
       }
     ]
   },
   {
     "testName": "Performance Consistency",
     "results": [
-      {
-        "name": "Performance Consistency",
-        "avg": 12.8446,
-        "min": 12.8446,
-        "max": 12.8446,
-        "median": 12.8446,
-        "std": 0,
-        "runs": 1,
-        "successRate": 1,
-        "avgMemoryUsage": 611000,
-        "timestamp": 1749667781949,
-        "environment": {
-          "nodeVersion": "v23.11.0",
-          "platform": "win32 x64",
-          "cpuCount": 8,
-          "totalMemory": 33674285056,
-          "gitCommit": "c4533f78",
-          "branch": "master"
-        }
-      },
       {
         "name": "Performance Consistency",
         "avg": 12.915,
@@ -10962,6 +10943,25 @@
           "cpuCount": 8,
           "totalMemory": 33674285056,
           "gitCommit": "dd6b7c26",
+          "branch": "master"
+        }
+      },
+      {
+        "name": "Performance Consistency",
+        "avg": 22.4336,
+        "min": 22.4336,
+        "max": 22.4336,
+        "median": 22.4336,
+        "std": 0,
+        "runs": 1,
+        "successRate": 1,
+        "timestamp": 1750343858227,
+        "environment": {
+          "nodeVersion": "v23.11.0",
+          "platform": "win32 x64",
+          "cpuCount": 8,
+          "totalMemory": 33674285056,
+          "gitCommit": "ced979a5",
           "branch": "master"
         }
       }

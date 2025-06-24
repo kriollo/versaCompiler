@@ -68,6 +68,7 @@ async function initSocket(retries = 0) {
 
         // Configurar listener para HMR de componentes Vue
         socket.on('HRMVue', async (/** @type {ComponentInfo} */ data) => {
+            hideErrorOverlay();
             vueInstance = window.__VUE_APP__ || vueInstance;
             if (vueInstance) {
                 console.log('🔥 Preparando HMR para Vue...');

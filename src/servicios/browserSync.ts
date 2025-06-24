@@ -8,6 +8,12 @@ import browserSync from 'browser-sync';
 import { html } from 'code-tag';
 import getPort from 'get-port';
 
+import { promptUser } from '../utils/promptUser';
+import {
+    getProxyInfo,
+    validateProxyAvailability,
+} from '../utils/proxyValidator';
+
 import { logger } from './logger';
 
 // ✨ NUEVA OPTIMIZACIÓN: Sistema de cache para archivos estáticos en BrowserSync
@@ -349,7 +355,45 @@ export async function browserSyncServer(): Promise<any> {
         } = {
             server: './',
         };
+
+        // ✨ VALIDACIÓN DE PROXY: Verificar disponibilidad antes de inicializar BrowserSync
         if (env.proxyUrl) {
+            logger.info(
+                `🔍 Validando disponibilidad del servidor proxy: ${env.proxyUrl}`,
+            );
+
+            const isProxyAvailable = await validateProxyAvailability(
+                env.proxyUrl,
+                5000,
+            );
+
+            if (!isProxyAvailable) {
+                const proxyInfo = getProxyInfo(env.proxyUrl);
+                logger.warn(`⚠️  El servidor proxy no está disponible:`);
+                logger.warn(`   Host: ${proxyInfo.host}`);
+                logger.warn(`   Puerto: ${proxyInfo.port}`);
+                logger.warn(`   Protocolo: ${proxyInfo.protocol}`);
+
+                const response = await promptUser(
+                    '\n¿Desea continuar de todos modos? El modo proxy podría no funcionar correctamente. (s/n): ',
+                    30000,
+                );
+
+                if (
+                    response.toLowerCase().trim() !== 's' &&
+                    response.toLowerCase().trim() !== 'si'
+                ) {
+                    logger.info('🛑 Operación cancelada por el usuario.');
+                    process.exit(0);
+                }
+
+                logger.warn(
+                    '⚠️  Continuando con el servidor proxy no disponible...',
+                );
+            } else {
+                logger.info('✅ Servidor proxy disponible');
+            }
+
             proxy = {
                 proxy: env.proxyUrl,
             };
