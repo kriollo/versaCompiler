@@ -476,14 +476,14 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.setHeader('ETag', cachedFile.etag);
 
-                            if (
-                                process.env.VERBOSE === 'true' &&
-                                cachedFile.cached
-                            ) {
-                                logger.info(
-                                    `🚀 File cache hit para ${vueLoaderPath}`,
-                                );
-                            }
+                            // if (
+                            //     process.env.VERBOSE === 'true' &&
+                            //     cachedFile.cached
+                            // ) {
+                            //     logger.info(
+                            //         `🚀 File cache hit para ${vueLoaderPath}`,
+                            //     );
+                            // }
 
                             res.end(cachedFile.content);
                         } else {
@@ -516,14 +516,14 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.setHeader('ETag', cachedFile.etag);
 
-                            if (
-                                process.env.VERBOSE === 'true' &&
-                                cachedFile.cached
-                            ) {
-                                logger.info(
-                                    `🚀 File cache hit para ${filePath}`,
-                                );
-                            }
+                            // if (
+                            //     process.env.VERBOSE === 'true' &&
+                            //     cachedFile.cached
+                            // ) {
+                            //     logger.info(
+                            //         `🚀 File cache hit para ${filePath}`,
+                            //     );
+                            // }
 
                             res.end(cachedFile.content);
                         } else {
@@ -553,14 +553,14 @@ export async function browserSyncServer(): Promise<any> {
                             );
                             res.setHeader('ETag', cachedFile.etag);
 
-                            if (
-                                process.env.VERBOSE === 'true' &&
-                                cachedFile.cached
-                            ) {
-                                logger.info(
-                                    `🚀 Module cache hit para ${modulePath}`,
-                                );
-                            }
+                            // if (
+                            //     process.env.VERBOSE === 'true' &&
+                            //     cachedFile.cached
+                            // ) {
+                            //     logger.info(
+                            //         `🚀 Module cache hit para ${modulePath}`,
+                            //     );
+                            // }
 
                             res.end(cachedFile.content);
                         } else {

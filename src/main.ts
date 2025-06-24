@@ -24,6 +24,24 @@ async function loadChalk() {
     return chalk;
 }
 
+// Función para obtener la versión del package.json
+async function getPackageVersion(): Promise<string> {
+    try {
+        const fs = await import('node:fs/promises');
+        const packageJsonPath = path.resolve(
+            env.PATH_PROY || path.dirname(fileURLToPath(import.meta.url)),
+            '..',
+            'package.json',
+        );
+        const packageContent = await fs.readFile(packageJsonPath, 'utf-8');
+        const packageData = JSON.parse(packageContent);
+        return packageData.version || 'unknown';
+    } catch {
+        // Fallback si no se puede leer el package.json
+        return 'unknown';
+    }
+}
+
 async function loadYargs() {
     if (!yargs) {
         const yargsModule = await import('yargs');
@@ -184,16 +202,16 @@ async function main() {
             },
         )
         .parse()) as CompileArgs;
-
     try {
         // 🎨 Header moderno y elegante
+        const version = await getPackageVersion();
         const headerLine = '━'.repeat(60);
         logger.log(
             `\n` +
                 chalk.cyan(headerLine) +
                 `\n` +
                 chalk.bold.cyan('  ⚡ VersaCompiler ') +
-                chalk.gray('v2.0.3') +
+                chalk.gray(`v${version}`) +
                 `\n` +
                 chalk.gray('  Vue · TypeScript · JavaScript Compiler') +
                 `\n` +
