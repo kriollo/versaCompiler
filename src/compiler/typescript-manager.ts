@@ -242,6 +242,41 @@ export const validateVueTypes = (
 };
 
 /**
+ * Limpia los export {} innecesarios que TypeScript agrega automáticamente
+ * @param compiledOutput - Código JavaScript compilado
+ * @param originalSource - Código TypeScript original
+ * @returns Código limpio sin export {} innecesarios
+ */
+const cleanupUnnecessaryExports = (
+    compiledOutput: string,
+    originalSource: string,
+): string => {
+    // Si el output está vacío o solo contiene export {}
+    if (compiledOutput.trim() === 'export {};') {
+        return '';
+    }
+
+    // Verificar si el código fuente original tiene imports/exports reales
+    const hasRealImportsExports =
+        /(?:^|\s)(?:import|export)\s+(?!(?:\s*\{\s*\}\s*;?\s*$))/m.test(
+            originalSource,
+        );
+
+    // Si no hay imports/exports reales, eliminar export {} del final
+    if (!hasRealImportsExports) {
+        // Buscar el patrón exacto en el archivo
+        const exportPattern = /export\s*\{\s*\}\s*;\s*$/m;
+        const hasExportAtEnd = exportPattern.test(compiledOutput);
+
+        if (hasExportAtEnd) {
+            return compiledOutput.replace(exportPattern, '');
+        }
+    }
+
+    return compiledOutput;
+};
+
+/**
  * Precompila el código TypeScript con pipeline optimizado para máxima performance.
  * @param {string} data - El código TypeScript a precompilar.
  * @param {string} fileName - El nombre del archivo que contiene el código typescript.
@@ -344,12 +379,10 @@ export const preCompileTS = async (
         }
 
         // PASO 3: Devolver resultado optimizado
-        const output = transpileResult.outputText;
+        let output = transpileResult.outputText;
 
-        // Limpiar output vacío
-        if (output.trim() === 'export {};') {
-            return { error: null, data: '', lang: 'ts' };
-        }
+        // Limpiar export {} innecesarios
+        output = cleanupUnnecessaryExports(output, data);
 
         return { error: null, data: output, lang: 'ts' };
     } catch (error) {
