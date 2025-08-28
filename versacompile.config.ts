@@ -1,4 +1,4 @@
-export default {
+const config =  {
     tsconfig: './tsconfig.json',
     compilerOptions: {
         sourceRoot: './src',
@@ -44,3 +44,5 @@ export default {
         },
     ],
 };
+
+export default config;

@@ -45,307 +45,246 @@ export type typeConfig = {
 /**
  * Utilidades de seguridad para validar configuraciones
  */
-class SecurityValidators {
-    private static readonly MAX_PATH_LENGTH = 260; // Windows MAX_PATH limit
-    private static readonly MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config size
-    private static readonly ALLOWED_PATH_CHARS =
-        /^[a-zA-Z0-9.\-_/\\:@ ()[\]]+$/;
-    private static readonly DANGEROUS_PATTERNS = [
-        /\.\./, // Path traversal
-        /[;&|`$]/, // Command injection characters
-        /\$\(/, // Command substitution
-        /`.*`/, // Backtick execution
-        /\|\s*[a-zA-Z]/, // Pipe to commands
-    ];
+const MAX_PATH_LENGTH = 260; // Windows MAX_PATH limit
+const MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config size
+const ALLOWED_PATH_CHARS = /^[a-zA-Z0-9.\-_/\\:@ ()[\]]+$/;
+const DANGEROUS_PATTERNS = [
+    /\.\./, // Path traversal
+    /[;&|`$]/, // Command injection characters
+    /\$\(/, // Command substitution
+    /`.*`/, // Backtick execution
+    /\|\s*[a-zA-Z]/, // Pipe to commands
+];
 
-    /**
-     * Valida que una ruta no contenga path traversal
-     */
-    static validatePath(path: string): boolean {
-        if (!path || typeof path !== 'string') {
-            return false;
-        }
-
-        if (path.length > this.MAX_PATH_LENGTH) {
-            logger.warn(`Ruta demasiado larga: ${path.length} caracteres`);
-            return false;
-        }
-
-        // Normalizar la ruta para detectar path traversal
-        const normalizedPath = normalize(path);
-        const resolvedPath = resolve(process.cwd(), normalizedPath);
-        const relativePath = relative(process.cwd(), resolvedPath);
-
-        // Verificar si la ruta trata de salir del directorio actual
-        if (relativePath.startsWith('..') || normalizedPath.includes('..')) {
-            logger.error(`Detectado intento de path traversal: ${path}`);
-            return false;
-        }
-
-        // Verificar caracteres permitidos
-        if (!this.ALLOWED_PATH_CHARS.test(path)) {
-            logger.error(`Caracteres no permitidos en la ruta: ${path}`);
-            return false;
-        }
-
-        return true;
+export function validatePath(pathStr: string): boolean {
+    if (!pathStr || typeof pathStr !== 'string') {
+        return false;
     }
 
-    /**
-     * Valida que un comando no contenga inyección de código
-     */
-    static validateCommand(command: string): boolean {
-        if (!command || typeof command !== 'string') {
-            return false;
-        }
-
-        if (command.length > this.MAX_PATH_LENGTH) {
-            logger.warn(
-                `Comando demasiado largo: ${command.length} caracteres`,
-            );
-            return false;
-        }
-
-        // Verificar patrones peligrosos
-        for (const pattern of this.DANGEROUS_PATTERNS) {
-            if (pattern.test(command)) {
-                logger.error(
-                    `Detectado patrón peligroso en comando: ${command}`,
-                );
-                return false;
-            }
-        }
-
-        // Solo permitir comandos que terminen en extensiones seguras
-        const allowedExecutables = [
-            '.exe',
-            '.cmd',
-            '.bat',
-            '.sh',
-            '.js',
-            '.ts',
-        ];
-        const hasAllowedExtension = allowedExecutables.some(
-            ext =>
-                command.toLowerCase().includes(ext) ||
-                command.startsWith('./node_modules/.bin/') ||
-                command.startsWith('npx '),
-        );
-
-        if (!hasAllowedExtension) {
-            logger.error(`Comando no permitido: ${command}`);
-            return false;
-        }
-
-        return true;
+    if (pathStr.length > MAX_PATH_LENGTH) {
+        logger.warn(`Ruta demasiado larga: ${pathStr.length} caracteres`);
+        return false;
     }
 
-    /**
-     * Valida configuración de bundlers
-     */
-    static validateBundlers(bundlers: any): bundlers is BundlerEntry[] {
-        if (!Array.isArray(bundlers)) {
-            logger.error('bundlers debe ser un array');
-            return false;
-        }
+    // Normalizar la ruta para detectar path traversal
+    const normalizedPath = normalize(pathStr);
+    const resolvedPath = resolve(process.cwd(), normalizedPath);
+    const relativePath = relative(process.cwd(), resolvedPath);
 
-        for (const entry of bundlers) {
-            if (!entry || typeof entry !== 'object') {
-                logger.error('Cada entrada de bundler debe ser un objeto');
-                return false;
-            }
-
-            if (!entry.name || typeof entry.name !== 'string') {
-                logger.error(
-                    'Cada entrada de bundler debe tener un nombre válido',
-                );
-                return false;
-            }
-
-            if (!entry.fileInput || typeof entry.fileInput !== 'string') {
-                logger.error(
-                    'Cada entrada de bundler debe tener un fileInput válido',
-                );
-                return false;
-            }
-
-            if (!this.validatePath(entry.fileInput)) {
-                logger.error(`Ruta de entrada no válida: ${entry.fileInput}`);
-                return false;
-            }
-
-            if (!entry.fileOutput || typeof entry.fileOutput !== 'string') {
-                logger.error(
-                    'Cada entrada de bundler debe tener un fileOutput válido',
-                );
-                return false;
-            }
-
-            if (!this.validatePath(entry.fileOutput)) {
-                logger.error(`Ruta de salida no válida: ${entry.fileOutput}`);
-                return false;
-            }
-        }
-
-        return true;
+    // Verificar si la ruta trata de salir del directorio actual
+    if (relativePath.startsWith('..') || normalizedPath.includes('..')) {
+        logger.error(`Detectado intento de path traversal: ${pathStr}`);
+        return false;
     }
 
-    /**
-     * Valida la estructura de configuración
-     */
-    static validateConfigStructure(config: any): config is typeConfig {
-        if (!config || typeof config !== 'object') {
-            logger.error('La configuración debe ser un objeto');
-            return false;
-        }
-
-        if (
-            !config.compilerOptions ||
-            typeof config.compilerOptions !== 'object'
-        ) {
-            logger.error('compilerOptions es requerido y debe ser un objeto');
-            return false;
-        }
-
-        if (
-            !config.compilerOptions.pathsAlias ||
-            typeof config.compilerOptions.pathsAlias !== 'object'
-        ) {
-            logger.error('pathsAlias es requerido y debe ser un objeto');
-            return false;
-        }
-
-        // Validar pathsAlias
-        for (const [key, value] of Object.entries(
-            config.compilerOptions.pathsAlias,
-        )) {
-            if (!Array.isArray(value)) {
-                logger.error(`pathsAlias["${key}"] debe ser un array`);
-                return false;
-            }
-
-            for (const path of value) {
-                if (typeof path !== 'string') {
-                    logger.error(
-                        `Todas las rutas en pathsAlias["${key}"] deben ser strings`,
-                    );
-                    return false;
-                }
-
-                if (!this.validatePath(path.replace('/*', ''))) {
-                    logger.error(
-                        `Ruta no válida en pathsAlias["${key}"]: ${path}`,
-                    );
-                    return false;
-                }
-            }
-        }
-
-        // Validar sourceRoot si existe
-        if (
-            config.compilerOptions.sourceRoot &&
-            !this.validatePath(config.compilerOptions.sourceRoot)
-        ) {
-            return false;
-        }
-
-        // Validar outDir si existe
-        if (
-            config.compilerOptions.outDir &&
-            !this.validatePath(config.compilerOptions.outDir)
-        ) {
-            return false;
-        }
-
-        // Validar linter si existe
-        if (config.linter && config.linter !== false) {
-            if (!Array.isArray(config.linter)) {
-                logger.error('linter debe ser un array o false');
-                return false;
-            }
-
-            for (const linter of config.linter) {
-                if (!this.validateLinter(linter)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+    // Verificar caracteres permitidos
+    if (!ALLOWED_PATH_CHARS.test(pathStr)) {
+        logger.error(`Caracteres no permitidos en la ruta: ${pathStr}`);
+        return false;
     }
 
-    /**
-     * Valida configuración de linter
-     */
-    static validateLinter(linter: any): linter is typeLinter {
-        if (!linter || typeof linter !== 'object') {
-            logger.error('Cada linter debe ser un objeto');
+    return true;
+}
+
+export function validateCommand(command: string): boolean {
+    if (!command || typeof command !== 'string') {
+        return false;
+    }
+
+    if (command.length > MAX_PATH_LENGTH) {
+        logger.warn(`Comando demasiado largo: ${command.length} caracteres`);
+        return false;
+    }
+
+    // Verificar patrones peligrosos
+    for (const pattern of DANGEROUS_PATTERNS) {
+        if (pattern.test(command)) {
+            logger.error(`Detectado patrón peligroso en comando: ${command}`);
+            return false;
+        }
+    }
+
+    // Solo permitir comandos que terminen en extensiones seguras
+    const allowedExecutables = ['.exe', '.cmd', '.bat', '.sh', '.js', '.ts'];
+    const hasAllowedExtension = allowedExecutables.some(
+        ext =>
+            command.toLowerCase().includes(ext) ||
+            command.startsWith('./node_modules/.bin/') ||
+            command.startsWith('npx '),
+    );
+
+    if (!hasAllowedExtension) {
+        logger.error(`Comando no permitido: ${command}`);
+        return false;
+    }
+
+    return true;
+}
+
+export function validateBundlers(bundlers: any): bundlers is BundlerEntry[] {
+    if (!Array.isArray(bundlers)) {
+        logger.error('bundlers debe ser un array');
+        return false;
+    }
+
+    for (const entry of bundlers) {
+        if (!entry || typeof entry !== 'object') {
+            logger.error('Cada entrada de bundler debe ser un objeto');
             return false;
         }
 
-        if (!linter.name || typeof linter.name !== 'string') {
-            logger.error('Linter debe tener un nombre válido');
+        if (!entry.name || typeof entry.name !== 'string') {
+            logger.error('Cada entrada de bundler debe tener un nombre válido');
             return false;
         }
 
-        if (!linter.bin || typeof linter.bin !== 'string') {
-            logger.error('Linter debe tener un bin válido');
+        if (!entry.fileInput || typeof entry.fileInput !== 'string') {
+            logger.error('Cada entrada de bundler debe tener un fileInput válido');
             return false;
         }
 
-        if (!this.validateCommand(linter.bin)) {
+        if (!validatePath(entry.fileInput)) {
+            logger.error(`Ruta de entrada no válida: ${entry.fileInput}`);
             return false;
         }
 
-        if (!linter.configFile || typeof linter.configFile !== 'string') {
-            logger.error('Linter debe tener un configFile válido');
+        if (!entry.fileOutput || typeof entry.fileOutput !== 'string') {
+            logger.error('Cada entrada de bundler debe tener un fileOutput válido');
             return false;
         }
 
-        if (!this.validatePath(linter.configFile)) {
+        if (!validatePath(entry.fileOutput)) {
+            logger.error(`Ruta de salida no válida: ${entry.fileOutput}`);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export function validateConfigStructure(config: any): config is typeConfig {
+    if (!config || typeof config !== 'object') {
+        logger.error('La configuración debe ser un objeto');
+        return false;
+    }
+
+    if (!config.compilerOptions || typeof config.compilerOptions !== 'object') {
+        logger.error('compilerOptions es requerido y debe ser un objeto');
+        return false;
+    }
+
+    if (!config.compilerOptions.pathsAlias || typeof config.compilerOptions.pathsAlias !== 'object') {
+        logger.error('pathsAlias es requerido y debe ser un objeto');
+        return false;
+    }
+
+    // Validar pathsAlias
+    for (const [key, value] of Object.entries(config.compilerOptions.pathsAlias)) {
+        if (!Array.isArray(value)) {
+            logger.error(`pathsAlias["${key}"] debe ser un array`);
             return false;
         }
 
-        if (linter.paths && !Array.isArray(linter.paths)) {
-            logger.error('linter.paths debe ser un array');
-            return false;
-        }
+        for (const p of value) {
+            if (typeof p !== 'string') {
+                logger.error(`Todas las rutas en pathsAlias["${key}"] deben ser strings`);
+                return false;
+            }
 
-        if (linter.paths) {
-            for (const path of linter.paths) {
-                if (typeof path !== 'string' || !this.validatePath(path)) {
-                    logger.error(`Ruta de linter no válida: ${path}`);
-                    return false;
-                }
+            if (!validatePath(p.replace('/*', ''))) {
+                logger.error(`Ruta no válida en pathsAlias["${key}"]: ${p}`);
+                return false;
             }
         }
-        if (linter.fix !== undefined && typeof linter.fix !== 'boolean') {
-            logger.error('Linter fix debe ser un booleano');
+    }
+
+    // Validar sourceRoot si existe
+    if (config.compilerOptions.sourceRoot && !validatePath(config.compilerOptions.sourceRoot)) {
+        return false;
+    }
+
+    // Validar outDir si existe
+    if (config.compilerOptions.outDir && !validatePath(config.compilerOptions.outDir)) {
+        return false;
+    }
+
+    // Validar linter si existe
+    if (config.linter && config.linter !== false) {
+        if (!Array.isArray(config.linter)) {
+            logger.error('linter debe ser un array o false');
+            return false;
+        }
+
+        for (const linter of config.linter) {
+            if (!validateLinter(linter)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+export function validateLinter(linter: any): linter is typeLinter {
+    if (!linter || typeof linter !== 'object') {
+        logger.error('Cada linter debe ser un objeto');
+        return false;
+    }
+
+    if (!linter.name || typeof linter.name !== 'string') {
+        logger.error('Linter debe tener un nombre válido');
+        return false;
+    }
+
+    if (!linter.bin || typeof linter.bin !== 'string') {
+        logger.error('Linter debe tener un bin válido');
+        return false;
+    }
+
+    if (!validateCommand(linter.bin)) {
+        return false;
+    }
+
+    if (!linter.configFile || typeof linter.configFile !== 'string') {
+        logger.error('Linter debe tener un configFile válido');
+        return false;
+    }
+
+    if (!validatePath(linter.configFile)) {
+        return false;
+    }
+
+    if (linter.paths && !Array.isArray(linter.paths)) {
+        logger.error('linter.paths debe ser un array');
+        return false;
+    }
+
+    if (linter.paths) {
+        for (const p of linter.paths) {
+            if (typeof p !== 'string' || !validatePath(p)) {
+                logger.error(`Ruta de linter no válida: ${p}`);
+                return false;
+            }
+        }
+    }
+    if (linter.fix !== undefined && typeof linter.fix !== 'boolean') {
+        logger.error('Linter fix debe ser un booleano');
+        return false;
+    }
+    return true;
+}
+
+export function validateConfigSize(config: any): boolean {
+    try {
+        const configString = JSON.stringify(config);
+        if (configString.length > MAX_CONFIG_SIZE) {
+            logger.error(`Configuración demasiado grande: ${configString.length} bytes`);
             return false;
         }
         return true;
-    }
-
-    /**
-     * Valida el tamaño del objeto de configuración
-     */
-    static validateConfigSize(config: any): boolean {
-        try {
-            const configString = JSON.stringify(config);
-            if (configString.length > this.MAX_CONFIG_SIZE) {
-                logger.error(
-                    `Configuración demasiado grande: ${configString.length} bytes`,
-                );
-                return false;
-            }
-            return true;
-        } catch (error) {
-            logger.error(
-                'Error al serializar configuración (posible referencia circular):',
-                error,
-            );
-            return false;
-        }
+    } catch (error) {
+        logger.error('Error al serializar configuración (posible referencia circular):', error);
+        return false;
     }
 }
 
@@ -410,8 +349,8 @@ export async function readConfig(): Promise<boolean> {
             );
         }
 
-        // Validar la ruta del archivo de configuración
-        if (!SecurityValidators.validatePath(env.PATH_CONFIG_FILE)) {
+    // Validar la ruta del archivo de configuración
+    if (!validatePath(env.PATH_CONFIG_FILE)) {
             throw new Error(
                 `Ruta de configuración no válida: ${env.PATH_CONFIG_FILE}`,
             );
@@ -434,15 +373,15 @@ export async function readConfig(): Promise<boolean> {
 
         const tsConfig = data.default || data;
 
-        // Validar tamaño de configuración
-        if (!SecurityValidators.validateConfigSize(tsConfig)) {
+    // Validar tamaño de configuración
+    if (!validateConfigSize(tsConfig)) {
             throw new Error(
                 'Configuración demasiado grande o contiene referencias circulares.',
             );
         }
 
-        // Validar estructura de configuración
-        if (!SecurityValidators.validateConfigStructure(tsConfig)) {
+    // Validar estructura de configuración
+    if (!validateConfigStructure(tsConfig)) {
             throw new Error(
                 'El archivo de configuración no tiene una estructura válida.',
             );
@@ -467,10 +406,8 @@ export async function readConfig(): Promise<boolean> {
         // Establecer variables de entorno de forma segura
         env.PATH_ALIAS = safeJsonStringify(pathAlias, '{}');
         env.tailwindcss = safeJsonStringify(tsConfig?.tailwindConfig, 'false');
-        env.proxyUrl = (tsConfig?.proxyConfig?.proxyUrl || '').toString();
-        env.AssetsOmit = (
-            tsConfig?.proxyConfig?.assetsOmit || false
-        ).toString();
+    env.proxyUrl = String(tsConfig?.proxyConfig?.proxyUrl || '');
+    env.AssetsOmit = String(tsConfig?.proxyConfig?.assetsOmit || false);
         env.linter = safeJsonStringify(tsConfig?.linter, 'false');
         env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
@@ -480,10 +417,10 @@ export async function readConfig(): Promise<boolean> {
         );
         const outDir = cleanPath(tsConfig?.compilerOptions?.outDir || './dist');
 
-        if (!SecurityValidators.validatePath(sourceRoot)) {
+    if (!validatePath(sourceRoot)) {
             throw new Error(`sourceRoot no válido: ${sourceRoot}`);
         }
-        if (!SecurityValidators.validatePath(outDir)) {
+    if (!validatePath(outDir)) {
             throw new Error(`outDir no válido: ${outDir}`);
         }
 
@@ -521,8 +458,8 @@ export async function initConfig(): Promise<boolean> {
             env.PATH_CONFIG_FILE || 'versacompile.config.ts',
         );
 
-        // Validar que la ruta de destino sea segura
-        if (!SecurityValidators.validatePath(configPath)) {
+    // Validar que la ruta de destino sea segura
+    if (!validatePath(configPath)) {
             throw new Error(`Ruta de configuración no válida: ${configPath}`);
         }
 

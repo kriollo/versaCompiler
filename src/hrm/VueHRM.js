@@ -8,6 +8,8 @@
  * @property {string} [from] - Origen del nodo
  */
 
+import { obtenerInstanciaVue } from './getInstanciaVue';
+
 /**
  * @typedef {Object} VNode
  * @property {Object} [type] - Tipo del VNode
@@ -276,8 +278,12 @@ export async function reloadComponent(App, Component) {
         const { normalizedPath: relativePath, nameFile: componentName } =
             Component;
         if (!App || !App._instance) {
-            console.error('❌ App o App._instance no están definidos');
-            return false;
+            const vueInstance = await obtenerInstanciaVue();
+            if (!vueInstance) {
+                console.error('❌ No se pudo obtener la instancia de Vue');
+                return false;
+            }
+            App = vueInstance;
         }
 
         if (!relativePath) {

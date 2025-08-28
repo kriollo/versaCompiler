@@ -1,5 +1,7 @@
 import pluginTs from '@typescript-eslint/eslint-plugin';
 import parserTs from '@typescript-eslint/parser';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import pluginImport from 'eslint-plugin-import';
 import oxlint from 'eslint-plugin-oxlint';
 import pluginVue from 'eslint-plugin-vue';
@@ -97,7 +99,9 @@ export default [
                 ecmaVersion: 2022,
                 sourceType: 'module',
                 project: './tsconfig.json',
-                tsconfigRootDir: '.',
+                // Ensure tsconfigRootDir is absolute for @typescript-eslint/parser
+                // Resolve relative to this config file using import.meta.url
+                tsconfigRootDir: path.dirname(fileURLToPath(import.meta.url)),
             },
         },
         plugins: {
