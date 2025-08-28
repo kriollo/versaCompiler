@@ -1,10 +1,10 @@
 import pluginTs from '@typescript-eslint/eslint-plugin';
 import parserTs from '@typescript-eslint/parser';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import pluginImport from 'eslint-plugin-import';
 import oxlint from 'eslint-plugin-oxlint';
 import pluginVue from 'eslint-plugin-vue';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import parserVue from 'vue-eslint-parser';
 
 export default [
