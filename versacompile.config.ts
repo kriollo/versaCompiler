@@ -1,4 +1,4 @@
-const config =  {
+const config = {
     tsconfig: './tsconfig.json',
     compilerOptions: {
         sourceRoot: './src',

@@ -1,4 +1,4 @@
-import oxc from 'oxc-transform';
+import { transform } from 'oxc-transform';
 
 export function traspileTStoJS(
     filePath: string,
@@ -9,7 +9,7 @@ export function traspileTStoJS(
             code: outputText,
             declaration,
             errors: diagnostics,
-        } = oxc.transform(filePath, sourceCode);
+        } = transform(filePath, sourceCode);
         return {
             outputText: outputText,
             declaration: declaration || '',

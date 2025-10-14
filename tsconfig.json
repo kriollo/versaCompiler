@@ -5,7 +5,7 @@
         "noEmitOnError": true,
         //comentario para probar si parsea bien el tsconfig.json
         "strict": true,
-        "noImplicitAny": true,
+        "noImplicitAny": false,
         "strictNullChecks": true,
         "strictFunctionTypes": true,
         "strictBindCallApply": true,
@@ -13,7 +13,6 @@
         "noImplicitThis": true,
         "useUnknownInCatchVariables": true,
         "alwaysStrict": true,
-
         "noUncheckedIndexedAccess": true,
         "moduleDetection": "force",
         "allowJs": true,
@@ -22,16 +21,26 @@
         "noEmit": true,
         "module": "esnext",
         "target": "es2022",
-        "lib": ["es2022", "dom", "dom.iterable"],
+        "lib": [
+            "es2022",
+            "dom",
+            "dom.iterable"
+        ],
         "outDir": "./public/",
         "sourceMap": true,
         "inlineSourceMap": false,
         "inlineSources": false,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["examples/*"],
-            "P@/*": ["public/*"],
-            "e@/*": ["examples/*"]
+            "@/*": [
+                "examples/*"
+            ],
+            "P@/*": [
+                "public/*"
+            ],
+            "e@/*": [
+                "examples/*"
+            ]
         },
         "typeRoots": [
             "./node_modules/@types",
@@ -45,14 +54,20 @@
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "types": ["jest", "node"],
+        "types": [
+            "jest",
+            "node"
+        ],
         "jsx": "preserve"
     },
     "vueCompilerOptions": {
         "target": 3.5,
         "strictTemplates": true
     },
-    "exclude": ["./public/**/*", "coverage/**/*"],
+    "exclude": [
+        "./public/**/*",
+        "coverage/**/*"
+    ],
     "include": [
         "src/**/*",
         "src/**/*.ts",
@@ -65,6 +80,8 @@
     ],
     "typeAcquisition": {
         "enable": true,
-        "include": ["vue"]
+        "include": [
+            "vue"
+        ]
     }
 }

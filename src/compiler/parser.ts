@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs, { readFile } from 'node:fs/promises';
 
-import oxc from 'oxc-parser';
+import { parseSync } from 'oxc-parser';
 
 // ✨ NUEVA OPTIMIZACIÓN: Sistema de cache AST inteligente
 interface ASTCacheEntry {
@@ -77,7 +77,7 @@ class ParserASTCache {
 
         // Cache miss - parsear nuevo AST
         this.cacheMisses++;
-        const ast = oxc.parseSync(filename, code, {
+        const ast = parseSync(filename, code, {
             sourceType: 'module',
             showSemanticErrors: true,
             astType,

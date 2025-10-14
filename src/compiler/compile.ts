@@ -49,6 +49,7 @@ class OptimizedModuleManager {
     private usageStats: Map<string, number> = new Map(); // Estadísticas de uso
     private preloadQueue: Set<string> = new Set(); // Cola de precarga
     private backgroundLoader: Promise<void> | null = null; // Cargador en background
+    private preloadLock: Promise<void> | null = null; // Lock para evitar precargas concurrentes
 
     // Módulos críticos que siempre se precargan
     private readonly HOT_MODULES = ['chalk', 'parser'];
@@ -94,9 +95,32 @@ class OptimizedModuleManager {
     }
 
     /**
-     * ✨ MEJORADO: Precarga contextual basada en tipos de archivo
+     * ✨ MEJORADO: Precarga contextual basada en tipos de archivo con lock para prevenir cargas concurrentes
      */
     async preloadForContext(
+        context: 'individual' | 'batch' | 'watch',
+        fileTypes: Set<string> = new Set(),
+    ): Promise<void> {
+        // Si ya hay una precarga en progreso, esperar a que termine
+        if (this.preloadLock) {
+            await this.preloadLock;
+            return;
+        }
+
+        // Crear el lock
+        this.preloadLock = this.doPreload(context, fileTypes);
+
+        try {
+            await this.preloadLock;
+        } finally {
+            this.preloadLock = null;
+        }
+    }
+
+    /**
+     * ✨ Método interno de precarga
+     */
+    private async doPreload(
         context: 'individual' | 'batch' | 'watch',
         fileTypes: Set<string> = new Set(),
     ): Promise<void> {
@@ -125,17 +149,25 @@ class OptimizedModuleManager {
                 toPreload.push('transforms');
         }
 
-        // Precargar en paralelo
-        const preloadPromises = toPreload.map(moduleName =>
-            this.ensureModuleLoaded(moduleName).catch(() => {
-                // Log warning pero no fallar
-                console.warn(
-                    `Warning: No se pudo precargar módulo ${moduleName}`,
-                );
-            }),
-        );
-
-        await Promise.allSettled(preloadPromises);
+        // Precargar SECUENCIALMENTE para evitar problemas de caché de ESM con node:crypto
+        // El problema: múltiples imports dinámicos simultáneos intentan cargar node:crypto al mismo tiempo
+        for (const moduleName of toPreload) {
+            try {
+                await this.ensureModuleLoaded(moduleName);
+            } catch (error) {
+                // Silenciar errores de precarga de caché de ESM - los módulos se cargarán bajo demanda
+                // Solo mostrar en modo verbose para debugging
+                if (env.VERBOSE === 'true') {
+                    const errorMessage =
+                        error instanceof Error ? error.message : String(error);
+                    console.warn(
+                        `[Verbose] Warning: No se pudo precargar módulo ${moduleName}:`,
+                        errorMessage,
+                    );
+                }
+                // Los módulos se cargarán correctamente cuando sean necesitados
+            }
+        }
     }
 
     /**
@@ -3015,23 +3047,39 @@ export async function initCompileAll() {
 
         let maxConcurrency: number;
 
-        // Ajustar concurrencia basado en memoria disponible y archivos
+        // Ajustar concurrencia de forma MUY agresiva para máximo rendimiento
         if (availableMemoryMB < 100) {
             // Poca memoria disponible
-            maxConcurrency = Math.min(2, cpuCount);
+            maxConcurrency = Math.min(6, cpuCount);
         } else if (fileCount < 10) {
-            maxConcurrency = Math.min(fileCount, Math.min(cpuCount, 4));
+            // Pocos archivos: usar todos los CPUs disponibles
+            maxConcurrency = Math.min(fileCount, cpuCount);
         } else if (fileCount < 50) {
-            maxConcurrency = Math.min(cpuCount, 6); // Reducido
+            // 10-49 archivos: usar todos los CPUs disponibles
+            maxConcurrency = Math.min(cpuCount, 16);
+        } else if (fileCount < 100) {
+            // 50-99 archivos: máxima concurrencia
+            maxConcurrency = Math.min(cpuCount, 20);
         } else {
-            maxConcurrency = Math.min(cpuCount, 8); // Reducido
+            // 100+ archivos: ultra concurrencia
+            maxConcurrency = Math.min(cpuCount, 24);
         }
 
-        // Fase 5: Configurando workers
+        // Fase 5: Configurando workers y precargando módulos
         progressManager.updateProgress('⚙️ Configurando workers...');
         logger.info(
             `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
-        ); // Configurar worker pool para modo batch
+        );
+
+        // Precargar módulos ANTES de iniciar la compilación concurrente
+        // Esto evita que múltiples hilos intenten cargar node:crypto simultáneamente
+        const moduleManager = OptimizedModuleManager.getInstance();
+        const fileExtensions = new Set(
+            filesToCompile.map(f => path.extname(f)),
+        );
+        await moduleManager.preloadForContext('batch', fileExtensions);
+
+        // Configurar worker pool para modo batch
         try {
             const { TypeScriptWorkerPool } = (await import(
                 './typescript-worker-pool'
@@ -3040,7 +3088,9 @@ export async function initCompileAll() {
             workerPool.setMode('batch');
         } catch {
             // Error silencioso en configuración del pool
-        } // Fase 6: Compilación (el progreso continúa en compileWithConcurrencyLimit)
+        }
+
+        // Fase 6: Compilación (el progreso continúa en compileWithConcurrencyLimit)
         progressManager.updateProgress(
             `🚀 Iniciando compilación de ${fileCount} archivos...`,
         );

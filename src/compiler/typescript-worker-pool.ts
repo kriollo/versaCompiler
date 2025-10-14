@@ -87,10 +87,10 @@ export class TypeScriptWorkerPool {
     private workerPath: string;
     private initPromise: Promise<void> | null = null;
     private isInitialized: boolean = false; // Configuración optimizada con reciclaje de workers
-    private readonly TASK_TIMEOUT = 15000; // 15 segundos por tarea (aumentado)
-    private readonly WORKER_INIT_TIMEOUT = 5000; // 5 segundos para inicializar
-    private readonly MAX_TASKS_PER_WORKER = 25; // Reducido para liberar memoria más frecuentemente
-    private readonly WORKER_MEMORY_CHECK_INTERVAL = 50; // Verificar cada 50 tareas (más frecuente)
+    private readonly TASK_TIMEOUT = 8000; // 8 segundos por tarea (reducido para mayor velocidad)
+    private readonly WORKER_INIT_TIMEOUT = 3000; // 3 segundos para inicializar (reducido)
+    private readonly MAX_TASKS_PER_WORKER = 50; // Aumentado para reducir overhead de reciclaje
+    private readonly WORKER_MEMORY_CHECK_INTERVAL = 100; // Verificar cada 100 tareas (reducir overhead)
 
     // Métricas de rendimiento
     private totalTasks: number = 0;
@@ -98,9 +98,10 @@ export class TypeScriptWorkerPool {
     private failedTasks: number = 0;
 
     private constructor() {
-        // Determinar tamaño óptimo del pool
+        // Determinar tamaño óptimo del pool - MÁS AGRESIVO para mejor rendimiento
         const cpuCount = os.cpus().length;
-        this.poolSize = Math.min(Math.max(cpuCount - 1, 2), 8); // Entre 2 y 8 workers
+        // Usar más workers para aprovechar mejor el CPU
+        this.poolSize = Math.min(Math.max(cpuCount, 4), 16); // Entre 4 y 16 workers
         this.workerPath = path.join(
             process.env.PATH_PROY || path.join(process.cwd(), 'src'),
             'compiler',
@@ -285,22 +286,22 @@ export class TypeScriptWorkerPool {
     }
 
     /**
-     * Configura el modo de operación del pool
+     * Configura el modo de operación del pool - OPTIMIZADO para máxima velocidad
      */
     setMode(mode: 'individual' | 'batch' | 'watch'): void {
-        // Ajustar configuración según el modo
+        // Ajustar configuración según el modo - MÁS AGRESIVO
         switch (mode) {
             case 'batch':
-                // Para modo batch, optimizar para throughput
-                this.poolSize = Math.min(os.cpus().length, 12);
+                // Para modo batch, máxima concurrencia para throughput
+                this.poolSize = Math.min(os.cpus().length, 20);
                 break;
             case 'watch':
-                // Para modo watch, menos workers pero más responsivos
-                this.poolSize = Math.min(Math.max(os.cpus().length / 2, 2), 6);
+                // Para modo watch, más workers para mejor responsividad
+                this.poolSize = Math.min(os.cpus().length, 12);
                 break;
             case 'individual':
-                // Para individual, pool pequeño
-                this.poolSize = Math.min(4, os.cpus().length);
+                // Para individual, pool moderado
+                this.poolSize = Math.min(8, os.cpus().length);
                 break;
         }
     }

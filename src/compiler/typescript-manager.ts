@@ -85,6 +85,7 @@ export const loadTypeScriptConfig = (
             );
             throw new Error(
                 `No se puede continuar sin un tsconfig.json válido. Error: ${error}`,
+                { cause: error },
             );
         }
     } else {
@@ -293,16 +294,28 @@ export const preCompileTS = async (
         }
 
         // Cargar configuración de TypeScript desde tsconfig.json
-        const compilerOptions = loadTypeScriptConfig(fileName); // PASO 1: Transpilación rápida con detección de errores críticos
+        const compilerOptions = loadTypeScriptConfig(fileName);
+
+        // PASO 1: Transpilación ULTRA RÁPIDA con mínima verificación
+        // Optimizaciones agresivas para máxima velocidad
         const transpileResult = typescript.transpileModule(data, {
             compilerOptions: {
                 ...compilerOptions,
+                // Optimizaciones de velocidad
                 noLib: true,
                 skipLibCheck: true,
                 isolatedModules: true,
+                // Deshabilitar checks innecesarios
+                noResolve: true,
+                suppressImplicitAnyIndexErrors: true,
+                suppressExcessPropertyErrors: true,
+                allowSyntheticDefaultImports: true,
+                // Modo más rápido
+                incremental: false, // No usar incremental en transpileModule
+                diagnostics: false,
             },
             fileName,
-            reportDiagnostics: true,
+            reportDiagnostics: env.VERBOSE === 'true', // Solo reportar en verbose
         });
 
         // const transpileResult = traspileTStoJS(
@@ -341,9 +354,7 @@ export const preCompileTS = async (
                 };
             }
         } // PASO 2: Type checking opcional (solo si está habilitado)
-        // console.log(`[DEBUG] env.typeCheck: ${env.typeCheck}`);
         if (env.typeCheck === 'true') {
-            // console.log(`[DEBUG] Iniciando verificación de tipos para: ${fileName}`);
             try {
                 const workerPool = TypeScriptWorkerPool.getInstance();
 

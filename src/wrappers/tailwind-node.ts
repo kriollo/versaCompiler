@@ -75,7 +75,9 @@ export class TailwindNode {
                 "Error al resolver el binario de Tailwind CSS. Asegúrate de que esté instalado y en el PATH, o provee la opción 'binPath'.",
                 error,
             );
-            throw new Error('Error al resolver el binario de Tailwind CSS.');
+            throw new Error('Error al resolver el binario de Tailwind CSS.', {
+                cause: error,
+            });
         }
     }
 

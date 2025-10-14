@@ -88,7 +88,9 @@ export class ESLintNode {
                 "Error al resolver el binario de ESLint. Asegúrate de que 'eslint' esté instalado y en el PATH, o provee la opción 'binPath'.",
                 error,
             );
-            throw new Error('Error al resolver el binario de ESLint.');
+            throw new Error('Error al resolver el binario de ESLint.', {
+                cause: error,
+            });
         }
     }
 

@@ -223,6 +223,7 @@ export class TransformOptimizer {
         } catch (error: unknown) {
             throw new Error(
                 `Error aplicando transformaciones: ${error instanceof Error ? error.message : String(error)}`,
+                { cause: error },
             );
         }
     }

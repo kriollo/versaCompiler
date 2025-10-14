@@ -86,7 +86,9 @@ export class OxlintNode {
                 "Error al resolver el binario de Oxlint. Asegúrate de que 'oxlint' esté instalado y en el PATH, o provee la opción 'binPath'.",
                 error,
             );
-            throw new Error('Error al resolver el binario de Oxlint.');
+            throw new Error('Error al resolver el binario de Oxlint.', {
+                cause: error,
+            });
         }
     }
 
