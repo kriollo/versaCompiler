@@ -32,7 +32,7 @@ interface PendingChange {
 class WatchDebouncer {
     private pendingChanges = new Map<string, PendingChange>();
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    private readonly DEBOUNCE_DELAY = 300; // 300ms debounce
+    private readonly DEBOUNCE_DELAY = 100; // ✨ OPTIMIZACIÓN #12: 100ms (reducido de 300ms) para mejor feedback
     private readonly BATCH_SIZE = 10; // Máximo archivos por batch
     private isProcessing = false;
     private browserSyncInstance: any = null; // ✨ Almacenar referencia a browserSync
@@ -42,6 +42,19 @@ class WatchDebouncer {
      */
     setBrowserSyncInstance(bs: any): void {
         this.browserSyncInstance = bs;
+    }
+
+    /**
+     * ✨ FIX #3: Limpia todos los recursos del debouncer
+     */
+    cleanup(): void {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = null;
+        }
+        this.pendingChanges.clear();
+        this.isProcessing = false;
+        this.browserSyncInstance = null;
     }
 
     /**
@@ -538,5 +551,30 @@ export async function initChokidar(bs: any) {
             process.exit(1);
         }
         throw error;
+    }
+}
+
+/**
+ * ✨ FIX #3: Limpia todos los recursos de watch mode
+ * Cierra watchers y limpia timers para evitar fugas de memoria
+ */
+export async function cleanupWatcher(watcher: any): Promise<void> {
+    try {
+        console.log('[FileWatcher] Limpiando recursos...');
+
+        // 1. Limpiar debouncer
+        watchDebouncer.cleanup();
+
+        // 2. Cerrar watcher de chokidar
+        if (watcher) {
+            await watcher.close();
+        }
+
+        console.log('[FileWatcher] Recursos limpiados correctamente');
+    } catch (error) {
+        console.error(
+            '[FileWatcher] Error al limpiar recursos:',
+            error instanceof Error ? error.message : String(error),
+        );
     }
 }

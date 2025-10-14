@@ -25,8 +25,13 @@ interface TypeCheckResult {
 
 /**
  * Cache para la configuración de TypeScript para evitar lecturas repetidas
+ * ✨ FIX #9: Ahora incluye timestamp para detectar cambios en el archivo
  */
-let configCache: { path?: string; options?: typescript.CompilerOptions } = {};
+let configCache: {
+    path?: string;
+    options?: typescript.CompilerOptions;
+    mtime?: number;
+} = {};
 
 /**
  * Carga la configuración de TypeScript desde tsconfig.json
@@ -49,14 +54,27 @@ export const loadTypeScriptConfig = (
               'tsconfig.json',
           );
 
-    // Usar cache si el path no ha cambiado
-    if (configCache.path === configPath && configCache.options) {
-        return configCache.options;
+    // ✨ FIX #9: Verificar si el archivo cambió comparando timestamp
+    if (configPath && fs.existsSync(configPath)) {
+        const stats = fs.statSync(configPath);
+        const currentMtime = stats.mtimeMs;
+
+        // Usar cache solo si el archivo no cambió
+        if (
+            configCache.path === configPath &&
+            configCache.mtime === currentMtime &&
+            configCache.options
+        ) {
+            return configCache.options;
+        }
     }
 
     let compilerOptions: typescript.CompilerOptions;
 
     if (configPath && fs.existsSync(configPath)) {
+        const stats = fs.statSync(configPath);
+        const currentMtime = stats.mtimeMs;
+
         try {
             const { config, error: configError } = typescript.readConfigFile(
                 configPath,
@@ -88,17 +106,29 @@ export const loadTypeScriptConfig = (
                 { cause: error },
             );
         }
+
+        // ✨ FIX #9: Guardar en cache con timestamp
+        configCache = {
+            path: configPath,
+            options: compilerOptions,
+            mtime: currentMtime,
+        };
+        return compilerOptions;
     } else {
         throw new Error(
             `No se encontró tsconfig.json en la raíz del proyecto (${rootConfigPath}) ni en el directorio del archivo. ` +
                 `El compilador requiere un tsconfig.json para funcionar correctamente.`,
         );
     }
-
-    // Guardar en cache
-    configCache = { path: configPath, options: compilerOptions };
-    return compilerOptions;
 };
+
+/**
+ * ✨ FIX #9: Invalida el cache de configuración de TypeScript
+ * Útil cuando se detectan cambios en tsconfig.json o para tests
+ */
+export function invalidateConfigCache(): void {
+    configCache = {};
+}
 
 /**
  * Crea una versión optimizada y serializable de las opciones del compilador typescript.

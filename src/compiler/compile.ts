@@ -20,6 +20,28 @@ import { showTimingForHumans } from '../utils/utils';
 // Configurar el getter del ProgressManager para el logger
 setProgressManagerGetter(() => ProgressManager.getInstance());
 
+/**
+ * ✨ FIX #5: Wrapper con timeout para operaciones críticas
+ * Evita que promesas colgadas bloqueen la compilación indefinidamente
+ */
+async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    operationName: string,
+): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+            () =>
+                reject(
+                    new Error(`Timeout en ${operationName} (${timeoutMs}ms)`),
+                ),
+            timeoutMs,
+        ),
+    );
+
+    return Promise.race([promise, timeoutPromise]);
+}
+
 // Heavy dependencies will be loaded dynamically when needed
 let chalk: any;
 let ESLint: any;
@@ -50,6 +72,10 @@ class OptimizedModuleManager {
     private preloadQueue: Set<string> = new Set(); // Cola de precarga
     private backgroundLoader: Promise<void> | null = null; // Cargador en background
     private preloadLock: Promise<void> | null = null; // Lock para evitar precargas concurrentes
+
+    // ✨ FIX #4: Límites estrictos de memoria para el pool
+    private readonly MAX_POOL_MEMORY = 100 * 1024 * 1024; // 100MB límite total
+    private readonly MAX_POOL_SIZE = 15; // Máximo 15 módulos en pool
 
     // Módulos críticos que siempre se precargan
     private readonly HOT_MODULES = ['chalk', 'parser'];
@@ -149,23 +175,43 @@ class OptimizedModuleManager {
                 toPreload.push('transforms');
         }
 
-        // Precargar SECUENCIALMENTE para evitar problemas de caché de ESM con node:crypto
-        // El problema: múltiples imports dinámicos simultáneos intentan cargar node:crypto al mismo tiempo
-        for (const moduleName of toPreload) {
-            try {
-                await this.ensureModuleLoaded(moduleName);
-            } catch (error) {
-                // Silenciar errores de precarga de caché de ESM - los módulos se cargarán bajo demanda
-                // Solo mostrar en modo verbose para debugging
-                if (env.VERBOSE === 'true') {
-                    const errorMessage =
-                        error instanceof Error ? error.message : String(error);
-                    console.warn(
-                        `[Verbose] Warning: No se pudo precargar módulo ${moduleName}:`,
-                        errorMessage,
-                    );
-                }
-                // Los módulos se cargarán correctamente cuando sean necesitados
+        // ✨ OPTIMIZACIÓN #10: Agrupar módulos compatibles y cargarlos en paralelo
+        // Grupos de módulos que NO comparten dependencias nativas problemáticas
+        const moduleGroups = [
+            ['chalk', 'parser'], // Grupo 1: Módulos ligeros sin node:crypto
+            ['transforms'], // Grupo 2: Puede usar node:crypto pero independiente
+            ['vue', 'typescript'], // Grupo 3: Comparten configuración
+            ['module-resolution-optimizer'], // Grupo 4: Independiente
+            ['minify'], // Grupo 5: Independiente
+        ];
+
+        // Cargar cada grupo en paralelo, pero grupos secuencialmente
+        for (const group of moduleGroups) {
+            const modulesToLoad = group.filter(name =>
+                toPreload.includes(name),
+            );
+
+            if (modulesToLoad.length > 0) {
+                // Cargar módulos del grupo en paralelo
+                await Promise.allSettled(
+                    modulesToLoad.map(async moduleName => {
+                        try {
+                            await this.ensureModuleLoaded(moduleName);
+                        } catch (error) {
+                            // Silenciar errores de precarga - los módulos se cargarán bajo demanda
+                            if (env.VERBOSE === 'true') {
+                                const errorMessage =
+                                    error instanceof Error
+                                        ? error.message
+                                        : String(error);
+                                console.warn(
+                                    `[Verbose] Warning: No se pudo precargar módulo ${moduleName}:`,
+                                    errorMessage,
+                                );
+                            }
+                        }
+                    }),
+                );
             }
         }
     }
@@ -349,19 +395,76 @@ class OptimizedModuleManager {
     }
 
     /**
-     * ✨ NUEVO: Limpia módulos no utilizados para liberar memoria
+     * ✨ FIX #4: Estima el tamaño en memoria de un módulo
+     */
+    private estimateModuleSize(moduleName: string): number {
+        // Estimaciones basadas en tipos de módulo
+        const sizeMap: Record<string, number> = {
+            'transform-optimizer': 5 * 1024 * 1024, // 5MB
+            typescript: 10 * 1024 * 1024, // 10MB
+            vue: 8 * 1024 * 1024, // 8MB
+            'module-resolution-optimizer': 3 * 1024 * 1024, // 3MB
+            transforms: 2 * 1024 * 1024, // 2MB
+            minify: 2 * 1024 * 1024, // 2MB
+            linter: 1 * 1024 * 1024, // 1MB
+            parser: 500 * 1024, // 500KB
+            chalk: 100 * 1024, // 100KB
+            default: 500 * 1024, // 500KB por defecto
+        };
+
+        return sizeMap[moduleName] ?? (sizeMap.default as number);
+    }
+
+    /**
+     * ✨ FIX #4: Obtiene el uso total de memoria del pool
+     */
+    private getPoolMemoryUsage(): number {
+        let totalSize = 0;
+        for (const moduleName of this.modulePool.keys()) {
+            totalSize += this.estimateModuleSize(moduleName);
+        }
+        return totalSize;
+    }
+
+    /**
+     * ✨ FIX #4: Limpia módulos no utilizados con control de memoria LRU
      */
     cleanupUnusedModules(): void {
-        const threshold = 1; // Mínimo de usos para mantener en pool
+        const currentMemory = this.getPoolMemoryUsage();
+        const currentSize = this.modulePool.size;
 
-        for (const [moduleName, usageCount] of this.usageStats) {
-            if (
-                usageCount < threshold &&
-                !this.HOT_MODULES.includes(moduleName)
-            ) {
+        // Limpiar si excedemos límites de memoria o tamaño
+        if (
+            currentMemory > this.MAX_POOL_MEMORY ||
+            currentSize > this.MAX_POOL_SIZE
+        ) {
+            // LRU: Ordenar por menos usado
+            const sortedModules = Array.from(this.usageStats.entries())
+                .sort((a, b) => a[1] - b[1]) // Ascendente por uso
+                .filter(([name]) => !this.HOT_MODULES.includes(name)); // No eliminar HOT_MODULES
+
+            // Eliminar módulos hasta estar por debajo del 70% del límite
+            const targetMemory = this.MAX_POOL_MEMORY * 0.7;
+            const targetSize = this.MAX_POOL_SIZE * 0.7;
+
+            for (const [moduleName] of sortedModules) {
                 this.modulePool.delete(moduleName);
                 this.loadedModules.delete(moduleName);
                 this.usageStats.delete(moduleName);
+
+                const newMemory = this.getPoolMemoryUsage();
+                const newSize = this.modulePool.size;
+
+                if (newMemory <= targetMemory && newSize <= targetSize) {
+                    break;
+                }
+            }
+
+            if (env.VERBOSE === 'true') {
+                console.log(
+                    `[ModuleManager] Limpieza: ${currentSize} → ${this.modulePool.size} módulos, ` +
+                        `${Math.round(currentMemory / 1024 / 1024)}MB → ${Math.round(this.getPoolMemoryUsage() / 1024 / 1024)}MB`,
+                );
             }
         }
     }
@@ -3098,6 +3201,10 @@ export async function initCompileAll() {
         progressManager.updateProgress('💾 Guardando cache...');
         await saveCache();
 
+        // ✨ FIX #4: Limpiar módulos no usados después de compilación masiva
+        progressManager.updateProgress('🧹 Limpiando módulos no usados...');
+        moduleManager.cleanupUnusedModules();
+
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime); // Finalizar progreso
         progressManager.endProgress();
@@ -3163,8 +3270,13 @@ function createProgressBarWithPercentage(
 }
 
 // Función wrapper para compatibilidad con tests
+// ✨ FIX #5: Con timeout de 60 segundos para compilación individual
 export async function compileFile(filePath: string) {
-    return await initCompile(filePath, true, 'individual');
+    return await withTimeout(
+        initCompile(filePath, true, 'individual'),
+        60000,
+        `compilación de ${path.basename(filePath)}`,
+    );
 }
 
 export { WatchModeOptimizer };

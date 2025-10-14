@@ -33,16 +33,58 @@ class BrowserSyncFileCache {
     private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutos para archivos estáticos
     private currentMemoryUsage = 0;
 
+    // ✨ FIX #8: Intervalo de limpieza automática
+    private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
     // Métricas
     private cacheHits = 0;
     private cacheMisses = 0;
     private totalRequests = 0;
+
+    private constructor() {
+        // ✨ FIX #8: Iniciar limpieza automática cada 5 minutos
+        this.startAutoCleanup();
+    }
 
     static getInstance(): BrowserSyncFileCache {
         if (!BrowserSyncFileCache.instance) {
             BrowserSyncFileCache.instance = new BrowserSyncFileCache();
         }
         return BrowserSyncFileCache.instance;
+    }
+
+    /**
+     * ✨ FIX #8: Inicia la limpieza automática de entradas expiradas
+     */
+    private startAutoCleanup(): void {
+        this.cleanupInterval = setInterval(
+            () => {
+                this.cleanupExpiredEntries();
+            },
+            5 * 60 * 1000,
+        ); // Cada 5 minutos
+    }
+
+    /**
+     * ✨ FIX #8: Limpia entradas de cache expiradas
+     */
+    private cleanupExpiredEntries(): void {
+        const now = Date.now();
+        let cleaned = 0;
+
+        for (const [filePath, entry] of this.cache.entries()) {
+            if (now - entry.lastModified > this.CACHE_TTL) {
+                this.currentMemoryUsage -= entry.size;
+                this.cache.delete(filePath);
+                cleaned++;
+            }
+        }
+
+        if (cleaned > 0) {
+            console.log(
+                `[BrowserSync] Limpiadas ${cleaned} entradas expiradas del cache`,
+            );
+        }
     }
 
     /**
@@ -333,6 +375,17 @@ class BrowserSyncFileCache {
         this.cacheHits = 0;
         this.cacheMisses = 0;
         this.totalRequests = 0;
+    }
+
+    /**
+     * ✨ FIX #8: Destruye la instancia y limpia recursos
+     */
+    terminate(): void {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
+        }
+        this.clear();
     }
 }
 

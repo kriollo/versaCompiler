@@ -89,8 +89,12 @@ export class TypeScriptWorkerPool {
     private isInitialized: boolean = false; // Configuración optimizada con reciclaje de workers
     private readonly TASK_TIMEOUT = 8000; // 8 segundos por tarea (reducido para mayor velocidad)
     private readonly WORKER_INIT_TIMEOUT = 3000; // 3 segundos para inicializar (reducido)
-    private readonly MAX_TASKS_PER_WORKER = 50; // Aumentado para reducir overhead de reciclaje
-    private readonly WORKER_MEMORY_CHECK_INTERVAL = 100; // Verificar cada 100 tareas (reducir overhead)
+    private readonly MAX_TASKS_PER_WORKER = 200; // ✨ OPTIMIZADO: Aumentado de 50 a 200 para reducir overhead de reciclaje
+    private readonly WORKER_MEMORY_CHECK_INTERVAL = 500; // ✨ OPTIMIZADO: Verificar cada 500 tareas (reducir overhead)
+
+    // ✨ FIX #1: Referencias a timers para limpieza adecuada
+    private memoryCheckInterval: ReturnType<typeof setInterval> | null = null;
+    private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
     // Métricas de rendimiento
     private totalTasks: number = 0;
@@ -115,17 +119,35 @@ export class TypeScriptWorkerPool {
 
     /**
      * Inicia el monitoreo automático de memoria de workers
+     * ✨ FIX #1: Ahora almacena referencias a los intervalos para limpieza posterior
      */
     private startMemoryMonitoring(): void {
+        // Limpiar intervalos previos si existen
+        this.stopMemoryMonitoring();
+
         // Monitoreo cada 15 segundos (más frecuente)
-        setInterval(() => {
+        this.memoryCheckInterval = setInterval(() => {
             this.checkWorkersMemory();
         }, 15000);
 
         // Limpieza de workers inactivos cada 2 minutos (más frecuente)
-        setInterval(() => {
+        this.cleanupInterval = setInterval(() => {
             this.cleanupInactiveWorkers();
         }, 120000);
+    }
+
+    /**
+     * ✨ FIX #1: Detiene el monitoreo automático de memoria
+     */
+    private stopMemoryMonitoring(): void {
+        if (this.memoryCheckInterval) {
+            clearInterval(this.memoryCheckInterval);
+            this.memoryCheckInterval = null;
+        }
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
+        }
     }
 
     /**
@@ -210,10 +232,11 @@ export class TypeScriptWorkerPool {
 
     /**
      * Obtiene la razón por la cual un worker debe ser reciclado
+     * ✨ OPTIMIZACIÓN #11: Límites aumentados para reducir overhead de reciclaje
      */
     private getRecycleReason(poolWorker: PoolWorker): string {
         const now = Date.now();
-        const MEMORY_LIMIT = 50 * 1024 * 1024; // 50MB
+        const MEMORY_LIMIT = 100 * 1024 * 1024; // ✨ 100MB (aumentado de 50MB)
         const TIME_LIMIT = 30 * 60 * 1000; // 30 minutos
         const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
 
@@ -261,11 +284,12 @@ export class TypeScriptWorkerPool {
         }
     } /**
      * Verifica si un worker debe ser reciclado por límites de memoria/tiempo
+     * ✨ OPTIMIZACIÓN #11: Límites aumentados para reducir overhead de reciclaje
      */
     private shouldRecycleWorker(poolWorker: PoolWorker): boolean {
         const now = Date.now();
-        const MEMORY_LIMIT = 30 * 1024 * 1024; // 30MB (reducido)
-        const TIME_LIMIT = 15 * 60 * 1000; // 15 minutos (reducido)
+        const MEMORY_LIMIT = 100 * 1024 * 1024; // ✨ 100MB (aumentado de 30MB)
+        const TIME_LIMIT = 30 * 60 * 1000; // ✨ 30 minutos (aumentado de 15 min)
         const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
 
         return (
@@ -616,6 +640,7 @@ export class TypeScriptWorkerPool {
 
     /**
      * Recicla un worker para prevenir memory leaks
+     * ✨ FIX #2: Mejorada limpieza explícita de listeners y referencias
      */
     private async recycleWorker(poolWorker: PoolWorker): Promise<void> {
         try {
@@ -641,23 +666,45 @@ export class TypeScriptWorkerPool {
                 checkPending();
             });
 
-            // 2. Si aún hay tareas pendientes, rechazarlas
-            if (poolWorker.pendingTasks.size > 0) {
-                poolWorker.pendingTasks.forEach(task => {
-                    clearTimeout(task.timeout);
-                    task.reject(new Error('Worker being recycled'));
-                });
-                poolWorker.pendingTasks.clear();
+            // 2. Si aún hay tareas pendientes, rechazarlas con cleanup de timeouts
+            const pendingTasksArray = Array.from(
+                poolWorker.pendingTasks.entries(),
+            );
+            for (const [_taskId, task] of pendingTasksArray) {
+                clearTimeout(task.timeout);
+                task.reject(new Error('Worker being recycled'));
             }
+            poolWorker.pendingTasks.clear();
 
-            // 3. Terminar worker actual
-            poolWorker.worker.removeAllListeners();
-            await poolWorker.worker.terminate();
+            // 3. ✨ FIX #2: Remover listeners explícitamente por tipo
+            const worker = poolWorker.worker;
+            worker.removeAllListeners('message');
+            worker.removeAllListeners('error');
+            worker.removeAllListeners('exit');
+            worker.removeAllListeners('online');
+            worker.removeAllListeners('messageerror');
 
-            // 4. Crear nuevo worker
+            // 4. ✨ FIX #2: Desreferenciar el worker antes de terminar
+            const workerToTerminate = poolWorker.worker;
+            poolWorker.worker = null as any; // Romper referencia circular
+
+            // 5. Terminar con timeout para evitar cuelgues
+            const terminatePromise = workerToTerminate.terminate();
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Terminate timeout')), 3000),
+            );
+
+            await Promise.race([terminatePromise, timeoutPromise]).catch(
+                error => {
+                    console.warn(
+                        `[WorkerPool] Warning al terminar worker ${poolWorker.id}:`,
+                        error,
+                    );
+                },
+            );
+
+            // 6. ✨ FIX #2: Crear y reemplazar con nuevo worker
             const newWorker = await this.createWorker(poolWorker.id);
-
-            // 5. Reemplazar en el array
             const index = this.workers.findIndex(w => w.id === poolWorker.id);
             if (index !== -1) {
                 this.workers[index] = newWorker;
@@ -907,9 +954,13 @@ export class TypeScriptWorkerPool {
 
     /**
      * Cierra todos los workers del pool con cleanup completo
+     * ✨ FIX #1: Ahora limpia timers de monitoreo para evitar fugas de memoria
      */
     async terminate(): Promise<void> {
         console.log('[WorkerPool] Cerrando pool de workers...');
+
+        // 0. ✨ FIX #1: Detener monitoreo de memoria primero
+        this.stopMemoryMonitoring();
 
         // 1. Rechazar todas las tareas pendientes con cleanup
         let totalPendingTasks = 0;

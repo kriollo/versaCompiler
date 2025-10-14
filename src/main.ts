@@ -429,19 +429,30 @@ async function main() {
                 process.exit(1);
             }
         }
-        process.on('SIGINT', async () => {
+        // ✨ FIX #7: Usar process.once() para evitar acumulación de listeners
+        process.once('SIGINT', async () => {
             if (bs) {
                 bs.exit();
             }
 
             if (watch) {
-                watch.close();
+                // ✨ FIX #3: Usar nuevo método cleanupWatcher
+                const { cleanupWatcher } = await loadChokidarModule();
+                await cleanupWatcher(watch);
             }
             stopCompile();
             process.exit(0);
         });
 
-        process.on('SIGTERM', async () => {
+        process.once('SIGTERM', async () => {
+            if (bs) {
+                bs.exit();
+            }
+
+            if (watch) {
+                const { cleanupWatcher } = await loadChokidarModule();
+                await cleanupWatcher(watch);
+            }
             stopCompile();
             process.exit(0);
         });
