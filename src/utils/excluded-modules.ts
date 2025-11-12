@@ -36,4 +36,5 @@ export const EXCLUDED_MODULES = new Set([
     'find-root',
     'fs-extra',
     'minimatch', // ✅ Incluir minimatch aquí
+    'minify-html-literals',
 ]);

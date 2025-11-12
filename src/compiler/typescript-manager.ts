@@ -337,8 +337,9 @@ export const preCompileTS = async (
                 isolatedModules: true,
                 // Deshabilitar checks innecesarios
                 noResolve: true,
-                suppressImplicitAnyIndexErrors: true,
-                suppressExcessPropertyErrors: true,
+                // ✅ REMOVIDAS opciones obsoletas de TypeScript 5.9:
+                // - suppressImplicitAnyIndexErrors (ya no existe)
+                // - suppressExcessPropertyErrors (ya no existe)
                 allowSyntheticDefaultImports: true,
                 // Modo más rápido
                 incremental: false, // No usar incremental en transpileModule

@@ -16,6 +16,9 @@ export default [
             'node_modules/**/*',
             'dist/**/*',
             'temp/**/*',
+            'tests/**/*', // Tests tienen su propia configuración
+            'test-results/**/*',
+            'coverage/**/*',
             '*.d.ts',
             'eslint.config.*.js',
             'performance-results/**/*',

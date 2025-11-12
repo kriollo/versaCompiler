@@ -330,7 +330,8 @@ class OptimizedModuleManager {
     private async loadMinify(): Promise<any> {
         if (!minifyJS) {
             const minifyModule = await import('./minify');
-            minifyJS = minifyModule.minifyJS;
+            // ✨ Usar minifyWithTemplates para minificar templates HTML ANTES del JS
+            minifyJS = minifyModule.minifyWithTemplates;
         }
         return minifyJS;
     }
@@ -507,7 +508,8 @@ async function loadLinter() {
 async function loadMinify() {
     if (!minifyJS) {
         const minifyModule = await import('./minify');
-        minifyJS = minifyModule.minifyJS;
+        // ✨ Usar minifyWithTemplates para minificar templates HTML ANTES del JS
+        minifyJS = minifyModule.minifyWithTemplates;
     }
     return minifyJS;
 }
@@ -3057,13 +3059,24 @@ async function compileWithConcurrencyLimit(
         results.push(promise);
         executing.push(promise);
 
+        // ✅ FIX: Esperar correctamente a que termine alguna promesa antes de continuar
         if (executing.length >= maxConcurrency) {
-            await Promise.race(executing);
-            executing.splice(
-                executing.findIndex(p => p === promise),
-                1,
-            );
+            // Esperar a que termine cualquier promesa
+            const completedPromise = await Promise.race(executing);
+            // Remover la promesa completada del array executing
+            const index = executing.indexOf(completedPromise);
+            if (index !== -1) {
+                executing.splice(index, 1);
+            }
         }
+
+        // Limpiar promesas completadas del array executing
+        promise.then(() => {
+            const index = executing.indexOf(promise);
+            if (index !== -1) {
+                executing.splice(index, 1);
+            }
+        });
     }
     await Promise.all(results);
 
@@ -3141,38 +3154,126 @@ export async function initCompileAll() {
             }
             // Usar la ruta tal como viene de glob, sin modificar
             filesToCompile.push(file);
-        } // Determinar concurrencia óptima considerando memoria disponible
-        const cpuCount = os.cpus().length;
+        }
+
+        // ✨ OPTIMIZACIÓN: Determinar concurrencia basada en CPUs y tipo de operación
+        let cpuCount = os.cpus().length;
         const fileCount = filesToCompile.length;
-        const memUsage = process.memoryUsage();
-        const availableMemoryMB =
-            (memUsage.heapTotal - memUsage.heapUsed) / (1024 * 1024);
+
+        // ✅ FIX: En algunos entornos (Docker, VMs), os.cpus() retorna 1
+        // Establecer un mínimo razonable basado en el tipo de sistema
+        if (cpuCount < 4) {
+            // Probablemente un contenedor o VM mal configurado
+            // Usar un valor conservador pero razonable
+            cpuCount = 4;
+            if (env.VERBOSE === 'true') {
+                logger.warn(
+                    `⚠️  Solo se detectó ${os.cpus().length} CPU. Usando ${cpuCount} hilos por defecto.`,
+                );
+            }
+        }
+
+        // ✅ OVERRIDE MANUAL: Permitir al usuario forzar un número de hilos
+        if (process.env.VERSACOMPILER_MAX_THREADS) {
+            const envThreads = parseInt(
+                process.env.VERSACOMPILER_MAX_THREADS,
+                10,
+            );
+            if (!isNaN(envThreads) && envThreads > 0) {
+                cpuCount = envThreads;
+                if (env.VERBOSE === 'true') {
+                    logger.info(
+                        `🔧 Usando ${cpuCount} hilos (variable de entorno VERSACOMPILER_MAX_THREADS)`,
+                    );
+                }
+            }
+        }
+
+        // Obtener memoria total del sistema (no solo heap)
+        const totalMemoryMB = os.totalmem() / (1024 * 1024);
+        const freeMemoryMB = os.freemem() / (1024 * 1024);
+        const memoryUsagePercent =
+            ((totalMemoryMB - freeMemoryMB) / totalMemoryMB) * 100;
 
         let maxConcurrency: number;
 
-        // Ajustar concurrencia de forma MUY agresiva para máximo rendimiento
-        if (availableMemoryMB < 100) {
-            // Poca memoria disponible
-            maxConcurrency = Math.min(6, cpuCount);
-        } else if (fileCount < 10) {
-            // Pocos archivos: usar todos los CPUs disponibles
-            maxConcurrency = Math.min(fileCount, cpuCount);
+        // ✅ ESTRATEGIA AGRESIVA: Usar TODOS los cores disponibles por defecto
+        // La compilación de archivos es I/O bound, no CPU bound, así que podemos ser agresivos
+        if (memoryUsagePercent > 90) {
+            // Solo si la memoria del SISTEMA está al 90%, reducir hilos
+            maxConcurrency = Math.max(4, Math.floor(cpuCount * 0.5));
+        } else if (fileCount < 5) {
+            // Muy pocos archivos: no tiene sentido más hilos que archivos
+            maxConcurrency = fileCount;
+        } else if (fileCount < 20) {
+            // Pocos archivos: usar todos los CPUs
+            maxConcurrency = cpuCount;
         } else if (fileCount < 50) {
-            // 10-49 archivos: usar todos los CPUs disponibles
-            maxConcurrency = Math.min(cpuCount, 16);
-        } else if (fileCount < 100) {
-            // 50-99 archivos: máxima concurrencia
-            maxConcurrency = Math.min(cpuCount, 20);
+            // Archivos moderados: 1.5x los CPUs (I/O permite más hilos)
+            maxConcurrency = Math.floor(cpuCount * 1.5);
+        } else if (fileCount < 200) {
+            // Muchos archivos: 2x los CPUs
+            maxConcurrency = cpuCount * 2;
         } else {
-            // 100+ archivos: ultra concurrencia
-            maxConcurrency = Math.min(cpuCount, 24);
+            // Proyectos grandes: máxima concurrencia
+            maxConcurrency = Math.min(cpuCount * 3, 48);
+        }
+
+        // ✅ GARANTIZAR MÍNIMO RAZONABLE: Nunca menos de 4 hilos en proyectos > 10 archivos
+        if (fileCount > 10 && maxConcurrency < 4) {
+            maxConcurrency = 4;
+            if (env.VERBOSE === 'true') {
+                logger.info(
+                    `⚡ Ajustando a mínimo de 4 hilos para proyecto de ${fileCount} archivos`,
+                );
+            }
         }
 
         // Fase 5: Configurando workers y precargando módulos
         progressManager.updateProgress('⚙️ Configurando workers...');
+
+        // ✅ Logging mejorado con información de recursos
         logger.info(
             `🚀 Compilando ${fileCount} archivos con concurrencia optimizada (${maxConcurrency} hilos)...`,
         );
+
+        // ✅ SIEMPRE mostrar info de CPUs/memoria para detectar problemas
+        logger.info(
+            `   📊 CPUs detectados: ${os.cpus().length} (usando: ${cpuCount})`,
+        );
+        logger.info(
+            `   💾 Memoria libre: ${freeMemoryMB.toFixed(0)}MB / ${totalMemoryMB.toFixed(0)}MB (${(100 - memoryUsagePercent).toFixed(1)}% libre)`,
+        );
+        logger.info(
+            `   ⚡ Hilos configurados: ${maxConcurrency} (${(maxConcurrency / cpuCount).toFixed(1)}x CPUs)`,
+        );
+
+        // ⚠️ Warning si los hilos son muy pocos para el tamaño del proyecto
+        const optimalThreads = Math.min(cpuCount * 2, 24);
+        if (fileCount > 50 && maxConcurrency < optimalThreads * 0.5) {
+            const chalk = await loadChalk();
+            logger.warn(
+                chalk.yellow(
+                    `⚠️  Solo se usarán ${maxConcurrency} hilos para ${fileCount} archivos.`,
+                ),
+            );
+            logger.info(
+                chalk.yellow(
+                    `   💡 Tip: export VERSACOMPILER_MAX_THREADS=${optimalThreads}`,
+                ),
+            );
+        }
+
+        // ⚠️ ADVERTENCIA: Si los hilos son muy bajos para el tamaño del proyecto
+        if (fileCount > 50 && maxConcurrency < 8) {
+            logger.warn(
+                `⚠️  Solo se usarán ${maxConcurrency} hilos para ${fileCount} archivos.`,
+            );
+            logger.warn(
+                `   💡 Tip: Establece VERSACOMPILER_MAX_THREADS para forzar más hilos:`,
+            );
+            logger.warn(`   💡 export VERSACOMPILER_MAX_THREADS=16`);
+        }
 
         // Precargar módulos ANTES de iniciar la compilación concurrente
         // Esto evita que múltiples hilos intenten cargar node:crypto simultáneamente

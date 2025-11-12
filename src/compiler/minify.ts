@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import { minify } from 'oxc-minify';
 
+import { minifyTemplate } from './minifyTemplate';
+
 // ✨ NUEVA OPTIMIZACIÓN: Sistema de cache para minificación
 interface MinificationCacheEntry {
     contentHash: string;
@@ -291,4 +293,46 @@ export const clearMinificationCache = () => {
 
 export const cleanExpiredMinificationCache = () => {
     minificationCache.cleanExpired();
+};
+
+/**
+ * ✨ Minifica templates HTML/Vue ANTES de minificar JavaScript
+ * Esta función combina la minificación de templates con la minificación JS en el orden correcto:
+ * 1. Primero minifica templates HTML usando minify-html-literals
+ * 2. Luego minifica el JavaScript resultante usando oxc-minify
+ *
+ * @param {string} data - El código a minificar (puede contener templates HTML)
+ * @param {string} filename - El nombre del archivo
+ * @param {boolean} isProd - Indica si está en modo producción
+ * @returns {Promise<Object>} El resultado de la minificación combinada { code, error }
+ */
+export const minifyWithTemplates = async (
+    data: string,
+    filename: string,
+    isProd = true,
+) => {
+    try {
+        // PASO 1: Minificar templates HTML primero
+        const templateResult = minifyTemplate(data, filename);
+
+        // Si hay error en la minificación de templates, pero tenemos código, continuar
+        if (templateResult.error && !templateResult.code) {
+            const errorMsg =
+                templateResult.error instanceof Error
+                    ? templateResult.error.message
+                    : String(templateResult.error);
+            return {
+                code: '',
+                error: new Error(`Template minification failed: ${errorMsg}`),
+            };
+        }
+
+        // PASO 2: Minificar el JavaScript resultante
+        return await minifyJS(templateResult.code, filename, isProd);
+    } catch (error) {
+        return {
+            error: error instanceof Error ? error : new Error(String(error)),
+            code: '',
+        };
+    }
 };

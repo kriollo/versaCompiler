@@ -55,7 +55,6 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "types": [
-            "jest",
             "node"
         ],
         "jsx": "preserve"
@@ -66,17 +65,18 @@
     },
     "exclude": [
         "./public/**/*",
-        "coverage/**/*"
+        "coverage/**/*",
+        "tests/**/*"
     ],
     "include": [
         "src/**/*",
         "src/**/*.ts",
         "src/types/**/*.d.ts",
-        "tests/**/*.ts",
         "examples/**/*",
         "examples/**/*.vue",
         "examples/**/*.ts",
-        "examples/test-typescript-validation.ts"
+        "examples/test-typescript-validation.ts",
+        "versacompile.config.ts"
     ],
     "typeAcquisition": {
         "enable": true,
