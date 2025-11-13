@@ -19,9 +19,13 @@ import { reloadComponent } from './VueHRM.js';
  * @param {string} data.libraryName - Nombre de la librería a actualizar
  * @param {string} data.libraryPath - Ruta de la nueva librería
  * @param {string} [data.globalName] - Nombre global de la librería (ej: 'Vue', 'React')
+ * @param {Function} [importFn] - Función import para cargar módulos (inyectable para tests)
  * @returns {Promise<boolean>} True si el hot reload fue exitoso
  */
-export async function handleLibraryHotReload(data) {
+export async function handleLibraryHotReload(
+    data,
+    importFn = url => import(url),
+) {
     const { libraryName, libraryPath, globalName } = data;
 
     if (!libraryName || !libraryPath) {
@@ -33,17 +37,21 @@ export async function handleLibraryHotReload(data) {
 
     // 2. Determinar el nombre global de la librería
     const targetGlobalName = globalName || libraryName;
-    let _oldLibraryVersion;
+
+    // 3. Backup de la versión anterior (antes de cargar la nueva)
+    let oldLibraryVersion;
 
     try {
         console.log(`🔄 Iniciando hot reload de librería: ${libraryName}`);
 
-        // 1. Cargar la nueva versión de la librería
+        oldLibraryVersion = window[targetGlobalName];
+
+        // 4. Cargar la nueva versión de la librería
         const timestamp = Date.now();
         const moduleUrl = `${libraryPath}?t=${timestamp}`;
 
         console.log(`📦 Cargando nueva versión desde: ${moduleUrl}`);
-        const module = await import(moduleUrl);
+        const module = await importFn(moduleUrl);
 
         if (!module.default && !module[libraryName]) {
             console.error(
@@ -54,32 +62,33 @@ export async function handleLibraryHotReload(data) {
 
         const newLibraryVersion = module.default || module[libraryName];
 
-        // 3. Backup de la versión anterior (por si necesitamos rollback)
-        _oldLibraryVersion = window[targetGlobalName];
-
-        // 4. Reemplazar la librería en el contexto global
+        // 3. Reemplazar la librería en el contexto global
         console.log(`🔄 Reemplazando ${targetGlobalName} en contexto global`);
         window[targetGlobalName] = newLibraryVersion;
 
-        // 5. Limpiar caches si existen
+        // 4. Limpiar caches si existen
         if (
             typeof newLibraryVersion === 'object' &&
             newLibraryVersion.clearCache
         ) {
-            newLibraryVersion.clearCache();
+            try {
+                newLibraryVersion.clearCache();
+            } catch (_e) {
+                // Ignorar errores de clearCache, no es crítico
+            }
         }
 
-        // 6. Re-inicializar aplicación si es necesario
+        // 5. Re-inicializar aplicación si es necesario
         if (targetGlobalName === 'Vue' || libraryName.includes('vue')) {
             console.log(
                 '🔄 Librería Vue actualizada, se recomienda recarga completa',
             );
             // Para Vue, es más seguro hacer recarga completa
-            setTimeout(() => window.location.reload(), 100);
+            window.location.reload();
             return true;
         }
 
-        // 7. Intentar limpiar caches si existen
+        // 6. Intentar limpiar caches si existen
         try {
             // Limpiar cualquier cache que pueda existir
             if (
@@ -102,17 +111,18 @@ export async function handleLibraryHotReload(data) {
         );
 
         // Intentar rollback si es posible
-        if (
-            targetGlobalName &&
-            window[targetGlobalName] !== _oldLibraryVersion
-        ) {
+        if (targetGlobalName && oldLibraryVersion !== undefined) {
             console.log('🔄 Intentando rollback de librería...');
-            window[targetGlobalName] = _oldLibraryVersion;
+            window[targetGlobalName] = oldLibraryVersion;
         }
 
         return false;
     }
 }
+
+// Variable para controlar si ya se está inicializando
+let isInitializing = false;
+let initializationTimeout = null;
 
 /**
  * Inicializa la conexión socket con BrowserSync y configura los listeners para HMR
@@ -120,6 +130,16 @@ export async function handleLibraryHotReload(data) {
  * @returns {Promise<void>} Promise que se resuelve cuando la conexión está configurada
  */
 async function initSocket(retries = 0) {
+    // Evitar inicializaciones concurrentes
+    if (isInitializing && retries > 0) {
+        console.log(
+            '⏳ Versa HMR: Ya hay una inicialización en curso, saltando...',
+        );
+        return;
+    }
+
+    isInitializing = true;
+
     const maxRetries = 10;
     const retryDelay = Math.min(2000 * (retries + 1), 10000); // Backoff exponencial hasta 10s
 
@@ -136,9 +156,16 @@ async function initSocket(retries = 0) {
         socket.off('HRMHelper');
         socket.off('error');
 
+        // Limpiar timeout previo si existe
+        if (initializationTimeout) {
+            clearTimeout(initializationTimeout);
+            initializationTimeout = null;
+        }
+
         // Configurar listener para eventos de conexión
         socket.on('connect', async () => {
             connected = true;
+            isInitializing = false;
             hideErrorOverlay();
             console.log('✔️ Versa HMR: Socket conectado');
         });
@@ -146,9 +173,10 @@ async function initSocket(retries = 0) {
         // Configurar listener para eventos de desconexión
         socket.on('disconnect', () => {
             connected = false;
+            isInitializing = false;
             console.log('❌ Versa HMR: Socket desconectado, reintentando...');
             // Lógica de reintentos para desconexión
-            setTimeout(() => {
+            initializationTimeout = setTimeout(() => {
                 if (!socket.connected && retries < maxRetries) {
                     initSocket(retries + 1);
                 } else if (!socket.connected) {
@@ -212,13 +240,14 @@ async function initSocket(retries = 0) {
                     retries + 1
                 }/${maxRetries})`,
             );
-            setTimeout(() => {
+            initializationTimeout = setTimeout(() => {
                 if (!socket.connected && retries <= maxRetries) {
                     console.warn(
                         'Versa HMR: Sin conexión de socket después del tiempo de espera inicial, reintentando initSocket...',
                     );
                     initSocket(retries + 1);
                 } else if (!socket.connected) {
+                    isInitializing = false;
                     console.error(
                         `❌ Versa HMR: Socket aún no conectado después de ${maxRetries} intentos iniciales.`,
                     );
@@ -228,6 +257,8 @@ async function initSocket(retries = 0) {
                     );
                 }
             }, 5000); // Timeout de 5s para el watchdog inicial
+        } else {
+            isInitializing = false;
         }
     } else {
         // BrowserSync no está disponible, intentar reinicializar
@@ -237,8 +268,12 @@ async function initSocket(retries = 0) {
             }/${maxRetries})`,
         );
         if (retries < maxRetries) {
-            setTimeout(() => initSocket(retries + 1), retryDelay);
+            initializationTimeout = setTimeout(
+                () => initSocket(retries + 1),
+                retryDelay,
+            );
         } else {
+            isInitializing = false;
             console.error(
                 `❌ Versa HMR: Socket de BrowserSync no encontrado después de ${maxRetries} reintentos.`,
             );
