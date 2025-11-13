@@ -173,8 +173,12 @@ const minifyCSS = (code: string): string => {
             /(?:=|:|\s)(html|css|__VERSA_TEMP__html|__VERSA_TEMP__css)?`([^`]+)`/g;
 
         return code.replace(cssPattern, (match, tag, content) => {
+            const looksLikeCSS =
+                content.includes('{') &&
+                content.includes('}') &&
+                /[a-z-]+\s*:\s*[^;]+;/.test(content);
             // Si no tiene tag, no procesar aquí (se procesará en detectAndTagTemplateStrings)
-            if (!tag) {
+            if (!tag && !looksLikeCSS) {
                 return match;
             }
 
@@ -197,7 +201,8 @@ const minifyCSS = (code: string): string => {
 
                 // Preservar el prefijo original (=, :, espacio)
                 const prefix = match.charAt(0);
-                return `${prefix}${tag}\`${minified}\``;
+                const tagPart = tag || ''; // Si no hay tag, usar string vacío
+                return `${prefix}${tagPart}\`${minified}\``;
             }
 
             // Si no es CSS, devolver sin cambios

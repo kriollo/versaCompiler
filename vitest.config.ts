@@ -39,7 +39,12 @@ export default defineConfig({
         },
 
         // Configuración de threads
-        pool: 'threads',
+        pool: 'forks',
+        poolOptions: {
+            forks: {
+                singleFork: true,
+            },
+        },
 
         // Modo watch
         watch: false,
