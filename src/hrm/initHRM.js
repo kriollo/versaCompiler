@@ -14,6 +14,107 @@ import { obtenerInstanciaVue } from './getInstanciaVue.js';
 import { reloadComponent } from './VueHRM.js';
 
 /**
+ * Maneja el hot reload de librerías sin recarga completa de página
+ * @param {Object} data - Datos del evento HRMHelper
+ * @param {string} data.libraryName - Nombre de la librería a actualizar
+ * @param {string} data.libraryPath - Ruta de la nueva librería
+ * @param {string} [data.globalName] - Nombre global de la librería (ej: 'Vue', 'React')
+ * @returns {Promise<boolean>} True si el hot reload fue exitoso
+ */
+export async function handleLibraryHotReload(data) {
+    const { libraryName, libraryPath, globalName } = data;
+
+    if (!libraryName || !libraryPath) {
+        console.error(
+            '❌ HRMHelper: Datos incompletos para hot reload de librería',
+        );
+        return false;
+    }
+
+    // 2. Determinar el nombre global de la librería
+    const targetGlobalName = globalName || libraryName;
+    let _oldLibraryVersion;
+
+    try {
+        console.log(`🔄 Iniciando hot reload de librería: ${libraryName}`);
+
+        // 1. Cargar la nueva versión de la librería
+        const timestamp = Date.now();
+        const moduleUrl = `${libraryPath}?t=${timestamp}`;
+
+        console.log(`📦 Cargando nueva versión desde: ${moduleUrl}`);
+        const module = await import(moduleUrl);
+
+        if (!module.default && !module[libraryName]) {
+            console.error(
+                '❌ HRMHelper: La nueva versión no tiene export válido',
+            );
+            return false;
+        }
+
+        const newLibraryVersion = module.default || module[libraryName];
+
+        // 3. Backup de la versión anterior (por si necesitamos rollback)
+        _oldLibraryVersion = window[targetGlobalName];
+
+        // 4. Reemplazar la librería en el contexto global
+        console.log(`🔄 Reemplazando ${targetGlobalName} en contexto global`);
+        window[targetGlobalName] = newLibraryVersion;
+
+        // 5. Limpiar caches si existen
+        if (
+            typeof newLibraryVersion === 'object' &&
+            newLibraryVersion.clearCache
+        ) {
+            newLibraryVersion.clearCache();
+        }
+
+        // 6. Re-inicializar aplicación si es necesario
+        if (targetGlobalName === 'Vue' || libraryName.includes('vue')) {
+            console.log(
+                '🔄 Librería Vue actualizada, se recomienda recarga completa',
+            );
+            // Para Vue, es más seguro hacer recarga completa
+            setTimeout(() => window.location.reload(), 100);
+            return true;
+        }
+
+        // 7. Intentar limpiar caches si existen
+        try {
+            // Limpiar cualquier cache que pueda existir
+            if (
+                typeof window !== 'undefined' &&
+                window.performance &&
+                window.performance.clearResourceTimings
+            ) {
+                window.performance.clearResourceTimings();
+            }
+        } catch (_e) {
+            // Ignorar errores de limpieza de cache
+        }
+
+        console.log(`✅ Hot reload exitoso de librería: ${libraryName}`);
+        return true;
+    } catch (error) {
+        console.error(
+            `❌ Error en hot reload de librería ${libraryName}:`,
+            error,
+        );
+
+        // Intentar rollback si es posible
+        if (
+            targetGlobalName &&
+            window[targetGlobalName] !== _oldLibraryVersion
+        ) {
+            console.log('🔄 Intentando rollback de librería...');
+            window[targetGlobalName] = _oldLibraryVersion;
+        }
+
+        return false;
+    }
+}
+
+/**
  * Inicializa la conexión socket con BrowserSync y configura los listeners para HMR
  * @param {number} [retries=0] - Número de reintentos realizados
  * @returns {Promise<void>} Promise que se resuelve cuando la conexión está configurada
@@ -79,10 +180,22 @@ async function initSocket(retries = 0) {
         });
 
         // Configurar listener para datos auxiliares de HMR
-        socket.on('HRMHelper', data => {
-            //TODO: Implementar lógica de HMRHelper
-            window.location.reload();
-            console.log('🔄 Recargando página por HMRHelper:', data);
+        socket.on('HRMHelper', async data => {
+            console.log('🔄 HRMHelper recibido:', data);
+
+            try {
+                // Intentar hacer hot reload de librería sin recarga completa
+                const success = await handleLibraryHotReload(data);
+                if (!success) {
+                    console.warn(
+                        '⚠️ Hot reload de librería falló, haciendo recarga completa',
+                    );
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('❌ Error en HRMHelper:', error);
+                window.location.reload();
+            }
         });
 
         // Configurar listener para errores de socket
