@@ -244,5 +244,271 @@ describe('VueHRM - Hot Module Replacement', () => {
 
             expect(result).toBe(false);
         });
+
+        it('debe retornar false cuando no se encuentra el componente en el árbol', async () => {
+            const mockNewComponent = {
+                template: '<div>Updated</div>',
+                name: 'TestComponent',
+            };
+
+            (global as any).import.mockResolvedValue({
+                default: mockNewComponent,
+            });
+
+            // El componente hijo tiene un nombre diferente al que buscamos
+            mockApp._instance.subTree.children[0].component.type.name =
+                'OtherComponent';
+
+            const result = await reloadComponent(mockApp, mockComponent);
+
+            // No debe encontrar el componente porque el nombre no coincide
+            expect(result).toBe(false);
+        });
+
+        it('debe intentar actualizar componente sin componentsDefinition', async () => {
+            const mockNewComponent = {
+                template: '<div>Updated</div>',
+                name: 'TestComponent',
+            };
+
+            (global as any).import.mockResolvedValue({
+                default: mockNewComponent,
+            });
+
+            // No establecer componentsDefinition en el padre
+            // El componente debe encontrarse pero no actualizarse
+            mockApp._instance.subTree.children[0].component.type.name =
+                'TestComponent';
+
+            const result = await reloadComponent(mockApp, mockComponent);
+
+            // Debería retornar false porque no se puede actualizar sin componentsDefinition
+            expect(result).toBe(false);
+        });
+
+        it('debe manejar componente que no se encuentra en el árbol', async () => {
+            const mockNewComponent = {
+                template: '<div>Updated</div>',
+                name: 'NonExistentComponent',
+            };
+
+            (global as any).import.mockResolvedValue({
+                default: mockNewComponent,
+            });
+
+            mockComponent.nameFile = 'NonExistentComponent';
+
+            const result = await reloadComponent(mockApp, mockComponent);
+
+            expect(result).toBe(false);
+        });
+
+        it('debe manejar error cuando no se puede construir el árbol', async () => {
+            const mockNewComponent = {
+                template: '<div>Updated</div>',
+                name: 'TestComponent',
+            };
+
+            (global as any).import.mockResolvedValue({
+                default: mockNewComponent,
+            });
+
+            // Hacer que buildComponentTree falle
+            mockApp._instance = null;
+
+            const result = await reloadComponent(mockApp, mockComponent);
+
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('findNodeByInstance y getPathToRoot', () => {
+        it('debe encontrar un nodo por nombre en el árbol', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        {
+                            type: { name: 'vnode' },
+                            component: {
+                                type: { name: 'TestComponent' },
+                                subTree: {
+                                    type: { name: 'span' },
+                                    children: [],
+                                },
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            // Verificar que el árbol se construyó correctamente
+            expect(tree).not.toBeNull();
+            expect(tree?.children).toHaveLength(1);
+            expect(tree?.children[0]?.name).toBe('TestComponent');
+        });
+
+        it('debe construir relaciones parent-child correctamente', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        {
+                            type: { name: 'vnode' },
+                            component: {
+                                type: { name: 'Parent' },
+                                subTree: {
+                                    type: { name: 'div' },
+                                    children: [
+                                        {
+                                            type: { name: 'vnode' },
+                                            component: {
+                                                type: { name: 'Child' },
+                                                subTree: {
+                                                    type: { name: 'span' },
+                                                    children: [],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            expect(tree?.parent).toBeNull();
+            expect(tree?.isRoot).toBe(true);
+            expect(tree?.children[0]?.parent).toBe(tree);
+            expect(tree?.children[0]?.children[0]?.parent).toBe(
+                tree?.children[0],
+            );
+        });
+    });
+
+    describe('buildComponentTree - casos adicionales', () => {
+        it('debe manejar componentes con children en array', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        {
+                            type: { name: 'vnode' }, // Agregar type al VNode
+                            component: {
+                                type: { name: 'Child1' },
+                                subTree: {
+                                    type: { name: 'span' },
+                                    children: [],
+                                },
+                            },
+                        },
+                        {
+                            type: { name: 'vnode' }, // Agregar type al VNode
+                            component: {
+                                type: { name: 'Child2' },
+                                subTree: { type: { name: 'p' }, children: [] },
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            expect(tree?.children).toHaveLength(2);
+            expect(tree?.children[0]?.name).toBe('Child1');
+            expect(tree?.children[1]?.name).toBe('Child2');
+        });
+
+        it('debe manejar VNodes sin component', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        { type: { name: 'text' } }, // VNode sin component
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            expect(tree).not.toBeNull();
+            expect(tree?.children).toHaveLength(0); // No debe agregar nodos sin component
+        });
+
+        it('debe manejar componentes anidados profundamente', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        {
+                            type: { name: 'vnode' }, // Agregar type al VNode
+                            component: {
+                                type: { name: 'Parent' },
+                                subTree: {
+                                    type: { name: 'div' },
+                                    children: [
+                                        {
+                                            type: { name: 'vnode' }, // Agregar type al VNode
+                                            component: {
+                                                type: { name: 'Child' },
+                                                subTree: {
+                                                    type: { name: 'span' },
+                                                    children: [],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            expect(tree?.children).toHaveLength(1);
+            expect(tree?.children[0]?.name).toBe('Parent');
+            expect(tree?.children[0]?.children).toHaveLength(1);
+            expect(tree?.children[0]?.children[0]?.name).toBe('Child');
+        });
+
+        it('debe establecer parent correctamente en el árbol', () => {
+            const mockComponentInstance = {
+                type: { name: 'App' },
+                subTree: {
+                    type: { name: 'div' },
+                    children: [
+                        {
+                            type: { name: 'vnode' }, // Agregar type al VNode
+                            component: {
+                                type: { name: 'Child' },
+                                subTree: {
+                                    type: { name: 'span' },
+                                    children: [],
+                                },
+                            },
+                        },
+                    ],
+                },
+            };
+
+            const tree = buildComponentTree(mockComponentInstance);
+
+            expect(tree?.parent).toBeNull();
+            expect(tree?.children[0]?.parent).toBe(tree);
+            expect(tree?.children[0]?.isRoot).toBe(false);
+        });
     });
 });
