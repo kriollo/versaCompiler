@@ -664,6 +664,77 @@ export async function browserSyncServer(): Promise<any> {
             ],
         });
 
+        // 🔍 Listener para errores del cliente
+        bs.sockets.on('connection', (socket: any) => {
+            socket.on('client:error', async (errorData: any) => {
+                const chalkInstance = await loadChalk();
+
+                logger.error(
+                    chalkInstance.red(
+                        '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                    ),
+                );
+                logger.error(
+                    chalkInstance.red.bold('🔥 ERROR DEL CLIENTE (NAVEGADOR)'),
+                );
+                logger.error(
+                    chalkInstance.red(
+                        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+                    ),
+                );
+
+                logger.error(
+                    chalkInstance.yellow(`📍 Tipo: ${errorData.type}`),
+                );
+                logger.error(
+                    chalkInstance.yellow(
+                        `⏰ Timestamp: ${errorData.timestamp}`,
+                    ),
+                );
+                logger.error(chalkInstance.yellow(`🌐 URL: ${errorData.url}`));
+                logger.error(
+                    chalkInstance.yellow(
+                        `🖥️  User Agent: ${errorData.userAgent}`,
+                    ),
+                );
+
+                if (
+                    errorData.context &&
+                    Object.keys(errorData.context).length > 0
+                ) {
+                    logger.error(chalkInstance.cyan('\n📋 Contexto:'));
+                    logger.error(
+                        chalkInstance.cyan(
+                            JSON.stringify(errorData.context, null, 2),
+                        ),
+                    );
+                }
+
+                if (errorData.error) {
+                    logger.error(chalkInstance.red('\n💥 Error:'));
+                    logger.error(
+                        chalkInstance.red(`   Nombre: ${errorData.error.name}`),
+                    );
+                    logger.error(
+                        chalkInstance.red(
+                            `   Mensaje: ${errorData.error.message}`,
+                        ),
+                    );
+
+                    if (errorData.error.stack) {
+                        logger.error(chalkInstance.gray('\n📚 Stack Trace:'));
+                        logger.error(chalkInstance.gray(errorData.error.stack));
+                    }
+                }
+
+                logger.error(
+                    chalkInstance.red(
+                        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n',
+                    ),
+                );
+            });
+        });
+
         return bs;
     } catch (error) {
         logger.error(

@@ -8,7 +8,7 @@
  * @property {string} [from] - Origen del nodo
  */
 
-import { obtenerInstanciaVue } from './getInstanciaVue';
+import { obtenerInstanciaVue } from './getInstanciaVue.js';
 
 /**
  * @typedef {Object} VNode
