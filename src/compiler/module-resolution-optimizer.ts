@@ -111,6 +111,13 @@ export class ModuleResolutionOptimizer {
     }
 
     /**
+     * Resetea la instancia del singleton (útil para tests)
+     */
+    public static resetInstance(): void {
+        ModuleResolutionOptimizer.instance = null as any;
+    }
+
+    /**
      * Inicializa los índices de módulos y alias
      */
     private initializeIndexes(): void {
@@ -522,11 +529,13 @@ export class ModuleResolutionOptimizer {
                 const pattern = alias.replace('/*', '');
                 const priority = pattern.length; // Patrones más largos tienen prioridad
 
+                // El regex debe coincidir con el patrón al inicio, seguido de cualquier cosa o fin de cadena
+                // Por ejemplo, para "@/" debe coincidir con "@/cualquier-cosa" o solo "@/"
                 this.aliasIndex.push({
                     pattern,
                     target: Array.isArray(target) ? target : [target],
                     regex: new RegExp(
-                        `^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`,
+                        `^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
                     ),
                     priority,
                 });
@@ -743,12 +752,17 @@ export class ModuleResolutionOptimizer {
         if (!alias || !env.PATH_DIST) {
             return null;
         }
+
+        // El relativePath es lo que queda después del pattern
+        // Por ejemplo: '@/components/Button.vue' con pattern '@/components' → '/Button.vue'
         const relativePath = path.replace(alias.pattern, '');
         const targetPath = alias.target[0];
 
         if (!targetPath) {
             return null;
-        } // Construir ruta final
+        }
+
+        // Construir ruta final
         let finalPath: string;
         const pathDist = env.PATH_DIST.replace('./', '');
 
@@ -768,20 +782,33 @@ export class ModuleResolutionOptimizer {
             }
         } else if (targetPath.startsWith('/')) {
             // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
-            // Para targets como "/src/*", mapear directamente al PATH_DIST
-            // Remover el primer directorio si es diferente de PATH_DIST
+            // Extraer la parte del target después de /src
             const targetWithoutSlash = targetPath
                 .substring(1)
                 .replace('/*', '');
-            if (
-                targetWithoutSlash === 'src' ||
-                targetWithoutSlash.startsWith('src/')
-            ) {
-                // Para "/src/*" mapear directamente a "/pathDist/relativePath"
+
+            // El target puede ser:
+            // - "/src/*" → queremos mapear a "/dist/*"
+            // - "/src/components/*" → queremos mapear a "/dist/components/*"
+
+            if (targetWithoutSlash === 'src') {
+                // Para "/src/*", mapear directamente a "/pathDist/relativePath"
                 finalPath = join('/', pathDist, relativePath);
+            } else if (targetWithoutSlash.startsWith('src/')) {
+                // Para "/src/components/*", extraer "components" y usarlo
+                // targetWithoutSlash = 'src/components'
+                // Queremos: 'components'
+                const targetSubpath = targetWithoutSlash.replace(/^src\/?/, '');
+                // relativePath ya incluye la barra inicial
+                finalPath = join('/', pathDist, targetSubpath, relativePath);
             } else {
-                // Para otros casos como "/examples/*", también mapear directamente
-                finalPath = join('/', pathDist, relativePath);
+                // Para otros casos como "/examples/*"
+                finalPath = join(
+                    '/',
+                    pathDist,
+                    targetWithoutSlash,
+                    relativePath,
+                );
             }
         } else {
             // Si es una ruta relativa, construir basándose en el target
@@ -1052,4 +1079,8 @@ export function getOptimizedAliasPath(path: string): string | null {
 export function getModuleResolutionMetrics() {
     const optimizer = ModuleResolutionOptimizer.getInstance();
     return optimizer.getMetrics();
+}
+
+export function resetModuleResolutionOptimizer(): void {
+    ModuleResolutionOptimizer.resetInstance();
 }

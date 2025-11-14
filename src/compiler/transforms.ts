@@ -253,7 +253,7 @@ export async function replaceAliasImportStatic(
     return resultCode;
 }
 
-async function replaceAliasImportDynamic(
+export async function replaceAliasImportDynamic(
     code: string,
     _imports: any,
     file?: string,
@@ -455,6 +455,12 @@ async function replaceAliasImportDynamic(
                             .replace(/\/\.\//g, '/')
                             .replace(/\/+/g, '/')
                             .replace(/\\/g, '/'); // Normalizar separadores de Windows a Unix
+
+                        // Transformar extensiones .ts y .vue a .js en template literals
+                        newModuleRequest = newModuleRequest
+                            .replace(/\.ts(\b|`|\$)/g, '.js$1')
+                            .replace(/\.vue(\b|`|\$)/g, '.js$1');
+
                         result = match.replace(moduleRequest, newModuleRequest);
                         transformed = true;
                         break;
