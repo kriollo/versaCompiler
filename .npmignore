@@ -3,3 +3,4 @@ public
 package-lock.json
 pnpm-lock.yaml
 coverage
+test-results

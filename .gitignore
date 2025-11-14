@@ -7,3 +7,4 @@ coverage
 dist
 src/compiler/.cache
 examples/dashboard
+test-results/*

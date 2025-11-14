@@ -11,7 +11,7 @@
 ## 🌟 Características Principales
 
 - ⚡ **Compilación ultra-rápida** - Workers paralelos y cache inteligente
-- 🔥 **Hot Module Replacement (HMR)** - Actualizaciones instantáneas con preservación de estado
+- 🔥 **HMR Automático (como Vite)** - Detección inteligente sin configuración manual, igual que Vite y esbuild
 - 🧩 **Soporte completo para Vue 3** - SFC, Composition API, script setup
 - 📝 **TypeScript avanzado** - Language Service, decorators, validación de tipos
 - 🔍 **Sistema de linting dual** - ESLint + OxLint con auto-fix
@@ -216,6 +216,51 @@ Array de configuraciones de bundling:
 - `name`: Nombre del bundle
 - `fileInput`: Archivo de entrada
 - `fileOutput`: Archivo de salida
+
+## 🔥 Hot Module Replacement (HMR)
+
+VersaCompiler incluye **detección automática de HMR** similar a Vite y esbuild, **sin necesidad de configuración manual**.
+
+### ✨ Detección Automática
+
+El sistema detecta automáticamente 3 estrategias:
+
+1. **Self-Accept** - Módulos que declaran soporte HMR explícito
+2. **Propagate** - Módulos con exports simples (funciones, constantes)
+3. **Full Reload** - Módulos complejos que requieren recarga completa
+
+### 📝 Ejemplo Básico
+
+```javascript
+// ✅ HMR automático - sin configuración
+export function formatDate(date) {
+    return new Intl.DateTimeFormat('es-ES').format(date);
+}
+
+// No necesitas agregar nada más, VersaCompiler lo detecta automáticamente
+```
+
+### 🎯 Ejemplo Avanzado
+
+```javascript
+// dashboard.js
+export function initDashboard() {
+    console.log('Dashboard iniciado');
+}
+
+// ✨ Soporte HMR explícito con preservación de estado
+if (import.meta.hot) {
+    import.meta.hot.accept(newModule => {
+        console.log('Dashboard actualizado sin recargar');
+        newModule?.initDashboard();
+    });
+}
+```
+
+### 📚 Documentación Completa
+
+- [Guía de HMR](./docs/hmr-guide.md) - Documentación completa con ejemplos
+- [Demo Interactiva](./examples/hmr-demo/) - Prueba el HMR en tiempo real
 
 ## 🎯 Ejemplos de Uso
 
