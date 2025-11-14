@@ -33,7 +33,7 @@ interface PendingChange {
 class WatchDebouncer {
     private pendingChanges = new Map<string, PendingChange>();
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    private readonly DEBOUNCE_DELAY = 100; // ✨ OPTIMIZACIÓN #12: 100ms (reducido de 300ms) para mejor feedback
+    private readonly DEBOUNCE_DELAY = 50; // ✨ OPTIMIZACIÓN: 50ms para hot reload más responsive
     private readonly BATCH_SIZE = 10; // Máximo archivos por batch
     private isProcessing = false;
     private browserSyncInstance: any = null; // ✨ Almacenar referencia a browserSync
@@ -485,6 +485,8 @@ export async function initChokidar(bs: any) {
             ignoreInitial: true,
             ignored: regExtExtension,
         });
+
+        // ✨ OPTIMIZACIÓN: Pre-cargar módulos críticos al iniciar el watcher
         watcher.on('ready', async () => {
             const chalkInstance = await loadChalk();
             logger.info(
@@ -494,6 +496,19 @@ export async function initChokidar(bs: any) {
                         .join('\n')}\n`,
                 ),
             );
+
+            // Pre-cargar módulos críticos para primera compilación más rápida
+            setImmediate(async () => {
+                try {
+                    // Pre-cargar módulos básicos que se usarán en compilación
+                    await Promise.all([
+                        import('../compiler/compile'),
+                        import('../compiler/parser'),
+                    ]);
+                } catch {
+                    // Ignorar errores de pre-carga, no son críticos
+                }
+            });
         });
 
         // ✨ CONFIGURAR: Establecer la instancia de browserSync en el debouncer

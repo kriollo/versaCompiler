@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import * as process from 'node:process';
-const { env } = process;
+import * as processModule from 'node:process';
+const { env } = processModule;
+// Usar el objeto process global para event listeners
+const globalProcess = globalThis.process || processModule;
 // Lazy loading optimizations - Only import lightweight modules synchronously
 import { fileURLToPath } from 'node:url';
 
@@ -15,7 +17,10 @@ let hideBin: any;
 
 // Obtener el directorio del archivo actual (src/)
 env.PATH_PROY = path.dirname(fileURLToPath(import.meta.url));
-env.PATH_CONFIG_FILE = path.resolve(process.cwd(), 'versacompile.config.ts');
+env.PATH_CONFIG_FILE = path.resolve(
+    globalProcess.cwd(),
+    'versacompile.config.ts',
+);
 
 // Lazy loading helper functions
 async function loadChalk() {
@@ -78,7 +83,7 @@ async function main() {
     const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
     const chalk = await loadChalk();
 
-    let yargInstance = yargsInstance(hideBinFn(process.argv))
+    let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
         .scriptName('versa')
         .usage(
             chalk.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
@@ -224,11 +229,11 @@ async function main() {
             logger.info('Iniciando la configuración...');
             const { initConfig } = await loadConfigModule();
             await initConfig();
-            process.exit(0);
+            globalProcess.exit(0);
         }
 
         if (!(await readConfig())) {
-            process.exit(1);
+            globalProcess.exit(1);
         }
 
         env.isPROD = argv.prod ? 'true' : 'false';
@@ -350,7 +355,7 @@ async function main() {
                 }
             }
 
-            process.exit(hasErrors ? 1 : 0);
+            globalProcess.exit(hasErrors ? 1 : 0);
         }
         if (argv.file) {
             // Compilar archivo individual
@@ -365,7 +370,7 @@ async function main() {
                 logger.error(
                     chalk.red(`❌ Error: El archivo '${argv.file}' no existe.`),
                 );
-                process.exit(1);
+                globalProcess.exit(1);
             }
 
             // Compilar el archivo (absolutePathFile está garantizado aquí)
@@ -377,25 +382,25 @@ async function main() {
                         `✅ Archivo compilado exitosamente: ${result.output}`,
                     ),
                 );
-                process.exit(0);
+                globalProcess.exit(0);
             } else {
                 logger.error(
                     chalk.red(`❌ Error al compilar el archivo: ${argv.file}`),
                 );
-                process.exit(1);
+                globalProcess.exit(1);
             }
         }
         if (argv.all) {
             const { initCompileAll } = await loadCompilerModule();
             await initCompileAll();
-            process.exit(0);
+            globalProcess.exit(0);
         }
 
         if (!argv.watch) {
             if (env.ENABLE_LINTER === 'true') {
                 const { runLinter } = await loadCompilerModule();
                 await runLinter(true);
-                process.exit(1);
+                globalProcess.exit(1);
             }
         }
         if (env.TAILWIND === 'true') {
@@ -423,15 +428,15 @@ async function main() {
 
             bs = await browserSyncServer();
             if (!bs) {
-                process.exit(1);
+                globalProcess.exit(1);
             }
             watch = await initChokidar(bs);
             if (!watch) {
-                process.exit(1);
+                globalProcess.exit(1);
             }
         }
-        // ✨ FIX #7: Usar process.once() para evitar acumulación de listeners
-        process.once('SIGINT', async () => {
+        // ✨ FIX: Cleanup handler para evitar acumulación de listeners
+        const cleanupHandler = async () => {
             if (bs) {
                 bs.exit();
             }
@@ -442,25 +447,18 @@ async function main() {
                 await cleanupWatcher(watch);
             }
             stopCompile();
-            process.exit(0);
-        });
+            globalProcess.exit(0);
+        };
 
-        process.once('SIGTERM', async () => {
-            if (bs) {
-                bs.exit();
-            }
+        const sigintHandler = () => cleanupHandler();
+        const sigtermHandler = () => cleanupHandler();
 
-            if (watch) {
-                const { cleanupWatcher } = await loadChokidarModule();
-                await cleanupWatcher(watch);
-            }
-            stopCompile();
-            process.exit(0);
-        });
+        globalProcess.on('SIGINT', sigintHandler);
+        globalProcess.on('SIGTERM', sigtermHandler);
     } catch (error) {
         logger.error('Error en la aplicación:', error);
         stopCompile();
-        process.exit(1);
+        globalProcess.exit(1);
     }
 }
 

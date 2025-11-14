@@ -393,11 +393,25 @@ class BrowserSyncFileCache {
 // Instancia global del cache de archivos
 const fileCache = BrowserSyncFileCache.getInstance();
 
-// Lazy loading para chalk
-const loadChalk = async () => {
-    const { default: chalk } = await import('chalk');
+// Lazy loading para chalk - pre-cargado para mejor rendimiento
+let chalk: any;
+let chalkPromise: Promise<any> | null = null;
+
+async function loadChalk() {
+    if (!chalk) {
+        if (!chalkPromise) {
+            chalkPromise = import('chalk').then(m => {
+                chalk = m.default;
+                return chalk;
+            });
+        }
+        await chalkPromise;
+    }
     return chalk;
-};
+}
+
+// Pre-cargar chalk al cargar el módulo para hot reload más rápido
+loadChalk().catch(() => {});
 
 export async function browserSyncServer(): Promise<any> {
     try {
@@ -746,16 +760,23 @@ export async function browserSyncServer(): Promise<any> {
 }
 
 export async function emitirCambios(bs: any, action: string, filePath: string) {
-    const chalkInstance = await loadChalk();
-    logger.info(
-        chalkInstance.green(`[HMR] Emitiendo cambios: ${action} ${filePath}\n`),
-    );
+    // ✨ OPTIMIZACIÓN: Emitir PRIMERO (crítico), logging DESPUÉS (no crítico)
     const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
     const nameFile = path.basename(
         normalizedPath,
         path.extname(normalizedPath),
     );
     bs.sockets.emit(action, { action, filePath, normalizedPath, nameFile });
+
+    // Logging asíncrono para no bloquear la emisión
+    setImmediate(async () => {
+        const chalkInstance = await loadChalk();
+        logger.info(
+            chalkInstance.green(
+                `[HMR] Emitiendo cambios: ${action} ${filePath}\n`,
+            ),
+        );
+    });
 }
 
 // ✨ NUEVAS FUNCIONES: Exportar funcionalidades del cache de archivos para uso externo
