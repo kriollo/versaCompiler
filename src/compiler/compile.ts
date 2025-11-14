@@ -7,9 +7,10 @@ import {
     unlink,
     writeFile,
 } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import process, { argv, cwd, env } from 'node:process';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as process from 'node:process';
+const { argv, cwd, env } = process;
 
 // Lazy loading optimizations - Only import lightweight modules synchronously
 

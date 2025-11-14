@@ -1,10 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { promises as fs, Stats } from 'node:fs';
-import path from 'node:path';
-import process, { env } from 'node:process';
+import * as path from 'node:path';
+import * as process from 'node:process';
+const { env } = process;
 
-import browserSync from 'browser-sync';
+import * as browserSync from 'browser-sync';
 import { html } from 'code-tag';
 import getPort from 'get-port';
 

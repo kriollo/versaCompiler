@@ -220,7 +220,7 @@ export const validateVueTypes = (
         // Lib: Asegurar que DOM esté disponible para archivos Vue, pero respetar otras libs del usuario
         const currentLibs = compilerOptions.lib || userConfig.lib || ['ES2020'];
         const hasDOM = currentLibs.some(
-            lib =>
+            (lib: any) =>
                 typeof lib === 'string' &&
                 (lib.toLowerCase().includes('dom') ||
                     lib.toLowerCase() === 'dom'),

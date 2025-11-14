@@ -36,7 +36,7 @@ export async function promptUser(
         process.on('SIGINT', handleSigint);
 
         rl.question(question)
-            .then(answer => {
+            .then((answer: string) => {
                 if (!isResolved) {
                     isResolved = true;
                     clearTimeout(timer);
@@ -45,7 +45,7 @@ export async function promptUser(
                     resolve(answer);
                 }
             })
-            .catch(error => {
+            .catch((error: Error) => {
                 if (!isResolved) {
                     isResolved = true;
                     clearTimeout(timer);

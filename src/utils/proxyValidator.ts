@@ -28,7 +28,7 @@ export async function validateProxyAvailability(
                     'User-Agent': 'VersaCompiler-ProxyValidator/1.0',
                 },
             };
-            const req = requestMethod(options, _res => {
+            const req = requestMethod(options, (_res: any) => {
                 // Cualquier respuesta HTTP (incluso errores 4xx/5xx) indica que el servidor está arriba
                 resolve(true);
             });

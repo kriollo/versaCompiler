@@ -1,6 +1,7 @@
 import { readdir, rm, stat, unlink } from 'node:fs/promises';
-import path from 'node:path';
-import process, { env } from 'node:process';
+import * as path from 'node:path';
+import * as process from 'node:process';
+const { env } = process;
 
 import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
@@ -499,7 +500,7 @@ export async function initChokidar(bs: any) {
         watchDebouncer.setBrowserSyncInstance(bs);
 
         // ✨ OPTIMIZADO: Evento cuando se añade un archivo - Con debouncing
-        watcher.on('add', async ruta => {
+        watcher.on('add', async (ruta: string) => {
             const isAdditional = isAdditionalWatchFile(ruta, watchAditional);
             const action = getAction(
                 ruta,
@@ -514,7 +515,7 @@ export async function initChokidar(bs: any) {
         });
 
         // ✨ OPTIMIZADO: Evento cuando se modifica un archivo - Con debouncing
-        watcher.on('change', async ruta => {
+        watcher.on('change', async (ruta: string) => {
             const isAdditional = isAdditionalWatchFile(ruta, watchAditional);
             const action = getAction(
                 ruta,
@@ -529,7 +530,7 @@ export async function initChokidar(bs: any) {
         });
 
         // ✨ OPTIMIZADO: Evento cuando se elimina un archivo - Con debouncing
-        watcher.on('unlink', async ruta => {
+        watcher.on('unlink', async (ruta: string) => {
             const action = getAction(
                 ruta,
                 extendsionWatch.filter(

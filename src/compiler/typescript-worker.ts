@@ -214,12 +214,12 @@ export class TypeScriptWorkerManager {
             }
         });
 
-        this.worker.on('error', error => {
+        this.worker.on('error', (error: Error) => {
             console.error('[WorkerManager] Error en worker thread:', error);
             this.handleWorkerError(error);
         });
 
-        this.worker.on('exit', code => {
+        this.worker.on('exit', (code: number | null) => {
             console.warn(
                 '[WorkerManager] Worker thread cerrado con código:',
                 code,

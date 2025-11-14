@@ -214,7 +214,7 @@ const minifyCSS = (code: string): string => {
     }
 };
 
-const minifyTemplate = (data, fileName) => {
+const minifyTemplate = (data: string, fileName: string) => {
     try {
         // ⚠️ SKIP: Archivos de definiciones de tipos TypeScript
         // Estos archivos NO contienen template strings HTML/CSS para minificar

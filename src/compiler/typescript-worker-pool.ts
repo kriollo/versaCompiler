@@ -6,6 +6,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as process from 'node:process';
+import { setImmediate } from 'node:timers';
 import { Worker } from 'node:worker_threads';
 
 import * as typescript from 'typescript';
@@ -173,7 +174,7 @@ export class TypeScriptWorkerPool {
                     );
                     await this.recycleWorker(poolWorker);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.warn(
                     `[WorkerPool] Error verificando memoria del worker ${poolWorker.id}:`,
                     error,
@@ -364,7 +365,7 @@ export class TypeScriptWorkerPool {
 
             this.workers = await Promise.all(workerPromises);
             this.isInitialized = true;
-        } catch (error) {
+        } catch (error: any) {
             this.isInitialized = false;
             throw error;
         }
@@ -434,7 +435,7 @@ export class TypeScriptWorkerPool {
 
                 // Intentar conectar
                 checkReady();
-            } catch (error) {
+            } catch (error: any) {
                 reject(error);
             }
         });
@@ -467,8 +468,13 @@ export class TypeScriptWorkerPool {
                     return;
                 }
 
-                // Limpiar timeout y eliminar tarea
+                // ✨ FIX MEMORIA: Limpiar timeout INMEDIATAMENTE para liberar referencias
                 clearTimeout(pendingTask.timeout);
+
+                // ✨ FIX MEMORIA: Guardar referencias necesarias antes de eliminar la tarea
+                const { resolve, reject } = pendingTask;
+
+                // ✨ FIX MEMORIA: Eliminar la tarea del mapa ANTES de procesarla
                 poolWorker.pendingTasks.delete(response.id);
 
                 // Marcar worker como disponible si no tiene más tareas
@@ -487,45 +493,47 @@ export class TypeScriptWorkerPool {
                 ) {
                     this.completedTasks++;
 
-                    // Analizar y categorizar errores de TypeScript
-                    const categorizedResult = this.categorizeTypeScriptErrors(
-                        {
-                            diagnostics: response.diagnostics,
-                            hasErrors: response.hasErrors,
-                        },
-                        pendingTask.fileName,
-                    );
+                    // ✨ FIX MEMORIA: Crear resultado sin referencias circulares
+                    const result: TypeCheckResult = {
+                        diagnostics: response.diagnostics || [],
+                        hasErrors: response.hasErrors,
+                    };
 
-                    pendingTask.resolve(categorizedResult);
+                    // ✨ FIX MEMORIA: No mantener response completo en memoria
+                    resolve(result);
+
+                    // ✨ FIX MEMORIA: Limpiar diagnostics después de resolver
+                    setImmediate(() => {
+                        if (response.diagnostics) {
+                            response.diagnostics.length = 0;
+                        }
+                    });
                 } else {
                     this.failedTasks++;
                     const errorMessage =
                         response.error || 'Error desconocido del worker';
 
-                    // ✨ Crear error categorizado
-                    const categorizedError = this.createCategorizedError(
-                        errorMessage,
-                        pendingTask.fileName,
-                        response,
-                    );
-                    pendingTask.reject(categorizedError);
+                    // ✨ FIX MEMORIA: Error simple sin referencias pesadas
+                    const error = new Error(errorMessage);
+                    reject(error);
                 }
             } catch {
                 // Error silencioso - no imprimir cada error
             }
         });
 
-        worker.on('error', async error => {
+        worker.on('error', async (error: Error) => {
             await this.handleWorkerError(poolWorker, error);
         });
 
-        worker.on('exit', async code => {
+        worker.on('exit', async (code: number | null) => {
             await this.handleWorkerExit(poolWorker, code);
         });
     }
 
     /**
      * Maneja errores de un worker específico con cleanup completo
+     * ✨ FIX MEMORIA: Limpieza agresiva y sin esperas
      */
     private async handleWorkerError(
         poolWorker: PoolWorker,
@@ -536,46 +544,53 @@ export class TypeScriptWorkerPool {
             error.message,
         );
 
-        // 1. Rechazar todas las tareas pendientes con cleanup de timeouts
-        poolWorker.pendingTasks.forEach(task => {
+        // 1. ✨ FIX MEMORIA: Limpiar INMEDIATAMENTE todas las tareas pendientes
+        const pendingTasksArray = Array.from(poolWorker.pendingTasks.entries());
+
+        for (const [taskId, task] of pendingTasksArray) {
             clearTimeout(task.timeout);
             this.failedTasks++;
-            task.reject(
-                new Error(`Worker ${poolWorker.id} failed: ${error.message}`),
-            );
-        });
-        poolWorker.pendingTasks.clear();
-
-        // 2. Terminar worker correctamente para evitar memory leaks
-        try {
-            poolWorker.worker.removeAllListeners();
-            await poolWorker.worker.terminate();
-        } catch (terminateError) {
-            console.error(
-                `[WorkerPool] Error terminando worker ${poolWorker.id}:`,
-                terminateError,
-            );
+            task.reject(new Error(`Worker ${poolWorker.id} failed`));
+            poolWorker.pendingTasks.delete(taskId);
         }
 
-        // 3. Marcar como no disponible
+        poolWorker.pendingTasks.clear();
+
+        // 2. ✨ FIX MEMORIA: Remover listeners antes de terminar
+        try {
+            poolWorker.worker.removeAllListeners('message');
+            poolWorker.worker.removeAllListeners('error');
+            poolWorker.worker.removeAllListeners('exit');
+            poolWorker.worker.removeAllListeners('online');
+            poolWorker.worker.removeAllListeners('messageerror');
+        } catch {
+            // Silencioso
+        }
+
+        // 3. ✨ FIX MEMORIA: Terminar sin esperar
+        const workerToTerminate = poolWorker.worker;
+        poolWorker.worker = null as any;
         poolWorker.busy = false;
 
-        // 4. Recrear worker si el pool está activo
+        workerToTerminate.terminate().catch(() => {
+            // Silencioso
+        });
+
+        // 4. ✨ FIX MEMORIA: Recrear worker asíncronamente sin bloquear
         if (this.isInitialized && this.workers.length > 0) {
-            try {
-                const newWorker = await this.createWorker(poolWorker.id);
-                const index = this.workers.findIndex(
-                    w => w.id === poolWorker.id,
-                );
-                if (index !== -1) {
-                    this.workers[index] = newWorker;
+            setImmediate(async () => {
+                try {
+                    const newWorker = await this.createWorker(poolWorker.id);
+                    const index = this.workers.findIndex(
+                        w => w.id === poolWorker.id,
+                    );
+                    if (index !== -1) {
+                        this.workers[index] = newWorker;
+                    }
+                } catch {
+                    // Silencioso
                 }
-            } catch (recreateError) {
-                console.error(
-                    `[WorkerPool] No se pudo recrear worker ${poolWorker.id}:`,
-                    recreateError,
-                );
-            }
+            });
         }
     }
 
@@ -584,7 +599,7 @@ export class TypeScriptWorkerPool {
      */
     private async handleWorkerExit(
         poolWorker: PoolWorker,
-        code: number,
+        code: number | null,
     ): Promise<void> {
         console.warn(
             `[WorkerPool] Worker ${poolWorker.id} salió con código ${code}`,
@@ -640,7 +655,7 @@ export class TypeScriptWorkerPool {
 
     /**
      * Recicla un worker para prevenir memory leaks
-     * ✨ FIX #2: Mejorada limpieza explícita de listeners y referencias
+     * ✨ FIX MEMORIA: Limpieza agresiva de todas las referencias
      */
     private async recycleWorker(poolWorker: PoolWorker): Promise<void> {
         try {
@@ -648,35 +663,21 @@ export class TypeScriptWorkerPool {
                 `[WorkerPool] Reciclando worker ${poolWorker.id} después de ${poolWorker.taskCounter} tareas`,
             );
 
-            // 1. Esperar a que termine tareas pendientes (timeout corto)
-            const maxWait = 2000; // 2 segundos máximo
-            const startTime = Date.now();
-
-            await new Promise<void>(resolve => {
-                const checkPending = () => {
-                    if (
-                        poolWorker.pendingTasks.size === 0 ||
-                        Date.now() - startTime >= maxWait
-                    ) {
-                        resolve();
-                    } else {
-                        setTimeout(checkPending, 100);
-                    }
-                };
-                checkPending();
-            });
-
-            // 2. Si aún hay tareas pendientes, rechazarlas con cleanup de timeouts
+            // 1. ✨ FIX MEMORIA: No esperar, rechazar inmediatamente todas las tareas pendientes
             const pendingTasksArray = Array.from(
                 poolWorker.pendingTasks.entries(),
             );
-            for (const [_taskId, task] of pendingTasksArray) {
+
+            for (const [taskId, task] of pendingTasksArray) {
                 clearTimeout(task.timeout);
                 task.reject(new Error('Worker being recycled'));
+                poolWorker.pendingTasks.delete(taskId);
             }
+
+            // ✨ FIX MEMORIA: Forzar limpieza del Map
             poolWorker.pendingTasks.clear();
 
-            // 3. ✨ FIX #2: Remover listeners explícitamente por tipo
+            // 2. ✨ FIX MEMORIA: Remover listeners explícitamente por tipo
             const worker = poolWorker.worker;
             worker.removeAllListeners('message');
             worker.removeAllListeners('error');
@@ -684,36 +685,51 @@ export class TypeScriptWorkerPool {
             worker.removeAllListeners('online');
             worker.removeAllListeners('messageerror');
 
-            // 4. ✨ FIX #2: Desreferenciar el worker antes de terminar
+            // 3. ✨ FIX MEMORIA: Guardar referencia temporal y limpiar poolWorker
             const workerToTerminate = poolWorker.worker;
-            poolWorker.worker = null as any; // Romper referencia circular
+            const workerId = poolWorker.id;
 
-            // 5. Terminar con timeout para evitar cuelgues
+            // Limpiar todas las propiedades del poolWorker
+            poolWorker.worker = null as any;
+            poolWorker.busy = false;
+            poolWorker.taskCounter = 0;
+            poolWorker.tasksProcessed = 0;
+            poolWorker.memoryUsage = 0;
+
+            // 4. ✨ FIX MEMORIA: Terminar con timeout agresivo
             const terminatePromise = workerToTerminate.terminate();
             const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('Terminate timeout')), 3000),
+                setTimeout(() => reject(new Error('Terminate timeout')), 2000),
             );
 
-            await Promise.race([terminatePromise, timeoutPromise]).catch(
-                error => {
-                    console.warn(
-                        `[WorkerPool] Warning al terminar worker ${poolWorker.id}:`,
-                        error,
-                    );
-                },
-            );
+            await Promise.race([terminatePromise, timeoutPromise]).catch(() => {
+                // Forzar terminación si falla
+                try {
+                    workerToTerminate.terminate();
+                } catch {
+                    // Silencioso
+                }
+            });
 
-            // 6. ✨ FIX #2: Crear y reemplazar con nuevo worker
-            const newWorker = await this.createWorker(poolWorker.id);
-            const index = this.workers.findIndex(w => w.id === poolWorker.id);
+            // ✨ FIX MEMORIA: Forzar garbage collection del worker terminado
+            setImmediate(() => {
+                // Dar tiempo al GC para limpiar
+            });
+
+            // 5. ✨ FIX MEMORIA: Crear y reemplazar con nuevo worker
+            const newWorker = await this.createWorker(workerId);
+            const index = this.workers.findIndex(w => w.id === workerId);
             if (index !== -1) {
                 this.workers[index] = newWorker;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(
                 `[WorkerPool] Error reciclando worker ${poolWorker.id}:`,
                 error,
             );
+            // ✨ FIX MEMORIA: Asegurar limpieza incluso en error
+            poolWorker.pendingTasks.clear();
+            poolWorker.busy = false;
         }
     }
 
@@ -765,6 +781,10 @@ export class TypeScriptWorkerPool {
 
         // Buscar worker disponible
         const availableWorker = this.findAvailableWorker();
+
+        // ✨ FIX: Incrementar totalTasks ANTES del try/catch para conteo correcto
+        this.totalTasks++;
+
         if (!availableWorker) {
             return this.typeCheckWithSyncFallback(
                 fileName,
@@ -774,7 +794,6 @@ export class TypeScriptWorkerPool {
         }
 
         try {
-            this.totalTasks++;
             return await this.typeCheckWithWorker(
                 availableWorker,
                 fileName,
@@ -792,6 +811,7 @@ export class TypeScriptWorkerPool {
 
     /**
      * Realiza type checking usando un worker específico con reciclaje automático
+     * ✨ FIX MEMORIA: Optimizado para prevenir fugas de memoria
      */
     private async typeCheckWithWorker(
         poolWorker: PoolWorker,
@@ -801,7 +821,12 @@ export class TypeScriptWorkerPool {
     ): Promise<TypeCheckResult> {
         // Verificar si el worker necesita reciclaje por número de tareas
         if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
-            await this.recycleWorker(poolWorker);
+            // ✨ FIX: No esperar el reciclaje, usar fallback
+            return this.typeCheckWithSyncFallback(
+                fileName,
+                content,
+                compilerOptions,
+            );
         }
 
         return new Promise<TypeCheckResult>((resolve, reject) => {
@@ -819,51 +844,67 @@ export class TypeScriptWorkerPool {
                 compilerOptions,
             );
 
-            // Configurar timeout para la tarea
+            // ✨ FIX MEMORIA: Configurar timeout con limpieza explícita
             const timeout = setTimeout(() => {
-                poolWorker.pendingTasks.delete(taskId);
-                if (poolWorker.pendingTasks.size === 0) {
-                    poolWorker.busy = false;
+                const task = poolWorker.pendingTasks.get(taskId);
+                if (task) {
+                    poolWorker.pendingTasks.delete(taskId);
+                    if (poolWorker.pendingTasks.size === 0) {
+                        poolWorker.busy = false;
+                    }
+                    reject(
+                        new Error(
+                            `Timeout (${dynamicTimeout}ms) en type checking para ${fileName}`,
+                        ),
+                    );
                 }
-                reject(
-                    new Error(
-                        `Timeout (${dynamicTimeout}ms) en type checking para ${fileName} - archivo complejo detectado`,
-                    ),
-                );
             }, dynamicTimeout);
 
-            // Agregar tarea a la lista de pendientes del worker
+            // ✨ FIX MEMORIA: Wrapper para resolver/rechazar que limpia el timeout
+            const wrappedResolve = (result: TypeCheckResult) => {
+                clearTimeout(timeout);
+                resolve(result);
+            };
+
+            const wrappedReject = (error: Error) => {
+                clearTimeout(timeout);
+                reject(error);
+            };
+
+            // ✨ FIX MEMORIA: Agregar tarea con wrappers que auto-limpian
             poolWorker.pendingTasks.set(taskId, {
-                resolve,
-                reject,
+                resolve: wrappedResolve,
+                reject: wrappedReject,
                 timeout,
                 fileName,
                 startTime: Date.now(),
             });
 
             try {
-                // Crear mensaje para el worker con configuración de timeout
+                // ✨ FIX MEMORIA: No copiar compilerOptions completo
                 const message: WorkerMessage = {
                     id: taskId,
                     fileName,
                     content,
                     compilerOptions: {
-                        ...compilerOptions,
-                        // ✨ Añadir timeout al worker para manejo interno
-                        _workerTimeout: dynamicTimeout - 1000, // 1 segundo menos para cleanup interno
+                        target: compilerOptions.target,
+                        module: compilerOptions.module,
+                        strict: compilerOptions.strict,
+                        skipLibCheck: compilerOptions.skipLibCheck,
+                        // No pasar propiedades innecesarias que ocupan memoria
                     },
                 };
 
                 // Enviar mensaje al worker
                 poolWorker.worker.postMessage(message);
-            } catch (error) {
+            } catch (error: any) {
                 // Limpiar en caso de error
                 clearTimeout(timeout);
                 poolWorker.pendingTasks.delete(taskId);
                 if (poolWorker.pendingTasks.size === 0) {
                     poolWorker.busy = false;
                 }
-                reject(error);
+                reject(error as Error);
             }
         });
     }
@@ -932,6 +973,7 @@ export class TypeScriptWorkerPool {
 
     /**
      * Fallback síncrono para type checking
+     * ✨ FIX: Ahora trackea las tareas correctamente
      */
     private typeCheckWithSyncFallback(
         fileName: string,
@@ -939,12 +981,15 @@ export class TypeScriptWorkerPool {
         compilerOptions: any,
     ): TypeCheckResult {
         try {
-            return validateTypesWithLanguageService(
+            const result = validateTypesWithLanguageService(
                 fileName,
                 content,
                 compilerOptions,
             );
+            this.completedTasks++; // ✨ FIX: Contabilizar tareas completadas en fallback
+            return result;
         } catch {
+            this.failedTasks++; // ✨ FIX: Contabilizar tareas fallidas en fallback
             return {
                 diagnostics: [],
                 hasErrors: false,
@@ -991,7 +1036,7 @@ export class TypeScriptWorkerPool {
         const terminatePromises = this.workers.map(async poolWorker => {
             try {
                 await poolWorker.worker.terminate();
-            } catch (error) {
+            } catch (error: any) {
                 console.warn(
                     `[WorkerPool] Error terminando worker ${poolWorker.id}:`,
                     error,

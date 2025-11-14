@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import path from 'node:path'; // Importar el módulo path
-import process, { env } from 'node:process';
+import * as path from 'node:path';
+import * as process from 'node:process';
+const { env } = process;
 // Lazy loading optimizations - Only import lightweight modules synchronously
 import { fileURLToPath } from 'node:url';
 

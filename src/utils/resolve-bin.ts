@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import * as process from 'node:process';
 
-import findRoot from 'find-root';
+import * as findRootModule from 'find-root';
 import fs from 'fs-extra';
+
+const findRoot = (findRootModule as any).default || findRootModule;
 
 // Función helper para resolver módulos sin createRequire
 function resolveModule(moduleName: string, paths: string[]): string {

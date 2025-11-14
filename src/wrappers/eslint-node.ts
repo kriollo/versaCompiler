@@ -1,4 +1,4 @@
-import path from 'node:path'; // Añadir importación de path
+import * as path from 'node:path';
 import { cwd } from 'node:process'; // Añadir importación de cwd
 
 import { execa } from 'execa';

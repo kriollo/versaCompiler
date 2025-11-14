@@ -119,7 +119,7 @@ function findOptimalESMVersion(
                 return optimizedPath;
             }
         } // Buscar archivos que contengan patrones ESM/browser dinámicamente
-        const esmBrowserFiles = files.filter(file => {
+        const esmBrowserFiles = files.filter((file: string) => {
             const lowerFile = file.toLowerCase();
             return (
                 (lowerFile.includes('.esm-browser.') || // Prioridad alta: combinación esm-browser
@@ -135,7 +135,7 @@ function findOptimalESMVersion(
         if (esmBrowserFiles.length > 0) {
             // Primera prioridad: archivos que combinan ESM y Browser (sin runtime)
             const esmBrowserCombined = esmBrowserFiles.filter(
-                file =>
+                (file: string) =>
                     file.toLowerCase().includes('.esm-browser.') &&
                     !file.toLowerCase().includes('.runtime.'),
             );
@@ -143,7 +143,7 @@ function findOptimalESMVersion(
             if (esmBrowserCombined.length > 0) {
                 // Dentro de esm-browser, priorizar desarrollo > .prod > .min
                 const devFiles = esmBrowserCombined.filter(
-                    file =>
+                    (file: string) =>
                         !file.toLowerCase().includes('.prod.') &&
                         !file.toLowerCase().includes('.min.'),
                 );
@@ -155,7 +155,7 @@ function findOptimalESMVersion(
                     return optimizedPath;
                 }
 
-                const prodFiles = esmBrowserCombined.filter(file =>
+                const prodFiles = esmBrowserCombined.filter((file: string) =>
                     file.toLowerCase().includes('.prod.'),
                 );
                 if (prodFiles.length > 0 && prodFiles[0]) {
@@ -171,7 +171,7 @@ function findOptimalESMVersion(
                     return optimizedPath;
                 }
 
-                const minFiles = esmBrowserCombined.filter(file =>
+                const minFiles = esmBrowserCombined.filter((file: string) =>
                     file.toLowerCase().includes('.min.'),
                 );
                 if (minFiles.length > 0 && minFiles[0]) {
@@ -203,7 +203,7 @@ function findOptimalESMVersion(
 
             // Segunda prioridad: cualquier versión ESM disponible (sin minificar)
             const esmFiles = esmBrowserFiles.filter(
-                file =>
+                (file: string) =>
                     (file.toLowerCase().includes('.esm.') ||
                         file.toLowerCase().includes('.module.')) &&
                     !file.toLowerCase().includes('.min.') &&
@@ -224,7 +224,7 @@ function findOptimalESMVersion(
 
             // Tercera prioridad: archivos minificados de cualquier tipo ESM/browser (sin runtime)
             const minifiedFiles = esmBrowserFiles.filter(
-                file =>
+                (file: string) =>
                     (file.toLowerCase().includes('.min.') ||
                         file.toLowerCase().includes('.prod.')) &&
                     !file.toLowerCase().includes('.runtime.'),
@@ -232,7 +232,7 @@ function findOptimalESMVersion(
             if (minifiedFiles.length > 0) {
                 // Priorizar ESM sobre browser sobre UMD
                 const esmFiles = minifiedFiles.filter(
-                    file =>
+                    (file: string) =>
                         file.toLowerCase().includes('.esm.') ||
                         file.toLowerCase().includes('.module.'),
                 );
@@ -265,14 +265,14 @@ function findOptimalESMVersion(
             }
 
             // Cuarta prioridad: versiones runtime como último recurso
-            const runtimeFiles = esmBrowserFiles.filter(file =>
+            const runtimeFiles = esmBrowserFiles.filter((file: string) =>
                 file.toLowerCase().includes('.runtime.esm-browser.'),
             );
 
             if (runtimeFiles.length > 0) {
                 // Priorizar desarrollo sobre producción en runtime también
                 const devRuntimeFiles = runtimeFiles.filter(
-                    file =>
+                    (file: string) =>
                         !file.toLowerCase().includes('.prod.') &&
                         !file.toLowerCase().includes('.min.'),
                 );
