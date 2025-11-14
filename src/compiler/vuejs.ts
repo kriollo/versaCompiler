@@ -226,6 +226,9 @@ export const preCompileVue = async (
             filename: fileName,
             sourceMap: !isProd,
             sourceRoot: path.dirname(source),
+            templateParseOptions: {
+                comments: !isProd, // ✨ Eliminar comentarios HTML del template
+            },
         });
 
         if (errors.length) {
@@ -327,6 +330,7 @@ export const preCompileVue = async (
                     runtimeModuleName: 'vue',
                     whitespace: 'condense',
                     ssr: false,
+                    comments: !isProd, // ✨ Eliminar comentarios HTML del template
                     nodeTransforms: [],
                     directiveTransforms: {},
                 },

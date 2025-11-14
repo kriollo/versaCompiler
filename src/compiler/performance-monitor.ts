@@ -16,7 +16,9 @@ import {
 import { getModuleResolutionMetrics } from './module-resolution-optimizer';
 import {
     cleanExpiredParserCache,
+    clearFileContentCache,
     clearParserCache,
+    getFileContentCacheStats,
     getParserCacheStats,
 } from './parser';
 import { TransformOptimizer } from './transform-optimizer';
@@ -32,6 +34,7 @@ import {
 interface PerformanceStats {
     vueHMRCache: any;
     parserCache: any;
+    fileContentCache: any;
     browserSyncCache: any;
     minificationCache: any;
     transformOptimizer: any;
@@ -61,6 +64,7 @@ export class PerformanceMonitor {
     getAllStats(): PerformanceStats {
         const vueHMRCache = getVueHMRCacheStats();
         const parserCache = getParserCacheStats();
+        const fileContentCache = getFileContentCacheStats();
         const browserSyncCache = getBrowserSyncCacheStats();
         const minificationCache = getMinificationCacheStats();
         const transformOptimizer = TransformOptimizer.getInstance().getStats();
@@ -69,6 +73,7 @@ export class PerformanceMonitor {
         // Calcular resumen general
         const totalCacheHits =
             (parserCache.cacheHits || 0) +
+            (fileContentCache.cacheHits || 0) +
             (browserSyncCache.cacheHits || 0) +
             (minificationCache.cacheHits || 0) +
             (transformOptimizer.cacheHits || 0) +
@@ -76,6 +81,7 @@ export class PerformanceMonitor {
 
         const totalCacheMisses =
             (parserCache.cacheMisses || 0) +
+            (fileContentCache.cacheMisses || 0) +
             (browserSyncCache.cacheMisses || 0) +
             (minificationCache.cacheMisses || 0) +
             (transformOptimizer.cacheMisses || 0) +
@@ -96,6 +102,7 @@ export class PerformanceMonitor {
         const totalCacheEntries =
             (vueHMRCache.size || 0) +
             (parserCache.cacheSize || 0) +
+            (fileContentCache.cacheSize || 0) +
             (browserSyncCache.cacheSize || 0) +
             (minificationCache.cacheSize || 0) +
             (transformOptimizer.cacheSize || 0) +
@@ -104,6 +111,7 @@ export class PerformanceMonitor {
         return {
             vueHMRCache,
             parserCache,
+            fileContentCache,
             browserSyncCache,
             minificationCache,
             transformOptimizer,
@@ -156,6 +164,12 @@ Cache Misses: ${stats.parserCache.cacheMisses}
 Size: ${stats.parserCache.cacheSize}/${stats.parserCache.maxCacheSize}
 Memoria: ${formatBytes(stats.parserCache.memoryUsage)}/${formatBytes(stats.parserCache.maxMemoryUsage)}
 
+📖 FILE CONTENT CACHE
+Hit Rate: ${stats.fileContentCache.hitRate}%
+Cache Hits: ${stats.fileContentCache.cacheHits}
+Cache Misses: ${stats.fileContentCache.cacheMisses}
+Size: ${stats.fileContentCache.cacheSize}/${stats.fileContentCache.maxCacheSize}
+
 🌐 BROWSERSYNC FILE CACHE
 Hit Rate: ${stats.browserSyncCache.hitRate}%
 Cache Hits: ${stats.browserSyncCache.cacheHits}
@@ -200,6 +214,7 @@ Tiempo Promedio: ${stats.moduleResolution.averageResolveTime?.toFixed(2)}ms
     clearAllCaches(): void {
         clearVueHMRCache();
         clearParserCache();
+        clearFileContentCache();
         clearBrowserSyncCache();
         clearMinificationCache();
         TransformOptimizer.getInstance().clear();

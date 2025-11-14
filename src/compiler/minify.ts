@@ -77,12 +77,16 @@ class MinificationCache {
             const result = await minify(filename, data, options);
 
             // Si el código de entrada no estaba vacío pero el resultado sí,
-            // probablemente hay un error de sintaxis
+            // retornar código original sin minificar con advertencia
             if (data.trim() && !result.code.trim()) {
-                const error = new Error(
-                    `Minification failed: likely syntax error in ${filename}`,
+                console.warn(
+                    `⚠️  Minificación fallida para ${filename}, usando código original`,
                 );
-                return { code: '', error, cached: false };
+                return {
+                    code: data, // Retornar código original
+                    error: null, // No es un error crítico
+                    cached: false,
+                };
             }
 
             const minifiedSize = result.code.length;
@@ -107,10 +111,14 @@ class MinificationCache {
                 cached: false,
             };
         } catch (error) {
+            // En caso de excepción, retornar código original con advertencia
+            console.warn(
+                `⚠️  Error al minificar ${filename}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            console.warn(`   Usando código original sin minificar`);
             return {
-                error:
-                    error instanceof Error ? error : new Error(String(error)),
-                code: '',
+                code: data, // Retornar código original
+                error: null, // No propagar el error
                 cached: false,
             };
         }

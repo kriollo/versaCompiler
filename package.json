@@ -18,7 +18,7 @@
     "scripts": {
         "dev": "tsx --watch src/main.ts --watch --verbose --tailwind",
         "file": "tsx src/main.ts ",
-        "compile": "tsx src/main.ts --all --t --cc --co -y --verbose --prod",
+        "compile": "tsx src/main.ts --all --cc --co -y --verbose --prod",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
@@ -47,7 +47,6 @@
     },
     "homepage": "https://github.com/kriollo/versaCompiler#readme",
     "dependencies": {
-        "@typescript/native-preview": "7.0.0-dev.20251114.1",
         "@vue/compiler-dom": "^3.5.24",
         "@vue/reactivity": "^3.5.24",
         "@vue/runtime-core": "^3.5.24",
@@ -81,11 +80,11 @@
         "@types/mocha": "^10.0.10",
         "@types/node": "^24.10.1",
         "@types/resolve": "^1.20.6",
-        "@types/yargs": "^17.0.34",
+        "@types/yargs": "^17.0.35",
         "@typescript-eslint/eslint-plugin": "^8.46.4",
         "@typescript-eslint/parser": "^8.46.4",
-        "@vitest/coverage-v8": "^4.0.8",
-        "@vitest/ui": "^4.0.8",
+        "@vitest/coverage-v8": "^4.0.9",
+        "@vitest/ui": "^4.0.9",
         "@vue/eslint-config-typescript": "^14.6.0",
         "@vue/test-utils": "^2.4.6",
         "code-tag": "^1.2.0",
@@ -101,7 +100,7 @@
         "rimraf": "^6.1.0",
         "sweetalert2": "^11.26.3",
         "tailwindcss": "^4.1.17",
-        "vitest": "^4.0.8",
+        "vitest": "^4.0.9",
         "vue-eslint-parser": "^10.2.0"
     },
     "packageManager": "pnpm@10.15.0+sha512.486ebc259d3e999a4e8691ce03b5cac4a71cbeca39372a9b762cb500cfdf0873e2cb16abe3d951b1ee2cf012503f027b98b6584e4df22524e0c7450d9ec7aa7b"
