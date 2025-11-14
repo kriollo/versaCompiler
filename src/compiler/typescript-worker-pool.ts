@@ -881,18 +881,27 @@ export class TypeScriptWorkerPool {
             });
 
             try {
-                // ✨ FIX MEMORIA: No copiar compilerOptions completo
+                // ✨ FIX: Pasar todas las opciones relevantes del tsconfig.json de forma serializable
+                // Crear copia limpia con solo valores primitivos (sin funciones, símbolos, etc.)
+                const serializableOptions: Record<string, any> = {};
+                for (const key in compilerOptions) {
+                    const value = (compilerOptions as any)[key];
+                    // Solo pasar valores serializables (primitivos, arrays, objetos simples)
+                    if (
+                        value !== undefined &&
+                        value !== null &&
+                        typeof value !== 'function' &&
+                        typeof value !== 'symbol'
+                    ) {
+                        serializableOptions[key] = value;
+                    }
+                }
+
                 const message: WorkerMessage = {
                     id: taskId,
                     fileName,
                     content,
-                    compilerOptions: {
-                        target: compilerOptions.target,
-                        module: compilerOptions.module,
-                        strict: compilerOptions.strict,
-                        skipLibCheck: compilerOptions.skipLibCheck,
-                        // No pasar propiedades innecesarias que ocupan memoria
-                    },
+                    compilerOptions: serializableOptions,
                 };
 
                 // Enviar mensaje al worker

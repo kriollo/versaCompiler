@@ -74,7 +74,7 @@ class WorkerTypeScriptLanguageServiceHost {
         };
 
         // console.log(
-        //     '[Worker] Opciones del compilador limpias creadas:',
+        //     '[Worker] Opciones del compilador recibidas:',
         //     Object.keys(cleanOptions),
         // );
         return cleanOptions;
