@@ -1,10 +1,19 @@
 import * as path from 'node:path';
 import * as process from 'node:process';
 
-import * as findRootModule from 'find-root';
-import fs from 'fs-extra';
+import * as fs from 'fs-extra';
 
-const findRoot = (findRootModule as any).default || findRootModule;
+// Reimplementación simple de findRoot para evitar dependencias problemáticas
+function findRoot(start: string): string {
+    let current = start;
+    while (current !== path.dirname(current)) {
+        if (fs.existsSync(path.join(current, 'package.json'))) {
+            return current;
+        }
+        current = path.dirname(current);
+    }
+    throw new Error(`Cannot find package.json from ${start}`);
+}
 
 // Función helper para resolver módulos sin createRequire
 function resolveModule(moduleName: string, paths: string[]): string {

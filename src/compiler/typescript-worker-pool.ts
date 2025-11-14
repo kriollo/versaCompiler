@@ -428,7 +428,7 @@ export class TypeScriptWorkerPool {
                     },
                 );
 
-                worker.on('error', error => {
+                worker.on('error', (error: Error) => {
                     clearTimeout(initTimeout);
                     reject(error);
                 });
