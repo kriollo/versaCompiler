@@ -5,6 +5,97 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.3.0] - 2025-01-15
+
+### 🐛 Correcciones Críticas
+
+- **Bug de Resolución de Módulos en Producción**: 
+    - Corrección crítica en `module-resolver.ts` y `module-resolution-optimizer.ts`
+    - El compilador ahora selecciona correctamente archivos `.prod.js` cuando `--prod` está activo
+    - Priorización correcta: `.prod.js` > `.min.js` > `.js` en modo producción
+    - Fix para Vue Router, Pinia y otras librerías ESM que no cargaban versión optimizada
+    - Mejora en el pattern matching para detectar variantes de producción (ej: `vue.runtime.esm-bundler` → `vue.esm-browser.prod.js`)
+
+- **Tests de Stress Corregidos**:
+    - Corrección de 6 tests fallidos en `stress-test-extreme.test.ts`
+    - Fix de extensiones de archivo (`.ts` → `.js`) en imports de tests
+    - Actualización de mocks para compatibilidad con Vitest 4.0.9
+    - Todos los tests de stress ahora pasan (compilaciones masivas, memory leaks, HMR performance)
+
+### ✨ Nuevas Características
+
+- **Suite de Tests Ampliada**: Cobertura de pruebas significativamente mejorada
+    - **readConfig.test.ts** (~15 tests): Validación de seguridad para paths y comandos
+        - Tests de `validatePath()` y `validateCommand()` con casos edge
+        - Validación estricta de path traversal, null bytes, Unicode exploits
+        - Límites de longitud de paths (MAX_PATH_LENGTH=260)
+    
+    - **linter.test.ts** (15 tests): Integración con ESLint y OxLint
+        - Tests de configuración válida e inválida
+        - Manejo de bins no encontrados
+        - Validación de seguridad en paths de archivos
+        - Tests de timeout y errores malformados
+    
+    - **typescript-compiler.test.ts** (~25 tests): Compilador TypeScript
+        - Compilación básica TS → JS
+        - Type errors en modo permisivo
+        - Edge cases (archivos vacíos, solo comentarios, archivos muy largos)
+        - Tests de imports/exports y preservación de código
+        - Memory leak detection (< 50MB)
+        - Config management con `loadTypeScriptConfig`
+    
+    - **file-watcher.test.ts** (7 tests): Operaciones de sistema de archivos
+        - CRUD de archivos (create, read, delete)
+        - Validación de paths peligrosos (../, null bytes)
+        - Caracteres especiales en nombres de archivo
+
+- **Tests de Producción**: Nuevos tests de integración para modo `--prod`
+    - Validación de que Vue 3 carga `vue.esm-browser.prod.js`
+    - Validación de que Vue Router carga versiones de producción
+    - Tests de múltiples compilaciones preservando modo producción
+
+### 🔧 Mejoras
+
+- **Estabilidad de Tests**: 374/374 tests pasando (100% ✅)
+    - Incremento de 299 tests base a 374 tests totales
+    - Eliminación de tests para APIs no exportadas (WatchDebouncer, loadConfig)
+    - Corrección de expectativas para APIs reales vs asumidas
+    - Simplificación de tests para enfocarse en funcionalidad exportada
+
+- **Descubrimientos de API Documentados**:
+    - `validatePath('')` retorna `false` (validación estricta)
+    - `validateCommand('npm')` retorna `false` (validación estricta)
+    - `loadTypeScriptConfig()` retorna `CompilerOptions` directamente (no wrapper)
+    - `preCompileTS()` en modo permisivo (no siempre reporta type errors)
+    - `WatchDebouncer` es clase interna, no exportada
+    - ESLint retorna `{json: {...}, stylish?: string}` o `false` en errores
+    - OxLint retorna `false` cuando bin no existe
+
+### 🧪 Testing
+
+- **Cobertura Mejorada**: Tests críticos implementados sin romper funcionalidad existente
+    - Seguridad de paths y comandos
+    - Integración con linters (ESLint/OxLint)
+    - Compilación TypeScript end-to-end
+    - Operaciones de file system
+    - Modo producción end-to-end
+
+- **Métricas de Tests**:
+    - 26 archivos de tests pasando
+    - 374 tests totales
+    - ~62 nuevos tests agregados en esta versión
+    - 0 tests fallidos
+    - Tiempo de ejecución: ~60-70s (suite completa)
+
+### 📝 Notas de Desarrollo
+
+- **Filosofía de Testing**: "Que no se pierda ninguna funcionalidad"
+    - Todos los tests validan comportamiento real, no asumido
+    - Tests simplificados cuando APIs internas no son accesibles
+    - Foco en funcionalidad exportada y casos de uso reales
+
+---
+
 ## [2.2.0] - 2025-01-14
 
 ### ✨ Nuevas Características
