@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs';
 import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { compileFile } from '../src/compiler/compile';
@@ -6,13 +7,16 @@ import { clearParserCache } from '../src/compiler/parser';
 
 // Mockear dependencias pesadas como el file system
 vi.mock('node:fs/promises');
+vi.mock('node:fs');
 
 describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
     const mockedReadFile = readFile as Mock;
     const mockedWriteFile = writeFile as Mock;
-    const _mockedMkdir = mkdir as Mock;
+    const mockedMkdir = mkdir as Mock;
     const mockedAccess = access as Mock;
     const mockedStat = stat as Mock;
+    const mockedStatSync = statSync as Mock;
+    const mockedExistsSync = existsSync as Mock;
 
     beforeEach(() => {
         // Limpiar todos los caches antes de cada test
@@ -27,6 +31,15 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
             isDirectory: () => false,
             mtimeMs: Date.now(),
         });
+        mockedStatSync.mockReturnValue({
+            isFile: () => true,
+            isDirectory: () => false,
+            mtimeMs: Date.now(),
+            size: 1024, // Tamaño por defecto para archivos
+        });
+        mockedExistsSync.mockReturnValue(false); // Simular que tsconfig.json no existe
+        mockedMkdir.mockResolvedValue(undefined);
+        mockedWriteFile.mockResolvedValue(undefined);
 
         // Configuración de alias para los tests
         process.env.PATH_ALIAS = JSON.stringify({
@@ -55,11 +68,15 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
         const FILE_COUNT = 200;
         const filesToCompile = [];
 
-        for (let i = 0; i < FILE_COUNT; i++) {
-            const filePath = `/src/file-${i}.ts`;
+        // Configurar mock de readFile ANTES de crear las promesas
+        mockedReadFile.mockImplementation(async (path: string) => {
             const fileContent = generateLargeFileContent(50); // 50KB file
-            filesToCompile.push({ path: filePath, content: fileContent });
-            mockedReadFile.mockResolvedValue(fileContent);
+            return fileContent;
+        });
+
+        for (let i = 0; i < FILE_COUNT; i++) {
+            const filePath = `/src/file-${i}.js`;
+            filesToCompile.push({ path: filePath });
         }
 
         const compilationPromises = filesToCompile.map(file =>
@@ -99,7 +116,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
         });
 
         for (let i = 0; i < FILE_COUNT; i++) {
-            const filePath = `/src/file-batch-${i}.ts`;
+            const filePath = `/src/file-batch-${i}.js`;
             // El contenido real no importa aquí porque el mock lo interceptará
             filesToCompile.push({ path: filePath, content: '' });
         }
@@ -143,7 +160,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
         });
 
         for (let i = 0; i < FILE_COUNT; i++) {
-            filesToCompile.push({ path: `/src/worker-stress-${i}.ts` });
+            filesToCompile.push({ path: `/src/worker-stress-${i}.js` });
         }
 
         const startTime = performance.now();
@@ -211,7 +228,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
             mockedReadFile.mockResolvedValue(scenario.content);
 
             const result = await compileFile(
-                `/src/test-error-${scenario.name.toLowerCase().replace(/\s/g, '-')}.ts`,
+                `/src/test-error-${scenario.name.toLowerCase().replace(/\s/g, '-')}.js`,
             );
 
             results.push({
@@ -267,7 +284,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
         const testContent = 'const x =; // Syntax error';
         mockedReadFile.mockResolvedValue(testContent);
 
-        const result = await compileFile('/src/ux-test.ts');
+        const result = await compileFile('/src/ux-test.js');
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
@@ -320,7 +337,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
         });
 
         const filesToCompile = Array.from({ length: FILE_COUNT }, (_, i) => ({
-            path: `/src/mixed-workload-${i}.ts`,
+            path: `/src/mixed-workload-${i}.js`,
         }));
 
         const startTime = performance.now();
