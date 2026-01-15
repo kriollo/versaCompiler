@@ -19,7 +19,7 @@
             "url": "vscode://schemas/tsconfig"
         }
     ],
-    "typescript.experimental.useTsgo": true,
+    "typescript.experimental.useTsgo": false,
     "typescript.suggest.autoImports": true,
     "typescript.preferences.quoteStyle": "double",
     "typescript.format.enable": true

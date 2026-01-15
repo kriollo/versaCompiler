@@ -261,7 +261,7 @@ describe('Parser - Funciones de parsing y cache', () => {
         });
 
         it('debe manejar código con expresiones regulares', async () => {
-            const code = `const regex = /test/gi; const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;`;
+            const code = `const regex = /test/gi; const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$/;`;
             const ast = await parser('regex.js', code, 'js');
 
             expect(ast).toBeDefined();

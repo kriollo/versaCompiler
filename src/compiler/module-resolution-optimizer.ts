@@ -483,6 +483,10 @@ export class ModuleResolutionOptimizer {
         const baseName = entryPoint.split('/').pop() || '';
         const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
 
+        // Determinar el nombre base sin sufijos como .runtime, .bundler, etc.
+        // Por ejemplo: vue.runtime.esm-bundler -> vue
+        const coreBaseName = nameWithoutExt.split('.')[0];
+
         const searchDir = join(moduleDir, dir);
         if (!existsSync(searchDir)) {
             return undefined;
@@ -492,16 +496,61 @@ export class ModuleResolutionOptimizer {
             const files = readdirSync(searchDir);
             this.metrics.filesystemAccess++;
 
-            // Patrones de prioridad para versiones optimizadas
-            const patterns = [
-                `${nameWithoutExt}.esm-browser.js`,
-                `${nameWithoutExt}.esm.js`,
-                `${nameWithoutExt}.module.js`,
-                `${nameWithoutExt}.browser.js`,
-            ];
+            // ✨ Patrones de prioridad dinámicos según modo producción
+            const patterns =
+                env.isPROD === 'true'
+                    ? [
+                          // 🏭 MODO PRODUCCIÓN: Priorizar versiones optimizadas
+                          // Primero intentar con el nombre exacto
+                          `${nameWithoutExt}.esm-browser.prod.js`,
+                          `${nameWithoutExt}.esm-browser.min.js`,
+                          // Luego con el nombre base (para casos como vue.runtime.esm-bundler -> vue.esm-browser.prod.js)
+                          `${coreBaseName}.esm-browser.prod.js`,
+                          `${coreBaseName}.esm-browser.min.js`,
+                          `${coreBaseName}.runtime.esm-browser.prod.js`,
+                          `${coreBaseName}.runtime.esm-browser.min.js`,
+                          // Otros patrones ESM optimizados
+                          `${nameWithoutExt}.esm.prod.js`,
+                          `${nameWithoutExt}.esm.min.js`,
+                          `${nameWithoutExt}.module.prod.js`,
+                          `${nameWithoutExt}.module.min.js`,
+                          `${nameWithoutExt}.browser.prod.js`,
+                          `${nameWithoutExt}.browser.min.js`,
+                          // Fallback a versiones de desarrollo
+                          `${coreBaseName}.esm-browser.js`,
+                          `${coreBaseName}.runtime.esm-browser.js`,
+                          `${nameWithoutExt}.esm-browser.js`,
+                          `${nameWithoutExt}.esm.js`,
+                          `${nameWithoutExt}.module.js`,
+                          `${nameWithoutExt}.browser.js`,
+                      ]
+                    : [
+                          // 🔧 MODO DESARROLLO: Priorizar versiones sin minificar
+                          // Primero con nombre exacto
+                          `${nameWithoutExt}.esm-browser.js`,
+                          // Luego con nombre base
+                          `${coreBaseName}.esm-browser.js`,
+                          `${coreBaseName}.runtime.esm-browser.js`,
+                          // Otros patrones ESM
+                          `${nameWithoutExt}.esm.js`,
+                          `${nameWithoutExt}.module.js`,
+                          `${nameWithoutExt}.browser.js`,
+                          // Fallback a versiones de producción si no hay desarrollo
+                          `${coreBaseName}.esm-browser.prod.js`,
+                          `${coreBaseName}.runtime.esm-browser.prod.js`,
+                          `${nameWithoutExt}.esm-browser.prod.js`,
+                          `${nameWithoutExt}.esm.prod.js`,
+                      ];
 
             for (const pattern of patterns) {
                 if (files.includes(pattern)) {
+                    if (env.VERBOSE === 'true') {
+                        const mode =
+                            env.isPROD === 'true' ? '🏭 PROD' : '🔧 DEV';
+                        logger.info(
+                            `${mode} Versión optimizada encontrada (${coreBaseName}): ${join(dir, pattern)}`,
+                        );
+                    }
                     return join(dir, pattern);
                 }
             }
