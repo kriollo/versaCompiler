@@ -9,7 +9,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### 🐛 Correcciones Críticas
 
-- **Bug de Resolución de Módulos en Producción**: 
+- **Bug de Resolución de Módulos en Producción**:
     - Corrección crítica en `module-resolver.ts` y `module-resolution-optimizer.ts`
     - El compilador ahora selecciona correctamente archivos `.prod.js` cuando `--prod` está activo
     - Priorización correcta: `.prod.js` > `.min.js` > `.js` en modo producción
@@ -29,13 +29,13 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
         - Tests de `validatePath()` y `validateCommand()` con casos edge
         - Validación estricta de path traversal, null bytes, Unicode exploits
         - Límites de longitud de paths (MAX_PATH_LENGTH=260)
-    
+
     - **linter.test.ts** (15 tests): Integración con ESLint y OxLint
         - Tests de configuración válida e inválida
         - Manejo de bins no encontrados
         - Validación de seguridad en paths de archivos
         - Tests de timeout y errores malformados
-    
+
     - **typescript-compiler.test.ts** (~25 tests): Compilador TypeScript
         - Compilación básica TS → JS
         - Type errors en modo permisivo
@@ -43,7 +43,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
         - Tests de imports/exports y preservación de código
         - Memory leak detection (< 50MB)
         - Config management con `loadTypeScriptConfig`
-    
+
     - **file-watcher.test.ts** (7 tests): Operaciones de sistema de archivos
         - CRUD de archivos (create, read, delete)
         - Validación de paths peligrosos (../, null bytes)

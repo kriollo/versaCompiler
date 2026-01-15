@@ -1,15 +1,15 @@
 import { transform } from 'oxc-transform';
 
-export function traspileTStoJS(
+export async function traspileTStoJS(
     filePath: string,
     sourceCode: string,
-): { outputText: string; declaration: string; diagnostics: any[] } {
+): Promise<{ outputText: string; declaration: string; diagnostics: any[] }> {
     try {
         const {
             code: outputText,
             declaration,
             errors: diagnostics,
-        } = transform(filePath, sourceCode);
+        } = await transform(filePath, sourceCode);
         return {
             outputText: outputText,
             declaration: declaration || '',
