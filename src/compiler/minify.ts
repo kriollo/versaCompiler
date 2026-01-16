@@ -267,6 +267,7 @@ export const minifyJS = async (
         const options = {
             compress: {
                 target: 'es2020' as const,
+                unused: true,
             },
             mangle: {
                 toplevel: true,

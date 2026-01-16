@@ -326,8 +326,8 @@ export const preCompileVue = async (
                     prefixIdentifiers: true,
                     hoistStatic: isProd,
                     cacheHandlers: isProd,
-                    runtimeGlobalName: 'Vue',
-                    runtimeModuleName: 'vue',
+                    // runtimeGlobalName: 'vue',
+                    // runtimeModuleName: 'vue',
                     whitespace: 'condense',
                     ssr: false,
                     comments: !isProd, // ✨ Eliminar comentarios HTML del template

@@ -18,7 +18,8 @@
     "scripts": {
         "dev": "tsx --watch src/main.ts --watch --verbose --tailwind",
         "file": "tsx src/main.ts ",
-        "compile": "tsx src/main.ts --all --cc --co -y --verbose --prod",
+        "compile": "tsx src/main.ts --all --cc -y --verbose --prod",
+        "compileDev": "tsx src/main.ts --all --cc -y --verbose",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
