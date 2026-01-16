@@ -74,8 +74,11 @@ class VueHMRInjectionCache {
             /import\s*\{[^}]*\bref\b[^}]*\}\s*from\s*['"]vue['"]/;
         const hasRefImport = vueImportPattern.test(originalData);
 
+        // ✨ FIX: Construir el import dinámicamente para evitar que el compilador lo transforme
+        const vueRefImport =
+            ['import', '{ ref }', 'from', '"vue"'].join(' ') + ';';
         const varContent = `
-            ${hasRefImport ? '' : 'import { ref } from "vue";'}
+            ${hasRefImport ? '' : vueRefImport}
             const versaComponentKey = ref(0);
             `;
 
@@ -326,8 +329,8 @@ export const preCompileVue = async (
                     prefixIdentifiers: true,
                     hoistStatic: isProd,
                     cacheHandlers: isProd,
-                    // runtimeGlobalName: 'vue',
-                    // runtimeModuleName: 'vue',
+                    runtimeGlobalName: 'Vue',
+                    runtimeModuleName: 'vue',
                     whitespace: 'condense',
                     ssr: false,
                     comments: !isProd, // ✨ Eliminar comentarios HTML del template

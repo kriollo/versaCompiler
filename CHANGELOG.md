@@ -5,11 +5,42 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.3.2] - 2026-01-15
+
+### 🐛 Correcciones Críticas
+
+- **Fix de Resolución de Imports en HMR Injection**:
+    - Corregido bug crítico donde el compilador transformaba imports literales en código de inyección HMR
+    - El string `'import { ref } from "vue"'` era incorrectamente transformado a ruta resuelta durante la compilación de `vuejs.ts`
+    - Solución: Construcción dinámica del import usando `.join()` para evitar detección por el parser
+    - Ahora el código inyectado mantiene correctamente `import { ref } from "vue"` sin transformación
+
+### 🔧 Mejoras
+
+- **Restauración de Configuraciones Vue Runtime**:
+    - Restauradas configuraciones `runtimeGlobalName: 'Vue'` y `runtimeModuleName: 'vue'` en template compiler
+    - Estas configuraciones ya no causan conflictos gracias al fix de HMR injection
+    - Mejora en la generación de código para templates Vue
+
+### 📝 Notas Técnicas
+
+- **Archivos Modificados**:
+    - `src/compiler/vuejs.ts`: 
+        - Fix de construcción dinámica de import en HMR injection (línea ~77)
+        - Restauradas configuraciones `runtimeGlobalName` y `runtimeModuleName` (líneas ~329-330)
+
+- **Impacto**:
+    - Componentes Vue en modo desarrollo (HMR) ahora reciben el import correcto sin transformación
+    - Eliminado el workaround temporal de comentar configuraciones de runtime
+    - Compatibilidad mejorada con el ecosistema Vue
+
+---
+
 ## [2.3.1] - 2026-01-15
 
 ### ✨ Nuevas Características
 
-- **Minificación Mejorada**: 
+- **Minificación Mejorada**:
     - Agregada opción `unused: true` en configuración de compresión
     - Eliminación automática de variables no utilizadas durante la minificación
     - Optimización de código muerto (dead code elimination)
