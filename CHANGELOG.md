@@ -5,6 +5,36 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.3.1] - 2026-01-15
+
+### ✨ Nuevas Características
+
+- **Minificación Mejorada**: 
+    - Agregada opción `unused: true` en configuración de compresión
+    - Eliminación automática de variables no utilizadas durante la minificación
+    - Optimización de código muerto (dead code elimination)
+
+### 🔧 Mejoras
+
+- **Optimización de Compilación Vue**:
+    - Comentadas configuraciones `runtimeGlobalName` y `runtimeModuleName` en precompilación Vue
+    - Mejora en la generación de código para componentes Vue
+    - Reducción de overhead en runtime de Vue
+
+- **Scripts de Compilación**:
+    - Nuevo script `compileDev`: Compilación completa sin optimizaciones de producción
+    - Reorganización de flags en script `compile`: Removido flag `--co` (clean output) por defecto
+    - Separación clara entre compilación de desarrollo y producción
+
+### 📝 Notas Técnicas
+
+- **Archivos Modificados**:
+    - `src/compiler/minify.ts`: Agregada opción `unused: true` para tree-shaking
+    - `src/compiler/vuejs.ts`: Optimización de configuración de template compiler
+    - `package.json`: Nuevos scripts y reorganización de flags
+
+---
+
 ## [2.3.0] - 2025-01-15
 
 ### 🐛 Correcciones Críticas
