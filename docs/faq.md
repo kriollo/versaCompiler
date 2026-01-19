@@ -275,8 +275,9 @@ versacompiler --linter
 # Linting con información detallada
 versacompiler --linter --verbose
 
-# Linting de archivos específicos
-versacompiler --linter src/components/ tests/
+# Linting de rutas específicas
+# → Se define vía versacompile.config.ts (propiedad "linter[].paths")
+# → Luego ejecuta: versacompiler --linter
 ```
 
 ### ¿Qué formatos de salida soporta?
@@ -353,7 +354,7 @@ npm install --save-dev oxlint      # Para OxLint
 
 1. Usa solo un linter (OxLint es más rápido)
 2. Limita los `paths` en la configuración del linter
-3. Usa `versacompiler --clean` para limpiar cache
+3. Usa `versacompiler --cleanCache` para limpiar caché
 
 ### Errores de importación
 
@@ -392,12 +393,12 @@ La migración es posible pero manual. VersaCompiler tiene menos características
 ```bash
 # Desarrollo
 versacompiler --watch              # Modo observación
-versacompiler --lint-only          # Solo linting
+versacompiler --linter             # Solo linting
 versacompiler --all                # Compilar una vez
 
 # Producción
 versacompiler --all --prod         # Build optimizado
-versacompiler --clean --all --prod # Limpiar y build
+versacompiler --cleanOutput --cleanCache --all --prod # Limpiar y build
 
 # Debug
 versacompiler --all --verbose      # Salida detallada

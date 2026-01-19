@@ -69,7 +69,9 @@ versacompiler --typeCheck
 
 # Build con limpieza completa
 versacompiler --all --prod --cleanOutput --cleanCache --yes
-versacompiler --lint-only
+
+# Solo linting
+versacompiler --linter
 
 # Con salida detallada
 versacompiler --all --verbose

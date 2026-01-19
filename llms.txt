@@ -1,0 +1,315 @@
+VersaCompiler — llms.txt (guía para IA)
+
+Objetivo de este archivo
+- Este documento complementa README.md y la documentación en docs/.
+- Está escrito para que una IA (y humanos) pueda entender rápidamente:
+  - Qué hace VersaCompiler
+  - Cómo se usa (CLI + config)
+  - Dónde está el código relevante para cambios/bugs/features
+  - Cómo validar cambios (tests)
+
+Fuentes de verdad / documentos principales
+- README.md: visión general, quick start, tabla de opciones CLI.
+- docs/getting-started.md: guía de inicio rápido y flujos comunes.
+- docs/configuration.md: referencia del archivo versacompile.config.ts.
+- docs/api.md: referencia API/CLI y estructura de config (interfaces).
+- docs/examples.md: recetas avanzadas (monorepo, QA, performance).
+- docs/contributing.md: estructura del proyecto y convenciones.
+
+Nota importante: “index.ts”
+- En este repositorio NO existe un archivo src/index.ts.
+- Sin embargo, VersaCompiler está diseñado para compilar archivos .ts/.js/.vue de proyectos consumidores.
+- Es común que un proyecto use src/main.ts o src/index.ts como entrypoint.
+- La documentación incluye ejemplos compilando index.ts de un monorepo (por ejemplo: packages/core/src/index.ts) en docs/examples.md.
+
+───────────────────────────────────────────────────────────────────────────────
+1) Qué es VersaCompiler
+───────────────────────────────────────────────────────────────────────────────
+VersaCompiler es una herramienta de compilación para proyectos Vue 3 que procesa:
+- Vue SFC (.vue)
+- TypeScript (.ts)
+- JavaScript (.js)
+
+Incluye (según README/docs y el código en src/):
+- Watch mode + servidor de desarrollo con recarga/HMR
+- Validación de configuración y seguridad básica en la lectura de comandos
+- Integraciones opcionales: TailwindCSS, ESLint y OxLint
+- Compilación y optimización para producción (minificación)
+- Workers/hilos para partes de TypeScript y operaciones pesadas
+
+───────────────────────────────────────────────────────────────────────────────
+2) Cómo ejecutar (desarrollo del repo vs uso como binario)
+───────────────────────────────────────────────────────────────────────────────
+2.1 Desarrollo dentro de este repo
+- Instalar dependencias:
+  - pnpm install
+  - o npm install
+
+- Ejecutar el CLI desde TypeScript (sin build previo):
+  - npm run file -- [args]
+  - o: tsx src/main.ts [args]
+
+- Compilar (genera dist/):
+  - npm run build
+
+- Tests:
+  - npm test
+  - npm run test:coverage
+
+2.2 Uso como CLI publicado
+- package.json declara:
+  - name: versacompiler
+  - bin: versacompiler -> dist/main.js
+- El entrypoint del CLI en el código fuente es:
+  - src/main.ts
+
+───────────────────────────────────────────────────────────────────────────────
+3) Entrada principal del CLI y responsabilidades
+───────────────────────────────────────────────────────────────────────────────
+Archivo clave
+- src/main.ts
+
+Responsabilidades principales
+- Parsear argumentos con yargs (lazy-loaded).
+- Imprimir header y configuración activa.
+- Ejecutar:
+  - init (generación de config)
+  - readConfig (validación y carga de versacompile.config.ts)
+  - compileFile (archivo individual o lista posicional)
+  - initCompileAll (compilar todo)
+  - watch + server (BrowserSync + watcher)
+  - tailwind (si aplica)
+  - linter (si aplica)
+
+Detalles operativos relevantes
+- src/main.ts establece variables de entorno internas (process.env) que luego son usadas por otros módulos.
+- El archivo de config esperado por defecto es:
+  - versacompile.config.ts (en el cwd del proceso)
+
+───────────────────────────────────────────────────────────────────────────────
+4) CLI — opciones soportadas (según src/main.ts)
+───────────────────────────────────────────────────────────────────────────────
+Comando
+- versacompiler [files...]
+
+Opciones (flags)
+- --init
+  - Inicializa configuración (delegado a initConfig en servicios/readConfig).
+
+- --watch, -w
+  - Habilita modo observación.
+  - En watch mode se levanta el servidor y el watcher.
+
+- --all
+  - Compila todos los archivos del proyecto (pipeline batch).
+
+- --file <ruta>, -f <ruta>
+  - Compila un archivo específico.
+
+- [files...] (argumentos posicionales)
+  - Compila uno o más archivos (ej: versacompiler src/main.ts src/App.vue).
+
+- --prod, -p
+  - Modo producción (activa minificación/optimizaciones).
+
+- --verbose, -v
+  - Salida detallada.
+
+- --cleanOutput, -co
+  - Limpia directorio de salida antes de compilar.
+
+- --cleanCache, -cc
+  - Limpia cache antes de compilar.
+
+- --yes, -y
+  - Auto-confirma acciones que requieren confirmación.
+
+- --typeCheck, -t
+  - Habilita verificación de tipos (por defecto false).
+
+- --tailwind
+  - (Boolean) habilita/deshabilita compilación de Tailwind.
+  - NOTA: la opción se registra solo si process.env.tailwindcss != 'false'.
+
+- --linter
+  - (Boolean) habilita/deshabilita ejecución de linters.
+  - NOTA: la opción se registra solo si process.env.linter != 'false'.
+
+Comportamiento / precedencia (simplificado)
+- Si --init: genera configuración y termina.
+- Luego: readConfig() debe devolver true; si falla, el proceso sale con error.
+- Si hay [files...] posicionales: compila esos archivos y termina.
+- Si hay --file: compila ese archivo y termina.
+- Si hay --all: compila todo y termina.
+- Si NO es watch:
+  - si linter está habilitado, ejecuta linter (ver nota más abajo).
+- Si tailwind está habilitado: compila tailwind.
+- Si --watch: inicia BrowserSync + watcher y se queda observando.
+
+Notas de mantenimiento (docs ↔ código)
+- La fuente de verdad del CLI es src/main.ts; si se agregan/quitan flags, actualizar README.md y docs/.
+- --linter es un booleano: para “solo ESLint” o “solo OxLint”, dejar únicamente ese linter en versacompile.config.ts (propiedad linter[]).
+
+───────────────────────────────────────────────────────────────────────────────
+5) Configuración — versacompile.config.ts
+───────────────────────────────────────────────────────────────────────────────
+Archivo esperado
+- versacompile.config.ts en la raíz del proyecto consumidor (cwd).
+
+Guías y referencias
+- docs/configuration.md
+- docs/api.md
+
+Campos típicos (resumen)
+- tsconfig: ruta a tsconfig.json
+- compilerOptions:
+  - sourceRoot: raíz de fuentes (p.ej. ./src)
+  - outDir: carpeta de salida (p.ej. ./dist)
+  - pathsAlias: alias para imports
+- proxyConfig:
+  - proxyUrl
+  - assetsOmit
+- aditionalWatch: globs adicionales a observar
+- tailwindConfig:
+  - bin, input, output
+- linter: array con configuración de ESLint/OxLint
+- bundlers: (en desarrollo) tareas de bundling
+
+Seguridad/validación de config
+- El cargador/validador principal está en src/servicios/readConfig.ts.
+- Hay validaciones para prevenir patrones peligrosos en comandos (command injection) cuando se configuran “bin” de herramientas externas.
+
+───────────────────────────────────────────────────────────────────────────────
+6) Arquitectura de alto nivel (mapa del código)
+───────────────────────────────────────────────────────────────────────────────
+Entrada
+- src/main.ts
+
+Carga/validación de config
+- src/servicios/readConfig.ts
+
+Motor de compilación (coordinador)
+- src/compiler/compile.ts
+  - Funciones clave a ubicar cuando depures o agregues features:
+    - initCompileAll(): pipeline batch
+    - compileFile(filePath): pipeline para archivo individual
+    - runLinter(...): integración de linters
+
+Compilación / pasos típicos
+- src/compiler/parser.ts: parsing/análisis
+- src/compiler/transforms.ts: transformaciones
+- src/compiler/transformTStoJS.ts: TS -> JS
+- src/compiler/typescript-*.ts: manager, compiler, workers, validación
+- src/compiler/vuejs.ts: compilación Vue SFC
+- src/compiler/minify.ts: minificación
+- src/compiler/minifyTemplate.ts: minificación de templates
+- src/compiler/module-resolution-optimizer.ts: optimizaciones de resolución de módulos
+
+Servicios de desarrollo
+- src/servicios/browserSync.ts: servidor dev/HMR
+- src/servicios/file-watcher.ts: watcher (chokidar)
+- src/hrm/*: runtime de hot reload (scripts inyectados/auxiliares)
+
+Wrappers de herramientas externas (CLI de terceros)
+- src/wrappers/tailwind-node.ts
+- src/wrappers/eslint-node.ts
+- src/wrappers/oxlint-node.ts
+
+Utilidades
+- src/utils/module-resolver.ts: resolución de módulos/paths
+- src/utils/*: helpers (promptUser, utils, etc.)
+
+───────────────────────────────────────────────────────────────────────────────
+7) Flujo típico de ejecución (para entender bugs)
+───────────────────────────────────────────────────────────────────────────────
+1) CLI inicia (src/main.ts)
+2) Resuelve PATH_CONFIG_FILE = <cwd>/versacompile.config.ts
+3) readConfig() valida y carga configuración (y setea envs de trabajo)
+4) Según flags:
+   - --file / [files...]: llama compileFile
+   - --all: llama initCompileAll
+   - --watch: inicia BrowserSync + watcher
+5) Opcional:
+   - Tailwind: generateTailwindCSS
+   - Linters: runLinter
+
+Dónde mirar según síntoma
+- “No encuentra config”: src/servicios/readConfig.ts
+- “No compila .vue”: src/compiler/vuejs.ts + transforms
+- “Problemas TS / tipos”: src/compiler/typescript-manager.ts + worker-pool
+- “Problemas HMR / watch”: src/servicios/file-watcher.ts + src/servicios/browserSync.ts + src/hrm/
+- “Lint no corre”: src/compiler/linter.ts + wrappers + config
+
+───────────────────────────────────────────────────────────────────────────────
+8) Guía para IA: cambios comunes y dónde implementarlos
+───────────────────────────────────────────────────────────────────────────────
+Añadir una nueva opción CLI
+- Editar src/main.ts:
+  - declarar .option(...)
+  - aplicar su efecto configurando envs o invocando módulos
+- Actualizar documentación:
+  - README.md (tabla CLI)
+  - docs/api.md, docs/configuration.md y/o docs/getting-started.md
+- Agregar/ajustar tests en tests/ si hay cobertura relevante.
+
+Cambiar el pipeline de compilación
+- Archivo principal: src/compiler/compile.ts
+- Transformaciones: src/compiler/transforms.ts y src/compiler/transform-optimizer.ts
+- Si impacta módulos: src/utils/module-resolver.ts y src/compiler/module-resolution-optimizer.ts
+
+Cambiar/ajustar TypeScript workers
+- src/compiler/typescript-worker*.ts
+- src/compiler/typescript-worker-pool.ts
+
+Cambiar linting
+- src/compiler/linter.ts
+- src/wrappers/eslint-node.ts y src/wrappers/oxlint-node.ts
+- Config: versacompile.config.ts (linter[])
+
+Cambiar Tailwind
+- src/compiler/tailwindcss.ts
+- src/wrappers/tailwind-node.ts
+- Config: versacompile.config.ts (tailwindConfig)
+
+───────────────────────────────────────────────────────────────────────────────
+9) Validación (tests y calidad)
+───────────────────────────────────────────────────────────────────────────────
+Comandos útiles
+- Unit/integration tests: npm test
+- Coverage: npm run test:coverage
+- Build: npm run build
+
+Estructura de tests
+- tests/*.test.ts cubren áreas como:
+  - readConfig y seguridad (inyección de comandos)
+  - compilación, transforms, minify
+  - file-watcher y HMR
+  - module resolver / optimizer
+
+Consejo para IA al hacer cambios
+- Preferir cambios mínimos y localizados.
+- Mantener consistencia con el estilo existente.
+- Si cambias el CLI, sincroniza README.md y docs/*.
+- Ejecutar vitest al final para confirmar que no rompiste flujos.
+
+───────────────────────────────────────────────────────────────────────────────
+10) Enlaces internos rápidos (rutas relevantes)
+───────────────────────────────────────────────────────────────────────────────
+Documentación
+- docs/getting-started.md
+- docs/configuration.md
+- docs/api.md
+- docs/examples.md
+- docs/faq.md
+- docs/contributing.md
+
+Código
+- src/main.ts
+- src/compiler/compile.ts
+- src/servicios/readConfig.ts
+- src/servicios/file-watcher.ts
+- src/servicios/browserSync.ts
+- src/utils/module-resolver.ts
+- src/compiler/typescript-worker-pool.ts
+
+Fin de llms.txt

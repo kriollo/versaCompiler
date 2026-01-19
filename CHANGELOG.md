@@ -25,7 +25,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### 📝 Notas Técnicas
 
 - **Archivos Modificados**:
-    - `src/compiler/vuejs.ts`: 
+    - `src/compiler/vuejs.ts`:
         - Fix de construcción dinámica de import en HMR injection (línea ~77)
         - Restauradas configuraciones `runtimeGlobalName` y `runtimeModuleName` (líneas ~329-330)
 

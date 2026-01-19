@@ -93,7 +93,7 @@ versacompiler --watch
 # → HMR instantáneo con TypeScript workers
 
 # 🔍 Solo verificar código (rápido)
-versacompiler --lint-only
+versacompiler --linter
 # → Ejecuta ESLint + OxLint
 # → No compila archivos
 # → Perfecto para CI/CD
@@ -150,16 +150,14 @@ versacompiler --tailwind --file src/styles/input.css
 ### Linting Avanzado
 
 ```bash
-# 🔍 Ejecutar linters específicos
-versacompiler --linter eslint
-# → Solo ejecuta ESLint
+# 🔍 Ejecutar linting
+versacompiler --linter
+# → Ejecuta los linters configurados en versacompile.config.ts (propiedad "linter")
+# → Si quieres ejecutar solo ESLint u OxLint, deja únicamente ese linter en la configuración.
 
-versacompiler --linter oxlint
-# → Solo ejecuta OxLint (más rápido)
-
-# 🔧 Auto-fix con linters
-versacompiler --lint-only --yes
-# → Ejecuta linters con auto-fix habilitado
+# 🔧 Linting sin prompts interactivos
+versacompiler --linter --yes
+# → Auto-confirma acciones que requieran confirmación (según configuración)
 ```
 
 ### Debugging
@@ -423,8 +421,8 @@ versacompiler --file src/main.ts --prod
 # Build con TailwindCSS optimizado
 versacompiler --all --tailwind --prod
 
-# Build con validación estricta
-versacompiler --all --typeCheck --lint-only --prod
+# Build con validación estricta (tipos + linting)
+versacompiler --all --typeCheck --linter --prod
 ```
 
 ## 📚 Próximos Pasos

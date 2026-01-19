@@ -158,11 +158,11 @@ export default {
 # Desarrollo con proxy habilitado
 versacompiler --watch --verbose
 
-# Solo verificar tipos en archivos de API
-versacompiler --typeCheck src/api/ src/types/
+# Solo verificar tipos (global)
+versacompiler --all --typeCheck
 
-# Linting específico para código de API
-versacompiler --linter src/api/
+# Linting (usa los paths definidos en versacompile.config.ts)
+versacompiler --linter
 ```
 
 ### Proyecto con Bundling
@@ -440,10 +440,10 @@ module.exports = {
 {
     "scripts": {
         "dev": "versacompiler --watch",
-        "build": "versacompiler --clean --all --prod",
-        "lint": "versacompiler --lint-only",
+        "build": "versacompiler --cleanOutput --cleanCache --all --prod",
+        "lint": "versacompiler --linter",
         "compile": "versacompiler --all",
-        "clean": "versacompiler --clean"
+        "clean": "versacompiler --cleanOutput --cleanCache"
     }
 }
 ```
@@ -751,7 +751,7 @@ versacompiler --file packages/core/src/index.ts
 versacompiler --all --verbose
 
 # Linting de package específico
-versacompiler --linter packages/ui/src/
+versacompiler --linter
 
 # Build completo del monorepo
 versacompiler --all --prod --cleanOutput --yes
@@ -797,7 +797,7 @@ export default {
 {
     "scripts": {
         "test:compile": "versacompiler --all --typeCheck",
-        "test:lint": "versacompiler --linter tests/ src/",
+        "test:lint": "versacompiler --linter",
         "test:prepare": "versacompiler --cleanCache && versacompiler --all",
         "test": "versacompiler --typeCheck --all && jest",
         "test:watch": "versacompiler --watch & jest --watch"
