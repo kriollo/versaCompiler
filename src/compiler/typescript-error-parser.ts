@@ -109,27 +109,30 @@ export function parseTypeScriptErrors(
                     // Para archivos Vue con sourceCode, extraer el snippet del código compilado
                     if (scriptInfo && sourceCode) {
                         const compiledLines = sourceCode.split('\n');
-                        const { line: compiledLine, column } = getLineAndColumnFromOffset(
-                            compiledLines,
-                            diagnostic.start,
-                        );
-                        
+                        const { line: compiledLine, column } =
+                            getLineAndColumnFromOffset(
+                                compiledLines,
+                                diagnostic.start,
+                            );
+
                         // Extraer la línea donde está el error
-                        const errorLine = compiledLines[compiledLine - 1]?.trim() || '';
-                        
+                        const errorLine =
+                            compiledLines[compiledLine - 1]?.trim() || '';
+
                         // Truncar si es muy largo, centrando en el punto del error
                         const maxSnippetLength = 80;
-                        
+
                         let snippet = errorLine;
                         if (snippet.length > maxSnippetLength) {
                             // Tomar alrededor del punto del error
                             const start = Math.max(0, column - 40);
                             const end = Math.min(snippet.length, column + 40);
-                            snippet = (start > 0 ? '...' : '') + 
-                                     snippet.substring(start, end) + 
-                                     (end < snippet.length ? '...' : '');
+                            snippet =
+                                (start > 0 ? '...' : '') +
+                                snippet.substring(start, end) +
+                                (end < snippet.length ? '...' : '');
                         }
-                        
+
                         // Para archivos Vue, mostrar snippet para buscar
                         help += ` | Buscar en archivo: "${snippet}"`;
                     } else {
