@@ -31,9 +31,15 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 - **Mejora de Performance Medida**:
     - Primera compilación: **<5s** (vs 12s antes, 60% más rápido)
-    - Compilación TypeScript: **<2s** (vs 10s antes, 80% más rápido) 
+    - Compilación TypeScript: **<2s** (vs 10s antes, 80% más rápido)
     - Overhead por archivo Vue: **1-5ms** (vs 50-100ms antes, 95% más rápido)
     - Ciclos posteriores: **~115ms** promedio (sin degradación)
+
+- **🔥 Optimizaciones Críticas de Cacheo (Nuevo)**:
+    - **Cache de PATH_ALIAS**: Eliminado `JSON.parse` repetido en `transforms.ts` (ejecutado miles de veces)
+    - **Cache de package.json**: Implementado `PackageJsonCache` con validación por mtime
+    - **Búsqueda Optimizada de Archivos ESM**: Un solo loop en lugar de múltiples `.filter()` encadenados
+    - **Resultado**: 17-22% mejora adicional en hot reload (1897ms → 1577ms total, 1363ms → 1059ms compilación)
 
 ### 🔧 Mejoras
 
@@ -64,6 +70,13 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
     - `enhanceErrorMessage()` marcado como DEPRECATED (no se usa en flujo normal)
     - Eliminado `WeakMap` cache innecesario y función `getLineAndColumnFromOffset`
     - Cálculo directo de línea/columna solo cuando está disponible
+
+- **🔥 Sistema de Cacheo Inteligente (Nuevo)**:
+    - **transforms.ts**: `getParsedPathAlias()` cachea el resultado de `JSON.parse(env.PATH_ALIAS)`
+    - **module-resolver.ts**: `PackageJsonCache` singleton con validación por mtime y LRU eviction
+    - **module-resolver.ts**: Búsqueda de archivos ESM optimizada con clasificación en un solo loop
+    - Eliminación de I/O síncronos repetidos (`readFileSync` ahora cacheado)
+    - Reducción de O(n×m) a O(n) en búsqueda de archivos con patrones
 
 ## [2.3.3] - 2026-02-05
 

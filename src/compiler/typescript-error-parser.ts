@@ -228,7 +228,8 @@ function enhanceErrorMessage(
                     diagnostic.start,
                 );
                 // Obtener código fuente apropiado
-                const text = scriptInfo?.originalData || sourceCode || sourceFile.text;
+                const text =
+                    scriptInfo?.originalData || sourceCode || sourceFile.text;
                 const lines = text.split('\n');
 
                 // Calcular la línea real en el archivo original

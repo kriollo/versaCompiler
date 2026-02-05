@@ -12,6 +12,23 @@ import {
 } from './module-resolution-optimizer';
 import { parser } from './parser';
 
+// ✨ OPTIMIZACIÓN CRÍTICA: Cache de PATH_ALIAS parseado
+let cachedPathAlias: any = null;
+let lastPathAliasString: string | null = null;
+
+function getParsedPathAlias(): any {
+    if (!env.PATH_ALIAS) return null;
+
+    // Solo parsear si el string cambió
+    if (cachedPathAlias && lastPathAliasString === env.PATH_ALIAS) {
+        return cachedPathAlias;
+    }
+
+    cachedPathAlias = JSON.parse(env.PATH_ALIAS);
+    lastPathAliasString = env.PATH_ALIAS;
+    return cachedPathAlias;
+}
+
 // Módulos built-in de Node.js que no deben ser resueltos
 const NODE_BUILTIN_MODULES = new Set([
     'fs',
@@ -114,7 +131,7 @@ export async function replaceAliasImportStatic(
     if (!env.PATH_ALIAS || !env.PATH_DIST) {
         return code;
     }
-    const pathAlias = JSON.parse(env.PATH_ALIAS);
+    const pathAlias = getParsedPathAlias();
     let resultCode = code;
 
     // Usar regex para transformar imports estáticos
@@ -262,7 +279,7 @@ export async function replaceAliasImportDynamic(
         return code;
     }
 
-    const pathAlias = JSON.parse(env.PATH_ALIAS);
+    const pathAlias = getParsedPathAlias();
     const pathDist = env.PATH_DIST;
     let resultCode = code;
 
@@ -504,7 +521,7 @@ async function replaceAliasInStrings(code: string): Promise<string> {
         return code;
     }
 
-    const pathAlias = JSON.parse(env.PATH_ALIAS);
+    const pathAlias = getParsedPathAlias();
     const pathDist = env.PATH_DIST;
     let resultCode = code; // Regex para encontrar strings que contengan posibles alias
     // Busca strings entre comillas simples, dobles o backticks que contengan alias

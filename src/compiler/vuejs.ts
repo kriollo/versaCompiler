@@ -529,7 +529,9 @@ export const preCompileVue = async (
         // Solo agregar scriptInfo cuando realmente hay script (evita overhead)
         if (descriptor.script || descriptor.scriptSetup) {
             result.scriptInfo = {
-                startLine: (descriptor.script || descriptor.scriptSetup)!.loc?.start.line || 1,
+                startLine:
+                    (descriptor.script || descriptor.scriptSetup)!.loc?.start
+                        .line || 1,
                 content: (descriptor.script || descriptor.scriptSetup)!.content,
                 originalData: originalData, // String directa, no closure
             };
