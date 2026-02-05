@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import { minifySync  } from 'oxc-minify';
+import { minifySync } from 'oxc-minify';
 
 import { logger } from '../servicios/logger';
 
+import { integrityValidator } from './integrity-validator';
 import { minifyTemplate } from './minifyTemplate';
 
 // ✨ NUEVA OPTIMIZACIÓN: Sistema de cache para minificación
@@ -77,6 +78,38 @@ class MinificationCache {
 
         try {
             const result = minifySync(filename, data, options);
+
+            // VALIDACIÓN DE INTEGRIDAD - Solo si flag está activo
+            if (process.env.CHECK_INTEGRITY === 'true') {
+                const validation = integrityValidator.validate(
+                    data,
+                    result.code,
+                    `minify:${filename}`,
+                    {
+                        skipSyntaxCheck: false,
+                        verbose: process.env.VERBOSE === 'true',
+                        throwOnError: true, // Detener build si falla
+                    },
+                );
+
+                if (!validation.valid) {
+                    // El validator ya lanzó el error si throwOnError=true
+                    // Pero por si acaso, retornamos el código original
+                    logger.error(
+                        `❌ Validación de integridad fallida para ${filename}`,
+                        validation.errors.join(', '),
+                    );
+                    throw new Error(
+                        `Integrity check failed for ${filename}: ${validation.errors.join(', ')}`,
+                    );
+                }
+
+                if (process.env.VERBOSE === 'true') {
+                    logger.info(
+                        `✅ Validación de integridad OK para ${filename} (${validation.metrics.duration.toFixed(2)}ms)`,
+                    );
+                }
+            }
 
             // Si el código de entrada no estaba vacío pero el resultado sí,
             // retornar código original sin minificar con advertencia
@@ -309,7 +342,7 @@ export const minifyJS = async (
                 normal: true,
                 jsdoc: true,
                 annotation: true,
-                legal: true
+                legal: true,
             },
             sourcemap: !isProd,
         };
@@ -370,7 +403,6 @@ export const minifyWithTemplates = async (
                 error: new Error(`Template minification failed: ${errorMsg}`),
             };
         }
-
 
         // PASO 2: Minificar el JavaScript resultante
         return await minifyJS(templateResult.code, filename, isProd);

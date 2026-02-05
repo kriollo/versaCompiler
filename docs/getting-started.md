@@ -97,7 +97,11 @@ versacompiler --linter
 # → Ejecuta ESLint + OxLint
 # → No compila archivos
 # → Perfecto para CI/CD
-
+# 🛡️ Build con validación de integridad
+versacompiler --all --prod --checkIntegrity
+# → Compila para producción
+# → Valida integridad de código (4 niveles)
+# → Detecta código corrupto antes de deploy
 # 🏗️ Compilar todo una vez
 versacompiler --all
 # → Compila todos los archivos

@@ -110,6 +110,39 @@ Array de configuraciones de bundling:
 - `fileInput`: Archivo de entrada
 - `fileOutput`: Archivo de salida
 
+### validationOptions (v2.3.5+)
+
+Opciones para el sistema de validación de integridad:
+
+```typescript
+validationOptions: {
+    skipSyntaxCheck: false,  // Omitir Check 4 (validación de sintaxis)
+    verbose: false,          // Logging detallado de validaciones
+    throwOnError: true       // Lanzar excepción al detectar error
+}
+```
+
+**Opciones disponibles:**
+
+- `skipSyntaxCheck`: Si es `true`, omite la validación de sintaxis (Check 4) para optimizar performance. Por defecto: `false`
+- `verbose`: Si es `true`, muestra logging detallado de cada validación. Por defecto: `false`
+- `throwOnError`: Si es `true`, lanza una excepción cuando se detecta código corrupto. Si es `false`, solo retorna un resultado inválido. Por defecto: `true`
+
+**Ejemplo de uso:**
+
+```typescript
+export default {
+    // ... otras configuraciones
+    validationOptions: {
+        skipSyntaxCheck: false, // Ejecutar validación completa
+        verbose: true, // Ver detalles de cada validación
+        throwOnError: true, // Fallar build si hay errores
+    },
+};
+```
+
+**Nota:** La validación de integridad se ejecuta automáticamente durante la compilación con el flag `--checkIntegrity`. Estas opciones controlan el comportamiento de las validaciones.
+
 ## Ejemplo Completo
 
 ```typescript
@@ -303,6 +336,114 @@ export default {
         },
     ],
 };
+```
+
+## Validación de Integridad
+
+VersaCompiler incluye un sistema de validación de integridad que detecta automáticamente código corrupto durante la compilación. Esta característica es especialmente útil para builds de producción y deploy.
+
+### ¿Qué Valida el Sistema de Integridad?
+
+El validador verifica que el código compilado/minificado:
+
+- ✅ **No esté vacío** - Previene archivos vacíos por errores de minificación
+- ✅ **Mantenga la estructura** - Verifica paréntesis, llaves y corchetes balanceados
+- ✅ **Preserve exports** - Asegura que los exports no se eliminen por error
+- ✅ **Sea sintácticamente válido** - Detecta errores de sintaxis introducidos por transformaciones
+
+### Uso del Flag --checkIntegrity / -ci
+
+La validación de integridad es **opcional** y se activa con el flag CLI:
+
+```bash
+# Compilar con validación de integridad
+versacompiler build --all --prod --checkIntegrity
+
+# O usar el shorthand
+versacompiler build --all --prod -ci
+
+# En modo verbose para ver detalles de validación
+versacompiler build --all --prod --checkIntegrity --verbose
+```
+
+### ¿Cuándo Usar Validación de Integridad?
+
+✅ **Recomendado:**
+
+- Antes de hacer deploy a producción
+- En pipelines CI/CD para validar builds
+- Después de actualizar dependencias de minificación
+- Cuando se introducen nuevas transformaciones de código
+
+❌ **NO recomendado:**
+
+- Durante desarrollo activo (agrega ~5ms por archivo)
+- En modo watch (se ejecuta en cada cambio)
+- Para iteraciones rápidas de desarrollo
+
+### Comportamiento en Caso de Error
+
+Si la validación detecta problemas:
+
+- ❌ El build se **detiene inmediatamente** con código de error
+- 📋 Se muestra en consola el archivo que falló y la razón
+- 🚫 No se genera output corrupto
+
+Ejemplo de salida en caso de error:
+
+```
+❌ Validación de integridad fallida para App.vue
+   Error: Exports fueron eliminados o modificados incorrectamente
+
+✖ Build failed - Integrity check error
+```
+
+### Performance
+
+El sistema de validación de integridad está optimizado para mínimo impacto:
+
+- ⚡ **<5ms por archivo** (típicamente 1-3ms)
+- 💾 **Cache inteligente** - Validaciones repetidas son instantáneas
+- 🎯 **Validación selectiva** - Skipea checks de sintaxis cuando es seguro
+- 📊 **Métricas disponibles** en modo verbose
+
+### Ejemplo de Uso en CI/CD
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Production
+on:
+    push:
+        branches: [main]
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: pnpm/action-setup@v2
+
+            # Instalar dependencias
+            - run: pnpm install
+
+            # Build con validación de integridad
+            - run: pnpm versacompiler build --all --prod --checkIntegrity
+
+            # Solo hacer deploy si la validación pasa
+            - run: pnpm deploy
+```
+
+### Package.json Scripts
+
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --all --prod",
+        "build:deploy": "versacompiler --all --prod --checkIntegrity",
+        "build:safe": "versacompiler --all --prod -ci --verbose"
+    }
+}
 ```
 
 ### Archivos de Configuración Relacionados

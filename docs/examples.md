@@ -103,6 +103,85 @@ versacompiler --watch --tailwind --verbose
 
 # Build con optimización de CSS
 versacompiler --all --prod --tailwind
+
+# Build con validación de integridad
+versacompiler --all --prod --tailwind --checkIntegrity
+```
+
+### Proyecto con Validación de Integridad para Deploy (v2.3.5+)
+
+```typescript
+// versacompile.config.ts
+export default {
+    tsconfig: './tsconfig.json',
+    compilerOptions: {
+        sourceRoot: './src',
+        outDir: './dist',
+        pathsAlias: {
+            '@/*': ['src/*'],
+        },
+    },
+    validationOptions: {
+        skipSyntaxCheck: false, // Validación completa de sintaxis
+        verbose: true, // Logging detallado
+        throwOnError: true, // Fallar build si hay errores
+    },
+    linter: [
+        {
+            name: 'eslint',
+            bin: './node_modules/.bin/eslint',
+            configFile: './eslint.config.js',
+            fix: false, // No auto-fix en producción
+            paths: ['src/'],
+            eslintConfig: {
+                cache: false, // Sin cache en CI/CD
+                maxWarnings: 0, // Cero warnings permitidos
+            },
+        },
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+            paths: ['src/'],
+            oxlintConfig: {
+                quiet: false, // Mostrar todos los errores
+                tsconfigPath: './tsconfig.json',
+            },
+        },
+    ],
+};
+```
+
+**Pipeline de CI/CD con validación:**
+
+```bash
+# 1. Linting completo
+versacompiler --linter
+
+# 2. Verificación de tipos
+versacompiler --typeCheck --all
+
+# 3. Build con validación de integridad
+versacompiler --all --prod --checkIntegrity --yes
+
+# 4. (Opcional) Verificar estadísticas de validación
+# Implementar script personalizado para leer logs
+```
+
+**Ejemplo de output con validación:**
+
+```
+✓ TypeScript: 35/35 archivos (100%)
+✓ Estandarización: 40/40 archivos (100%)
+✓ Validación de integridad:
+  - Check 1 (Size): 40/40 ✅
+  - Check 2 (Structure): Suspendido ⏸️
+  - Check 3 (Exports): 40/40 ✅
+  - Check 4 (Syntax): 40/40 ✅
+  - Cache hits: 85%
+  - Duración promedio: 1.2ms
+✓ ¡No se encontraron errores ni advertencias!
 ```
 
 ### Proyecto con Proxy para API Backend
@@ -880,6 +959,120 @@ export default {
 };
 ```
 
+### Build con Validación de Integridad (Deploy Seguro)
+
+El flag `--checkIntegrity` / `-ci` valida que el código compilado no tenga errores de integridad antes de hacer deploy.
+
+**¿Qué valida?**
+
+- Código no vacío después de minificación
+- Exports preservados correctamente
+- Sintaxis válida sin corrupción
+- Estructura de código correcta
+
+#### Ejemplo Básico
+
+```bash
+# Build normal (desarrollo)
+versacompiler --all --prod
+
+# Build con validación de integridad (deploy)
+versacompiler --all --prod --checkIntegrity
+
+# Con logs detallados
+versacompiler --all --prod --checkIntegrity --verbose
+```
+
+#### Scripts en package.json
+
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --all --prod",
+        "build:deploy": "versacompiler --all --prod --checkIntegrity",
+        "build:safe": "versacompiler --all --prod -ci --verbose --cleanCache"
+    }
+}
+```
+
+**Cuándo usar:**
+
+- ✅ Antes de deploy a producción
+- ✅ En CI/CD pipelines
+- ✅ Después de actualizar dependencias
+- ❌ NO en desarrollo (overhead de ~5ms/archivo)
+
+#### CI/CD con GitHub Actions
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Production
+on:
+    push:
+        branches: [main]
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: pnpm/action-setup@v2
+
+            # Instalar dependencias
+            - name: Install dependencies
+              run: pnpm install
+
+            # Build con validación de integridad
+            - name: Build with integrity check
+              run: pnpm versacompiler --all --prod --checkIntegrity --verbose
+
+            # Si llega aquí, la validación pasó ✅
+            - name: Deploy to production
+              run: pnpm deploy
+```
+
+#### CI/CD con GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+stages:
+    - build
+    - deploy
+
+build:
+    stage: build
+    script:
+        - npm install
+        - npx versacompiler --all --prod --checkIntegrity
+    artifacts:
+        paths:
+            - dist/
+
+deploy:
+    stage: deploy
+    dependencies:
+        - build
+    script:
+        - npm run deploy
+    only:
+        - main
+```
+
+#### Comportamiento en Caso de Error
+
+Si la validación detecta un problema:
+
+```bash
+❌ Validación de integridad fallida para App.vue
+   Error: Código procesado está vacío o demasiado pequeño
+
+✖ Build failed - Integrity check error
+Process exited with code 1
+```
+
+El build se detiene inmediatamente y NO se genera output corrupto.
+
 ### Docker Multi-stage
 
 ```dockerfile
@@ -891,7 +1084,8 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 COPY . .
-RUN npx versacompiler --all --prod --cleanOutput --yes
+# Build con validación de integridad
+RUN npx versacompiler --all --prod --checkIntegrity --cleanOutput --yes
 
 FROM nginx:alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -914,9 +1108,9 @@ spec:
                 - name: builder
                   image: node:18-alpine
                   command: ['/bin/sh']
-                  args:
-                      [
+                  args: [
                           '-c',
+                          checkIntegrity --
                           'npm install && npx versacompiler --all --prod --yes',
                       ]
                   volumeMounts:

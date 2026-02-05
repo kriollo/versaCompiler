@@ -17,6 +17,7 @@ const { argv, cwd, env } = process;
 import { logger, setProgressManagerGetter } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
+import { integrityValidator } from './integrity-validator';
 
 // Configurar el getter del ProgressManager para el logger
 setProgressManagerGetter(() => ProgressManager.getInstance());
@@ -2293,6 +2294,7 @@ async function compileJS(
         // Asegurar que el módulo de minificación esté cargado
         await moduleManager.ensureModuleLoaded('minify');
         const minifyJS = await loadMinify();
+        const beforeMinification = code; // Guardar código antes de minificar
         const resultMinify = await minifyJS(code, inPath, true);
         timings.minification = Date.now() - start;
         if (resultMinify === undefined || resultMinify === null) {
@@ -2319,6 +2321,32 @@ async function compileJS(
         }
         registerCompilationSuccess(inPath, 'minification');
         code = resultMinify.code;
+
+        // VALIDACIÓN DE INTEGRIDAD - Solo si flag está activo
+        // Esta es una validación redundante (ya se hizo en minify.ts)
+        // pero crítica para asegurar integridad antes de escribir archivo final
+        if (env.CHECK_INTEGRITY === 'true') {
+            const validation = integrityValidator.validate(
+                beforeMinification,
+                code,
+                `compile:${path.basename(inPath)}`,
+                {
+                    skipSyntaxCheck: true, // Ya validado en minify.ts
+                    verbose: env.VERBOSE === 'true',
+                    throwOnError: true,
+                },
+            );
+
+            if (!validation.valid) {
+                logger.error(
+                    `❌ Validación de integridad fallida en compilación para ${path.basename(inPath)}`,
+                    validation.errors.join(', '),
+                );
+                throw new Error(
+                    `Compilation integrity check failed for ${path.basename(inPath)}: ${validation.errors.join(', ')}`,
+                );
+            }
+        }
     } // Escribir archivo final
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });

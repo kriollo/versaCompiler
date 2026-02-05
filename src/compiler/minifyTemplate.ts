@@ -1,6 +1,7 @@
 import { minifyHTMLLiterals } from 'minify-html-literals';
 
 import { logger } from '../servicios/logger';
+import { integrityValidator } from './integrity-validator';
 
 const defaultMinifyOptions = {
     // Opciones esenciales para componentes Vue
@@ -279,6 +280,36 @@ const minifyTemplate = (data: string, fileName: string) => {
         // Esto convierte __VERSA_TEMP__html` de vuelta a ` para que el código
         // final no contenga los marcadores temporales
         const finalCode = removeTemporaryTags(minifiedCode);
+
+        // VALIDACIÓN DE INTEGRIDAD - Solo si flag está activo
+        if (process.env.CHECK_INTEGRITY === 'true') {
+            const validation = integrityValidator.validate(
+                data,
+                finalCode,
+                `minifyTemplate:${fileName}`,
+                {
+                    skipSyntaxCheck: true, // No validar sintaxis (puede no ser JS puro)
+                    verbose: process.env.VERBOSE === 'true',
+                    throwOnError: true, // Detener build si falla
+                },
+            );
+
+            if (!validation.valid) {
+                logger.error(
+                    `❌ Validación de integridad fallida para template ${fileName}`,
+                    validation.errors.join(', '),
+                );
+                throw new Error(
+                    `Template integrity check failed for ${fileName}: ${validation.errors.join(', ')}`,
+                );
+            }
+
+            if (process.env.VERBOSE === 'true') {
+                logger.info(
+                    `✅ Validación de template OK para ${fileName} (${validation.metrics.duration.toFixed(2)}ms)`,
+                );
+            }
+        }
 
         return { code: finalCode, error: null };
     } catch (error) {

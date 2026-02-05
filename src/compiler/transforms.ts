@@ -4,6 +4,7 @@ import { env } from 'node:process';
 import { logger } from '../servicios/logger';
 import { EXCLUDED_MODULES } from '../utils/excluded-modules';
 import { getModuleSubPath } from '../utils/module-resolver';
+import { integrityValidator } from './integrity-validator';
 
 import { analyzeAndFormatMultipleErrors } from './error-reporter';
 import {
@@ -687,6 +688,7 @@ export async function estandarizaCode(
     code: string,
     file: string,
 ): Promise<{ code: string; error: string | null }> {
+    const originalCode = code; // Guardar código original para validación
     try {
         const ast = await parser(file, code);
         if (ast && ast.errors && ast.errors.length > 0) {
@@ -726,6 +728,37 @@ export async function estandarizaCode(
         if (env.isPROD === 'true') {
             code = await removePreserverComent(code);
         }
+
+        // VALIDACIÓN DE INTEGRIDAD - Solo si flag está activo
+        if (env.CHECK_INTEGRITY === 'true') {
+            const validation = integrityValidator.validate(
+                originalCode,
+                code,
+                `transforms:${path.basename(file)}`,
+                {
+                    skipSyntaxCheck: false, // SÍ validar sintaxis en transformaciones
+                    verbose: env.VERBOSE === 'true',
+                    throwOnError: true,
+                },
+            );
+
+            if (!validation.valid) {
+                logger.error(
+                    `❌ Validación de integridad fallida en transformaciones para ${path.basename(file)}`,
+                    validation.errors.join(', '),
+                );
+                throw new Error(
+                    `Transform integrity check failed for ${path.basename(file)}: ${validation.errors.join(', ')}`,
+                );
+            }
+
+            if (env.VERBOSE === 'true') {
+                logger.info(
+                    `✅ Validación de transformaciones OK para ${path.basename(file)} (${validation.metrics.duration.toFixed(2)}ms)`,
+                );
+            }
+        }
+
         return { code, error: null };
     } catch (error) {
         return {

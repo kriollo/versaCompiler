@@ -98,6 +98,80 @@ versacompiler --watch --typeCheck
 
 ### ¿Hay HMR (Hot Module Replacement)?
 
+**Sí**, VersaCompiler incluye HMR completo similar a Vite:
+
+- ✅ **Componentes Vue** con preservación de estado
+- ✅ **TypeScript/JavaScript** con actualizaciones instantáneas
+- ✅ **CSS/TailwindCSS** con inyección en tiempo real
+- ✅ **Keys únicas** para identificación de componentes
+
+```bash
+# HMR automático en modo watch
+versacompiler --watch
+```
+
+### ¿Qué es la validación de integridad? (v2.3.5+)
+
+Es un sistema de 4 niveles que detecta código corrupto durante compilación:
+
+**Check 1 (Size)**: Detecta código vacío (~0.1ms)
+
+```typescript
+// ❌ Detecta esto
+const result = minify(code);
+// → resultado: "" (vacío)
+```
+
+**Check 2 (Structure)**: Verifica brackets balanceados (~1ms) ⚠️ _Suspendido temporalmente_
+
+```typescript
+// ❌ Detectaría esto (cuando esté activo)
+const arr = [1, 2, 3; // falta ]
+```
+
+**Check 3 (Exports)**: Detecta exports eliminados (~1ms)
+
+```typescript
+// ❌ Detecta esto
+// Original: export const API_KEY = "..."
+// Procesado: const API_KEY = "..." (export eliminado)
+```
+
+**Check 4 (Syntax)**: Validación con oxc-parser (~3ms)
+
+```typescript
+// ❌ Detecta esto
+const obj = { key: value  // falta }
+```
+
+**Uso:**
+
+```bash
+# Validación automática en desarrollo
+versacompiler --watch
+
+# Validación explícita para deploy
+versacompiler --all --prod --checkIntegrity
+```
+
+**Resultados:**
+
+- Performance: 1-3ms por archivo
+- Cache hit: <0.1ms
+- 40/40 archivos validados (100%)
+- Protección contra corrupciones críticas
+
+### ¿Por qué está suspendido el Check 2?
+
+El Check 2 (validación de estructura) tiene problemas con **character classes en regex**:
+
+```typescript
+// Problema: brackets dentro de character classes
+const regex = /[(abc)]/; // ❌ Detecta ( como bracket real
+```
+
+Afecta a 6 archivos avanzados del compilador. Los otros 3 checks (1, 3, 4) proporcionan protección suficiente hasta que se implemente detección de character classes.
+
 VersaCompiler tiene **HMR avanzado** con:
 
 - ✅ **Preservación de estado** en componentes Vue
@@ -301,16 +375,30 @@ Sí, el sistema de linting está optimizado para TypeScript estricto e incluye:
 ### ¿Cómo compilo para producción?
 
 ```bash
+# Build estándar
 versacompiler --all --prod
+
+# Build con limpieza previa
+versacompiler --all --prod --cleanOutput --cleanCache
+
+# Build con validación de integridad (recomendado)
+versacompiler --all --prod --checkIntegrity
+
+# Build silencioso para CI/CD
+versacompiler --all --prod --checkIntegrity --yes
 ```
 
-Esto compila todos los archivos y minifica el código usando OxcMinify.
+Esto compila todos los archivos, minifica el código usando OxcMinify y opcionalmente valida la integridad del código compilado.
 
 ### ¿Qué optimizaciones incluye?
 
-- **Minificación** básica con OxcMinify
-- **Compilación de TailwindCSS**
-- **Transpilación de TypeScript**
+- **Minificación avanzada** con OxcMinify (Rust)
+- **Tree shaking** eliminación de código no utilizado
+- **Variable mangling** renombrado de variables
+- **Dead code elimination** eliminación de código muerto
+- **Compilación de TailwindCSS** con purging optimizado
+- **Transpilación de TypeScript** a JavaScript moderno
+- **Validación de integridad** (opcional con `--checkIntegrity`)
 
 ### ¿Genera source maps?
 

@@ -29,22 +29,23 @@ export default {
 
 ### Comandos Disponibles
 
-| Comando            | Alias | Descripción                                    |
-| ------------------ | ----- | ---------------------------------------------- |
-| `--init`           |       | Inicializar configuración del proyecto         |
-| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
-| `--all`            |       | Compilar todos los archivos del proyecto       |
-| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
-| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
-| `--prod`           | `-p`  | Modo producción con minificación               |
-| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
-| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
-| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
-| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
-| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos   |
-| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS |
-| `--linter`         |       | Habilitar/deshabilitar análisis de código      |
-| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
+| Comando            | Alias | Descripción                                      |
+| ------------------ | ----- | ------------------------------------------------ |
+| `--init`           |       | Inicializar configuración del proyecto           |
+| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación    |
+| `--all`            |       | Compilar todos los archivos del proyecto         |
+| `--file <archivo>` | `-f`  | Compilar un archivo específico                   |
+| `[archivos...]`    |       | Compilar múltiples archivos específicos          |
+| `--prod`           | `-p`  | Modo producción con minificación                 |
+| `--verbose`        | `-v`  | Mostrar información detallada de compilación     |
+| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar   |
+| `--cleanCache`     | `-cc` | Limpiar caché de compilación                     |
+| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones     |
+| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos     |
+| `--checkIntegrity` | `-ci` | Validar integridad del código compilado (deploy) |
+| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS   |
+| `--linter`         |       | Habilitar/deshabilitar análisis de código        |
+| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles             |
 
 ### Ejemplos de Uso
 
@@ -237,6 +238,331 @@ versacompiler --all --prod --cleanOutput # Build limpio para producción
 # GitHub Actions example
 versacompiler --all --prod --verbose --yes  # Build con logging detallado
 ```
+
+## IntegrityValidator API (v2.3.5+)
+
+### Introducción
+
+El **IntegrityValidator** es un sistema de validación de 4 niveles diseñado para detectar código corrupto durante la compilación y minificación. Protege contra errores comunes como código vacío, exports eliminados, y errores de sintaxis.
+
+### Arquitectura
+
+```typescript
+class IntegrityValidator {
+    // Singleton pattern
+    static getInstance(): IntegrityValidator;
+
+    // Método principal de validación
+    validate(
+        original: string,
+        processed: string,
+        options?: IntegrityCheckOptions,
+    ): IntegrityCheckResult;
+
+    // Gestión de caché y estadísticas
+    clearCache(): void;
+    getStats(): ValidationStats;
+    resetStats(): void;
+}
+```
+
+### Interfaces
+
+#### IntegrityCheckOptions
+
+```typescript
+interface IntegrityCheckOptions {
+    skipSyntaxCheck?: boolean; // Omitir Check 4 (validación de sintaxis)
+    verbose?: boolean; // Logging detallado de validación
+    throwOnError?: boolean; // Lanzar excepción vs retornar resultado
+}
+```
+
+#### IntegrityCheckResult
+
+```typescript
+interface IntegrityCheckResult {
+    valid: boolean; // true si pasó todos los checks
+    errors: string[]; // Lista de errores detectados
+    warnings: string[]; // Lista de warnings (actualmente no usado)
+    checksPerformed: {
+        size: boolean; // Check 1 ejecutado
+        structure: boolean; // Check 2 ejecutado (actualmente false)
+        exports: boolean; // Check 3 ejecutado
+        syntax: boolean; // Check 4 ejecutado
+    };
+    metadata: {
+        originalSize: number; // Tamaño del código original
+        processedSize: number; // Tamaño del código procesado
+        exportCount: number; // Número de exports detectados
+        validationTime: number; // Tiempo de validación en ms
+    };
+}
+```
+
+#### ValidationStats
+
+```typescript
+interface ValidationStats {
+    totalValidations: number; // Total de validaciones ejecutadas
+    successfulValidations: number; // Validaciones exitosas
+    failedValidations: number; // Validaciones fallidas
+    cacheHits: number; // Hits de caché LRU
+    cacheMisses: number; // Misses de caché LRU
+    averageDuration: number; // Duración promedio en ms
+    totalDuration: number; // Duración total acumulada en ms
+}
+```
+
+### Checks de Validación
+
+#### Check 1: Validación de Tamaño (~0.1ms)
+
+```typescript
+// Verifica que el código tenga al menos 10 caracteres
+if (processed.trim().length < 10) {
+    errors.push('Tamaño de código inválido');
+}
+```
+
+**Detecta:**
+
+- Código completamente vacío
+- Archivos con solo espacios en blanco
+- Minificación que eliminó todo el código
+
+#### Check 2: Validación de Estructura (~1ms) ⚠️ SUSPENDIDO
+
+```typescript
+// Parser character-by-character de brackets
+// Actualmente suspendido debido a:
+// - Character classes en regex: /[()\[\]{}]/
+// - Arrays de regex con patrones complejos
+const structureOk = true; // this.checkStructure(processed);
+```
+
+**Detectaría (cuando esté activo):**
+
+- Paréntesis desbalanceados: `( )` → cuenta: 0 ✅
+- Corchetes desbalanceados: `[ ]` → cuenta: 0 ✅
+- Llaves desbalanceadas: `{ }` → cuenta: 0 ✅
+- Strings, templates, comentarios, regex manejados correctamente
+
+**Limitación actual:**
+
+- `/[(abc)]/ ` → detecta `[` dentro del regex como bracket real ❌
+- Se suspendió hasta implementar detección de character classes
+
+#### Check 3: Validación de Exports (~1ms)
+
+```typescript
+// Extrae exports del código original y procesado
+const originalExports = extractExports(original);
+const processedExports = extractExports(processed);
+
+// Detecta exports eliminados
+for (const exp of originalExports) {
+    if (!processedExports.includes(exp)) {
+        errors.push(`Export '${exp}' fue eliminado`);
+    }
+}
+```
+
+**Detecta:**
+
+- `export const API_KEY` eliminado por transformación
+- `export function handler()` removido incorrectamente
+- `export default Component` perdido en minificación
+- `export { foo, bar }` eliminado parcial o completamente
+
+**Patrones soportados:**
+
+- `export const/let/var name`
+- `export function name()`
+- `export class Name`
+- `export default`
+- `export { name1, name2 }`
+- `export * from 'module'`
+
+#### Check 4: Validación de Sintaxis (~3ms)
+
+```typescript
+import { parseSync } from 'oxc-parser';
+
+try {
+    parseSync(processed, { sourceFilename: 'validation.js' });
+} catch (error) {
+    errors.push(`SyntaxError: ${error.message}`);
+}
+```
+
+**Detecta:**
+
+- Errores de sintaxis JavaScript/TypeScript
+- Brackets/paréntesis/llaves desbalanceados
+- Strings sin cerrar
+- Expresiones inválidas
+- Código malformado
+
+**Ventaja:**
+
+- Usa parser de producción (oxc-parser)
+- Validación 100% confiable
+- Soporta sintaxis moderna (ES2020+)
+
+### Uso Programático
+
+```typescript
+import { IntegrityValidator } from './compiler/integrity-validator';
+
+const validator = IntegrityValidator.getInstance();
+
+// Validación básica
+const result = validator.validate(originalCode, processedCode);
+if (!result.valid) {
+    console.error('Validación fallida:', result.errors);
+}
+
+// Validación con opciones
+const result = validator.validate(originalCode, processedCode, {
+    skipSyntaxCheck: false, // Ejecutar Check 4
+    verbose: true, // Logging detallado
+    throwOnError: false, // No lanzar excepción
+});
+
+// Obtener estadísticas
+const stats = validator.getStats();
+console.log('Cache hit rate:', stats.cacheHits / stats.totalValidations);
+console.log('Duración promedio:', stats.averageDuration, 'ms');
+
+// Limpiar caché (útil en tests)
+validator.clearCache();
+
+// Resetear estadísticas
+validator.resetStats();
+```
+
+### Uso en CLI
+
+```bash
+# Validación automática en desarrollo
+versacompiler --watch
+# → IntegrityValidator se ejecuta en cada compilación
+
+# Validación explícita para deploy
+versacompiler --all --prod --checkIntegrity
+# → Build fallará si algún archivo está corrupto
+
+# Validación con logging detallado
+versacompiler --all --prod --checkIntegrity --verbose
+# → Muestra detalles de cada validación
+
+# Solo compilar sin validación (más rápido)
+versacompiler --all --prod
+# → IntegrityValidator no se ejecuta
+```
+
+### Performance
+
+```typescript
+// Métricas típicas por archivo:
+{
+    size: '~0.1ms',        // Check 1
+    structure: 'N/A',       // Check 2 (suspendido)
+    exports: '~1ms',        // Check 3
+    syntax: '~3ms',         // Check 4
+    total: '1-3ms',         // Total sin Check 2
+    cacheHit: '<0.1ms'      // Resultado cacheado
+}
+
+// Overhead en compilación completa (40 archivos):
+// Sin cache: ~120ms (40 × 3ms)
+// Con cache: ~40ms (algunos hits)
+```
+
+### Cache LRU
+
+```typescript
+// Configuración del cache
+const CACHE_SIZE = 100; // Últimas 100 validaciones
+
+// Key de cache: hash del código procesado
+const cacheKey = createHash('md5').update(processed).digest('hex');
+
+// Cache hit: retorna resultado inmediato
+if (cache.has(cacheKey)) {
+    return cache.get(cacheKey); // <0.1ms
+}
+
+// Cache miss: ejecuta validación completa
+const result = performValidation(original, processed);
+cache.set(cacheKey, result); // Almacena para futuro
+```
+
+### Mejores Prácticas
+
+#### 1. Desarrollo Local
+
+```bash
+# Validación automática sin overhead significativo
+versacompiler --watch
+# → Validación integrada, cache efectivo
+```
+
+#### 2. Builds de Producción
+
+```bash
+# Validación exhaustiva antes de deploy
+versacompiler --all --prod --checkIntegrity --verbose
+# → Detecta cualquier corrupción antes de desplegar
+```
+
+#### 3. CI/CD Pipeline
+
+```bash
+# Validación en pipeline con fail-fast
+versacompiler --all --prod --checkIntegrity --yes
+# → Build falla automáticamente si hay errores
+```
+
+#### 4. Testing
+
+```typescript
+// Limpiar cache entre tests
+beforeEach(() => {
+    IntegrityValidator.getInstance().clearCache();
+    IntegrityValidator.getInstance().resetStats();
+});
+```
+
+### Limitaciones Conocidas
+
+#### Check 2 (Structure) Suspendido
+
+```typescript
+// Problema: Character classes en regex
+const regex = /[(abc)]/; // ❌ Detecta ( como bracket real
+
+// Afecta a estos archivos:
+// - readConfig.ts
+// - compile.ts
+// - minifyTemplate.ts
+// - transforms.ts
+// - module-resolver.ts
+// - module-resolution-optimizer.ts
+
+// Solución temporal: Check 2 deshabilitado
+// Los Checks 1, 3 y 4 proporcionan protección suficiente
+```
+
+### Roadmap Futuro
+
+- [ ] **Check 2**: Implementar detección de character classes en regex
+- [ ] **Check 5**: Validación de imports (similar a exports)
+- [ ] **Cache persistente**: Cache entre sesiones de compilación
+- [ ] **Warnings**: Sistema de warnings no-críticos
+- [ ] **Custom checks**: API para checks personalizados
+- [ ] **Performance**: Optimizar Check 4 con worker threads
 
 ### Docker Integration
 

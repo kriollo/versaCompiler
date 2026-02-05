@@ -144,7 +144,14 @@ async function main() {
                 'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=false',
             default: false,
         })
-        .alias('t', 'typeCheck');
+        .alias('t', 'typeCheck')
+        .option('checkIntegrity', {
+            type: 'boolean',
+            description:
+                'Validar la integridad del código compilado (para builds de deploy). Por defecto --checkIntegrity=false',
+            default: false,
+        })
+        .alias('ci', 'checkIntegrity');
 
     // Definir la opción tailwind dinámicamente
     // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
@@ -176,6 +183,7 @@ async function main() {
         cleanCache?: boolean;
         y?: boolean;
         typeCheck?: boolean;
+        checkIntegrity?: boolean;
         tailwind?: boolean;
         linter?: boolean;
         files?: string[];
@@ -242,7 +250,8 @@ async function main() {
         env.TAILWIND =
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
         env.ENABLE_LINTER = String(argv.linter);
-        env.VERBOSE = argv.verbose ? 'true' : 'false'; // 🎯 Configuración moderna y organizada
+        env.VERBOSE = argv.verbose ? 'true' : 'false';
+        env.CHECK_INTEGRITY = argv.checkIntegrity ? 'true' : 'false'; // 🎯 Configuración moderna y organizada
         logger.info(chalk.bold.blue('⚙️  Configuración'));
         logger.info(chalk.gray('   ┌─ Modo de ejecución'));
 
@@ -266,6 +275,11 @@ async function main() {
                 icon: '🔍',
             },
             { label: 'Verificar tipos', value: argv.typeCheck, icon: '📘' },
+            {
+                label: 'Validar integridad',
+                value: argv.checkIntegrity,
+                icon: '🛡️',
+            },
             { label: 'Detallado', value: env.VERBOSE === 'true', icon: '📝' },
         ];
 

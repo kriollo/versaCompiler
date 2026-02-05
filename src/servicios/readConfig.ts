@@ -40,6 +40,7 @@ export type typeConfig = {
         | false;
     linter?: typeLinter[] | false;
     bundlers?: BundlerEntry[] | false;
+    checkIntegrity?: boolean; // Flag de validación de integridad
 };
 
 /**
@@ -139,7 +140,9 @@ export function validateBundlers(bundlers: any): bundlers is BundlerEntry[] {
         }
 
         if (!entry.fileInput || typeof entry.fileInput !== 'string') {
-            logger.error('Cada entrada de bundler debe tener un fileInput válido');
+            logger.error(
+                'Cada entrada de bundler debe tener un fileInput válido',
+            );
             return false;
         }
 
@@ -149,7 +152,9 @@ export function validateBundlers(bundlers: any): bundlers is BundlerEntry[] {
         }
 
         if (!entry.fileOutput || typeof entry.fileOutput !== 'string') {
-            logger.error('Cada entrada de bundler debe tener un fileOutput válido');
+            logger.error(
+                'Cada entrada de bundler debe tener un fileOutput válido',
+            );
             return false;
         }
 
@@ -173,13 +178,18 @@ export function validateConfigStructure(config: any): config is typeConfig {
         return false;
     }
 
-    if (!config.compilerOptions.pathsAlias || typeof config.compilerOptions.pathsAlias !== 'object') {
+    if (
+        !config.compilerOptions.pathsAlias ||
+        typeof config.compilerOptions.pathsAlias !== 'object'
+    ) {
         logger.error('pathsAlias es requerido y debe ser un objeto');
         return false;
     }
 
     // Validar pathsAlias
-    for (const [key, value] of Object.entries(config.compilerOptions.pathsAlias)) {
+    for (const [key, value] of Object.entries(
+        config.compilerOptions.pathsAlias,
+    )) {
         if (!Array.isArray(value)) {
             logger.error(`pathsAlias["${key}"] debe ser un array`);
             return false;
@@ -187,7 +197,9 @@ export function validateConfigStructure(config: any): config is typeConfig {
 
         for (const p of value) {
             if (typeof p !== 'string') {
-                logger.error(`Todas las rutas en pathsAlias["${key}"] deben ser strings`);
+                logger.error(
+                    `Todas las rutas en pathsAlias["${key}"] deben ser strings`,
+                );
                 return false;
             }
 
@@ -199,12 +211,18 @@ export function validateConfigStructure(config: any): config is typeConfig {
     }
 
     // Validar sourceRoot si existe
-    if (config.compilerOptions.sourceRoot && !validatePath(config.compilerOptions.sourceRoot)) {
+    if (
+        config.compilerOptions.sourceRoot &&
+        !validatePath(config.compilerOptions.sourceRoot)
+    ) {
         return false;
     }
 
     // Validar outDir si existe
-    if (config.compilerOptions.outDir && !validatePath(config.compilerOptions.outDir)) {
+    if (
+        config.compilerOptions.outDir &&
+        !validatePath(config.compilerOptions.outDir)
+    ) {
         return false;
     }
 
@@ -278,12 +296,17 @@ export function validateConfigSize(config: any): boolean {
     try {
         const configString = JSON.stringify(config);
         if (configString.length > MAX_CONFIG_SIZE) {
-            logger.error(`Configuración demasiado grande: ${configString.length} bytes`);
+            logger.error(
+                `Configuración demasiado grande: ${configString.length} bytes`,
+            );
             return false;
         }
         return true;
     } catch (error) {
-        logger.error('Error al serializar configuración (posible referencia circular):', error);
+        logger.error(
+            'Error al serializar configuración (posible referencia circular):',
+            error,
+        );
         return false;
     }
 }
@@ -349,8 +372,8 @@ export async function readConfig(): Promise<boolean> {
             );
         }
 
-    // Validar la ruta del archivo de configuración
-    if (!validatePath(env.PATH_CONFIG_FILE)) {
+        // Validar la ruta del archivo de configuración
+        if (!validatePath(env.PATH_CONFIG_FILE)) {
             throw new Error(
                 `Ruta de configuración no válida: ${env.PATH_CONFIG_FILE}`,
             );
@@ -373,15 +396,15 @@ export async function readConfig(): Promise<boolean> {
 
         const tsConfig = data.default || data;
 
-    // Validar tamaño de configuración
-    if (!validateConfigSize(tsConfig)) {
+        // Validar tamaño de configuración
+        if (!validateConfigSize(tsConfig)) {
             throw new Error(
                 'Configuración demasiado grande o contiene referencias circulares.',
             );
         }
 
-    // Validar estructura de configuración
-    if (!validateConfigStructure(tsConfig)) {
+        // Validar estructura de configuración
+        if (!validateConfigStructure(tsConfig)) {
             throw new Error(
                 'El archivo de configuración no tiene una estructura válida.',
             );
@@ -406,8 +429,8 @@ export async function readConfig(): Promise<boolean> {
         // Establecer variables de entorno de forma segura
         env.PATH_ALIAS = safeJsonStringify(pathAlias, '{}');
         env.tailwindcss = safeJsonStringify(tsConfig?.tailwindConfig, 'false');
-    env.proxyUrl = String(tsConfig?.proxyConfig?.proxyUrl || '');
-    env.AssetsOmit = String(tsConfig?.proxyConfig?.assetsOmit || false);
+        env.proxyUrl = String(tsConfig?.proxyConfig?.proxyUrl || '');
+        env.AssetsOmit = String(tsConfig?.proxyConfig?.assetsOmit || false);
         env.linter = safeJsonStringify(tsConfig?.linter, 'false');
         env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
@@ -417,10 +440,10 @@ export async function readConfig(): Promise<boolean> {
         );
         const outDir = cleanPath(tsConfig?.compilerOptions?.outDir || './dist');
 
-    if (!validatePath(sourceRoot)) {
+        if (!validatePath(sourceRoot)) {
             throw new Error(`sourceRoot no válido: ${sourceRoot}`);
         }
-    if (!validatePath(outDir)) {
+        if (!validatePath(outDir)) {
             throw new Error(`outDir no válido: ${outDir}`);
         }
 
@@ -458,8 +481,8 @@ export async function initConfig(): Promise<boolean> {
             env.PATH_CONFIG_FILE || 'versacompile.config.ts',
         );
 
-    // Validar que la ruta de destino sea segura
-    if (!validatePath(configPath)) {
+        // Validar que la ruta de destino sea segura
+        if (!validatePath(configPath)) {
             throw new Error(`Ruta de configuración no válida: ${configPath}`);
         }
 

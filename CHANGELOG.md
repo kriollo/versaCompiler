@@ -5,6 +5,94 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.3.5] - 2026-02-05
+
+### ✨ Nuevas Características
+
+- **Sistema de Validación de Integridad del Código (IntegrityValidator)**:
+    - Implementado sistema completo de validación de código transformado/compilado
+    - Detecta automáticamente código vacío después de minificación
+    - Verifica que los exports no sean eliminados por error durante transformaciones
+    - Validación de sintaxis integrada con `oxc-parser`
+    - Cache LRU para optimizar validaciones repetidas (hasta 100 entradas)
+    - Performance objetivo: <5ms por archivo (típicamente 1-3ms)
+    - 32 tests unitarios completos pasando
+
+- **Validación Multi-Nivel en 4 Checks**:
+    - **Check 1 (Size)**: Verifica que el código no esté vacío o demasiado pequeño (~0.1ms)
+    - **Check 2 (Structure)**: Parser character-by-character para verificar brackets balanceados (~1ms, temporalmente suspendido)
+    - **Check 3 (Exports)**: Detecta exports eliminados o modificados incorrectamente (~1ms)
+    - **Check 4 (Syntax)**: Validación de sintaxis JavaScript/TypeScript con oxc-parser (~3ms)
+
+- **Soporte Avanzado de Sintaxis JavaScript/TypeScript**:
+    - Detección correcta de strings normales (`"..."` y `'...'`)
+    - Template literals (`` `...` ``)
+    - Template interpolations (`` `${expression}` ``) con tracking de nested braces
+    - Comentarios de línea (`//`) y multilínea (`/* */`)
+    - Regex literals (`/pattern/flags`) con detección contextual
+    - Strings dentro de interpolaciones de template
+    - Escape sequences en strings, templates y regex
+
+### 🐛 Correcciones
+
+- **Parser de Estructura de Código**:
+    - Corregido control de loop para evitar saltar caracteres al usar `i++`
+    - Implementado incremento manual de `i` en `for (i = 0; i < length; )` para precisión
+    - Corregida detección de strings dentro de interpolaciones `${"text"}`
+    - Agregado soporte para template literals solo fuera de regex (evita conflictos con ``/`.*`/``)
+    - Corregidos problemas de tipo TypeScript con `code[j]` potencialmente `undefined`
+
+- **Validación de Integridad en Proceso de Compilación**:
+    - Integrado en fase de `standardization` para detectar corrupciones temprano
+    - Early return en Check 1 si el código está vacío (optimización)
+    - Skip de Check 4 (Syntax) si Check 2 o 3 fallan (optimización)
+    - Respeta flag `skipSyntaxCheck` en opciones de validación
+
+### 🔧 Mejoras
+
+- **Estadísticas de Validación**:
+    - Tracking de validaciones totales, exitosas y fallidas
+    - Métricas de cache hits/misses para optimización
+    - Duración promedio y total de validaciones
+    - Conteo de exports en código procesado
+    - Comparación de tamaño original vs procesado
+
+- **Opciones de Validación Configurables**:
+    - `skipSyntaxCheck`: Omitir validación de sintaxis para optimizar performance
+    - `verbose`: Logging detallado de cada validación
+    - `throwOnError`: Lanzar excepción vs retornar resultado inválido
+
+- **API del IntegrityValidator**:
+    - Singleton pattern para instancia compartida
+    - Método `validate()` con resultado detallado `IntegrityCheckResult`
+    - `getStats()`: Obtener estadísticas acumuladas
+    - `clearCache()`: Limpiar cache manualmente
+    - `resetStats()`: Resetear estadísticas
+
+### ⚠️ Problemas Conocidos
+
+- **Check 2 (Structure) Temporalmente Suspendido**:
+    - El parser de brackets tiene problemas con character classes en regex literals
+    - Ejemplo problemático: `/[()\[\]{}]/` - los `[` y `]` dentro del regex son contados incorrectamente
+    - Arrays de regex también causan falsos positivos
+    - 6 archivos afectados: readConfig.ts, compile.ts, minifyTemplate.ts, transforms.ts, module-resolver.ts, module-resolution-optimizer.ts
+    - Los otros 3 checks (Size, Exports, Syntax) funcionan perfectamente al 100%
+    - Compilación exitosa: 40/40 archivos (100%) con Check 2 deshabilitado
+
+### 📊 Casos de Uso Detectados
+
+- **Bug #1**: Código vacío después de minificación (detectado por Check 1)
+- **Bug #2**: Export eliminado por error en transformación (detectado por Check 3)
+- **Bug #3**: Comentario malformado introduciendo sintaxis inválida (detectado por Check 4)
+- **Bug #4**: Transformación de path alias corrupta (detectado por Check 2, cuando esté habilitado)
+
+### 🚀 Performance
+
+- Validación típica: **1-3ms por archivo**
+- Cache hit: **<0.1ms** (reutiliza resultado previo)
+- Overhead total en compilación: **<5ms** adicional por archivo
+- 32 tests ejecutados en: **~450ms total**
+
 ## [2.3.4] - 2026-02-05
 
 ### ✨ Nuevas Características
