@@ -1,13 +1,14 @@
 {
     "$schema": "./node_modules/oxlint/configuration_schema.json",
     "plugins": ["typescript", "import"],
-    "ignore": [
+    "ignorePatterns": [
         "public/**/*",
         "node_modules/**/*",
         "dist/**/*",
         "temp/**/*",
         "performance-results/**/*",
-        "examples/js/examples/test-errors.js"
+        "examples/js/examples/test-errors.js",
+        "tests/**/*"
     ],
     "env": {
         "builtin": true,

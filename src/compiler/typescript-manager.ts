@@ -344,6 +344,7 @@ export const preCompileTS = async (
                 // Modo más rápido
                 incremental: false, // No usar incremental en transpileModule
                 diagnostics: false,
+                removeComments: env.isPROD === 'true',
             },
             fileName,
             reportDiagnostics: env.VERBOSE === 'true', // Solo reportar en verbose

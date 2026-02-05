@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { minify } from 'oxc-minify';
+import { minifySync  } from 'oxc-minify';
+
+import { logger } from '../servicios/logger';
 
 import { minifyTemplate } from './minifyTemplate';
 
@@ -74,14 +76,32 @@ class MinificationCache {
         const originalSize = data.length;
 
         try {
-            const result = await minify(filename, data, options);
+            const result = minifySync(filename, data, options);
 
             // Si el código de entrada no estaba vacío pero el resultado sí,
             // retornar código original sin minificar con advertencia
             if (data.trim() && !result.code.trim()) {
-                console.warn(
+                logger.warn(
                     `⚠️  Minificación fallida para ${filename}, usando código original`,
                 );
+
+                if (process.env.VERBOSE === 'true') {
+                    logger.debug(
+                        `[Minify Debug] El resultado de oxc-minify fue un código vacío para un archivo de tamaño: ${data.length}`,
+                    );
+                    // Si el objeto result tiene otros campos útiles (como errores), los mostramos
+                    if (Object.keys(result).length > 1) {
+                        logger.debug(
+                            `[Minify Debug] Información adicional del resultado:`,
+                            JSON.stringify(
+                                { ...result, code: '[REDACTED]' },
+                                null,
+                                2,
+                            ),
+                        );
+                    }
+                }
+
                 return {
                     code: data, // Retornar código original
                     error: null, // No es un error crítico
@@ -112,10 +132,21 @@ class MinificationCache {
             };
         } catch (error) {
             // En caso de excepción, retornar código original con advertencia
-            console.warn(
-                `⚠️  Error al minificar ${filename}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            console.warn(`   Usando código original sin minificar`);
+            const errorMsg =
+                error instanceof Error ? error.message : String(error);
+            logger.warn(`⚠️  Error al minificar ${filename}: ${errorMsg}`);
+            logger.warn(`   Usando código original sin minificar`);
+
+            if (process.env.VERBOSE === 'true') {
+                if (error instanceof Error && error.stack) {
+                    logger.debug(`[Minify Debug] Stack trace: ${error.stack}`);
+                }
+                logger.debug(
+                    `[Minify Debug] Opciones de minificación:`,
+                    JSON.stringify(options, null, 2),
+                );
+            }
+
             return {
                 code: data, // Retornar código original
                 error: null, // No propagar el error
@@ -137,7 +168,7 @@ class MinificationCache {
             this.cache.set(cacheKey, entry);
             this.currentMemoryUsage += entrySize;
         } catch (error) {
-            console.warn(
+            logger.warn(
                 '[MinificationCache] Error cacheando minificación:',
                 error,
             );
@@ -275,6 +306,10 @@ export const minifyJS = async (
             },
             codegen: {
                 removeWhitespace: true,
+                normal: true,
+                jsdoc: true,
+                annotation: true,
+                legal: true
             },
             sourcemap: !isProd,
         };
@@ -335,6 +370,7 @@ export const minifyWithTemplates = async (
                 error: new Error(`Template minification failed: ${errorMsg}`),
             };
         }
+
 
         // PASO 2: Minificar el JavaScript resultante
         return await minifyJS(templateResult.code, filename, isProd);

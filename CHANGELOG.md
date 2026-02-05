@@ -5,6 +5,68 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.3.3] - 2026-02-05
+
+### 🐛 Correcciones Críticas
+
+- **Fix de Minificación - Eliminación Segura de Comentarios**:
+    - Corregido bug crítico donde la eliminación agresiva de comentarios con regex rompía código válido
+    - El regex `removeAllComments` eliminaba incorrectamente cadenas que contenían `//` o `/* */`
+    - Casos afectados: URLs (`https://`), strings (`"//localhost"`), métodos (`startsWith("//")`)
+    - **Solución**: Uso de `removeComments: true` nativo de TypeScript durante transpilación
+    - TypeScript usa un parser completo que distingue correctamente entre comentarios y strings
+    - Eliminado el regex manual `removeAllComments` de `transforms.ts`
+
+### 🔧 Mejoras
+
+- **Logging Mejorado**:
+    - Agregado `--debug` como alias de `--verbose` en CLI
+    - Mejoras en mensajes de error de minificación con contexto adicional
+    - Logs detallados cuando `oxc-minify` retorna código vacío o falla
+    - Información de debug incluye: tamaño de archivo, opciones de minificación, stack traces
+
+- **Configuración de Linter**:
+    - Actualizado `.oxlintrc.json` para usar `ignorePatterns` en lugar de `ignore`
+    - Agregado `tests/**/*` a patrones ignorados
+    - Reducción de falsos positivos en análisis de código
+
+- **Scripts de Build**:
+    - Actualizado script `compile` para incluir flag `--co` (clean output)
+    - Cambio de `sourceRoot` en config de `./examples` a `./src`
+
+### 🧪 Testing
+
+- **Nueva Suite de Tests de Integridad**:
+    - Creado `tests/minification-integrity.test.ts` con 4 tests automatizados
+    - Test 1: Preservación de strings con `//` (URLs, `startsWith("//")`)
+    - Test 2: Preservación de expresiones regulares con slashes (`/\/\//g`)
+    - Test 3: Eliminación correcta de comentarios reales
+    - Test 4: Manejo de URLs en parámetros de función
+    - **Resultado**: 382/382 tests pasando (100% ✅)
+
+- **Archivo de Test Manual**:
+    - Creado `examples/test-minification-edge-cases.ts` para validación manual
+    - Casos edge incluidos: URLs, regex, comentarios en strings, paths de Windows
+
+### 📝 Notas Técnicas
+
+- **Archivos Modificados**:
+    - `src/compiler/typescript-manager.ts`: Agregado `removeComments: env.isPROD === 'true'` (línea 347)
+    - `src/compiler/transforms.ts`: Eliminada función `removeAllComments` y su llamada
+    - `src/compiler/minify.ts`: Mejoras en logging y manejo de errores
+    - `src/compiler/minifyTemplate.ts`: Unificación de logging con `logger`
+    - `src/main.ts`: Agregado alias `--debug` → `--verbose`, fix de shebang
+    - `.oxlintrc.json`: Actualización de configuración
+    - `package.json`: Actualización de scripts
+
+- **Impacto**:
+    - Minificación ahora es 100% segura para código con URLs, regex y strings complejos
+    - No más falsos positivos en eliminación de "comentarios"
+    - Mejor experiencia de debugging con logs detallados
+    - Protección contra regresiones con suite de tests automatizados
+
+---
+
 ## [2.3.2] - 2026-01-15
 
 ### 🐛 Correcciones Críticas

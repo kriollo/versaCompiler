@@ -118,6 +118,7 @@ async function main() {
             default: false, // Por defecto, verbose está deshabilitado
         })
         .alias('v', 'verbose')
+        .alias('debug', 'verbose')
         .option('cleanOutput', {
             type: 'boolean',
             description: 'Limpiar el directorio de salida antes de compilar',

@@ -1,5 +1,7 @@
 import { minifyHTMLLiterals } from 'minify-html-literals';
 
+import { logger } from '../servicios/logger';
+
 const defaultMinifyOptions = {
     // Opciones esenciales para componentes Vue
     caseSensitive: true, // Preserva mayúsculas/minúsculas en nombres de componentes
@@ -129,7 +131,7 @@ const detectAndTagTemplateStrings = (code: string): string => {
             return match;
         });
     } catch (error) {
-        console.warn(
+        logger.warn(
             '[MinifyTemplate] Error detectando template strings:',
             error,
         );
@@ -150,7 +152,7 @@ const removeTemporaryTags = (code: string): string => {
 
         return code.replace(tempHtmlPattern, '`').replace(tempCssPattern, '`');
     } catch (error) {
-        console.warn(
+        logger.warn(
             '[MinifyTemplate] Error removiendo tags temporales:',
             error,
         );
@@ -209,7 +211,7 @@ const minifyCSS = (code: string): string => {
             return match;
         });
     } catch (error) {
-        console.warn('[MinifyTemplate] Error minificando CSS:', error);
+        logger.warn('[MinifyTemplate] Error minificando CSS:', error);
         return code;
     }
 };
@@ -263,7 +265,7 @@ const minifyTemplate = (data: string, fileName: string) => {
             } catch (parseError) {
                 // Si minifyHTMLLiterals falla (ej: encuentra código TypeScript en vez de HTML),
                 // devolver el código sin minificar en lugar de fallar completamente
-                console.warn(
+                logger.warn(
                     `[MinifyTemplate] minifyHTMLLiterals falló para ${fileName}, usando código sin minificar:`,
                     parseError instanceof Error
                         ? parseError.message
@@ -280,7 +282,7 @@ const minifyTemplate = (data: string, fileName: string) => {
 
         return { code: finalCode, error: null };
     } catch (error) {
-        console.warn(
+        logger.warn(
             `[MinifyTemplate] Error minificando plantilla ${fileName}:`,
             error,
         );

@@ -706,7 +706,7 @@ export async function estandarizaCode(
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
 
-        if (env.isProd === 'true') {
+        if (env.isPROD === 'true') {
             code = await removePreserverComent(code);
         }
         return { code, error: null };
