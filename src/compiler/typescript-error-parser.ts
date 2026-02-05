@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import * as typescript from 'typescript';
 
 /**
@@ -41,7 +42,7 @@ export interface ScriptExtractionInfo {
 export function parseTypeScriptErrors(
     diagnostics: typescript.Diagnostic[],
     fileName: string,
-    _sourceCode?: string,
+    sourceCode?: string,
     scriptInfo?: ScriptExtractionInfo,
 ): CleanTypeScriptError[] {
     return diagnostics.map(diagnostic => {
@@ -81,44 +82,75 @@ export function parseTypeScriptErrors(
                         diagnostic.file.getLineAndCharacterOfPosition(
                             diagnostic.start,
                         );
+
                     // Ajustar línea si es un archivo Vue con script extraído
                     const adjustedLine = scriptInfo
                         ? lineAndChar.line + scriptInfo.startLine
                         : lineAndChar.line + 1;
                     help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.character + 1}`;
                 } catch {
-                    // Si falla, intentar calcular manualmente
-                    if (cachedLines) {
-                        const lineAndChar = getLineAndColumnFromOffset(
-                            cachedLines,
+                    // Fallback: calcular posición leyendo el archivo
+                    try {
+                        const content = readFileSync(fileName, 'utf-8');
+                        const lines = content.split('\n');
+                        const { line, column } = getLineAndColumnFromOffset(
+                            lines,
                             diagnostic.start,
                         );
-                        const adjustedLine = scriptInfo
-                            ? lineAndChar.line + scriptInfo.startLine - 1
-                            : lineAndChar.line;
-                        help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.column}`;
-                    } else {
+                        help += ` | Línea ${line}, Columna ${column}`;
+                    } catch {
+                        // Último fallback: solo mostrar posición
                         help += ` | Posición ${diagnostic.start}`;
                     }
                 }
-            } else if (cachedLines) {
-                // No hay sourceFile, calcular manualmente desde sourceCode
-                const lineAndChar = getLineAndColumnFromOffset(
-                    cachedLines,
-                    diagnostic.start,
-                );
-                const adjustedLine = scriptInfo
-                    ? lineAndChar.line + scriptInfo.startLine - 1
-                    : lineAndChar.line;
-                help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.column}`;
             } else {
-                // Fallback: solo mostrar posición
-                help += ` | Posición ${diagnostic.start}`;
+                // Fallback: calcular posición y mostrar snippet de código
+                try {
+                    // Para archivos Vue con sourceCode, extraer el snippet del código compilado
+                    if (scriptInfo && sourceCode) {
+                        const compiledLines = sourceCode.split('\n');
+                        const { line: compiledLine, column } = getLineAndColumnFromOffset(
+                            compiledLines,
+                            diagnostic.start,
+                        );
+                        
+                        // Extraer la línea donde está el error
+                        const errorLine = compiledLines[compiledLine - 1]?.trim() || '';
+                        
+                        // Truncar si es muy largo, centrando en el punto del error
+                        const maxSnippetLength = 80;
+                        
+                        let snippet = errorLine;
+                        if (snippet.length > maxSnippetLength) {
+                            // Tomar alrededor del punto del error
+                            const start = Math.max(0, column - 40);
+                            const end = Math.min(snippet.length, column + 40);
+                            snippet = (start > 0 ? '...' : '') + 
+                                     snippet.substring(start, end) + 
+                                     (end < snippet.length ? '...' : '');
+                        }
+                        
+                        // Para archivos Vue, mostrar snippet para buscar
+                        help += ` | Buscar en archivo: "${snippet}"`;
+                    } else {
+                        // No es Vue o no tenemos sourceCode, usar el archivo directamente
+                        const content = readFileSync(fileName, 'utf-8');
+                        const lines = content.split('\n');
+                        const { line, column } = getLineAndColumnFromOffset(
+                            lines,
+                            diagnostic.start,
+                        );
+                        help += ` | Línea ${line}, Columna ${column}`;
+                    }
+                } catch {
+                    // Último fallback: solo mostrar posición
+                    help += ` | Posición ${diagnostic.start}`;
+                }
             }
         }
         return {
             file: fileName,
-            message: enhancedMessage,
+            message: cleanedMessage,
             severity,
             help,
         };

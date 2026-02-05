@@ -15,6 +15,30 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
     - Mejora significativa en la experiencia de debugging para componentes Vue con TypeScript
     - Soporte para mapeo de líneas en errores de compilación y validación de tipos
 
+- **Snippets de Código en Errores de Archivos Vue**:
+    - Para archivos Vue, los errores TypeScript ahora muestran un snippet del código donde ocurre el error
+    - Formato: `Código TS#### | Buscar en archivo: "snippet de código"`
+    - Permite búsqueda rápida con Ctrl+F del fragmento exacto en el archivo original
+    - Soluciona el problema de números de línea incorrectos del código compilado
+
+### 🐛 Correcciones
+
+- **Errores de Referencia en Parser de TypeScript**:
+    - Corregida referencia a variable `enhancedMessage` no definida (ahora usa `cleanedMessage`)
+    - Eliminadas referencias a `cachedLines` removido en optimizaciones previas
+    - Simplificado cálculo de posición de errores con fallbacks apropiados
+
+- **Validación de Tipos en module-resolver.ts**:
+    - Agregado non-null assertion para `entryPoint` después de validación de tipo
+    - Corregido manejo de `firstKey` en cache LRU que podía ser `undefined`
+    - Type checking completo ahora pasa sin errores
+
+- **Stack Trace Confuso del Compilador**:
+    - Eliminado stack trace interno del compilador para errores de tipo TypeScript
+    - Los errores de tipo ahora solo muestran el mensaje y ubicación, sin `at preCompileTS...`
+    - Errores del usuario ya no se confunden con errores del compilador
+    - Implementado flag `isTypeError` para distinguir errores de tipo de errores internos
+
 ### 🚀 Optimizaciones de Rendimiento
 
 - **Eliminación de Overhead Crítico en Parseo de Errores**:

@@ -1301,7 +1301,10 @@ async function handleCompilationError(
     isVerbose: boolean = false,
 ): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : error;
-    const errorDetails = error instanceof Error ? error.stack : undefined;
+    // No mostrar stack trace para errores de tipo TypeScript (son errores del usuario, no del compilador)
+    const isTypeError = error instanceof Error && (error as any).isTypeError;
+    const errorDetails =
+        error instanceof Error && !isTypeError ? error.stack : undefined;
 
     // Registrar el error en el sistema unificado
     registerCompilationError(

@@ -380,7 +380,12 @@ export const preCompileTS = async (
 
             if (criticalErrors.length > 0) {
                 const errorMessage = createUnifiedErrorMessage(
-                    parseTypeScriptErrors(criticalErrors, fileName, data, scriptInfo),
+                    parseTypeScriptErrors(
+                        criticalErrors,
+                        fileName,
+                        data,
+                        scriptInfo,
+                    ),
                 );
                 return {
                     error: new Error(errorMessage),
@@ -410,8 +415,13 @@ export const preCompileTS = async (
                             scriptInfo,
                         ),
                     );
+                    const error = new Error(errorMessage);
+                    // Marcar como error de tipo (no error del compilador)
+                    (error as any).isTypeError = true;
+                    // Limpiar stack trace para no confundir con errores del compilador
+                    error.stack = undefined;
                     return {
-                        error: new Error(errorMessage),
+                        error,
                         data: null,
                         lang: 'ts',
                     };
