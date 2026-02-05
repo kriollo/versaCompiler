@@ -363,9 +363,8 @@ class OptimizedModuleManager {
 
     private async loadModuleResolutionOptimizer(): Promise<any> {
         if (!ModuleResolutionOptimizer) {
-            const resolutionModule = await import(
-                './module-resolution-optimizer'
-            );
+            const resolutionModule =
+                await import('./module-resolution-optimizer');
             ModuleResolutionOptimizer =
                 resolutionModule.ModuleResolutionOptimizer.getInstance();
         }
@@ -2039,9 +2038,10 @@ class WatchModeOptimizer {
                         resolve({ success: true, cached: true });
                         return;
                     } // Configurar worker pool para modo watch
-                    const { TypeScriptWorkerPool } = (await import(
-                        './typescript-worker-pool'
-                    )) as { TypeScriptWorkerPool: any };
+                    const { TypeScriptWorkerPool } =
+                        (await import('./typescript-worker-pool')) as {
+                            TypeScriptWorkerPool: any;
+                        };
                     const workerPool = TypeScriptWorkerPool.getInstance();
                     workerPool.setMode('watch');
                     const result = await compileFn(filePath);
@@ -2190,7 +2190,8 @@ async function compileJS(
             );
         }
 
-        tsResult = await preCompileTS(code, inPath);
+        // 🚀 OPTIMIZACIÓN: Pasar scriptInfo directamente sin crear objeto nuevo
+        tsResult = await preCompileTS(code, inPath, vueResult?.scriptInfo);
         timings.tsCompile = Date.now() - start;
         if (tsResult === undefined || tsResult === null) {
             throw new Error(
@@ -2332,9 +2333,7 @@ async function compileJS(
         if (timings.vueCompile)
             logger.info(chalk!.cyan(`  💚 Vue: ${timings.vueCompile}ms`));
         if (timings.tsCompile)
-            logger.info(
-                chalk!.cyan(`  🔄️ TypeScript: ${timings.tsCompile}ms`),
-            );
+            logger.info(chalk!.cyan(`  🔄️ TypeScript: ${timings.tsCompile}ms`));
         if (timings.standardization)
             logger.info(
                 chalk!.cyan(
@@ -3286,9 +3285,10 @@ export async function initCompileAll() {
 
         // Configurar worker pool para modo batch
         try {
-            const { TypeScriptWorkerPool } = (await import(
-                './typescript-worker-pool'
-            )) as { TypeScriptWorkerPool: any };
+            const { TypeScriptWorkerPool } =
+                (await import('./typescript-worker-pool')) as {
+                    TypeScriptWorkerPool: any;
+                };
             const workerPool = TypeScriptWorkerPool.getInstance();
             workerPool.setMode('batch');
         } catch {

@@ -207,6 +207,11 @@ export const preCompileVue = async (
     error: Error | null;
     data: string | null;
     lang: 'ts' | 'js' | null;
+    scriptInfo?: {
+        startLine: number;
+        content: string;
+        originalData: string;
+    };
 }> => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
@@ -216,8 +221,12 @@ export const preCompileVue = async (
                 error: null,
                 data: 'export default {};',
                 lang: 'js',
+                scriptInfo: undefined,
             };
         }
+
+        // Guardar el código original antes de inyectar HMR
+        const originalData = data;
 
         if (!isProd) {
             const { injectedData } =
@@ -501,17 +510,39 @@ export const preCompileVue = async (
             export default ${componentName};        `;
         output = `${output}\n${finishComponent}`;
 
-        return {
+        // 🚀 OPTIMIZACIÓN CRÍTICA: Evitar crear scriptInfo si no hay script
+        const result: {
+            lang: 'ts' | 'js';
+            error: null;
+            data: string;
+            scriptInfo?: {
+                startLine: number;
+                content: string;
+                originalData: string;
+            };
+        } = {
             lang: finalCompiledScript.lang,
             error: null,
             data: output,
         };
+
+        // Solo agregar scriptInfo cuando realmente hay script (evita overhead)
+        if (descriptor.script || descriptor.scriptSetup) {
+            result.scriptInfo = {
+                startLine: (descriptor.script || descriptor.scriptSetup)!.loc?.start.line || 1,
+                content: (descriptor.script || descriptor.scriptSetup)!.content,
+                originalData: originalData, // String directa, no closure
+            };
+        }
+
+        return result;
     } catch (error) {
         logger.error('Vue compilation error:', error);
         return {
             lang: null,
             error: error instanceof Error ? error : new Error(String(error)),
             data: null,
+            scriptInfo: undefined,
         };
     }
 };

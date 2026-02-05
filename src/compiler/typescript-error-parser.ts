@@ -20,21 +20,41 @@ export interface ErrorDisplayConfig {
 }
 
 /**
+ * Información sobre la extracción de script de archivos Vue
+ * Permite mapear posiciones del código extraído al archivo original
+ */
+export interface ScriptExtractionInfo {
+    /** Línea donde inicia el tag <script> en el archivo original (1-indexed) */
+    startLine: number;
+    /** Contenido del script extraído */
+    content: string;
+    /** Código fuente original completo (solo cuando hay errores) */
+    originalData?: string;
+}
+
+/**
  * Parsea errores de TypeScript y los convierte a un formato limpio
  * que incluye solo: archivo, mensaje, severidad y ubicación como ayuda
+ * 🚀 OPTIMIZADO: Sin split preventivo, sin enhance - solo lo esencial para máxima velocidad
+ * @param scriptInfo - Información de extracción de script para archivos Vue (opcional)
  */
 export function parseTypeScriptErrors(
     diagnostics: typescript.Diagnostic[],
     fileName: string,
-    sourceCode?: string,
+    _sourceCode?: string,
+    scriptInfo?: ScriptExtractionInfo,
 ): CleanTypeScriptError[] {
     return diagnostics.map(diagnostic => {
-        // Usar el mejorador de errores para obtener mensaje detallado
-        const enhancedMessage = enhanceErrorMessage(
-            diagnostic,
-            fileName,
-            sourceCode,
-        ); // Determinar la severidad
+        // Extraer mensaje básico sin enhance (más rápido)
+        const message =
+            typeof diagnostic.messageText === 'string'
+                ? diagnostic.messageText
+                : typescript.flattenDiagnosticMessageText(
+                      diagnostic.messageText,
+                      '\n',
+                  );
+
+        const cleanedMessage = cleanErrorMessage(message); // Determinar la severidad
         let severity: 'error' | 'warning' | 'info';
         switch (diagnostic.category) {
             case typescript.DiagnosticCategory.Error:
@@ -49,24 +69,50 @@ export function parseTypeScriptErrors(
         } // Construir información de ubicación limpia
         let help = `Código TS${diagnostic.code}`;
 
-        if (diagnostic.file && diagnostic.start !== undefined) {
-            const sourceFile = diagnostic.file;
-            // Verificar que el método getLineAndCharacterOfPosition existe (para compatibilidad con mocks)
+        if (diagnostic.start !== undefined) {
+            // Intentar usar el sourceFile si está disponible
             if (
-                typeof sourceFile.getLineAndCharacterOfPosition === 'function'
+                diagnostic.file &&
+                typeof diagnostic.file.getLineAndCharacterOfPosition ===
+                    'function'
             ) {
                 try {
                     const lineAndChar =
-                        sourceFile.getLineAndCharacterOfPosition(
+                        diagnostic.file.getLineAndCharacterOfPosition(
                             diagnostic.start,
                         );
-                    help += ` | Línea ${lineAndChar.line + 1}, Columna ${lineAndChar.character + 1}`;
+                    // Ajustar línea si es un archivo Vue con script extraído
+                    const adjustedLine = scriptInfo
+                        ? lineAndChar.line + scriptInfo.startLine
+                        : lineAndChar.line + 1;
+                    help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.character + 1}`;
                 } catch {
-                    // Si falla, solo mostrar la posición de carácter
-                    help += ` | Posición ${diagnostic.start}`;
+                    // Si falla, intentar calcular manualmente
+                    if (cachedLines) {
+                        const lineAndChar = getLineAndColumnFromOffset(
+                            cachedLines,
+                            diagnostic.start,
+                        );
+                        const adjustedLine = scriptInfo
+                            ? lineAndChar.line + scriptInfo.startLine - 1
+                            : lineAndChar.line;
+                        help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.column}`;
+                    } else {
+                        help += ` | Posición ${diagnostic.start}`;
+                    }
                 }
+            } else if (cachedLines) {
+                // No hay sourceFile, calcular manualmente desde sourceCode
+                const lineAndChar = getLineAndColumnFromOffset(
+                    cachedLines,
+                    diagnostic.start,
+                );
+                const adjustedLine = scriptInfo
+                    ? lineAndChar.line + scriptInfo.startLine - 1
+                    : lineAndChar.line;
+                help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.column}`;
             } else {
-                // Fallback para cuando no está disponible el método (como en tests)
+                // Fallback: solo mostrar posición
                 help += ` | Posición ${diagnostic.start}`;
             }
         }
@@ -77,6 +123,36 @@ export function parseTypeScriptErrors(
             help,
         };
     });
+}
+
+/**
+ * Calcula línea y columna desde un offset de caracteres
+ * @param lines - Array de líneas ya procesadas (para evitar múltiples splits)
+ * @param offset - Posición del carácter
+ */
+function getLineAndColumnFromOffset(
+    lines: string[],
+    offset: number,
+): { line: number; column: number } {
+    let currentOffset = 0;
+    let line = 1;
+    let column = 1;
+
+    for (let i = 0; i < lines.length; i++) {
+        const currentLine = lines[i];
+        if (currentLine === undefined) continue;
+
+        const lineLength = currentLine.length + 1; // +1 para el \n
+        if (currentOffset + lineLength > offset) {
+            line = i + 1;
+            column = offset - currentOffset + 1;
+            break;
+        }
+
+        currentOffset += lineLength;
+    }
+
+    return { line, column };
 }
 
 /**
@@ -97,11 +173,15 @@ function cleanErrorMessage(message: string): string {
 
 /**
  * Mejora significativamente el mensaje de error TypeScript con contexto visual
+ * ⚠️ DEPRECATED: Ya no se usa en el flujo normal para evitar overhead de performance
+ * Se mantiene para compatibilidad futura o modo verbose avanzado
+ * @param scriptInfo - Información de extracción de script para archivos Vue (opcional)
  */
 function enhanceErrorMessage(
     diagnostic: typescript.Diagnostic,
     fileName: string,
     sourceCode?: string,
+    scriptInfo?: ScriptExtractionInfo,
 ): string {
     // Extraer el mensaje del error
     const message =
@@ -124,36 +204,45 @@ function enhanceErrorMessage(
                 const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
                     diagnostic.start,
                 );
-                const line = lineAndChar.line + 1;
+                // Ajustar línea si es un archivo Vue con script extraído
+                const line = scriptInfo
+                    ? lineAndChar.line + scriptInfo.startLine
+                    : lineAndChar.line + 1;
                 const column = lineAndChar.character + 1;
 
                 location = `Línea ${line}, Columna ${column} | Código TS${diagnostic.code}`;
             } catch {
-                // Si falla, solo mostrar la posición de carácter
-                location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
+                // Si falla, solo mostrar el código de error
+                location = `Código TS${diagnostic.code}`;
             }
         } else {
-            // Fallback para cuando no está disponible el método (como en tests)
-            location = `Posición ${diagnostic.start} | Código TS${diagnostic.code}`;
+            // Fallback: solo mostrar el código de error
+            location = `Código TS${diagnostic.code}`;
         } // Agregar contexto del código si está disponible
         if (
-            (sourceCode || sourceFile.text) &&
+            (sourceCode || scriptInfo?.originalData || sourceFile.text) &&
             typeof sourceFile.getLineAndCharacterOfPosition === 'function'
         ) {
             try {
                 const lineAndChar = sourceFile.getLineAndCharacterOfPosition(
                     diagnostic.start,
                 );
-                const text = sourceCode || sourceFile.text;
+                // Obtener código fuente apropiado
+                const text = scriptInfo?.originalData || sourceCode || sourceFile.text;
                 const lines = text.split('\n');
-                const errorLine = lines[lineAndChar.line];
+
+                // Calcular la línea real en el archivo original
+                const actualLineIndex = scriptInfo
+                    ? lineAndChar.line + scriptInfo.startLine - 1
+                    : lineAndChar.line;
+                const errorLine = lines[actualLineIndex];
 
                 if (errorLine) {
                     // Mostrar hasta 2 líneas antes y después para contexto
-                    const startLine = Math.max(0, lineAndChar.line - 2);
+                    const startLine = Math.max(0, actualLineIndex - 2);
                     const endLine = Math.min(
                         lines.length - 1,
-                        lineAndChar.line + 2,
+                        actualLineIndex + 2,
                     );
 
                     codeContext = '\n\n📝 Contexto del código:\n';
@@ -161,7 +250,7 @@ function enhanceErrorMessage(
                     for (let i = startLine; i <= endLine; i++) {
                         const currentLine = i + 1;
                         const lineContent = lines[i] || '';
-                        const isErrorLine = i === lineAndChar.line;
+                        const isErrorLine = i === actualLineIndex;
 
                         if (isErrorLine) {
                             codeContext += `  ${currentLine.toString().padStart(3, ' ')} ❌ ${lineContent}\n`;

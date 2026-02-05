@@ -8,6 +8,7 @@ import * as typescript from 'typescript';
 import {
     createUnifiedErrorMessage,
     parseTypeScriptErrors,
+    ScriptExtractionInfo,
 } from './typescript-error-parser';
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 import { TypeScriptWorkerPool } from './typescript-worker-pool';
@@ -311,11 +312,13 @@ const cleanupUnnecessaryExports = (
  * Precompila el código TypeScript con pipeline optimizado para máxima performance.
  * @param {string} data - El código TypeScript a precompilar.
  * @param {string} fileName - El nombre del archivo que contiene el código typescript.
+ * @param {ScriptExtractionInfo} scriptInfo - Información de extracción de script para archivos Vue (opcional).
  * @returns {Promise<CompileResult>} - Un objeto con el código precompilado o un error.
  */
 export const preCompileTS = async (
     data: string,
     fileName: string,
+    scriptInfo?: ScriptExtractionInfo,
 ): Promise<CompileResult> => {
     try {
         // Validación temprana: contenido vacío
@@ -377,7 +380,7 @@ export const preCompileTS = async (
 
             if (criticalErrors.length > 0) {
                 const errorMessage = createUnifiedErrorMessage(
-                    parseTypeScriptErrors(criticalErrors, fileName, data),
+                    parseTypeScriptErrors(criticalErrors, fileName, data, scriptInfo),
                 );
                 return {
                     error: new Error(errorMessage),
@@ -404,6 +407,7 @@ export const preCompileTS = async (
                             typeCheckResult.diagnostics,
                             fileName,
                             data,
+                            scriptInfo,
                         ),
                     );
                     return {
