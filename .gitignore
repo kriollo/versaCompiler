@@ -9,3 +9,4 @@ src/compiler/.cache
 examples/dashboard
 test-results/*
 temp/*
+testProjects/*
