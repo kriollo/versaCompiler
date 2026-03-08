@@ -6,7 +6,7 @@ const { env } = process;
 import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
 
-import { getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
+import { clearCompilationState, getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser';
 
 import { emitirCambios } from './browserSync';
@@ -103,6 +103,9 @@ class WatchDebouncer {
         if (this.isProcessing || this.pendingChanges.size === 0) {
             return;
         }
+
+        // Limpiar errores del ciclo anterior para evitar memory leak en watch mode
+        clearCompilationState();
 
         this.isProcessing = true;
         const changes = Array.from(this.pendingChanges.values());

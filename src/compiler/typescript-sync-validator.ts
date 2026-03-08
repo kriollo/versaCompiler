@@ -114,19 +114,19 @@ class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
         return typescript.getDefaultLibFilePath(options);
     }
 
-    fileExists(path: string): boolean {
-        return this.files.has(path) || fs.existsSync(path);
+    fileExists(filePath: string): boolean {
+        return this.files.has(filePath) || fs.existsSync(filePath);
     }
 
-    readFile(path: string): string | undefined {
-        const file = this.files.get(path);
+    readFile(filePath: string): string | undefined {
+        const file = this.files.get(filePath);
         if (file) {
             return file.content;
         }
 
-        if (fs.existsSync(path)) {
+        if (fs.existsSync(filePath)) {
             try {
-                return fs.readFileSync(path, 'utf-8');
+                return fs.readFileSync(filePath, 'utf-8');
             } catch {
                 return undefined;
             }
@@ -208,9 +208,6 @@ export const validateTypesWithLanguageService = (
         try {
             // Verificar que el archivo existe en el host antes de solicitar diagnósticos
             if (!host.fileExists(actualFileName)) {
-                console.log(
-                    'File does not exist in host, returning empty result',
-                );
                 return { diagnostics: [], hasErrors: false };
             } // Obtener diagnósticos de tipos con manejo de errores
             let syntacticDiagnostics: typescript.Diagnostic[] = [];
@@ -332,6 +329,8 @@ export const validateTypesWithLanguageService = (
             };
         } catch {
             return { diagnostics: [], hasErrors: false };
+        } finally {
+            try { languageService.dispose(); } catch { /* ignore dispose errors */ }
         }
     } catch (error) {
         // En caso de error, devolver diagnóstico de error

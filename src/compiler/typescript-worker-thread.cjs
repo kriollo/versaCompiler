@@ -128,19 +128,19 @@ class WorkerTypeScriptLanguageServiceHost {
         return ts.getDefaultLibFilePath(options);
     }
 
-    fileExists(path) {
-        return this.files.has(path) || fs.existsSync(path);
+    fileExists(filePath) {
+        return this.files.has(filePath) || fs.existsSync(filePath);
     }
 
-    readFile(path) {
-        const file = this.files.get(path);
+    readFile(filePath) {
+        const file = this.files.get(filePath);
         if (file) {
             return file.content;
         }
 
-        if (fs.existsSync(path)) {
+        if (fs.existsSync(filePath)) {
             try {
-                return fs.readFileSync(path, 'utf-8');
+                return fs.readFileSync(filePath, 'utf-8');
             } catch {
                 return undefined;
             }
@@ -224,6 +224,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             if (!host.fileExists(actualFileName)) {
                 return { diagnostics: [], hasErrors: false };
             }
+
 
             // Obtener diagnósticos de tipos con manejo de errores
             let syntacticDiagnostics = [];
@@ -344,6 +345,8 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             };
         } catch {
             return { diagnostics: [], hasErrors: false };
+        } finally {
+            try { languageService.dispose(); } catch { /* ignore dispose errors */ }
         }
     } catch (error) {
         // En caso de error, devolver diagnóstico de error

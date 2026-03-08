@@ -17,6 +17,7 @@ const { argv, cwd, env } = process;
 import { logger, setProgressManagerGetter } from '../servicios/logger';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
+
 import { integrityValidator } from './integrity-validator';
 
 // Configurar el getter del ProgressManager para el logger
@@ -489,71 +490,39 @@ class OptimizedModuleManager {
     }
 }
 
-// Lazy loading helper functions
+// Lazy loading helper functions - delegan al OptimizedModuleManager para evitar duplicación
+const moduleManagerRef = () => OptimizedModuleManager.getInstance();
+
 async function loadChalk() {
-    if (!chalk) {
-        chalk = (await import('chalk')).default;
-    }
-    return chalk;
+    return moduleManagerRef().ensureModuleLoaded('chalk');
 }
 
 async function loadLinter() {
-    if (!ESLint || !OxLint) {
-        const linterModule = await import('./linter');
-        ESLint = linterModule.ESLint;
-        OxLint = linterModule.OxLint;
-    }
-    return { ESLint, OxLint };
+    return moduleManagerRef().ensureModuleLoaded('linter');
 }
 
 async function loadMinify() {
-    if (!minifyJS) {
-        const minifyModule = await import('./minify');
-        // ✨ Usar minifyWithTemplates para minificar templates HTML ANTES del JS
-        minifyJS = minifyModule.minifyWithTemplates;
-    }
-    return minifyJS;
+    return moduleManagerRef().ensureModuleLoaded('minify');
 }
 
 async function loadParser() {
-    if (!getCodeFile) {
-        const parserModule = await import('./parser');
-        getCodeFile = parserModule.getCodeFile;
-    }
-    return getCodeFile;
+    return moduleManagerRef().ensureModuleLoaded('parser');
 }
 
 async function loadTailwind() {
-    if (!generateTailwindCSS) {
-        const tailwindModule = await import('./tailwindcss');
-        generateTailwindCSS = tailwindModule.generateTailwindCSS;
-    }
-    return generateTailwindCSS;
+    return moduleManagerRef().ensureModuleLoaded('tailwind');
 }
 
 async function loadTransforms() {
-    if (!estandarizaCode) {
-        const transformsModule = await import('./transforms');
-        estandarizaCode = transformsModule.estandarizaCode;
-    }
-    return estandarizaCode;
+    return moduleManagerRef().ensureModuleLoaded('transforms');
 }
 
 async function loadTypeScript() {
-    if (!preCompileTS) {
-        const typescriptModule = await import('./typescript-manager');
-        preCompileTS = typescriptModule.preCompileTS;
-    }
-
-    return preCompileTS;
+    return moduleManagerRef().ensureModuleLoaded('typescript');
 }
 
 async function loadVue() {
-    if (!preCompileVue) {
-        const vueModule = await import('./vuejs');
-        preCompileVue = vueModule.preCompileVue;
-    }
-    return preCompileVue;
+    return moduleManagerRef().ensureModuleLoaded('vue');
 }
 
 // ⚠️ Función eliminada: preloadAllModules()
@@ -615,6 +584,11 @@ class SmartCompilationCache {
     private readonly maxMemory = 50 * 1024 * 1024; // 50MB límite (reducido)
     private currentMemoryUsage = 0;
 
+    // Cache para dependencyHash con TTL de 5 minutos para evitar stat() redundantes
+    private _cachedDepHash: string | null = null;
+    private _depHashExpiry = 0;
+    private readonly DEP_HASH_TTL = 5 * 60 * 1000; // 5 minutos
+
     // ✨ ISSUE #3: Sistema de vigilancia de dependencias
     private fileWatchers = new Map<string, any>(); // chokidar watchers
     private dependencyGraph = new Map<string, Set<string>>(); // archivo -> dependencias
@@ -622,6 +596,7 @@ class SmartCompilationCache {
     private packageJsonPath = path.join(cwd(), 'package.json');
     private nodeModulesPath = path.join(cwd(), 'node_modules');
     private isWatchingDependencies = false;
+    private _depWatcherFailed = false; // Flag para indicar que el watcher de deps falló
     /**
      * Genera hash SHA-256 del contenido del archivo
      */ async generateContentHash(filePath: string): Promise<string> {
@@ -684,6 +659,12 @@ class SmartCompilationCache {
      * Incluye vigilancia de package.json, node_modules y versiones instaladas
      */
     private async generateDependencyHash(): Promise<string> {
+        // Retornar hash cacheado si sigue vigente (evita 10+ stat() por ciclo)
+        const now = Date.now();
+        if (this._cachedDepHash && now < this._depHashExpiry) {
+            return this._cachedDepHash;
+        }
+
         try {
             const hash = createHash('sha256');
 
@@ -760,16 +741,30 @@ class SmartCompilationCache {
                 hash.update('nmtime:none');
             }
 
-            return hash.digest('hex').substring(0, 16);
+            const result = hash.digest('hex').substring(0, 16);
+            this._cachedDepHash = result;
+            this._depHashExpiry = Date.now() + this.DEP_HASH_TTL;
+            return result;
         } catch (error) {
             // Incluir información del error en el hash para debugging
-            return createHash('sha256')
+            const result = createHash('sha256')
                 .update(
                     `error:${error instanceof Error ? error.message : 'unknown'}`,
                 )
                 .digest('hex')
                 .substring(0, 16);
+            this._cachedDepHash = result;
+            this._depHashExpiry = Date.now() + this.DEP_HASH_TTL;
+            return result;
         }
+    }
+
+    /**
+     * Invalida el cache de dependencyHash (llamar cuando package.json cambie)
+     */
+    invalidateDepHashCache(): void {
+        this._cachedDepHash = null;
+        this._depHashExpiry = 0;
     }
 
     /**
@@ -791,40 +786,26 @@ class SmartCompilationCache {
         if (!entry) return false;
 
         try {
-            // Verificar si el archivo de salida existe
-            await stat(entry.outputPath);
+            // Ejecutar todas las verificaciones independientes en paralelo
+            const [currentContentHash, currentDependencyHash, fileStat, _outputStat] =
+                await Promise.all([
+                    this.generateContentHash(filePath),
+                    this.generateDependencyHash(),
+                    stat(filePath),
+                    stat(entry.outputPath),
+                ]);
 
-            // Verificar si el contenido ha cambiado
-            const currentContentHash = await this.generateContentHash(filePath);
-            if (entry.contentHash !== currentContentHash) {
-                this.cache.delete(filePath);
-                return false;
-            }
-
-            // Verificar si la configuración ha cambiado
+            // Los hashes síncronos son baratos, evaluarlos tras el await
             const currentConfigHash = this.generateConfigHash();
-            if (entry.configHash !== currentConfigHash) {
-                this.cache.delete(filePath);
-                return false;
-            }
-
-            // Verificar si las variables de entorno han cambiado
             const currentEnvHash = this.generateEnvHash();
-            if (entry.envHash !== currentEnvHash) {
-                this.cache.delete(filePath);
-                return false;
-            }
 
-            // Verificar si las dependencias han cambiado
-            const currentDependencyHash = await this.generateDependencyHash();
-            if (entry.dependencyHash !== currentDependencyHash) {
-                this.cache.delete(filePath);
-                return false;
-            }
-
-            // Verificar tiempo de modificación como backup
-            const stats = await stat(filePath);
-            if (stats.mtimeMs > entry.mtime) {
+            if (
+                entry.contentHash !== currentContentHash ||
+                entry.configHash !== currentConfigHash ||
+                entry.envHash !== currentEnvHash ||
+                entry.dependencyHash !== currentDependencyHash ||
+                fileStat.mtimeMs > entry.mtime
+            ) {
                 this.cache.delete(filePath);
                 return false;
             }
@@ -916,7 +897,28 @@ class SmartCompilationCache {
             if (entry) {
                 this.currentMemoryUsage -= entry.size;
                 this.cache.delete(oldestKey);
+                // Podar el grafo de dependencias para evitar entradas obsoletas
+                this.pruneDependencyGraph(oldestKey);
             }
+        }
+    }
+
+    /**
+     * Elimina entradas obsoletas del grafo de dependencias para un archivo
+     */
+    private pruneDependencyGraph(filePath: string): void {
+        const deps = this.dependencyGraph.get(filePath);
+        if (deps) {
+            for (const dep of deps) {
+                const reverseDeps = this.reverseDependencyGraph.get(dep);
+                if (reverseDeps) {
+                    reverseDeps.delete(filePath);
+                    if (reverseDeps.size === 0) {
+                        this.reverseDependencyGraph.delete(dep);
+                    }
+                }
+            }
+            this.dependencyGraph.delete(filePath);
         }
     }
 
@@ -1030,6 +1032,7 @@ class SmartCompilationCache {
                     logger.info(
                         '📦 package.json modificado - invalidando cache de dependencias',
                     );
+                    this.invalidateDepHashCache();
                     this.invalidateByDependencyChange();
                 });
 
@@ -1047,16 +1050,16 @@ class SmartCompilationCache {
                         ignored: /(^|[/\\])\../, // Ignorar archivos ocultos
                     },
                 );
-                nodeModulesWatcher.on('addDir', (path: string) => {
+                nodeModulesWatcher.on('addDir', (dirPath: string) => {
                     logger.info(
-                        `📦 Nueva dependencia instalada: ${path.split(/[/\\]/).pop()}`,
+                        `📦 Nueva dependencia instalada: ${dirPath.split(/[/\\]/).pop()}`,
                     );
                     this.invalidateByDependencyChange();
                 });
 
-                nodeModulesWatcher.on('unlinkDir', (path: string) => {
+                nodeModulesWatcher.on('unlinkDir', (dirPath: string) => {
                     logger.info(
-                        `📦 Dependencia eliminada: ${path.split(/[/\\]/).pop()}`,
+                        `📦 Dependencia eliminada: ${dirPath.split(/[/\\]/).pop()}`,
                     );
                     this.invalidateByDependencyChange();
                 });
@@ -1071,6 +1074,8 @@ class SmartCompilationCache {
                 '⚠️ No se pudo iniciar vigilancia de dependencias:',
                 error,
             );
+            // Marcar fallo para que el sistema lo tenga en cuenta
+            this._depWatcherFailed = true;
         }
     }
 
@@ -1317,24 +1322,24 @@ async function handleCompilationError(
     );
     registerCompilationResult(stage, 1, 0, [fileName]); // Mostrar error inmediatamente solo en modo individual y watch
     if (mode === 'individual' || mode === 'watch') {
-        const chalk = await loadChalk();
+        const chalkLib = await loadChalk();
         const baseName = path.basename(fileName);
         const stageColor = await getStageColor(stage);
 
         if (isVerbose) {
             // Modo verbose: Mostrar error completo con contexto
             logger.error(
-                chalk.red(
+                chalkLib.red(
                     `❌ Error en etapa ${stageColor(stage)} - ${baseName}:`,
                 ),
             );
-            logger.error(chalk.red(errorMessage));
+            logger.error(chalkLib.red(errorMessage));
             if (errorDetails && (stage === 'typescript' || stage === 'vue')) {
                 // Mostrar stack trace limitado para TypeScript y Vue
                 const stackLines = errorDetails.split('\n').slice(0, 5);
                 stackLines.forEach(line => {
                     if (line.trim()) {
-                        logger.error(chalk.gray(`  ${line.trim()}`));
+                        logger.error(chalkLib.gray(`  ${line.trim()}`));
                     }
                 });
             }
@@ -1342,11 +1347,11 @@ async function handleCompilationError(
             // Modo normal: Mostrar error simplificado
             const firstLine = errorMessage.split('\n')[0];
             logger.error(
-                chalk.red(`❌ Error en ${stageColor(stage)}: ${baseName}`),
+                chalkLib.red(`❌ Error en ${stageColor(stage)}: ${baseName}`),
             );
-            logger.error(chalk.red(`   ${firstLine}`));
+            logger.error(chalkLib.red(`   ${firstLine}`));
             logger.info(
-                chalk.yellow(`💡 Usa --verbose para ver detalles completos`),
+                chalkLib.yellow(`💡 Usa --verbose para ver detalles completos`),
             );
         }
     }
@@ -1363,7 +1368,7 @@ function registerCompilationSuccess(fileName: string, stage: string): void {
 /**
  * Limpia todos los errores y resultados acumulados
  */
-function clearCompilationState(): void {
+export function clearCompilationState(): void {
     compilationErrors.length = 0;
     compilationResults.length = 0;
 }
@@ -1375,14 +1380,14 @@ async function displayCompilationSummary(
     isVerbose: boolean = false,
     totalTime?: string,
 ): Promise<void> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
     if (compilationErrors.length === 0 && compilationResults.length === 0) {
         logger.info(
-            chalk.green('✅ No hay errores de compilación para mostrar.'),
+            chalkLib.green('✅ No hay errores de compilación para mostrar.'),
         );
         if (totalTime) {
             logger.info(
-                chalk.bold(`\n⏱️ TIEMPO TOTAL DE COMPILACIÓN: ${totalTime}`),
+                chalkLib.bold(`\n⏱️ TIEMPO TOTAL DE COMPILACIÓN: ${totalTime}`),
             );
         }
         return;
@@ -1391,14 +1396,14 @@ async function displayCompilationSummary(
     // 🎨 Header moderno del resumen
     const summaryLine = '━'.repeat(40);
     logger.info('');
-    logger.info(chalk.bold.cyan('📊 Resumen de Compilación'));
-    logger.info(chalk.gray(summaryLine)); // ⏱️ Tiempo total con formato elegante
+    logger.info(chalkLib.bold.cyan('📊 Resumen de Compilación'));
+    logger.info(chalkLib.gray(summaryLine)); // ⏱️ Tiempo total con formato elegante
     if (totalTime) {
-        logger.info(chalk.bold(`⏱️  Tiempo Total: ${chalk.green(totalTime)}`));
+        logger.info(chalkLib.bold(`⏱️  Tiempo Total: ${chalkLib.green(totalTime)}`));
         logger.info('');
     } // 🔧 Estadísticas por etapa con mejor formato
     if (compilationResults.length > 0) {
-        logger.info(chalk.bold.blue('🔧 Estadísticas por Etapa:'));
+        logger.info(chalkLib.bold.blue('🔧 Estadísticas por Etapa:'));
 
         for (const result of compilationResults) {
             const totalFiles = result.success + result.errors;
@@ -1409,12 +1414,12 @@ async function displayCompilationSummary(
 
             // Iconos y colores dinámicos por etapa
             const stageIcon = getStageIcon(result.stage);
-            const statusColor = result.errors === 0 ? chalk.green : chalk.red;
+            const statusColor = result.errors === 0 ? chalkLib.green : chalkLib.red;
             const progressBar = createProgressBarWithPercentage(
                 successRate,
                 20,
             );
-            logger.info(`   ${stageIcon} ${chalk.bold(result.stage)}`);
+            logger.info(`   ${stageIcon} ${chalkLib.bold(result.stage)}`);
             logger.info(
                 `     ${statusColor('●')} ${result.success}/${totalFiles} archivos ${statusColor(`(${successRate}%)`)}`,
             );
@@ -1422,7 +1427,7 @@ async function displayCompilationSummary(
 
             if (result.errors > 0) {
                 logger.info(
-                    `     ${chalk.red('⚠')} ${result.errors} ${result.errors === 1 ? 'error' : 'errores'}`,
+                    `     ${chalkLib.red('⚠')} ${result.errors} ${result.errors === 1 ? 'error' : 'errores'}`,
                 );
             }
             logger.info('');
@@ -1432,7 +1437,7 @@ async function displayCompilationSummary(
     // Mostrar errores detallados
     if (compilationErrors.length > 0) {
         logger.info(
-            chalk.red(
+            chalkLib.red(
                 `\n❌ Se encontraron ${compilationErrors.length} errores:`,
             ),
         );
@@ -1456,10 +1461,10 @@ async function displayCompilationSummary(
             const warningCount = fileErrors.filter(
                 e => e.severity === 'warning',
             ).length;
-            logger.info(chalk.cyan(`\n📄 ${fileIndex}. ${baseName}`));
-            logger.info(chalk.gray(`   Ruta: ${filePath}`));
+            logger.info(chalkLib.cyan(`\n📄 ${fileIndex}. ${baseName}`));
+            logger.info(chalkLib.gray(`   Ruta: ${filePath}`));
             logger.info(
-                chalk.yellow(
+                chalkLib.yellow(
                     `   ${errorCount} errores, ${warningCount} advertencias`,
                 ),
             );
@@ -1477,13 +1482,13 @@ async function displayCompilationSummary(
                     const detailLines = error.details.split('\n').slice(0, 5);
                     detailLines.forEach(line => {
                         if (line.trim()) {
-                            logger.info(chalk.gray(`      ${line.trim()}`));
+                            logger.info(chalkLib.gray(`      ${line.trim()}`));
                         }
                     });
                 }
 
                 if (error.help) {
-                    logger.info(chalk.blue(`      💡 ${error.help}`));
+                    logger.info(chalkLib.blue(`      💡 ${error.help}`));
                 }
             }
 
@@ -1500,19 +1505,19 @@ async function displayCompilationSummary(
         // Header elegante para estadísticas finales
         const statLine = '═'.repeat(50);
         logger.info('');
-        logger.info(chalk.bold.cyan(statLine));
-        logger.info(chalk.bold.cyan('                📊 RESUMEN FINAL'));
-        logger.info(chalk.bold.cyan(statLine));
+        logger.info(chalkLib.bold.cyan(statLine));
+        logger.info(chalkLib.bold.cyan('                📊 RESUMEN FINAL'));
+        logger.info(chalkLib.bold.cyan(statLine));
 
         // Estadísticas con iconos y colores modernos
         logger.info('');
-        logger.info(chalk.bold('🎯 Resultados:'));
-        logger.info(`   📁 Archivos afectados: ${chalk.cyan.bold(totalFiles)}`);
+        logger.info(chalkLib.bold('🎯 Resultados:'));
+        logger.info(`   📁 Archivos afectados: ${chalkLib.cyan.bold(totalFiles)}`);
         logger.info(
-            `   ${totalErrors > 0 ? chalk.red('●') : chalk.green('○')} Errores: ${totalErrors > 0 ? chalk.red.bold(totalErrors) : chalk.green.bold('0')}`,
+            `   ${totalErrors > 0 ? chalkLib.red('●') : chalkLib.green('○')} Errores: ${totalErrors > 0 ? chalkLib.red.bold(totalErrors) : chalkLib.green.bold('0')}`,
         );
         logger.info(
-            `   ${totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○')} Advertencias: ${totalWarnings > 0 ? chalk.yellow.bold(totalWarnings) : chalk.green.bold('0')}`,
+            `   ${totalWarnings > 0 ? chalkLib.yellow('●') : chalkLib.green('○')} Advertencias: ${totalWarnings > 0 ? chalkLib.yellow.bold(totalWarnings) : chalkLib.green.bold('0')}`,
         );
 
         logger.info('');
@@ -1520,49 +1525,49 @@ async function displayCompilationSummary(
         // Estado final con diseño visual atractivo
         if (totalErrors > 0) {
             logger.info(
-                chalk.red.bold('🚨 COMPILACIÓN COMPLETADA CON ERRORES'),
+                chalkLib.red.bold('🚨 COMPILACIÓN COMPLETADA CON ERRORES'),
             );
             logger.info(
-                chalk.red(
+                chalkLib.red(
                     '   Por favor revisa y corrige los problemas anteriores.',
                 ),
             );
         } else if (totalWarnings > 0) {
             logger.info(
-                chalk.yellow.bold(
+                chalkLib.yellow.bold(
                     '⚠️  COMPILACIÓN COMPLETADA CON ADVERTENCIAS',
                 ),
             );
             logger.info(
-                chalk.yellow(
+                chalkLib.yellow(
                     '   Considera revisar las advertencias anteriores.',
                 ),
             );
         } else {
-            logger.info(chalk.green.bold('✅ COMPILACIÓN EXITOSA'));
+            logger.info(chalkLib.green.bold('✅ COMPILACIÓN EXITOSA'));
             logger.info(
-                chalk.green(
+                chalkLib.green(
                     '   ¡Todos los archivos se compilaron sin problemas!',
                 ),
             );
         }
 
         logger.info('');
-        logger.info(chalk.bold.cyan(statLine));
+        logger.info(chalkLib.bold.cyan(statLine));
     } else {
         // Caso exitoso sin errores
         const successLine = '═'.repeat(50);
         logger.info('');
-        logger.info(chalk.bold.green(successLine));
-        logger.info(chalk.bold.green('                ✨ ÉXITO'));
-        logger.info(chalk.bold.green(successLine));
+        logger.info(chalkLib.bold.green(successLine));
+        logger.info(chalkLib.bold.green('                ✨ ÉXITO'));
+        logger.info(chalkLib.bold.green(successLine));
         logger.info('');
-        logger.info(chalk.green.bold('🎉 COMPILACIÓN COMPLETADA EXITOSAMENTE'));
+        logger.info(chalkLib.green.bold('🎉 COMPILACIÓN COMPLETADA EXITOSAMENTE'));
         logger.info(
-            chalk.green('   ¡No se encontraron errores ni advertencias!'),
+            chalkLib.green('   ¡No se encontraron errores ni advertencias!'),
         );
         logger.info('');
-        logger.info(chalk.bold.green(successLine));
+        logger.info(chalkLib.bold.green(successLine));
     }
 
     logger.info('');
@@ -1572,7 +1577,7 @@ async function displayCompilationSummary(
  * Muestra errores del linter con formato visual moderno y profesional
  */
 async function displayLinterErrors(errors: any[]): Promise<void> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
 
     // Agrupar errores por archivo
     const errorsByFile = new Map<string, any[]>();
@@ -1589,19 +1594,19 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
 
     // Header estilo moderno con gradiente visual
     logger.info(
-        chalk.bold.rgb(
+        chalkLib.bold.rgb(
             255,
             120,
             120,
         )('╭─────────────────────────────────────────────────────────────╮'),
     );
     logger.info(
-        chalk.bold.rgb(255, 120, 120)('│                    ') +
-            chalk.bold.white('🔍 LINTER REPORT') +
-            chalk.bold.rgb(255, 120, 120)('                    │'),
+        chalkLib.bold.rgb(255, 120, 120)('│                    ') +
+            chalkLib.bold.white('🔍 LINTER REPORT') +
+            chalkLib.bold.rgb(255, 120, 120)('                    │'),
     );
     logger.info(
-        chalk.bold.rgb(
+        chalkLib.bold.rgb(
             255,
             120,
             120,
@@ -1609,23 +1614,23 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
     );
 
     // Resumen con iconos profesionales
-    const errorIcon = totalErrors > 0 ? chalk.red('●') : chalk.green('○');
+    const errorIcon = totalErrors > 0 ? chalkLib.red('●') : chalkLib.green('○');
     const warningIcon =
-        totalWarnings > 0 ? chalk.yellow('●') : chalk.green('○');
+        totalWarnings > 0 ? chalkLib.yellow('●') : chalkLib.green('○');
 
     logger.info('');
-    logger.info(chalk.bold('📊 Summary:'));
+    logger.info(chalkLib.bold('📊 Summary:'));
     logger.info(
-        `   ${errorIcon} ${chalk.bold(totalErrors)} ${chalk.red('errors')}`,
+        `   ${errorIcon} ${chalkLib.bold(totalErrors)} ${chalkLib.red('errors')}`,
     );
     logger.info(
-        `   ${warningIcon} ${chalk.bold(totalWarnings)} ${chalk.yellow('warnings')}`,
+        `   ${warningIcon} ${chalkLib.bold(totalWarnings)} ${chalkLib.yellow('warnings')}`,
     );
-    logger.info(`   📁 ${chalk.bold(totalFiles)} ${chalk.cyan('files')}`);
+    logger.info(`   📁 ${chalkLib.bold(totalFiles)} ${chalkLib.cyan('files')}`);
     logger.info('');
 
     if (totalErrors === 0 && totalWarnings === 0) {
-        logger.info(chalk.green.bold('✨ All checks passed! No issues found.'));
+        logger.info(chalkLib.green.bold('✨ All checks passed! No issues found.'));
         return;
     }
 
@@ -1641,22 +1646,22 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
         fileIndex++;
 
         if (fileIndex <= totalFiles) {
-            logger.info(chalk.gray('─'.repeat(80))); // Separador entre archivos
+            logger.info(chalkLib.gray('─'.repeat(80))); // Separador entre archivos
         }
     }
 
     // Footer con estadísticas
     logger.info('');
     logger.info(
-        chalk.bold.rgb(
+        chalkLib.bold.rgb(
             255,
             120,
             120,
         )('╭─────────────────────────────────────────────────────────────╮'),
     );
     logger.info(
-        chalk.bold.rgb(255, 120, 120)('│  ') +
-            chalk.bold.white(
+        chalkLib.bold.rgb(255, 120, 120)('│  ') +
+            chalkLib.bold.white(
                 `Found ${totalErrors + totalWarnings} issues in ${totalFiles} files`,
             ) +
             ' '.repeat(
@@ -1667,10 +1672,10 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
                             .length,
                 ),
             ) +
-            chalk.bold.rgb(255, 120, 120)('  │'),
+            chalkLib.bold.rgb(255, 120, 120)('  │'),
     );
     logger.info(
-        chalk.bold.rgb(
+        chalkLib.bold.rgb(
             255,
             120,
             120,
@@ -1687,7 +1692,7 @@ async function displayFileErrorsGroup(
     _fileIndex: number,
     _totalFiles: number,
 ): Promise<void> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
 
     // Header del archivo con iconos de estado
     const errorCount = fileErrors.filter(e => e.severity === 'error').length;
@@ -1695,7 +1700,7 @@ async function displayFileErrorsGroup(
         e => e.severity === 'warning',
     ).length;
 
-    const statusIcon = errorCount > 0 ? chalk.red('✕') : chalk.yellow('⚠');
+    const statusIcon = errorCount > 0 ? chalkLib.red('✕') : chalkLib.yellow('⚠');
     const fileIcon = filePath.endsWith('.vue')
         ? '🎨'
         : filePath.endsWith('.ts')
@@ -1706,12 +1711,12 @@ async function displayFileErrorsGroup(
 
     logger.info('');
     logger.info(
-        chalk.bold(
-            `${statusIcon} ${fileIcon} ${chalk.cyan(path.relative(process.cwd(), filePath))}`,
+        chalkLib.bold(
+            `${statusIcon} ${fileIcon} ${chalkLib.cyan(path.relative(process.cwd(), filePath))}`,
         ),
     );
     logger.info(
-        chalk.gray(`   ${errorCount} errors, ${warningCount} warnings`),
+        chalkLib.gray(`   ${errorCount} errors, ${warningCount} warnings`),
     );
     logger.info('');
 
@@ -1736,12 +1741,12 @@ async function displayModernLinterError(
     errorIndex: number,
     totalErrorsInFile: number,
 ): Promise<void> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
     const fs = await import('node:fs/promises');
 
     // Determinar tipo y color del error
     const isError = error.severity === 'error';
-    const typeColor = isError ? chalk.red : chalk.yellow;
+    const typeColor = isError ? chalkLib.red : chalkLib.yellow;
     const typeIcon = isError ? '✕' : '⚠';
 
     const line = error.line || 1;
@@ -1749,13 +1754,13 @@ async function displayModernLinterError(
     const ruleId = error.ruleId || error.from || 'unknown';
 
     // Línea principal del error con formato moderno
-    const errorHeader = `  ${typeColor(typeIcon)} ${chalk.bold(error.message)}`;
-    const ruleInfo = `${chalk.gray(ruleId)}`;
-    const locationInfo = `${chalk.blue(`${line}:${column}`)}`;
+    const errorHeader = `  ${typeColor(typeIcon)} ${chalkLib.bold(error.message)}`;
+    const ruleInfo = `${chalkLib.gray(ruleId)}`;
+    const locationInfo = `${chalkLib.blue(`${line}:${column}`)}`;
 
     logger.info(errorHeader);
     logger.info(
-        `    ${chalk.gray('at')} ${locationInfo} ${chalk.gray('·')} ${ruleInfo}`,
+        `    ${chalkLib.gray('at')} ${locationInfo} ${chalkLib.gray('·')} ${ruleInfo}`,
     );
 
     // Mostrar código con contexto
@@ -1784,19 +1789,19 @@ async function displayModernLinterError(
                 if (isErrorLine) {
                     // Línea con el error - destacada
                     logger.info(
-                        `    ${chalk.red('>')} ${chalk.gray(lineNumStr)} ${chalk.gray('│')} ${currentLine}`,
+                        `    ${chalkLib.red('>')} ${chalkLib.gray(lineNumStr)} ${chalkLib.gray('│')} ${currentLine}`,
                     );
 
                     // Indicador de posición del error
                     const pointer =
                         ' '.repeat(Math.max(0, column - 1)) + typeColor('^');
                     logger.info(
-                        `    ${chalk.gray(' ')} ${chalk.gray(' '.repeat(maxLineNumWidth))} ${chalk.gray('│')} ${pointer}`,
+                        `    ${chalkLib.gray(' ')} ${chalkLib.gray(' '.repeat(maxLineNumWidth))} ${chalkLib.gray('│')} ${pointer}`,
                     );
                 } else {
                     // Líneas de contexto
                     logger.info(
-                        `    ${chalk.gray(' ')} ${chalk.gray(lineNumStr)} ${chalk.gray('│')} ${chalk.gray(currentLine)}`,
+                        `    ${chalkLib.gray(' ')} ${chalkLib.gray(lineNumStr)} ${chalkLib.gray('│')} ${chalkLib.gray(currentLine)}`,
                     );
                 }
             }
@@ -1804,7 +1809,7 @@ async function displayModernLinterError(
     } catch {
         // Si no se puede leer el archivo, mostrar formato simplificado
         logger.info(
-            `    ${chalk.gray('│')} ${chalk.gray('(Unable to read file content)')}`,
+            `    ${chalkLib.gray('│')} ${chalkLib.gray('(Unable to read file content)')}`,
         );
     }
 
@@ -1813,7 +1818,7 @@ async function displayModernLinterError(
         logger.info('');
         const helpText = error.help.replace(/^Regla \w+: /, '').trim();
         logger.info(
-            `    ${chalk.blue('💡')} ${chalk.blue('Help:')} ${chalk.gray(helpText)}`,
+            `    ${chalkLib.blue('💡')} ${chalkLib.blue('Help:')} ${chalkLib.gray(helpText)}`,
         );
     }
 
@@ -1831,7 +1836,7 @@ async function _displaySingleLinterError(
     error: any,
     filePath: string,
 ): Promise<void> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
     const fs = await import('node:fs/promises');
 
     const icon = error.severity === 'error' ? '×' : '⚠';
@@ -1840,7 +1845,7 @@ async function _displaySingleLinterError(
     const column = error.column || 10; // Columna por defecto si no está disponible
 
     // Línea principal del error
-    const mainErrorLine = `${chalk.red(icon)} ${chalk.cyan(`${error.from}(${ruleInfo.replace(/^Regla \w+: /, '')})`)}: ${error.message}`;
+    const mainErrorLine = `${chalkLib.red(icon)} ${chalkLib.cyan(`${error.from}(${ruleInfo.replace(/^Regla \w+: /, '')})`)}: ${error.message}`;
     logger.info(mainErrorLine);
 
     // Intentar leer el contenido del archivo para mostrar contexto
@@ -1852,7 +1857,7 @@ async function _displaySingleLinterError(
 
         if (lineNum >= 0 && lineNum < lines.length) {
             // Mostrar ubicación
-            logger.info(chalk.blue(`    ╭─[${filePath}:${line}:${column}]`));
+            logger.info(chalkLib.blue(`    ╭─[${filePath}:${line}:${column}]`));
 
             // Mostrar líneas de contexto
             const startLine = Math.max(0, lineNum - 1);
@@ -1865,49 +1870,49 @@ async function _displaySingleLinterError(
 
                 if (i === lineNum) {
                     // Línea con el error
-                    logger.info(chalk.blue(` ${prefix} │ `) + currentLine);
+                    logger.info(chalkLib.blue(` ${prefix} │ `) + currentLine);
 
                     // Mostrar el indicador de error
                     const indent = ' '.repeat(prefix.length + 3); // Espacios para alinear
                     const pointer =
                         ' '.repeat(Math.max(0, (column || 1) - 1)) +
-                        chalk.red('───────┬──────');
-                    logger.info(chalk.blue(indent + '·') + pointer);
+                        chalkLib.red('───────┬──────');
+                    logger.info(chalkLib.blue(indent + '·') + pointer);
 
                     // Mensaje de ubicación específica
                     const messageIndent = ' '.repeat(
                         Math.max(0, (column || 1) + 6),
                     );
                     logger.info(
-                        chalk.blue(indent + '·') +
+                        chalkLib.blue(indent + '·') +
                             messageIndent +
-                            chalk.red('╰── ') +
-                            chalk.gray(getErrorLocationMessage(error)),
+                            chalkLib.red('╰── ') +
+                            chalkLib.gray(getErrorLocationMessage(error)),
                     );
                 } else {
                     // Líneas de contexto
                     logger.info(
-                        chalk.blue(` ${prefix} │ `) + chalk.gray(currentLine),
+                        chalkLib.blue(` ${prefix} │ `) + chalkLib.gray(currentLine),
                     );
                 }
             }
 
-            logger.info(chalk.blue('    ╰────'));
+            logger.info(chalkLib.blue('    ╰────'));
         }
     } catch {
         // Si no se puede leer el archivo, mostrar formato simplificado
-        logger.info(chalk.blue(`    ╭─[${filePath}:${line}:${column}]`));
+        logger.info(chalkLib.blue(`    ╭─[${filePath}:${line}:${column}]`));
         logger.info(
-            chalk.blue('    │ ') +
-                chalk.gray('(No se pudo leer el contenido del archivo)'),
+            chalkLib.blue('    │ ') +
+                chalkLib.gray('(No se pudo leer el contenido del archivo)'),
         );
-        logger.info(chalk.blue('    ╰────'));
+        logger.info(chalkLib.blue('    ╰────'));
     }
 
     // Mostrar ayuda si está disponible
     if (error.help) {
         const helpMessage = error.help.replace(/^Regla \w+: /, '');
-        logger.info(chalk.blue('  help: ') + chalk.yellow(helpMessage));
+        logger.info(chalkLib.blue('  help: ') + chalkLib.yellow(helpMessage));
     }
 
     logger.info(''); // Espacio entre errores
@@ -1942,22 +1947,22 @@ function getErrorLocationMessage(error: any): string {
  * Obtiene el color apropiado para cada etapa de compilación
  */
 async function getStageColor(stage: string): Promise<(text: string) => string> {
-    const chalk = await loadChalk();
+    const chalkLib = await loadChalk();
     switch (stage) {
         case 'vue':
-            return chalk.green;
+            return chalkLib.green;
         case 'typescript':
-            return chalk.blue;
+            return chalkLib.blue;
         case 'standardization':
-            return chalk.yellow;
+            return chalkLib.yellow;
         case 'minification':
-            return chalk.red;
+            return chalkLib.red;
         case 'tailwind':
-            return chalk.magenta;
+            return chalkLib.magenta;
         case 'file-read':
-            return chalk.gray;
+            return chalkLib.gray;
         default:
-            return chalk.white;
+            return chalkLib.white;
     }
 }
 
@@ -2086,8 +2091,8 @@ async function compileJS(
 
     const extension = path.extname(inPath); // Asegurar que el parser esté cargado
     await moduleManager.ensureModuleLoaded('parser');
-    const getCodeFile = await loadParser();
-    const result = await getCodeFile(inPath);
+    const getCodeFileLib = await loadParser();
+    const result = await getCodeFileLib(inPath);
     let code = result.code;
     const error = result.error;
     timings.fileRead = Date.now() - start;
@@ -2128,15 +2133,15 @@ async function compileJS(
 
         // Asegurar que el módulo Vue esté cargado
         await moduleManager.ensureModuleLoaded('vue');
-        const preCompileVue = await loadVue();
+        const preCompileVueLib = await loadVue();
 
-        if (typeof preCompileVue !== 'function') {
+        if (typeof preCompileVueLib !== 'function') {
             throw new Error(
-                `loadVue devolvió ${typeof preCompileVue} en lugar de una función para archivo: ${inPath}`,
+                `loadVue devolvió ${typeof preCompileVueLib} en lugar de una función para archivo: ${inPath}`,
             );
         }
 
-        vueResult = await preCompileVue(code, inPath, env.isPROD === 'true');
+        vueResult = await preCompileVueLib(code, inPath, env.isPROD === 'true');
         timings.vueCompile = Date.now() - start;
         if (vueResult === undefined || vueResult === null) {
             throw new Error(
@@ -2186,16 +2191,16 @@ async function compileJS(
 
         // Asegurar que el módulo TypeScript esté cargado
         await moduleManager.ensureModuleLoaded('typescript');
-        const preCompileTS = await loadTypeScript();
+        const preCompileTSLib = await loadTypeScript();
 
-        if (typeof preCompileTS !== 'function') {
+        if (typeof preCompileTSLib !== 'function') {
             throw new Error(
-                `loadTypeScript devolvió ${typeof preCompileTS} en lugar de una función para archivo: ${inPath}`,
+                `loadTypeScript devolvió ${typeof preCompileTSLib} en lugar de una función para archivo: ${inPath}`,
             );
         }
 
         // 🚀 OPTIMIZACIÓN: Pasar scriptInfo directamente sin crear objeto nuevo
-        tsResult = await preCompileTS(code, inPath, vueResult?.scriptInfo);
+        tsResult = await preCompileTSLib(code, inPath, vueResult?.scriptInfo);
         timings.tsCompile = Date.now() - start;
         if (tsResult === undefined || tsResult === null) {
             throw new Error(
@@ -2252,8 +2257,8 @@ async function compileJS(
 
     // Asegurar que el módulo de transformaciones esté cargado
     await moduleManager.ensureModuleLoaded('transforms');
-    const estandarizaCode = await loadTransforms();
-    const resultSTD = await estandarizaCode(code, inPath);
+    const estandarizaCodeLib = await loadTransforms();
+    const resultSTD = await estandarizaCodeLib(code, inPath);
     timings.standardization = Date.now() - start;
     if (resultSTD === undefined || resultSTD === null) {
         throw new Error(
@@ -2293,9 +2298,9 @@ async function compileJS(
 
         // Asegurar que el módulo de minificación esté cargado
         await moduleManager.ensureModuleLoaded('minify');
-        const minifyJS = await loadMinify();
+        const minifyJSLib = await loadMinify();
         const beforeMinification = code; // Guardar código antes de minificar
-        const resultMinify = await minifyJS(code, inPath, true);
+        const resultMinify = await minifyJSLib(code, inPath, true);
         timings.minification = Date.now() - start;
         if (resultMinify === undefined || resultMinify === null) {
             throw new Error(
@@ -2404,8 +2409,8 @@ export async function initCompile(
         // Generar TailwindCSS si está habilitado
         if (compileTailwind && Boolean(env.TAILWIND)) {
             await moduleManager.ensureModuleLoaded('tailwind');
-            const generateTailwindCSS = await loadTailwind();
-            const resultTW = await generateTailwindCSS();
+            const generateTailwindCSSLib = await loadTailwind();
+            const resultTW = await generateTailwindCSSLib();
             if (typeof resultTW !== 'boolean') {
                 if (resultTW?.success) {
                     logger.info(`🎨 ${resultTW.message}`);
@@ -2463,9 +2468,9 @@ export async function initCompile(
                 logger.info(`🔚 Destino: ${outFile}`);
                 logger.info(`⏱️ Tiempo: ${elapsedTime}`);
             }
-            const chalk = await loadChalk();
+            const chalkLib = await loadChalk();
             logger.info(
-                chalk.green(`✅ Compilación exitosa: ${path.basename(file)}`),
+                chalkLib.green(`✅ Compilación exitosa: ${path.basename(file)}`),
             );
         }
 
@@ -2719,13 +2724,13 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             const parsedLinterEnv = JSON.parse(linterENV);
             if (Array.isArray(parsedLinterEnv)) {
                 // Cargar dependencias de linting de forma lazy
-                const { ESLint, OxLint } = await loadLinter();
+                const { ESLint: ESLintLib, OxLint: OxLintLib } = await loadLinter();
                 for (const item of parsedLinterEnv) {
                     if (item.name.toLowerCase() === 'eslint') {
                         logger.info(
                             `🔧 Ejecutando ESLint con config: ${item.configFile || 'por defecto'}`,
                         );
-                        const eslintPromise = ESLint(item)
+                        const eslintPromise = ESLintLib(item)
                             .then((eslintResult: any) => {
                                 if (eslintResult && eslintResult.json) {
                                     // Procesar resultados de ESLint
@@ -2813,7 +2818,7 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                         logger.info(
                             `🔧 Ejecutando OxLint con config: ${item.configFile || 'por defecto'}`,
                         );
-                        const oxlintPromise = OxLint(item)
+                        const oxlintPromise = OxLintLib(item)
                             .then((oxlintResult: any) => {
                                 if (
                                     oxlintResult &&
@@ -2893,9 +2898,9 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                 if (linterErrors.length > 0) {
                     await displayLinterErrors(linterErrors);
                 } else {
-                    const chalk = await loadChalk();
+                    const chalkLib = await loadChalk();
                     logger.info(
-                        chalk.green(
+                        chalkLib.green(
                             '✅ No se encontraron errores ni advertencias de linting.',
                         ),
                     );
@@ -3158,8 +3163,8 @@ export async function initCompileAll() {
 
         // Fase 3: TailwindCSS
         progressManager.updateProgress('🎨 Generando TailwindCSS...');
-        const generateTailwindCSS = await loadTailwind();
-        const resultTW = await generateTailwindCSS();
+        const generateTailwindCSSLib = await loadTailwind();
+        const resultTW = await generateTailwindCSSLib();
         if (typeof resultTW !== 'boolean') {
             if (resultTW?.success) {
                 logger.info(`🎨 ${resultTW.message}\n`);
@@ -3282,14 +3287,14 @@ export async function initCompileAll() {
         // ⚠️ Warning si los hilos son muy pocos para el tamaño del proyecto
         const optimalThreads = Math.min(cpuCount * 2, 24);
         if (fileCount > 50 && maxConcurrency < optimalThreads * 0.5) {
-            const chalk = await loadChalk();
+            const chalkLib = await loadChalk();
             logger.warn(
-                chalk.yellow(
+                chalkLib.yellow(
                     `⚠️  Solo se usarán ${maxConcurrency} hilos para ${fileCount} archivos.`,
                 ),
             );
             logger.info(
-                chalk.yellow(
+                chalkLib.yellow(
                     `   💡 Tip: export VERSACOMPILER_MAX_THREADS=${optimalThreads}`,
                 ),
             );

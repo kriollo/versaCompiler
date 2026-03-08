@@ -81,12 +81,12 @@ function stopCompile() {
 async function main() {
     // Load yargs dynamically
     const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
-    const chalk = await loadChalk();
+    const chalkInstance = await loadChalk();
 
     let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
         .scriptName('versa')
         .usage(
-            chalk.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
+            chalkInstance.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
         )
         .option('init', {
             type: 'boolean',
@@ -208,8 +208,8 @@ async function main() {
         .command(
             '* [files...]',
             'Compilar archivos específicos',
-            (yargs: YargsCommandBuilder) => {
-                return yargs.positional('files', {
+            (yargsCmd: YargsCommandBuilder) => {
+                return yargsCmd.positional('files', {
                     describe: 'Archivos para compilar',
                     type: 'string',
                     array: true,

@@ -41,6 +41,9 @@ export type typeConfig = {
     linter?: typeLinter[] | false;
     bundlers?: BundlerEntry[] | false;
     checkIntegrity?: boolean; // Flag de validación de integridad
+    typeCheckOptions?: {
+        maxWorkers?: number; // Número máximo de workers para type checking (default: 2)
+    };
 };
 
 /**
@@ -64,6 +67,12 @@ export function validatePath(pathStr: string): boolean {
 
     if (pathStr.length > MAX_PATH_LENGTH) {
         logger.warn(`Ruta demasiado larga: ${pathStr.length} caracteres`);
+        return false;
+    }
+
+    // Rechazar rutas absolutas de Windows (válido en cualquier plataforma)
+    if (/^[A-Za-z]:[\\\/]/.test(pathStr)) {
+        logger.error(`Ruta absoluta de Windows no permitida: ${pathStr}`);
         return false;
     }
 
@@ -354,7 +363,7 @@ export function withTimeout<T>(
     timeoutMs: number,
     errorMessage: string,
 ): Promise<T> {
-    const timeoutPromise = new Promise<T>((resolve, reject) =>
+    const timeoutPromise = new Promise<T>((_, reject) =>
         setTimeout(() => reject(new Error(errorMessage)), timeoutMs),
     );
     return Promise.race([promise, timeoutPromise]);
@@ -451,6 +460,15 @@ export async function readConfig(): Promise<boolean> {
         env.PATH_DIST = outDir;
         env.aditionalWatch = safeJsonStringify(tsConfig?.aditionalWatch, '[]');
         env.bundlers = safeJsonStringify(tsConfig?.bundlers, 'false');
+
+        // Configurar número máximo de workers para type checking
+        if (tsConfig?.typeCheckOptions?.maxWorkers) {
+            const maxWorkers = Math.max(
+                1,
+                Math.min(8, Number(tsConfig.typeCheckOptions.maxWorkers)),
+            );
+            env.TS_MAX_WORKERS = String(maxWorkers);
+        }
 
         // Configuración adicional para compatibilidad
         if (!tsConfig.compilerOptions.sourceRoot) {

@@ -110,7 +110,7 @@ versacompiler --watch --typeCheck
 versacompiler --watch
 ```
 
-### ¿Qué es la validación de integridad? (v2.3.5+)
+### ¿Qué es la validación de integridad? (v2.4.0+)
 
 Es un sistema de 4 niveles que detecta código corrupto durante compilación:
 

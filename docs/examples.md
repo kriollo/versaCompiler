@@ -108,7 +108,7 @@ versacompiler --all --prod --tailwind
 versacompiler --all --prod --tailwind --checkIntegrity
 ```
 
-### Proyecto con Validación de Integridad para Deploy (v2.3.5+)
+### Proyecto con Validación de Integridad para Deploy (v2.4.0+)
 
 ```typescript
 // versacompile.config.ts

@@ -213,7 +213,7 @@ export async function handleLibraryHotReload(
         ) {
             try {
                 newLibraryVersion.clearCache();
-            } catch (_e) {
+            } catch {
                 // Ignorar errores de clearCache, no es crítico
             }
         }
@@ -238,7 +238,7 @@ export async function handleLibraryHotReload(
             ) {
                 window.performance.clearResourceTimings();
             }
-        } catch (_e) {
+        } catch {
             // Ignorar errores de limpieza de cache
         }
 

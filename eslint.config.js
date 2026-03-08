@@ -1,6 +1,6 @@
 import pluginTs from '@typescript-eslint/eslint-plugin';
 import parserTs from '@typescript-eslint/parser';
-import pluginImport from 'eslint-plugin-import';
+import pluginImport from 'eslint-plugin-import-x';
 import oxlint from 'eslint-plugin-oxlint';
 import pluginVue from 'eslint-plugin-vue';
 import path from 'path';

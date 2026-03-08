@@ -1,6 +1,7 @@
 import { minifyHTMLLiterals } from 'minify-html-literals';
 
 import { logger } from '../servicios/logger';
+
 import { integrityValidator } from './integrity-validator';
 
 const defaultMinifyOptions = {

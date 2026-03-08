@@ -4,9 +4,9 @@ import { env } from 'node:process';
 import { logger } from '../servicios/logger';
 import { EXCLUDED_MODULES } from '../utils/excluded-modules';
 import { getModuleSubPath } from '../utils/module-resolver';
-import { integrityValidator } from './integrity-validator';
 
 import { analyzeAndFormatMultipleErrors } from './error-reporter';
+import { integrityValidator } from './integrity-validator';
 import {
     getOptimizedAliasPath,
     getOptimizedModulePath,

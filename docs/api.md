@@ -239,7 +239,7 @@ versacompiler --all --prod --cleanOutput # Build limpio para producción
 versacompiler --all --prod --verbose --yes  # Build con logging detallado
 ```
 
-## IntegrityValidator API (v2.3.5+)
+## IntegrityValidator API (v2.4.0+)
 
 ### Introducción
 

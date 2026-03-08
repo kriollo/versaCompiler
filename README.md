@@ -394,7 +394,7 @@ versacompiler --tailwind --verbose
 - **Compresión avanzada**: Algoritmos de compresión optimizados
 - **Source maps**: Generación de source maps en desarrollo
 
-### 🛡️ Sistema de Validación de Integridad (v2.3.5+)
+### 🛡️ Sistema de Validación de Integridad (v2.4.0+)
 
 Protección automática contra código corrupto en compilación y minificación con sistema de 4 niveles:
 

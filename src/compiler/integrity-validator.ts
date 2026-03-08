@@ -57,8 +57,9 @@ interface ValidationStats {
  */
 export class IntegrityValidator {
     private static instance: IntegrityValidator;
-    private cache = new Map<string, IntegrityCheckResult>();
+    private cache = new Map<string, { result: IntegrityCheckResult; timestamp: number }>();
     private readonly MAX_CACHE_SIZE = 100;
+    private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutos
 
     // Estadísticas
     private stats: ValidationStats = {
@@ -101,12 +102,12 @@ export class IntegrityValidator {
         // Revisar cache
         const cacheKey = this.getCacheKey(context, processed);
         const cached = this.cache.get(cacheKey);
-        if (cached) {
+        if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
             this.stats.cacheHits++;
             if (options.verbose) {
                 logger.info(`[IntegrityValidator] Cache hit for ${context}`);
             }
-            return cached;
+            return cached.result;
         }
         this.stats.cacheMisses++;
 
@@ -135,14 +136,13 @@ export class IntegrityValidator {
             return result;
         }
 
-        // Check 2: Structure (~1ms) - TEMPORALMENTE DESHABILITADO
-        // TODO: Mejorar detección de character classes en regex literals
-        const structureOk = true; // this.checkStructure(processed);
-        // if (!structureOk) {
-        //     errors.push(
-        //         'Estructura de código inválida (paréntesis/llaves/corchetes desbalanceados)',
-        //     );
-        // }
+        // Check 2: Structure (~1ms)
+        const structureOk = this.checkStructure(processed);
+        if (!structureOk) {
+            errors.push(
+                'Estructura de código inválida (paréntesis/llaves/corchetes desbalanceados)',
+            );
+        }
 
         // Check 3: Exports (~1ms)
         const exportsOk = this.checkExports(original, processed);
@@ -634,7 +634,7 @@ export class IntegrityValidator {
             }
         }
 
-        this.cache.set(key, result);
+        this.cache.set(key, { result, timestamp: Date.now() });
     }
 
     /**

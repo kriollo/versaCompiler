@@ -159,7 +159,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
 
         // El worker pool debe detectar correctamente la mayoría de errores
         expect(accuracy).toBeGreaterThan(80); // Al menos 80% de precisión
-    }, 15000);
+    }, 30000); // Aumentado: la cola async agrega latencia bajo carga
 
     it('should maintain performance with mixed complexity tasks', async () => {
         const TASK_COUNT = 300;

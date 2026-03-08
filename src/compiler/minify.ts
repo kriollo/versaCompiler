@@ -88,20 +88,16 @@ class MinificationCache {
                     {
                         skipSyntaxCheck: false,
                         verbose: process.env.VERBOSE === 'true',
-                        throwOnError: true, // Detener build si falla
+                        throwOnError: false, // Usar fallback en lugar de lanzar excepción
                     },
                 );
 
                 if (!validation.valid) {
-                    // El validator ya lanzó el error si throwOnError=true
-                    // Pero por si acaso, retornamos el código original
-                    logger.error(
-                        `❌ Validación de integridad fallida para ${filename}`,
-                        validation.errors.join(', '),
+                    logger.warn(
+                        `⚠️  Validación de integridad fallida para ${filename}: ${validation.errors.join(', ')}`,
                     );
-                    throw new Error(
-                        `Integrity check failed for ${filename}: ${validation.errors.join(', ')}`,
-                    );
+                    logger.warn(`   Usando código original sin minificar`);
+                    return { code: data, error: null, cached: false };
                 }
 
                 if (process.env.VERBOSE === 'true') {

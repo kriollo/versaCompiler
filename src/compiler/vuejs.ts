@@ -131,17 +131,21 @@ class VueHMRInjectionCache {
     }
 
     /**
-     * Limpia entradas de cache cuando se excede el límite
+     * Limpia entradas de cache cuando se excede el límite (O(n) en lugar de O(n log n))
      */
     private evictIfNeeded(): void {
         if (this.cache.size <= this.MAX_CACHE_SIZE) return;
 
-        const entries = Array.from(this.cache.entries());
-        entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-
-        // Eliminar las entradas más antiguas
-        const toDelete = entries.slice(0, entries.length - this.MAX_CACHE_SIZE);
-        toDelete.forEach(([key]) => this.cache.delete(key));
+        // Eliminar la entrada más antigua con un solo barrido O(n)
+        let oldestKey = '';
+        let oldestTime = Infinity;
+        for (const [key, entry] of this.cache) {
+            if (entry.timestamp < oldestTime) {
+                oldestTime = entry.timestamp;
+                oldestKey = key;
+            }
+        }
+        if (oldestKey) this.cache.delete(oldestKey);
     }
 
     /**

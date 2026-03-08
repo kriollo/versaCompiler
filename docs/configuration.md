@@ -110,7 +110,7 @@ Array de configuraciones de bundling:
 - `fileInput`: Archivo de entrada
 - `fileOutput`: Archivo de salida
 
-### validationOptions (v2.3.5+)
+### validationOptions (v2.4.0+)
 
 Opciones para el sistema de validación de integridad:
 
