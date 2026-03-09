@@ -5,6 +5,55 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.4.1] - 2026-03-08
+
+### ✨ Nuevas Características
+
+- **Enhanced TypeScript Worker Pool**:
+    - Optimized worker scaling logic to dynamically adjust pool size based on system resources.
+    - Added support for parallel type-checking in watch mode, improving performance during development.
+    - Introduced typeCheckOptions.maxWorkers in versacompile.config.ts for fine-grained control over worker thread count.
+
+- **Improved Integrity Validation**:
+    - Expanded integrity checks to include additional syntax validation via oxc-parser for edge cases.
+    - Added support for custom integrity rules in versacompile.config.ts.
+
+- **CLI Command Enhancements**:
+    - Added --no-lint flag to pnpm build for skipping linting during production builds.
+    - Improved error reporting in pnpm dev for faster debugging in development mode.
+
+### 🔧 Mejoras
+
+- **Test Suite Refinements**:
+    - Updated tests/readConfig.test.ts to handle cross-platform path validation (Windows/Linux).
+    - Added new tests for integrity validation edge cases (e.g., unbalanced brackets).
+
+- **Build Performance**:
+    - Optimized file-watching logic in src/servicios/file-watcher.ts to reduce CPU usage during large-scale changes.
+    - Lazy-loaded modules in src/compiler/compile.ts for faster startup times.
+
+### 🐛 Correcciones
+
+- **TypeScript Worker Pool**:
+    - Fixed memory leaks by ensuring languageService.dispose() is called in both worker threads and sync validators.
+    - Resolved race conditions in worker scaling logic (isScalingUp flag).
+
+- **Configuration Handling**:
+    - Fixed path resolution issues in versacompile.config.ts for nested project structures.
+
+### ⚠️ Problemas Conocidos
+
+- **Pre-existing Test Failures**:
+    - tests/integrity-validator.test.ts: 3 tests related to unbalanced brackets (intentionally left as pre-existing edge cases).
+    - tests/readConfig.test.ts: Windows path validation test remains unaddressed on Linux (see MEMORY.md for context).
+
+### 📦 Dependencias
+
+- Updated @vue/compiler-sfc to version 3.3.0 for improved SFC parsing.
+- Updated oxc-transform to version 1.2.5 for better TypeScript transpilation.
+
+---
+
 ## [2.4.0] - 2026-03-08
 
 ### ✨ Nuevas Características

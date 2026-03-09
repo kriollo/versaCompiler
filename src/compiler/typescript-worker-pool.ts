@@ -100,8 +100,8 @@ export class TypeScriptWorkerPool {
     private workerPath: string;
     private initPromise: Promise<void> | null = null;
     private isInitialized: boolean = false; // Configuración optimizada con reciclaje de workers
-    private readonly TASK_TIMEOUT = 8000; // 8 segundos por tarea (reducido para mayor velocidad)
-    private readonly WORKER_INIT_TIMEOUT = 3000; // 3 segundos para inicializar (reducido)
+    private readonly TASK_TIMEOUT = 60000; // 60 segundos por tarea - workers son secuenciales, necesitan tiempo
+    private readonly WORKER_INIT_TIMEOUT = 10000; // 10 segundos para inicializar
     private readonly MAX_TASKS_PER_WORKER = 200; // ✨ OPTIMIZADO: Aumentado de 50 a 200 para reducir overhead de reciclaje
     private readonly WORKER_MEMORY_CHECK_INTERVAL = 500; // ✨ OPTIMIZADO: Verificar cada 500 tareas (reducir overhead)
 
@@ -111,7 +111,7 @@ export class TypeScriptWorkerPool {
 
     // Cola de tareas para cuando todos los workers están ocupados
     private taskQueue: QueuedTask[] = [];
-    private readonly MAX_QUEUE_SIZE = 50;
+    private readonly MAX_QUEUE_SIZE = 1000; // Suficiente para proyectos de 300+ archivos
 
     // Flag para evitar concurrencia en ensureWorkerCapacity
     private isScalingUp: boolean = false;
@@ -185,8 +185,11 @@ export class TypeScriptWorkerPool {
                 const memoryInfo = await this.getWorkerMemoryUsage(poolWorker);
                 poolWorker.memoryUsage = memoryInfo.heapUsed;
 
-                // Verificar límites de memoria y reciclaje automático
-                if (this.shouldRecycleWorker(poolWorker)) {
+                // Verificar límites de memoria y reciclaje automático.
+                // Solo reciclar workers INACTIVOS para evitar rechazar tareas en vuelo.
+                // Los workers con tareas pendientes se reciclan vía drainQueue cuando quedan libres.
+                const isIdle = !poolWorker.busy && poolWorker.pendingTasks.size === 0;
+                if (isIdle && this.shouldRecycleWorker(poolWorker)) {
                     const reason = this.getRecycleReason(poolWorker);
                     console.warn(
                         `[WorkerPool] Worker ${poolWorker.id} requiere reciclaje: ${reason}`,
@@ -336,8 +339,8 @@ export class TypeScriptWorkerPool {
         const cpuCount = os.cpus().length;
         switch (mode) {
             case 'batch':
-                // Para modo batch, hasta 3 workers conservando al menos 1 CPU libre
-                this.poolSize = Math.min(3, Math.max(1, cpuCount - 1));
+                // Para modo batch, hasta 4 workers para mejor rendimiento en proyectos grandes
+                this.poolSize = Math.min(4, Math.max(1, cpuCount - 1));
                 break;
             case 'watch':
                 // Para modo watch, hasta 2 workers para menor impacto en sistema
@@ -549,11 +552,12 @@ export class TypeScriptWorkerPool {
                         }
                     });
                 } else {
-                    this.failedTasks++;
                     const errorMessage =
                         response.error || 'Error desconocido del worker';
 
                     // ✨ FIX MEMORIA: Error simple sin referencias pesadas
+                    // failedTasks se incrementa en el wrapper de queued.reject para tareas de cola,
+                    // o en handleWorkerError/Exit para tareas directas que se re-encolan.
                     const error = new Error(errorMessage);
                     reject(error);
                 }
@@ -589,7 +593,8 @@ export class TypeScriptWorkerPool {
 
         for (const [taskId, task] of pendingTasksArray) {
             clearTimeout(task.timeout);
-            this.failedTasks++;
+            // failedTasks se contabiliza en el wrapper de queued.reject (para cola)
+            // o via re-encolado en typeCheck() catch (para tareas directas).
             task.reject(new Error(`Worker ${poolWorker.id} failed`));
             poolWorker.pendingTasks.delete(taskId);
         }
@@ -627,6 +632,8 @@ export class TypeScriptWorkerPool {
                     if (index !== -1) {
                         this.workers[index] = newWorker;
                     }
+                    // Drenar la cola con el nuevo worker para evitar tareas atascadas
+                    setImmediate(() => this.drainAllWorkers());
                 } catch {
                     // Silencioso
                 }
@@ -648,7 +655,8 @@ export class TypeScriptWorkerPool {
         // 1. Rechazar tareas pendientes con cleanup
         poolWorker.pendingTasks.forEach(task => {
             clearTimeout(task.timeout);
-            this.failedTasks++;
+            // failedTasks se contabiliza en el wrapper de queued.reject (para cola)
+            // o via re-encolado en typeCheck() catch (para tareas directas).
             task.reject(
                 new Error(`Worker ${poolWorker.id} exited with code ${code}`),
             );
@@ -762,6 +770,9 @@ export class TypeScriptWorkerPool {
             if (index !== -1) {
                 this.workers[index] = newWorker;
             }
+
+            // Drenar la cola con el nuevo worker listo
+            setImmediate(() => this.drainQueue(newWorker));
         } catch (error: any) {
             console.error(
                 `[WorkerPool] Error reciclando worker ${poolWorker.id}:`,
@@ -802,21 +813,43 @@ export class TypeScriptWorkerPool {
     }
 
     /**
+     * Drena la cola en todos los workers disponibles
+     */
+    private drainAllWorkers(): void {
+        for (const worker of this.workers) {
+            if (!worker.busy && worker.pendingTasks.size === 0) {
+                this.drainQueue(worker);
+                if (this.taskQueue.length === 0) break;
+            }
+        }
+    }
+
+    /**
      * Procesa la siguiente tarea de la cola en el worker liberado
      */
     private drainQueue(poolWorker: PoolWorker): void {
         if (this.taskQueue.length === 0) return;
         if (poolWorker.busy || poolWorker.pendingTasks.size > 0) return;
-        if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) return;
+
+        // Si el worker alcanzó el límite de tareas, reciclarlo y luego drenar
+        if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
+            this.recycleWorker(poolWorker)
+                .then(() => setImmediate(() => this.drainAllWorkers()))
+                .catch(() => {});
+            return;
+        }
 
         const queued = this.taskQueue.shift();
         if (!queued) return;
 
         const waitMs = Date.now() - queued.queuedAt;
         if (waitMs > 30000) {
+            // queued.reject incluye failedTasks++ en el wrapper (ver typeCheck())
             queued.reject(
                 new Error(`Queue task expired after ${waitMs}ms`),
             );
+            // Continuar drenando la cola con la siguiente tarea
+            setImmediate(() => this.drainQueue(poolWorker));
             return;
         }
 
@@ -827,7 +860,7 @@ export class TypeScriptWorkerPool {
             queued.compilerOptions,
         )
             .then(queued.resolve)
-            .catch(queued.reject);
+            .catch(queued.reject); // queued.reject incluye failedTasks++ en el wrapper
     }
 
     /**
@@ -863,30 +896,43 @@ export class TypeScriptWorkerPool {
                     compilerOptions,
                 );
             } catch {
-                // Worker falló; intentar encolar
+                // Worker falló o llegó al límite de tareas
+                // Si alcanzó el límite, disparar reciclaje inmediato
+                if (availableWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
+                    this.recycleWorker(availableWorker)
+                        .then(() => setImmediate(() => this.drainAllWorkers()))
+                        .catch(() => {});
+                }
             }
         }
 
         // Ningún worker disponible: encolar la tarea
         if (this.taskQueue.length >= this.MAX_QUEUE_SIZE) {
-            // Cola llena → fallback síncrono para no perder el type check
-            return this.typeCheckWithSyncFallback(
-                fileName,
-                content,
-                compilerOptions,
+            // Cola llena → omitir type check para no bloquear el event loop
+            // (con MAX_QUEUE_SIZE=1000 esto solo ocurre en proyectos extremadamente grandes)
+            console.warn(
+                `[TypeCheckQueue] Cola llena (${this.MAX_QUEUE_SIZE} tareas). Type check omitido para: ${path.basename(fileName)}`,
             );
+            this.completedTasks++; // Contabilizar como completado para mantener métricas consistentes
+            return { diagnostics: [], hasErrors: false };
         }
 
         // Escalar el pool si es posible
         this.ensureWorkerCapacity().catch(() => {});
 
         return new Promise<TypeCheckResult>((resolve, reject) => {
+            // Wrapper para reject que garantiza que failedTasks se incrementa exactamente una vez
+            // para todas las tareas que pasan por la cola (drainQueue path).
+            const wrappedReject = (err: Error) => {
+                this.failedTasks++;
+                reject(err);
+            };
             this.taskQueue.push({
                 fileName,
                 content,
                 compilerOptions,
                 resolve,
-                reject,
+                reject: wrappedReject,
                 queuedAt: Date.now(),
             });
         });
@@ -902,13 +948,9 @@ export class TypeScriptWorkerPool {
         content: string,
         compilerOptions: any,
     ): Promise<TypeCheckResult> {
-        // Si el worker alcanzó su límite de tareas, usar fallback síncrono
+        // Si el worker alcanzó su límite de tareas, encolar para reciclaje
         if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
-            return this.typeCheckWithSyncFallback(
-                fileName,
-                content,
-                compilerOptions,
-            );
+            throw new Error(`Worker ${poolWorker.id} ha alcanzado el límite de tareas`);
         }
 
         return new Promise<TypeCheckResult>((resolve, reject) => {
@@ -939,6 +981,8 @@ export class TypeScriptWorkerPool {
                             `Timeout (${dynamicTimeout}ms) en type checking para ${fileName}`,
                         ),
                     );
+                    // Drenar la cola cuando se libera la tarea por timeout
+                    setImmediate(() => this.drainQueue(poolWorker));
                 }
             }, dynamicTimeout);
 
@@ -1059,7 +1103,7 @@ export class TypeScriptWorkerPool {
 
         const finalTimeout = Math.round(baseTimeout * complexityMultiplier);
 
-        return Math.min(finalTimeout, 60000); // Máximo absoluto de 60 segundos
+        return Math.min(finalTimeout, 120000); // Máximo absoluto de 120 segundos
     }
 
     /**

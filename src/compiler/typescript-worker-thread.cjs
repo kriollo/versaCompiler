@@ -155,6 +155,38 @@ class WorkerTypeScriptLanguageServiceHost {
 }
 
 /**
+ * Language Service persistente para reusar entre tareas (evita cold-start de 200-500ms por tarea)
+ * Se resetea periódicamente para controlar el uso de memoria
+ */
+let _persistentHost = null;
+let _persistentLS = null;
+let _persistentCompilerOptionsStr = null;
+let _tasksSinceReset = 0;
+const MAX_TASKS_BEFORE_LS_RESET = 50; // Resetear cada 50 tareas para controlar memoria
+
+function getOrResetLanguageService(compilerOptions) {
+    const optionsStr = JSON.stringify(compilerOptions);
+    const needsReset =
+        !_persistentLS ||
+        optionsStr !== _persistentCompilerOptionsStr ||
+        _tasksSinceReset >= MAX_TASKS_BEFORE_LS_RESET;
+
+    if (needsReset) {
+        if (_persistentLS) {
+            try { _persistentLS.dispose(); } catch { /* ignore */ }
+            _persistentLS = null;
+        }
+        _persistentHost = new WorkerTypeScriptLanguageServiceHost(compilerOptions);
+        _persistentLS = ts.createLanguageService(_persistentHost);
+        _persistentCompilerOptionsStr = optionsStr;
+        _tasksSinceReset = 0;
+    }
+
+    _tasksSinceReset++;
+    return { host: _persistentHost, ls: _persistentLS };
+}
+
+/**
  * Realiza validación de tipos en el worker thread
  */
 function validateTypesInWorker(fileName, content, compilerOptions) {
@@ -167,30 +199,16 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             return { diagnostics: [], hasErrors: false };
         }
 
-        // Crear Language Service Host
-        const host = new WorkerTypeScriptLanguageServiceHost(compilerOptions); // Para archivos Vue, crear un archivo virtual .ts
+        // Obtener o crear Language Service persistente (rápido después del primer uso)
+        const { host, ls: languageService } = getOrResetLanguageService(compilerOptions);
+
+        // Para archivos Vue, crear un archivo virtual .ts
         if (fileName.endsWith('.vue')) {
-            // Crear un nombre de archivo virtual único
             const virtualFileName = `${fileName}.ts`;
             host.addFile(virtualFileName, scriptContent);
             actualFileName = virtualFileName;
-            // console.log('[Worker] Archivo Vue agregado como:', virtualFileName);
-        } else {
-            // Para archivos virtuales, usar el nombre tal como viene
-            host.addFile(fileName, scriptContent);
-            actualFileName = fileName;
-            // console.log('[Worker] Archivo agregado como:', fileName);
-        }
 
-        // console.log(
-        //     '[Worker] Contenido del archivo:',
-        //     scriptContent.substring(0, 100) + '...',
-        // );
-        // console.log('[Worker] Archivos en host:', host.getScriptFileNames());
-
-        // Agregar declaraciones básicas de tipos para Vue si es necesario
-        if (fileName.endsWith('.vue')) {
-            // Usar el directorio del archivo actual para las declaraciones
+            // Agregar declaraciones de tipos Vue si es necesario
             const projectDir = path.dirname(actualFileName);
             const vueTypesPath = path.join(projectDir, 'vue-types.d.ts');
             const vueTypesDeclaration = `// Declaraciones de tipos Vue para validación
@@ -214,10 +232,27 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                 }
                 export {};`;
             host.addFile(vueTypesPath, vueTypesDeclaration);
-        }
 
-        // Crear Language Service
-        const languageService = ts.createLanguageService(host);
+            // Eliminar archivos de tareas anteriores para evitar que el programa crezca.
+            // Se hace DESPUÉS de addFile para que la versión se incremente correctamente
+            // (evita que el LS use resultados cacheados de versiones anteriores).
+            for (const key of host.files.keys()) {
+                if (key !== virtualFileName && key !== vueTypesPath) {
+                    host.files.delete(key);
+                }
+            }
+        } else {
+            host.addFile(fileName, scriptContent);
+            actualFileName = fileName;
+
+            // Eliminar archivos de tareas anteriores para evitar que el programa crezca.
+            // Se hace DESPUÉS de addFile para que la versión se incremente correctamente.
+            for (const key of host.files.keys()) {
+                if (key !== fileName) {
+                    host.files.delete(key);
+                }
+            }
+        }
 
         try {
             // Verificar que el archivo existe en el host antes de solicitar diagnósticos
@@ -225,17 +260,12 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                 return { diagnostics: [], hasErrors: false };
             }
 
-
             // Obtener diagnósticos de tipos con manejo de errores
             let syntacticDiagnostics = [];
             let semanticDiagnostics = [];
             try {
                 syntacticDiagnostics =
                     languageService.getSyntacticDiagnostics(actualFileName);
-                // console.log(
-                //     '[Worker] Diagnósticos sintácticos:',
-                //     syntacticDiagnostics.length,
-                // );
             } catch (error) {
                 console.error(
                     '[Worker] Error obteniendo diagnósticos sintácticos:',
@@ -246,36 +276,17 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             try {
                 semanticDiagnostics =
                     languageService.getSemanticDiagnostics(actualFileName);
-                // console.log(
-                //     '[Worker] Diagnósticos semánticos:',
-                //     semanticDiagnostics.length,
-                // );
             } catch (error) {
                 console.error(
                     '[Worker] Error obteniendo diagnósticos semánticos:',
                     error.message,
                 );
-            } // Combinar todos los diagnósticos
+            }
+
             const allDiagnostics = [
                 ...syntacticDiagnostics,
                 ...semanticDiagnostics,
             ];
-
-            // console.log(
-            //     '[Worker] Total diagnósticos encontrados:',
-            //     allDiagnostics.length,
-            // );
-
-            // Log de todos los diagnósticos antes del filtrado
-            // allDiagnostics.forEach((diag, index) => {
-            //     const messageText = ts.flattenDiagnosticMessageText(
-            //         diag.messageText,
-            //         '\n',
-            //     );
-            //     console.log(
-            //         `[Worker] Diagnóstico ${index + 1}: [${diag.category}] ${messageText}`,
-            //     );
-            // });
 
             // Filtrar diagnósticos relevantes
             const filteredDiagnostics = allDiagnostics.filter(diag => {
@@ -287,7 +298,9 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                 // Solo errores de categoría Error
                 if (diag.category !== ts.DiagnosticCategory.Error) {
                     return false;
-                } // Ignorar SOLO errores específicos de infraestructura Vue y rutas de módulos
+                }
+
+                // Ignorar errores de infraestructura Vue y rutas de módulos
                 return (
                     !messageText.includes('Cannot find module') &&
                     !messageText.includes('Could not find source file') &&
@@ -315,17 +328,12 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
                     !messageText.includes(
                         "Parameter '_cache' implicitly has an 'any' type",
                     ) &&
-                    // Ignorar errores específicos de decorators cuando están mal configurados
                     !messageText.includes(
                         'Unable to resolve signature of method decorator when called as an expression',
                     ) &&
                     !messageText.includes(
                         'The runtime will invoke the decorator with',
                     ) &&
-                    // NO ignorar errores TS7031 y TS7006 de forma general, solo para parámetros específicos de Vue
-                    // diag.code !== 7031 &&
-                    // diag.code !== 7006 &&
-                    // Ignorar errores TS1241 (decorator signature mismatch) durante desarrollo
                     diag.code !== 1241 &&
                     !(
                         messageText.includes("implicitly has an 'any' type") &&
@@ -345,8 +353,6 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             };
         } catch {
             return { diagnostics: [], hasErrors: false };
-        } finally {
-            try { languageService.dispose(); } catch { /* ignore dispose errors */ }
         }
     } catch (error) {
         // En caso de error, devolver diagnóstico de error

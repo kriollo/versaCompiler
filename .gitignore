@@ -10,3 +10,4 @@ examples/dashboard
 test-results/*
 temp/*
 testProjects/*
+testProjectsCompiled/*
