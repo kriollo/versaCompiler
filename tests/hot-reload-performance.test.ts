@@ -99,9 +99,8 @@ describe('Hot Reload Performance Tests', () => {
 
             // 4. Tiempo de emisión al socket
             const startEmission = performance.now();
-            const { emitirCambios } = await import(
-                '../src/servicios/browserSync'
-            );
+            const { emitirCambios } =
+                await import('../src/servicios/browserSync');
             await emitirCambios(
                 mockBS,
                 result.action || 'reloadFull',

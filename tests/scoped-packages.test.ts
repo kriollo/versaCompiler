@@ -75,14 +75,17 @@ describe('resolveExportValue', () => {
 
     it('falls back to browser when import is absent', () => {
         expect(
-            resolveExportValue({ browser: './browser.mjs', default: './index.mjs' }),
+            resolveExportValue({
+                browser: './browser.mjs',
+                default: './index.mjs',
+            }),
         ).toBe('./browser.mjs');
     });
 
     it('falls back to module', () => {
-        expect(resolveExportValue({ module: './esm.js', default: './cjs.js' })).toBe(
-            './esm.js',
-        );
+        expect(
+            resolveExportValue({ module: './esm.js', default: './cjs.js' }),
+        ).toBe('./esm.js');
     });
 
     it('falls back to default when nothing else matches', () => {
@@ -92,7 +95,15 @@ describe('resolveExportValue', () => {
     });
 
     it('returns null for deeply nested object exceeding depth limit', () => {
-        const deep = { import: { import: { import: { import: { import: { import: { import: './x' } } } } } } };
+        const deep = {
+            import: {
+                import: {
+                    import: {
+                        import: { import: { import: { import: './x' } } },
+                    },
+                },
+            },
+        };
         // depth limit is 5, so this should return null
         expect(resolveExportValue(deep)).toBeNull();
     });

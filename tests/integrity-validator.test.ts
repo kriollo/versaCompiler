@@ -15,7 +15,9 @@ describe('IntegrityValidator', () => {
                 'const x = 1;',
                 '',
                 'test:empty',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -30,7 +32,9 @@ describe('IntegrityValidator', () => {
                 'const x = 1;',
                 'x=1',
                 'test:small',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -59,7 +63,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:unbalanced',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -77,7 +84,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:unbalanced-braces',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -92,7 +102,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:unbalanced-brackets',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -105,7 +118,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:valid-structure',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.structure).toBe(true);
@@ -117,7 +132,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:strings',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.structure).toBe(true);
@@ -129,7 +146,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:template',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.structure).toBe(true);
@@ -146,7 +165,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:export-removed',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -164,7 +186,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:default-removed',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -180,7 +205,10 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:multiple-removed',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -193,7 +221,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:no-exports',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.exports).toBe(true);
@@ -209,7 +239,9 @@ describe('IntegrityValidator', () => {
                 original,
                 minified,
                 'test:exports-kept',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.exports).toBe(true);
@@ -223,7 +255,9 @@ describe('IntegrityValidator', () => {
                 original,
                 minified,
                 'test:export-block',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.exports).toBe(true);
@@ -239,7 +273,9 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:malformed-comment',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -257,7 +293,9 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:unclosed-string',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -277,7 +315,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:valid-syntax',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.checks.syntax).toBe(true);
@@ -290,7 +330,10 @@ describe('IntegrityValidator', () => {
                 invalidCode,
                 invalidCode,
                 'test:skip-syntax',
-                { throwOnError: false, skipSyntaxCheck: true },
+                {
+                    throwOnError: false,
+                    skipSyntaxCheck: true,
+                },
             );
 
             // No debería fallar porque skipSyntaxCheck=true
@@ -314,7 +357,9 @@ describe('IntegrityValidator', () => {
                 original,
                 minified,
                 'test:valid-minification',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(true);
@@ -333,7 +378,9 @@ describe('IntegrityValidator', () => {
                 original,
                 corrupted,
                 'test:corrupted',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -356,7 +403,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:performance',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.metrics.duration).toBeLessThan(5);
@@ -371,7 +420,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:cache',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             // Segunda validación (debería usar caché)
@@ -379,7 +430,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:cache',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             const stats = integrityValidator.getStats();
@@ -397,7 +450,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:cache-speed',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
             const duration1 = result1.metrics.duration;
 
@@ -406,7 +461,9 @@ describe('IntegrityValidator', () => {
                 code,
                 code,
                 'test:cache-speed',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
             const duration2 = result2.metrics.duration;
 
@@ -437,7 +494,9 @@ describe('IntegrityValidator', () => {
                     original,
                     corrupted,
                     'test:no-throw',
-                    { throwOnError: false },
+                    {
+                        throwOnError: false,
+                    },
                 );
                 expect(result.valid).toBe(false);
             }).not.toThrow();
@@ -475,7 +534,9 @@ describe('IntegrityValidator', () => {
                 original,
                 minified,
                 'test:metrics',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.metrics.originalSize).toBe(original.length);
@@ -496,7 +557,9 @@ describe('IntegrityValidator', () => {
                 original,
                 buggedMinification,
                 'test:bug-empty',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -513,7 +576,9 @@ describe('IntegrityValidator', () => {
                 original,
                 buggedTransform,
                 'test:bug-export',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -528,7 +593,9 @@ describe('IntegrityValidator', () => {
                 original,
                 buggedMinification,
                 'test:bug-comment',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);
@@ -543,7 +610,9 @@ describe('IntegrityValidator', () => {
                 original,
                 buggedTransform,
                 'test:bug-alias',
-                { throwOnError: false },
+                {
+                    throwOnError: false,
+                },
             );
 
             expect(result.valid).toBe(false);

@@ -119,9 +119,8 @@ describe('Hot Reload Memory Leak Tests', () => {
         const result = await initCompile(filePath, false, 'watch');
 
         if (result.success) {
-            const { emitirCambios } = await import(
-                '../src/servicios/browserSync'
-            );
+            const { emitirCambios } =
+                await import('../src/servicios/browserSync');
             await emitirCambios(
                 mockBS,
                 result.action || 'reloadFull',
@@ -292,9 +291,8 @@ describe('Hot Reload Memory Leak Tests', () => {
         console.log(`\n💾 Monitoreando crecimiento de caché...\n`);
 
         // Obtener stats del caché
-        const { getBrowserSyncCacheStats } = await import(
-            '../src/servicios/browserSync'
-        );
+        const { getBrowserSyncCacheStats } =
+            await import('../src/servicios/browserSync');
 
         const initialStats = getBrowserSyncCacheStats();
         console.log(`📊 Caché inicial:`);
@@ -345,9 +343,8 @@ describe('Hot Reload Memory Leak Tests', () => {
         const afterSnapshot = takeMemorySnapshot();
 
         // Limpiar caché y recursos manualmente
-        const { clearBrowserSyncCache } = await import(
-            '../src/servicios/browserSync'
-        );
+        const { clearBrowserSyncCache } =
+            await import('../src/servicios/browserSync');
         clearBrowserSyncCache();
 
         // Snapshot después de limpieza

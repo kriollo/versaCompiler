@@ -208,9 +208,8 @@ describe('VueHRM - Hot Module Replacement', () => {
         });
 
         it('debe manejar error cuando no se encuentra instancia de Vue', async () => {
-            const { obtenerInstanciaVue } = await import(
-                '../src/hrm/getInstanciaVue.js'
-            );
+            const { obtenerInstanciaVue } =
+                await import('../src/hrm/getInstanciaVue.js');
             (obtenerInstanciaVue as any).mockResolvedValue(null);
 
             const result = await reloadComponent({} as any, mockComponent);
