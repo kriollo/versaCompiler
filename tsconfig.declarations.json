@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.build.json",
+    "compilerOptions": {
+        "noEmit": false,
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "declarationDir": "./dist",
+        "rootDir": "./src",
+        "ignoreDeprecations": "6.0"
+    },
+    "include": ["src/config.ts", "src/servicios/versacompile.config.types.ts"]
+}

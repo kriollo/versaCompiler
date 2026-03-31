@@ -31,13 +31,25 @@
     ],
     "type": "module",
     "main": "dist/main.js",
+    "types": "dist/config.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/main.js",
+            "types": "./dist/main.d.ts"
+        },
+        "./config": {
+            "import": "./dist/config.js",
+            "types": "./dist/config.d.ts"
+        }
+    },
     "publishConfig": {
         "access": "public"
     },
     "scripts": {
         "dev": "tsx --watch src/main.ts --watch --verbose --tailwind",
         "file": "tsx src/main.ts ",
-        "build": "tsx src/main.ts --all --cc --co -y",
+        "build": "tsx src/main.ts --all --cc --co -y && pnpm build:types",
+        "build:types": "tsc -p tsconfig.declarations.json",
         "compileDev": "tsx src/main.ts --all --ci --cc -y -t --linter --verbose",
         "vlint": "tsx src/main.ts --all --cc --co -y --linter",
         "vtlint": "tsx src/main.ts --all --cc --co -y -t --verbose",
@@ -111,7 +123,8 @@
         "tailwindcss": "^4.2.2",
         "vitest": "^4.1.2",
         "vue-eslint-parser": "^10.4.0",
-        "vue-router": "^5.0.4"
+        "vue-router": "^5.0.4",
+        "zod": "^4.3.6"
     },
     "packageManager": "pnpm@10.33.0"
 }

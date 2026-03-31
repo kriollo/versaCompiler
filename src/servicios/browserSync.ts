@@ -759,14 +759,25 @@ export async function browserSyncServer(): Promise<any> {
     }
 }
 
-export async function emitirCambios(bs: any, action: string, filePath: string) {
+export async function emitirCambios(
+    bs: any,
+    action: string,
+    filePath: string,
+    payload: Record<string, any> = {},
+) {
     // ✨ OPTIMIZACIÓN: Emitir PRIMERO (crítico), logging DESPUÉS (no crítico)
     const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
     const nameFile = path.basename(
         normalizedPath,
         path.extname(normalizedPath),
     );
-    bs.sockets.emit(action, { action, filePath, normalizedPath, nameFile });
+    bs.sockets.emit(action, {
+        action,
+        filePath,
+        normalizedPath,
+        nameFile,
+        ...payload,
+    });
 
     // Logging asíncrono para no bloquear la emisión
     setImmediate(async () => {

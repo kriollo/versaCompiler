@@ -18,7 +18,7 @@
     <modal idModal="modal" :showModal="showModal" size="max-w-2xl">
         <template #modalTitle>
             <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100">
-                Título del Modals
+                Título del Modalsssss
             </h1>
         </template>
         <template #modalBody>

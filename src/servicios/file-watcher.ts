@@ -9,8 +9,10 @@ import { minimatch } from 'minimatch';
 import {
     clearCompilationState,
     getOutputPath,
+    getPipelineModuleGraph,
     initCompile,
     normalizeRuta,
+    runPipelineHotUpdate,
 } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser';
 
@@ -210,6 +212,7 @@ class WatchDebouncer {
         compilableFiles: PendingChange[],
     ): Promise<void> {
         const chalkInstance = await loadChalk();
+        const graph = getPipelineModuleGraph();
 
         // Procesar en batches para evitar sobrecarga
         for (let i = 0; i < compilableFiles.length; i += this.BATCH_SIZE) {
@@ -223,7 +226,29 @@ class WatchDebouncer {
                 );
             }
 
-            const promises = batch.map(change => this.compileFile(change));
+            const expandedChanges = new Map<string, PendingChange>();
+
+            for (const change of batch) {
+                expandedChanges.set(change.filePath, change);
+
+                if (graph) {
+                    const invalidated = graph.invalidate(change.filePath);
+                    for (const invalidatedPath of invalidated) {
+                        if (expandedChanges.has(invalidatedPath)) continue;
+                        expandedChanges.set(invalidatedPath, {
+                            filePath: invalidatedPath,
+                            action: 'change',
+                            timestamp: Date.now(),
+                            extensionAction: 'reloadFull',
+                            isAdditionalFile: false,
+                        });
+                    }
+                }
+            }
+
+            const promises = Array.from(expandedChanges.values()).map(change =>
+                this.compileFile(change),
+            );
             await Promise.allSettled(promises);
         }
 
@@ -266,15 +291,44 @@ class WatchDebouncer {
      */
     private async compileFile(change: PendingChange): Promise<void> {
         try {
+            let pluginHmrReload: 'none' | 'module' | 'full' = 'none';
+            if (change.action !== 'unlink') {
+                const hotUpdate = await runPipelineHotUpdate(
+                    change.filePath,
+                    change.action,
+                );
+                pluginHmrReload = hotUpdate.reload || 'none';
+            }
             const result = await initCompile(change.filePath, true, 'watch');
             if (result.success) {
                 let accion = result.action || change.extensionAction;
                 accion =
                     accion === 'extension' ? change.extensionAction : accion;
+                let payload: Record<string, any> = {};
+                if (accion === 'HRMHelper') {
+                    if (pluginHmrReload === 'full') {
+                        accion = 'reloadFull';
+                    }
+                    const graph = getPipelineModuleGraph();
+                    const node = graph?.getNode(change.filePath);
+                    const importers = node ? Array.from(node.importers) : [];
+                    const strategy =
+                        importers.length > 0 ? 'propagate' : 'full-reload';
+                    if (pluginHmrReload === 'module') {
+                        payload.strategy = 'propagate';
+                    } else {
+                        payload.strategy = strategy;
+                    }
+                    payload = {
+                        importers,
+                        ...payload,
+                    };
+                }
                 emitirCambios(
                     this.browserSyncInstance,
                     accion || 'reloadFull',
                     result.output,
+                    payload,
                 );
             }
         } catch (error) {

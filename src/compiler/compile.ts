@@ -15,10 +15,15 @@ const { argv, cwd, env } = process;
 // Lazy loading optimizations - Only import lightweight modules synchronously
 
 import { logger, setProgressManagerGetter } from '../servicios/logger';
+import { getLoadedConfig } from '../servicios/readConfig';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
 import { integrityValidator } from './integrity-validator';
+import { BuildPipeline } from './pipeline/build-pipeline';
+import { createCorePlugins } from './pipeline/core-plugins';
+import { ModuleGraph } from './pipeline/module-graph';
+import type { HotUpdateResult, Plugin } from './pipeline/types';
 
 // Configurar el getter del ProgressManager para el logger
 setProgressManagerGetter(() => ProgressManager.getInstance());
@@ -55,6 +60,8 @@ let generateTailwindCSS: any;
 let estandarizaCode: any;
 let preCompileTS: any;
 let preCompileVue: any;
+
+let pipelineInstance: BuildPipeline | null = null;
 
 // 🚀 Importar optimizador de transformaciones
 let TransformOptimizer: any;
@@ -716,6 +723,16 @@ class SmartCompilationCache {
                 );
             } catch {
                 // Ignorar si no existe package-lock.json
+            }
+
+            // 2b. Hash de pnpm-lock.yaml si existe (pnpm)
+            try {
+                const pnpmLockPath = path.join(cwd(), 'pnpm-lock.yaml');
+                const pnpmLockContent = await readFile(pnpmLockPath, 'utf8');
+                hash.update(`pnpm-lock:${pnpmLockContent.length}`);
+                hash.update(pnpmLockContent);
+            } catch {
+                // Ignorar si no existe pnpm-lock.yaml
             }
 
             // 3. ✨ NUEVO: Hash de timestamps críticos de node_modules
@@ -2088,6 +2105,95 @@ class WatchModeOptimizer {
     }
 }
 
+function getBuildPipeline(): BuildPipeline {
+    if (!pipelineInstance) {
+        const basePlugins = createCorePlugins();
+        const config = getLoadedConfig();
+        const userPlugins = normalizeUserPlugins(config?.plugins);
+        pipelineInstance = new BuildPipeline([...basePlugins, ...userPlugins]);
+    }
+    return pipelineInstance;
+}
+
+function normalizeUserPlugins(plugins: unknown[] | undefined): Plugin[] {
+    if (!plugins || !Array.isArray(plugins)) return [];
+    return plugins.filter((plugin): plugin is Plugin => {
+        if (!plugin || typeof plugin !== 'object') return false;
+        const candidate = plugin as Plugin;
+        if (!candidate.name || typeof candidate.name !== 'string') return false;
+        return Boolean(
+            candidate.onResolve ||
+            candidate.onLoad ||
+            candidate.onTransform ||
+            candidate.onHotUpdate ||
+            candidate.onEnd,
+        );
+    });
+}
+
+export function getPipelineModuleGraph(): ModuleGraph | null {
+    if (env.PIPELINE_V2 === 'false') return null;
+    return getBuildPipeline().getModuleGraph();
+}
+
+export async function runPipelineHotUpdate(
+    filePath: string,
+    type: 'add' | 'change' | 'unlink',
+): Promise<HotUpdateResult> {
+    if (env.PIPELINE_V2 === 'false') {
+        return { reload: 'none' };
+    }
+    return getBuildPipeline().hotUpdate({ path: filePath, type });
+}
+
+async function compileWithPipeline(
+    inPath: string,
+    outPath: string,
+    mode: CompilationMode = 'individual',
+) {
+    const pipeline = getBuildPipeline();
+    const result = await pipeline.compileFile(inPath);
+
+    if (result.errors.length > 0) {
+        for (const message of result.errors) {
+            await handleCompilationError(
+                new Error(message),
+                inPath,
+                'pipeline',
+                mode,
+                env.VERBOSE === 'true',
+            );
+        }
+        throw new Error(result.errors[0]);
+    }
+
+    if (!result.code || result.code.trim().length === 0) {
+        await handleCompilationError(
+            new Error('El código compilado está vacío.'),
+            inPath,
+            'pipeline',
+            mode,
+            env.VERBOSE === 'true',
+        );
+        throw new Error('El código compilado está vacío.');
+    }
+
+    const destinationDir = path.dirname(outPath);
+    await mkdir(destinationDir, { recursive: true });
+    await writeFile(outPath, result.code, 'utf-8');
+
+    if (result.dependencies.length > 0) {
+        smartCache.registerDependencies(inPath, result.dependencies);
+    }
+
+    registerCompilationSuccess(inPath, 'pipeline');
+
+    return {
+        error: null,
+        action: 'extension',
+    };
+}
+
 async function compileJS(
     inPath: string,
     outPath: string,
@@ -2100,6 +2206,10 @@ async function compileJS(
         ? normalizeRuta(inPath)
         : normalizeRuta(path.resolve(inPath)); // 🚀 Usar OptimizedModuleManager para carga optimizada
     const moduleManager = OptimizedModuleManager.getInstance();
+
+    if (env.PIPELINE_V2 !== 'false') {
+        return compileWithPipeline(inPath, outPath, mode);
+    }
 
     // Timing de lectura
     let start = Date.now();

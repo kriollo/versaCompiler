@@ -372,6 +372,48 @@ async function initSocket(retries = 0) {
             console.log('🔄 HRMHelper recibido:', data);
             console.log('📋 Archivo modificado:', data.filePath);
 
+            if (data?.strategy) {
+                switch (data.strategy) {
+                    case 'self-accept': {
+                        try {
+                            const timestamp = Date.now();
+                            await import(`${data.filePath}?t=${timestamp}`);
+                            return;
+                        } catch (error) {
+                            reportErrorToServer(
+                                'hmr-self-accept-failed',
+                                error instanceof Error
+                                    ? error
+                                    : new Error(String(error)),
+                                data,
+                            );
+                        }
+                        break;
+                    }
+                    case 'propagate': {
+                        try {
+                            const timestamp = Date.now();
+                            await import(`${data.filePath}?t=${timestamp}`);
+                            return;
+                        } catch (error) {
+                            reportErrorToServer(
+                                'hmr-propagate-failed',
+                                error instanceof Error
+                                    ? error
+                                    : new Error(String(error)),
+                                data,
+                            );
+                        }
+                        break;
+                    }
+                    case 'full-reload':
+                    default: {
+                        window.location.reload();
+                        return;
+                    }
+                }
+            }
+
             // Sistema inteligente de detección automática (como Vite/esbuild)
             if (data.filePath && !data.libraryName && !data.libraryPath) {
                 console.log('🔍 Analizando estrategia HMR automática...');

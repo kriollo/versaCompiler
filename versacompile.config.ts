@@ -1,20 +1,28 @@
-const config = {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './exaples',
-        outDir: './public',
-        pathsAlias: {
-            '@/*': ['testProject/*'],
-            'P@/*': ['public/*'],
-            'e@/*': ['examples/*'],
+import { defineConfig } from './src/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
+        outDir: './dist',
+    },
+    resolve: {
+        alias: {
+            '@': 'public',
+            'P@': 'public',
+            'e@': 'examples',
         },
     },
-    proxyConfig: {
+    server: {
         proxyUrl: '',
         assetsOmit: true,
+        watch: {
+            additional: [
+                './app/templates/**/*.twig',
+                './app/templates/**/*.html',
+            ],
+        },
     },
-    aditionalWatch: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
-    // puede dejar en false o no agregarlo si no quiere que se ejecute el compilador de tailwind
+    tsconfig: './tsconfig.json',
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './examples/css/input.css',
@@ -36,13 +44,4 @@ const config = {
             paths: ['src/'],
         },
     ],
-    bundlers: [
-        {
-            name: 'appLoader',
-            fileInput: './public/module/appLoader.js',
-            fileOutput: './public/module/appLoader.prod.js',
-        },
-    ],
-};
-
-export default config;
+});

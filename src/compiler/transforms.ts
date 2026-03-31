@@ -127,6 +127,265 @@ function isExternalModule(
     return true;
 }
 
+async function resolveModuleRequest(
+    moduleRequest: string,
+    file: string | undefined,
+    pathAlias: Record<string, any>,
+): Promise<string | null> {
+    let newPath: string | null = null;
+    let transformed = false;
+
+    if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
+        try {
+            const optimizedResult = await getOptimizedModulePath(
+                moduleRequest,
+                file,
+            );
+            if (optimizedResult.excluded) {
+                return null;
+            }
+            if (optimizedResult.path) {
+                newPath = optimizedResult.path;
+                transformed = true;
+            } else {
+                const modulePath = getModuleSubPath(moduleRequest, file);
+                if (modulePath === null) {
+                    return null;
+                }
+                if (modulePath) {
+                    newPath = modulePath;
+                    transformed = true;
+                }
+            }
+        } catch (error) {
+            if (env.VERBOSE === 'true')
+                logger.warn(
+                    `Error resolviendo módulo ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
+                );
+        }
+    }
+
+    if (!transformed) {
+        const aliasPath = getOptimizedAliasPath(moduleRequest);
+        if (aliasPath) {
+            let newImportPath = aliasPath;
+            if (
+                newImportPath.endsWith('.ts') ||
+                newImportPath.endsWith('.vue')
+            ) {
+                newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
+            } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+                newImportPath += '.js';
+            }
+            newPath = newImportPath;
+            transformed = true;
+        } else {
+            for (const [alias] of Object.entries(pathAlias)) {
+                const aliasPattern = alias.replace('*', '');
+                if (moduleRequest.startsWith(aliasPattern)) {
+                    const relativePath = moduleRequest.replace(
+                        aliasPattern,
+                        '',
+                    );
+                    let newImportPath = path.join(
+                        '/',
+                        env.PATH_DIST!,
+                        relativePath,
+                    );
+                    newImportPath = newImportPath
+                        .replace(/\/\.\//g, '/')
+                        .replace(/\\/g, '/');
+
+                    if (
+                        newImportPath.endsWith('.ts') ||
+                        newImportPath.endsWith('.vue')
+                    ) {
+                        newImportPath = newImportPath.replace(
+                            /\.(ts|vue)$/,
+                            '.js',
+                        );
+                    } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+                        newImportPath += '.js';
+                    }
+                    newPath = newImportPath;
+                    transformed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (
+        !transformed &&
+        (moduleRequest.startsWith('./') || moduleRequest.startsWith('../'))
+    ) {
+        let relativePath = moduleRequest;
+        if (relativePath.endsWith('.ts') || relativePath.endsWith('.vue')) {
+            relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
+            newPath = relativePath;
+            transformed = true;
+        } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
+            newPath = relativePath + '.js';
+            transformed = true;
+        }
+    }
+
+    return transformed ? newPath : null;
+}
+
+function extractLiteralValue(
+    raw: string,
+): { quote: string; value: string } | null {
+    if (!raw || raw.length < 2) return null;
+    const quote = raw[0];
+    const last = raw[raw.length - 1];
+    if ((quote !== '"' && quote !== "'" && quote !== '`') || last !== quote) {
+        return null;
+    }
+    if (quote === '`' && raw.includes('${')) {
+        return null;
+    }
+    return { quote, value: raw.slice(1, -1) };
+}
+
+function resolveAliasTemplateLiteral(
+    raw: string,
+    pathAlias: Record<string, any>,
+): string | null {
+    if (!raw.startsWith('`')) return null;
+    const exprIndex = raw.indexOf('${');
+    if (exprIndex === -1) return null;
+
+    const prefix = raw.slice(1, exprIndex);
+    if (!prefix) return null;
+
+    const sortedAliases = Object.entries(pathAlias).sort((a, b) => {
+        const aliasA = a[0].replace('/*', '');
+        const aliasB = b[0].replace('/*', '');
+        return aliasB.length - aliasA.length;
+    });
+
+    for (const [alias, target] of sortedAliases) {
+        const aliasPattern = alias.replace('/*', '');
+        if (!prefix.startsWith(aliasPattern)) continue;
+
+        const relativePath = prefix.replace(aliasPattern, '');
+        const targetArray = Array.isArray(target) ? target : [target];
+        const targetPath = targetArray[0];
+        if (!targetPath) continue;
+
+        let newPrefix: string;
+        if (targetPath.startsWith('/')) {
+            newPrefix = path.join('/', env.PATH_DIST!, relativePath);
+        } else {
+            const cleanTarget = targetPath.replace('./', '').replace('/*', '');
+            const normalizedPathDist = env.PATH_DIST!.replace('./', '');
+            if (cleanTarget === normalizedPathDist) {
+                newPrefix = path.join('/', normalizedPathDist, relativePath);
+            } else {
+                newPrefix = path.join(
+                    '/',
+                    normalizedPathDist,
+                    cleanTarget,
+                    relativePath,
+                );
+            }
+        }
+
+        newPrefix = newPrefix
+            .replace(/\/\.\//g, '/')
+            .replace(/\\/g, '/')
+            .replace(/\/+/g, '/');
+
+        return `\`${newPrefix}${raw.slice(exprIndex)}`;
+    }
+
+    return null;
+}
+
+async function replaceAliasImportsAst(
+    code: string,
+    file: string,
+    ast: any,
+): Promise<string> {
+    if (!env.PATH_ALIAS || !env.PATH_DIST) {
+        return code;
+    }
+
+    const pathAlias = getParsedPathAlias();
+    if (!pathAlias) return code;
+
+    const replacements: Array<{ start: number; end: number; value: string }> =
+        [];
+    const staticImports = ast?.module?.staticImports || [];
+    for (const item of staticImports) {
+        const moduleRequest = item?.moduleRequest?.value;
+        const start = item?.moduleRequest?.start;
+        const end = item?.moduleRequest?.end;
+        if (typeof moduleRequest !== 'string') continue;
+        if (typeof start !== 'number' || typeof end !== 'number') continue;
+
+        const newPath = await resolveModuleRequest(
+            moduleRequest,
+            file,
+            pathAlias,
+        );
+        if (!newPath || newPath === moduleRequest) continue;
+
+        const raw = code.slice(start, end);
+        const literal = extractLiteralValue(raw);
+        if (!literal) continue;
+        replacements.push({
+            start,
+            end,
+            value: `${literal.quote}${newPath}${literal.quote}`,
+        });
+    }
+
+    const dynamicImports = ast?.module?.dynamicImports || [];
+    for (const item of dynamicImports) {
+        const start = item?.moduleRequest?.start;
+        const end = item?.moduleRequest?.end;
+        if (typeof start !== 'number' || typeof end !== 'number') continue;
+
+        const raw = code.slice(start, end);
+        const literal = extractLiteralValue(raw);
+        if (!literal) {
+            const replaced = resolveAliasTemplateLiteral(raw, pathAlias);
+            if (replaced) {
+                replacements.push({ start, end, value: replaced });
+            }
+            continue;
+        }
+
+        const newPath = await resolveModuleRequest(
+            literal.value,
+            file,
+            pathAlias,
+        );
+        if (!newPath || newPath === literal.value) continue;
+
+        replacements.push({
+            start,
+            end,
+            value: `${literal.quote}${newPath}${literal.quote}`,
+        });
+    }
+
+    if (replacements.length === 0) return code;
+
+    replacements.sort((a, b) => b.start - a.start);
+    let resultCode = code;
+    for (const replacement of replacements) {
+        resultCode =
+            resultCode.slice(0, replacement.start) +
+            replacement.value +
+            resultCode.slice(replacement.end);
+    }
+
+    return resultCode;
+}
+
 export async function replaceAliasImportStatic(
     file: string,
     code: string,
@@ -717,12 +976,7 @@ export async function estandarizaCode(
             const firstError = ast.errors[0];
             throw new Error(firstError?.message || 'Error sin mensaje');
         }
-        code = await replaceAliasImportStatic(file, code);
-        code = await replaceAliasImportDynamic(
-            code,
-            ast?.module.dynamicImports,
-            file,
-        );
+        code = await replaceAliasImportsAst(code, file, ast);
         code = await replaceAliasInStrings(code);
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);

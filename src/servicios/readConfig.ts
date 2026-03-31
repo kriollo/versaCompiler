@@ -19,6 +19,37 @@ export type BundlerEntry = {
     fileOutput: string;
 };
 
+export type ViteStyleAlias =
+    | Record<string, string | string[]>
+    | Array<{ find: string; replacement: string }>
+    | undefined;
+
+export type ViteStyleConfig = {
+    root?: string;
+    build?: {
+        outDir?: string;
+        bundlers?: BundlerEntry[] | false;
+    };
+    resolve?: {
+        alias?: ViteStyleAlias;
+    };
+    server?: {
+        proxyUrl?: string;
+        assetsOmit?: boolean;
+        watch?: {
+            additional?: string[];
+        };
+    };
+    watch?: {
+        additional?: string[];
+    };
+    plugins?: unknown[];
+    tsconfig?: string;
+    tailwindConfig?: typeConfig['tailwindConfig'];
+    linter?: typeConfig['linter'];
+    typeCheckOptions?: typeConfig['typeCheckOptions'];
+};
+
 export type typeConfig = {
     tsconfig?: string;
     compilerOptions: {
@@ -26,6 +57,7 @@ export type typeConfig = {
         outDir?: string;
         pathsAlias: Record<string, string[]>;
     };
+    plugins?: unknown[];
     proxyConfig?: {
         proxyUrl?: string;
         assetsOmit?: boolean;
@@ -71,7 +103,7 @@ export function validatePath(pathStr: string): boolean {
     }
 
     // Rechazar rutas absolutas de Windows (válido en cualquier plataforma)
-    if (/^[A-Za-z]:[\\\/]/.test(pathStr)) {
+    if (/^[A-Za-z]:[/\\]/.test(pathStr)) {
         logger.error(`Ruta absoluta de Windows no permitida: ${pathStr}`);
         return false;
     }
@@ -348,6 +380,85 @@ function safeJsonStringify(obj: any, fallback: string = 'false'): string {
     }
 }
 
+function normalizeAliasKey(key: string): string {
+    if (key.includes('*')) return key;
+    if (key.endsWith('/')) return `${key}*`;
+    return `${key}/*`;
+}
+
+function normalizeAliasValue(value: string): string {
+    if (value.includes('*')) return value;
+    if (value.endsWith('/')) return `${value}*`;
+    return `${value}/*`;
+}
+
+function normalizeAlias(alias: ViteStyleAlias): Record<string, string[]> {
+    if (!alias) return {};
+
+    const result: Record<string, string[]> = {};
+
+    if (Array.isArray(alias)) {
+        for (const entry of alias) {
+            if (!entry || typeof entry.find !== 'string') continue;
+            if (typeof entry.replacement !== 'string') continue;
+            const key = normalizeAliasKey(entry.find);
+            const value = normalizeAliasValue(entry.replacement);
+            result[key] = [value];
+        }
+        return result;
+    }
+
+    for (const [key, value] of Object.entries(alias)) {
+        const normalizedKey = normalizeAliasKey(key);
+        if (Array.isArray(value)) {
+            result[normalizedKey] = value
+                .filter(v => typeof v === 'string')
+                .map(v => normalizeAliasValue(v));
+        } else if (typeof value === 'string') {
+            result[normalizedKey] = [normalizeAliasValue(value)];
+        }
+    }
+
+    return result;
+}
+
+function normalizeConfig(input: any): typeConfig {
+    if (input?.compilerOptions) {
+        return input as typeConfig;
+    }
+
+    const viteConfig = input as ViteStyleConfig;
+    const aliases = normalizeAlias(viteConfig?.resolve?.alias);
+
+    return {
+        tsconfig: viteConfig?.tsconfig,
+        compilerOptions: {
+            sourceRoot: viteConfig?.root || './src',
+            outDir: viteConfig?.build?.outDir || './dist',
+            pathsAlias: aliases,
+        },
+        plugins: viteConfig?.plugins,
+        proxyConfig: {
+            proxyUrl: viteConfig?.server?.proxyUrl || '',
+            assetsOmit: viteConfig?.server?.assetsOmit ?? false,
+        },
+        aditionalWatch:
+            viteConfig?.watch?.additional ||
+            viteConfig?.server?.watch?.additional ||
+            [],
+        tailwindConfig: viteConfig?.tailwindConfig,
+        linter: viteConfig?.linter,
+        bundlers: viteConfig?.build?.bundlers,
+        typeCheckOptions: viteConfig?.typeCheckOptions,
+    };
+}
+
+let loadedConfig: typeConfig | null = null;
+
+export function getLoadedConfig(): typeConfig | null {
+    return loadedConfig;
+}
+
 /**
  * Wrapper para el import dinámico que permite mejor testing
  */
@@ -403,7 +514,8 @@ export async function readConfig(): Promise<boolean> {
             throw new Error('No se pudo leer el archivo de configuración.');
         }
 
-        const tsConfig = data.default || data;
+        const rawConfig = data.default || data;
+        const tsConfig = normalizeConfig(rawConfig);
 
         // Validar tamaño de configuración
         if (!validateConfigSize(tsConfig)) {
@@ -475,6 +587,8 @@ export async function readConfig(): Promise<boolean> {
             env.tsConfig = safeJsonStringify(tsConfig, '{}');
         }
 
+        loadedConfig = tsConfig;
+
         logger.info('✅ Configuration loaded and validated successfully');
         return true;
     } catch (error) {
@@ -511,23 +625,34 @@ export async function initConfig(): Promise<boolean> {
             return true;
         }
 
-        const configContent = `// Archivo de configuración de VersaCompiler
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+        const configContent = `import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            'P@/*': ['public/*'],
+        bundlers: [
+            {
+                name: 'appLoader',
+                fileInput: './public/module/appLoader.js',
+                fileOutput: './public/module/appLoader.prod.js',
+            },
+        ],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            'P@': 'public',
         },
     },
-    proxyConfig: {
+    server: {
         proxyUrl: '',
         assetsOmit: true,
+        watch: {
+            additional: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
+        },
     },
-    aditionalWatch: ['./app/templates/**/*.twig', './app/templates/**/*.html'],
-    // puede dejar en false o no agregarlo si no quiere que se ejecute el compilador de tailwind
+    tsconfig: './tsconfig.json',
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
@@ -539,30 +664,18 @@ export default {
             bin: './node_modules/.bin/eslint',
             configFile: './.eslintrc.json',
             fix: false,
-            paths: ['src/']
+            paths: ['src/'],
         },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
             fix: false,
-            paths: ['src/']
+            paths: ['src/'],
         },
     ],
-    // Configuración de bundlers
-    bundlers: [
-        {
-            name: 'appLoader',
-            fileInput: './public/module/appLoader.js',
-            fileOutput: './public/module/appLoader.prod.js',
-        },
-        {
-            name: 'mainApp',
-            fileInput: './src/main.ts',
-            fileOutput: './dist/main.bundle.js',
-        }
-    ],
-};
+    plugins: [],
+});
 `;
 
         fs.writeFileSync(configPath, configContent, 'utf8');
