@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>VersaCompiler — Contact Manager E2E</title>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "vue": "/node_modules/vue/dist/vue.esm-browser.js",
+                    "pinia": "/node_modules/pinia/dist/pinia.esm-browser.js",
+                    "vue-router": "/node_modules/vue-router/dist/vue-router.esm-browser.js",
+                    "@vue/devtools-api": "/e2e/devtools-stub.mjs",
+                    "@vueuse/shared": "/node_modules/.pnpm/@vueuse+shared@14.2.1_vue@3.5.31_typescript@6.0.2_/node_modules/@vueuse/shared/dist/index.js",
+                    "zod": "/node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js"
+                }
+            }
+        </script>
+
+        <style>
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                font-family: system-ui, sans-serif;
+                background: #f3f4f6;
+                color: #111827;
+            }
+            #loading {
+                text-align: center;
+                padding: 3rem;
+                color: #6b7280;
+                font-size: 1.1rem;
+            }
+            #error {
+                color: #dc2626;
+                background: #fef2f2;
+                border: 1px solid #fca5a5;
+                border-radius: 6px;
+                padding: 1rem;
+                margin: 1rem;
+                white-space: pre-wrap;
+                font-family: monospace;
+                font-size: 0.85rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="loading">⏳ Cargando Contact Manager...</div>
+        <div id="app"></div>
+        <!-- Teleport target: ContactModal renderiza aquí -->
+        <div id="modal-target"></div>
+        <div id="error" style="display: none"></div>
+
+        <script type="module">
+            import { createApp } from '/node_modules/vue/dist/vue.esm-browser.js';
+            import { createPinia } from '/node_modules/pinia/dist/pinia.esm-browser.js';
+
+            import App from '/dist/ContactManagerApp.js';
+
+            const errEl = document.getElementById('error');
+            const loadEl = document.getElementById('loading');
+
+            try {
+                const pinia = createPinia();
+                const app = createApp(App);
+                app.use(pinia);
+                app.mount('#app');
+
+                loadEl.remove();
+                document.body.setAttribute('data-app-ready', 'true');
+            } catch (err) {
+                loadEl.remove();
+                errEl.style.display = 'block';
+                errEl.textContent = `[ERROR] ${err.message}\n\n${err.stack}`;
+                console.error(err);
+            }
+        </script>
+    </body>
+</html>
