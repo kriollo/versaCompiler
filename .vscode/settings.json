@@ -1,9 +1,5 @@
 {
-    "eslint.validate": [
-        "javascript",
-        "typescript",
-        "vue"
-    ],
+    "eslint.validate": ["javascript", "typescript", "vue"],
     "git.ignoreLimitWarning": true,
     "typescript.preferences.includePackageJsonAutoImports": "auto",
     "typescript.tsdk": "./node_modules/typescript/lib",
@@ -12,10 +8,7 @@
     "json.validate.enable": true,
     "json.schemas": [
         {
-            "fileMatch": [
-                "tsconfig.json",
-                "tsconfig.*.json"
-            ],
+            "fileMatch": ["tsconfig.json", "tsconfig.*.json"],
             "url": "vscode://schemas/tsconfig"
         }
     ],

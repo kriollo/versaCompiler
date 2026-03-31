@@ -4,13 +4,13 @@
  */
 
 // 1. Strings con caracteres que parecen comentarios
-const str1 = "Esto no es un comentario // ni esto";
+const str1 = 'Esto no es un comentario // ni esto';
 const str2 = 'Tampoco esto /* ni esto */';
 const str3 = `Template literal con // y /* */ internos`;
 
 // 2. URLs (caso muy común)
-const apiUrl = "https://api.example.com/v1/data";
-const localUrl = "//localhost:3000/test";
+const apiUrl = 'https://api.example.com/v1/data';
+const localUrl = '//localhost:3000/test';
 
 // 3. Regex con slashes
 const regex1 = /\/\//g;
@@ -38,9 +38,22 @@ function test(p: string) {
 
 // 5. Casos combinados complejos
 const complex = {
-    path: "C://users/test",
-    pattern: "//[a-z]+//",
-    func: () => "/* fake comment */"
+    path: 'C://users/test',
+    pattern: '//[a-z]+//',
+    func: () => '/* fake comment */',
 };
 
-console.log(str1, str2, str3, apiUrl, localUrl, regex1, regex2, regex3, x, y, test("test"), complex);
+console.log(
+    str1,
+    str2,
+    str3,
+    apiUrl,
+    localUrl,
+    regex1,
+    regex2,
+    regex3,
+    x,
+    y,
+    test('test'),
+    complex,
+);

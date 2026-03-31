@@ -77,7 +77,10 @@
     const dynamicResult = ref<string>('pendiente...');
     const runDynamicImport = async () => {
         const { defineStore: ds } = await import('pinia');
-        dynamicResult.value = typeof ds === 'function' ? '✅ pinia cargado dinámicamente' : '❌ fallo';
+        dynamicResult.value =
+            typeof ds === 'function'
+                ? '✅ pinia cargado dinámicamente'
+                : '❌ fallo';
     };
 
     onMounted(() => {
@@ -97,16 +100,22 @@
         <!-- 1. vue: ref / computed / watch -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                1. <code>vue</code> — named import (exports string simple)
+                1.
+                <code>vue</code>
+                — named import (exports string simple)
             </h2>
             <div class="flex items-center gap-3">
                 <button
                     @click="count--"
-                    class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded">-</button>
+                    class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded">
+                    -
+                </button>
                 <span class="text-lg font-mono">{{ count }}</span>
                 <button
                     @click="count++"
-                    class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded">+</button>
+                    class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded">
+                    +
+                </button>
                 <span class="text-sm text-gray-500">× 2 = {{ doubled }}</span>
             </div>
         </section>
@@ -114,7 +123,9 @@
         <!-- 2. sweetalert2: default import -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                2. <code>sweetalert2</code> — default import (campo "module")
+                2.
+                <code>sweetalert2</code>
+                — default import (campo "module")
             </h2>
             <button
                 @click="showSwal"
@@ -126,11 +137,16 @@
         <!-- 3. @vueuse/core: scoped package -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                3. <code>@vueuse/core</code> — named import (paquete scoped)
+                3.
+                <code>@vueuse/core</code>
+                — named import (paquete scoped)
             </h2>
-            <ul class="text-sm font-mono space-y-1 text-gray-600 dark:text-gray-300">
+            <ul
+                class="text-sm font-mono space-y-1 text-gray-600 dark:text-gray-300">
                 <li>useMouse → x: {{ mouseX }}, y: {{ mouseY }}</li>
-                <li>usePreferredDark → {{ isDark ? '🌙 oscuro' : '☀️ claro' }}</li>
+                <li>
+                    usePreferredDark → {{ isDark ? '🌙 oscuro' : '☀️ claro' }}
+                </li>
                 <li>
                     useToggle →
                     <button
@@ -151,7 +167,9 @@
         <!-- 4. pinia: exports condicionales anidados -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                4. <code>pinia</code> — named import (exports condicionales anidados)
+                4.
+                <code>pinia</code>
+                — named import (exports condicionales anidados)
             </h2>
             <div class="flex items-center gap-3">
                 <span class="font-mono text-lg">{{ storeCount }}</span>
@@ -166,18 +184,25 @@
         <!-- 5. vue-router: exports condicionales anidados -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                5. <code>vue-router</code> — named import (exports condicionales anidados)
+                5.
+                <code>vue-router</code>
+                — named import (exports condicionales anidados)
             </h2>
             <p class="text-sm text-gray-500">
-                RouterLink importado: {{ typeof RouterLink === 'object' ? '✅' : '❌' }}
-                <code class="ml-2 text-xs">{{ RouterLink.__name ?? RouterLink.name }}</code>
+                RouterLink importado:
+                {{ typeof RouterLink === 'object' ? '✅' : '❌' }}
+                <code class="ml-2 text-xs">
+                    {{ RouterLink.__name ?? RouterLink.name }}
+                </code>
             </p>
         </section>
 
         <!-- 6. Alias import -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                6. Alias <code>e@/...</code> — import de componente local via alias
+                6. Alias
+                <code>e@/...</code>
+                — import de componente local via alias
             </h2>
             <SwitchToggle v-model="isToggled" />
         </section>
@@ -185,7 +210,8 @@
         <!-- 7. Relative import -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                7. Import relativo — <code>./operacionesMatematicas.vue</code>
+                7. Import relativo —
+                <code>./operacionesMatematicas.vue</code>
             </h2>
             <OperacionesMatematicas message="test" />
         </section>
@@ -193,7 +219,9 @@
         <!-- 8. Dynamic import -->
         <section class="border rounded-lg p-4 space-y-2">
             <h2 class="font-semibold text-gray-700 dark:text-gray-200">
-                8. Dynamic <code>import()</code> — pinia cargado en onMounted
+                8. Dynamic
+                <code>import()</code>
+                — pinia cargado en onMounted
             </h2>
             <p class="font-mono text-sm">{{ dynamicResult }}</p>
         </section>

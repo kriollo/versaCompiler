@@ -47,14 +47,14 @@ VersaCompiler is a CLI build tool (Node.js/TypeScript ESM) that compiles Vue 3 S
 
 ### Source Directories
 
-| Directory | Purpose |
-|-----------|---------|
-| `src/compiler/` | Core compilation logic |
+| Directory        | Purpose                                                                     |
+| ---------------- | --------------------------------------------------------------------------- |
+| `src/compiler/`  | Core compilation logic                                                      |
 | `src/servicios/` | Infrastructure services (logger, config reader, browser-sync, file watcher) |
-| `src/hrm/` | HMR client-side scripts injected into the browser |
-| `src/utils/` | Shared utilities, module resolver, prompt helper |
-| `src/types/` | TypeScript type definitions |
-| `src/wrappers/` | Thin wrappers for excluded modules and Vue types setup |
+| `src/hrm/`       | HMR client-side scripts injected into the browser                           |
+| `src/utils/`     | Shared utilities, module resolver, prompt helper                            |
+| `src/types/`     | TypeScript type definitions                                                 |
+| `src/wrappers/`  | Thin wrappers for excluded modules and Vue types setup                      |
 
 ### Key Compiler Files
 
@@ -76,6 +76,7 @@ VersaCompiler is a CLI build tool (Node.js/TypeScript ESM) that compiles Vue 3 S
 ### Configuration
 
 VersaCompiler reads `versacompile.config.ts` from the **consumer project's root** (not its own root). The repo's own `versacompile.config.ts` is used when compiling `examples/`. Key config fields:
+
 - `compilerOptions.sourceRoot` / `outDir` — input/output directories
 - `compilerOptions.pathsAlias` — import alias map
 - `tailwindConfig` — TailwindCSS binary and I/O paths
@@ -98,6 +99,7 @@ Tests live in `tests/` and run with **Vitest** using `pool: 'forks'` with `singl
 ### Environment Variables (runtime)
 
 The compiler communicates between modules via `process.env`:
+
 - `env.isPROD` — production mode
 - `env.VERBOSE` — verbose logging
 - `env.TAILWIND` — enable TailwindCSS

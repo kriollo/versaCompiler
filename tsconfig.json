@@ -21,11 +21,7 @@
         "noEmit": true,
         "module": "esnext",
         "target": "es2022",
-        "lib": [
-            "es2022",
-            "dom",
-            "dom.iterable"
-        ],
+        "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
         "sourceMap": true,
         "inlineSourceMap": false,
@@ -33,15 +29,9 @@
         "baseUrl": ".",
         "ignoreDeprecations": "6.0",
         "paths": {
-            "@/*": [
-                "examples/*"
-            ],
-            "P@/*": [
-                "public/*"
-            ],
-            "e@/*": [
-                "examples/*"
-            ]
+            "@/*": ["examples/*"],
+            "P@/*": ["public/*"],
+            "e@/*": ["examples/*"]
         },
         "typeRoots": [
             "./node_modules/@types",
@@ -55,20 +45,14 @@
         "forceConsistentCasingInFileNames": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "types": [
-            "node"
-        ],
+        "types": ["node"],
         "jsx": "preserve"
     },
     "vueCompilerOptions": {
         "target": 3.5,
         "strictTemplates": true
     },
-    "exclude": [
-        "./public/**/*",
-        "coverage/**/*",
-        "tests/**/*"
-    ],
+    "exclude": ["./public/**/*", "coverage/**/*", "tests/**/*"],
     "include": [
         "src/**/*",
         "src/**/*.ts",
@@ -81,8 +65,6 @@
     ],
     "typeAcquisition": {
         "enable": true,
-        "include": [
-            "vue"
-        ]
+        "include": ["vue"]
     }
 }

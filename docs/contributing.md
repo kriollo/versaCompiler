@@ -164,7 +164,6 @@ Antes de reportar un bug:
     ```
 
 2. **Hacer cambios**
-
     - Escribe código
     - Agrega tests
     - Actualiza documentación
