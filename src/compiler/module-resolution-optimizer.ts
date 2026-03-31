@@ -16,6 +16,10 @@ import { cwd, env } from 'node:process';
 
 import { logger } from '../servicios/logger';
 import { EXCLUDED_MODULES } from '../utils/excluded-modules';
+import {
+    parseModuleSpecifier,
+    resolveExportValue,
+} from '../utils/module-resolver';
 
 interface ModuleInfo {
     fullPath: string;
@@ -32,6 +36,7 @@ interface ResolvedModule {
     cached: boolean;
     resolveTime: number;
     fromCache?: boolean;
+    excluded?: boolean;
 }
 
 interface CacheEntry {
@@ -296,10 +301,7 @@ export class ModuleResolutionOptimizer {
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    entryPoint =
-                        dotExport.import ||
-                        dotExport.browser ||
-                        dotExport.default;
+                    entryPoint = resolveExportValue(dotExport);
                 }
             }
         } else if (
@@ -575,7 +577,9 @@ export class ModuleResolutionOptimizer {
 
             // Convertir alias a índice con prioridad
             for (const [alias, target] of Object.entries(pathAlias)) {
-                const pattern = alias.replace('/*', '');
+                // Quitar solo el '*' final para conservar el separador '/'
+                // Ejemplo: '@/*' → '@/', así '@vueuse/core' no hace match pero '@/foo' sí
+                const pattern = alias.replace('*', '');
                 const priority = pattern.length; // Patrones más largos tienen prioridad
 
                 // El regex debe coincidir con el patrón al inicio, seguido de cualquier cosa o fin de cadena
@@ -619,6 +623,7 @@ export class ModuleResolutionOptimizer {
                 path: null,
                 cached: false,
                 resolveTime: performance.now() - startTime,
+                excluded: true,
             };
         }
 
@@ -643,12 +648,16 @@ export class ModuleResolutionOptimizer {
         let resolvedPath: string | null = null;
 
         try {
-            // 1. Verificar si es subpath de módulo (ej: 'vue/dist/vue.esm-bundler')
-            if (moduleName.includes('/')) {
+            // 1. Parse specifier to correctly handle scoped packages
+            const { packageName, subPath } = parseModuleSpecifier(moduleName);
+
+            if (subPath) {
+                // Has a real subpath (e.g. 'vue/dist/x' or '@scope/pkg/sub')
                 resolvedPath = await this.resolveSubPath(moduleName);
             } else {
+                // Direct package (e.g. 'vue' or '@vueuse/core')
                 // 2. Búsqueda O(1) en el índice
-                resolvedPath = this.resolveFromIndex(moduleName);
+                resolvedPath = this.resolveFromIndex(packageName);
             }
 
             // 3. Si no se encuentra en índice, intentar resolución tradicional
@@ -699,8 +708,7 @@ export class ModuleResolutionOptimizer {
      * Resuelve subpaths de módulos (ej: 'vue/dist/vue.esm-bundler')
      */
     private async resolveSubPath(moduleName: string): Promise<string | null> {
-        const [packageName, ...subPathParts] = moduleName.split('/');
-        const subPath = subPathParts.join('/');
+        const { packageName, subPath } = parseModuleSpecifier(moduleName);
 
         if (!packageName) {
             return null;
@@ -712,19 +720,22 @@ export class ModuleResolutionOptimizer {
             return null;
         }
 
+        // If no subPath, resolve as direct package
+        if (!subPath) {
+            const entryPoint =
+                moduleInfo.optimizedEntry || moduleInfo.entryPoint;
+            return join(moduleInfo.fullPath, entryPoint);
+        }
+
         // Verificar exports field para subpaths
         if (moduleInfo.hasExports && moduleInfo.packageJson.exports) {
             const exportKey = `./${subPath}`;
             const exportPath = moduleInfo.packageJson.exports[exportKey];
 
             if (exportPath) {
-                if (typeof exportPath === 'string') {
-                    return join(moduleInfo.fullPath, exportPath);
-                } else if (typeof exportPath === 'object') {
-                    const importPath = exportPath.import || exportPath.default;
-                    if (typeof importPath === 'string') {
-                        return join(moduleInfo.fullPath, importPath);
-                    }
+                const resolved = resolveExportValue(exportPath);
+                if (resolved) {
+                    return join(moduleInfo.fullPath, resolved);
                 }
             }
         }
@@ -1114,10 +1125,10 @@ export class ModuleResolutionOptimizer {
 export async function getOptimizedModulePath(
     moduleName: string,
     fromFile?: string,
-): Promise<string | null> {
+): Promise<{ path: string | null; excluded: boolean }> {
     const optimizer = ModuleResolutionOptimizer.getInstance();
     const result = await optimizer.resolveModule(moduleName, fromFile);
-    return result.path;
+    return { path: result.path, excluded: result.excluded === true };
 }
 
 export function getOptimizedAliasPath(path: string): string | null {

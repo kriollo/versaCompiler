@@ -440,31 +440,7 @@ function simpleESMResolver(moduleName: string): string | null {
                 if (typeof dotExport === 'string') {
                     entryPoint = dotExport;
                 } else if (typeof dotExport === 'object') {
-                    // Priorizar import > browser > default para compatibilidad ESM
-                    // Buscar específicamente patrones esm-browser primero
-                    const exportKeys = Object.keys(dotExport);
-                    const esmBrowserKey = exportKeys.find(
-                        key =>
-                            key.includes('browser') &&
-                            (key.includes('esm') || key.includes('module')),
-                    );
-
-                    if (
-                        esmBrowserKey &&
-                        typeof dotExport[esmBrowserKey] === 'string'
-                    ) {
-                        entryPoint = dotExport[esmBrowserKey];
-                    } else {
-                        // Priorizar import > browser > default
-                        entryPoint =
-                            (typeof dotExport.import === 'string'
-                                ? dotExport.import
-                                : null) ||
-                            dotExport.browser ||
-                            (typeof dotExport.default === 'string'
-                                ? dotExport.default
-                                : null);
-                    }
+                    entryPoint = resolveExportValue(dotExport);
                 }
             }
         }
@@ -618,6 +594,62 @@ function getNodeModulesRelativePath(
     return rel;
 }
 
+/**
+ * Parses a module specifier into packageName and subPath.
+ * Handles scoped packages correctly.
+ * Examples:
+ *   '@vueuse/core'      → { packageName: '@vueuse/core', subPath: '' }
+ *   '@vueuse/core/sub'  → { packageName: '@vueuse/core', subPath: 'sub' }
+ *   'vue/dist/x'        → { packageName: 'vue', subPath: 'dist/x' }
+ *   'vue'               → { packageName: 'vue', subPath: '' }
+ */
+export function parseModuleSpecifier(moduleName: string): {
+    packageName: string;
+    subPath: string;
+} {
+    if (moduleName.startsWith('@')) {
+        const parts = moduleName.split('/');
+        if (parts.length < 2 || !parts[1]) {
+            return { packageName: moduleName, subPath: '' };
+        }
+        const packageName = `${parts[0]}/${parts[1]}`;
+        const subPath = parts.slice(2).join('/');
+        return { packageName, subPath };
+    } else {
+        const slashIdx = moduleName.indexOf('/');
+        if (slashIdx === -1) {
+            return { packageName: moduleName, subPath: '' };
+        }
+        return {
+            packageName: moduleName.slice(0, slashIdx),
+            subPath: moduleName.slice(slashIdx + 1),
+        };
+    }
+}
+
+/**
+ * Recursively resolves a conditional export value.
+ * Priority: import > browser > module > default
+ * Handles nested objects up to a depth limit.
+ */
+export function resolveExportValue(
+    exportVal: unknown,
+    depth = 0,
+): string | null {
+    if (depth > 5) return null;
+    if (typeof exportVal === 'string') return exportVal;
+    if (typeof exportVal === 'object' && exportVal !== null) {
+        const obj = exportVal as Record<string, unknown>;
+        for (const key of ['import', 'browser', 'module', 'default', 'require']) {
+            if (obj[key] !== undefined) {
+                const resolved = resolveExportValue(obj[key], depth + 1);
+                if (resolved) return resolved;
+            }
+        }
+    }
+    return null;
+}
+
 export function getModulePath(
     moduleName: string,
     fromFile?: string,
@@ -638,16 +670,18 @@ export function getModuleSubPath(
     // Verificar si el módulo está en la lista de excluidos
     if (EXCLUDED_MODULES.has(moduleName)) {
         return null; // Retornar null para mantener la importación original
-    } // Si contiene '/', es un subpath
+    }
+
+    // Usar parseModuleSpecifier para manejar correctamente paquetes con scope
+    const { packageName, subPath } = parseModuleSpecifier(moduleName);
+
+    // Si no hay subPath, delegar al resolver normal
+    if (!subPath) {
+        return getModulePath(moduleName, fromFile);
+    }
+
+    // Es un subpath: resolver con el packageName correcto
     if (moduleName.includes('/')) {
-        const [packageName, ...subPathParts] = moduleName.split('/');
-        const subPath = subPathParts.join('/');
-
-        // Verificar que packageName no esté vacío
-        if (!packageName) {
-            return null;
-        }
-
         try {
             const nodeModulesPath = join(cwd(), 'node_modules', packageName);
             const packagePath = join(nodeModulesPath, 'package.json');
@@ -670,21 +704,12 @@ export function getModuleSubPath(
                 const exportPath = packageJson.exports[exportKey];
 
                 if (exportPath) {
-                    if (typeof exportPath === 'string') {
+                    const resolved = resolveExportValue(exportPath);
+                    if (resolved) {
                         return getNodeModulesRelativePath(
-                            join(moduleDir, exportPath),
+                            join(moduleDir, resolved),
                             fromFile,
                         );
-                    } else if (typeof exportPath === 'object') {
-                        // Priorizar import > default para ESM
-                        const importPath =
-                            exportPath.import || exportPath.default;
-                        if (typeof importPath === 'string') {
-                            return getNodeModulesRelativePath(
-                                join(moduleDir, importPath),
-                                fromFile,
-                            );
-                        }
                     }
                 }
             }

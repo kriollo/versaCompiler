@@ -32,15 +32,15 @@ describe('ModuleResolutionOptimizer - Tests Exhaustivos', () => {
     describe('Resolución de módulos npm', () => {
         it('debe resolver módulos ESM conocidos correctamente', async () => {
             const result = await getOptimizedModulePath('vue');
-            expect(result).toBeTruthy();
-            expect(result).toContain('/node_modules/vue/');
+            expect(result.path).toBeTruthy();
+            expect(result.path).toContain('/node_modules/vue/');
         });
 
         it('debe cachear resoluciones repetidas', async () => {
             const result1 = await getOptimizedModulePath('vue');
             const result2 = await getOptimizedModulePath('vue');
 
-            expect(result1).toBe(result2);
+            expect(result1.path).toBe(result2.path);
 
             const metrics = getModuleResolutionMetrics();
             expect(metrics.cacheHits).toBeGreaterThan(0);
@@ -50,7 +50,7 @@ describe('ModuleResolutionOptimizer - Tests Exhaustivos', () => {
             const result = await getOptimizedModulePath(
                 'modulo-que-no-existe-xyz-123',
             );
-            expect(result).toBeNull();
+            expect(result.path).toBeNull();
         });
 
         it('debe manejar resolución desde diferentes archivos fuente', async () => {
@@ -64,8 +64,8 @@ describe('ModuleResolutionOptimizer - Tests Exhaustivos', () => {
             );
 
             // Ambos deben resolver al mismo módulo
-            expect(result1).toBeTruthy();
-            expect(result1).toBe(result2);
+            expect(result1.path).toBeTruthy();
+            expect(result1.path).toBe(result2.path);
         });
     });
 
@@ -120,7 +120,9 @@ describe('ModuleResolutionOptimizer - Tests Exhaustivos', () => {
             const results = await Promise.all(promises);
 
             // Todos deben resolver al mismo path
-            const uniquePaths = new Set(results.filter(r => r !== null));
+            const uniquePaths = new Set(
+                results.map(r => r.path).filter(p => p !== null),
+            );
             expect(uniquePaths.size).toBeLessThanOrEqual(1);
         });
 

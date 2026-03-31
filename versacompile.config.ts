@@ -1,10 +1,10 @@
 const config = {
     tsconfig: './tsconfig.json',
     compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
+        sourceRoot: './exaples',
+        outDir: './public',
         pathsAlias: {
-            '@/*': ['examples/*'],
+            '@/*': ['testProject/*'],
             'P@/*': ['public/*'],
             'e@/*': ['examples/*'],
         },

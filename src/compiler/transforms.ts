@@ -106,7 +106,9 @@ function isExternalModule(
         return true;
     } // Descartar alias conocidos
     for (const alias of Object.keys(pathAlias)) {
-        const aliasPattern = alias.replace('/*', '');
+        // Quitar solo el '*' final para conservar el separador '/'
+        // Ejemplo: '@/*' → '@/', así '@vueuse/core' no hace match pero '@/foo' sí
+        const aliasPattern = alias.replace('*', '');
         if (moduleRequest.startsWith(aliasPattern)) {
             return false;
         }
@@ -150,16 +152,16 @@ export async function replaceAliasImportStatic(
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
                 // Usar el sistema optimizado primero
-                const optimizedPath = await getOptimizedModulePath(
+                const optimizedResult = await getOptimizedModulePath(
                     moduleRequest,
                     file,
                 );
-                if (optimizedPath === null) {
-                    // Si el optimizador retorna null, significa que es un módulo excluido
+                if (optimizedResult.excluded) {
+                    // Módulo excluido explícitamente: mantener importación original
                     continue;
                 }
-                if (optimizedPath) {
-                    newPath = optimizedPath;
+                if (optimizedResult.path) {
+                    newPath = optimizedResult.path;
                     transformed = true;
                 } else {
                     // Fallback al sistema anterior
@@ -199,7 +201,7 @@ export async function replaceAliasImportStatic(
             } else {
                 // Fallback al sistema anterior
                 for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('/*', '');
+                    const aliasPattern = alias.replace('*', '');
                     if (moduleRequest.startsWith(aliasPattern)) {
                         // Reemplazar el alias con la ruta del target
                         const relativePath = moduleRequest.replace(
@@ -301,16 +303,16 @@ export async function replaceAliasImportDynamic(
         if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
             try {
                 // Usar el sistema optimizado primero
-                const optimizedPath = await getOptimizedModulePath(
+                const optimizedResult = await getOptimizedModulePath(
                     moduleRequest,
                     file,
                 );
-                if (optimizedPath === null) {
-                    // Si el optimizador retorna null, significa que es un módulo excluido
+                if (optimizedResult.excluded) {
+                    // Módulo excluido explícitamente: mantener importación original
                     continue;
                 }
-                if (optimizedPath) {
-                    newPath = optimizedPath;
+                if (optimizedResult.path) {
+                    newPath = optimizedResult.path;
                     transformed = true;
                 } else {
                     // Fallback al sistema anterior
@@ -351,7 +353,7 @@ export async function replaceAliasImportDynamic(
             } else {
                 // Fallback al sistema anterior
                 for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('/*', '');
+                    const aliasPattern = alias.replace('*', '');
                     if (moduleRequest.startsWith(aliasPattern)) {
                         // Reemplazar el alias con la ruta del target
                         const relativePath = moduleRequest.replace(
@@ -455,7 +457,7 @@ export async function replaceAliasImportDynamic(
             // 2. Verificar aliases en template literals
             if (!transformed) {
                 for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('/*', '');
+                    const aliasPattern = alias.replace('*', '');
                     if (moduleRequest.includes(aliasPattern)) {
                         const relativePath = moduleRequest.replace(
                             aliasPattern,
