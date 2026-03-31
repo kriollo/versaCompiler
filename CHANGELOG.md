@@ -5,6 +5,49 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.5.0] - 2026-03-31
+
+### ✨ Nuevas Características
+
+- **Contact Manager — App E2E Avanzada**:
+    - Nueva aplicación de prueba end-to-end que valida patrones Vue 3 avanzados: `provide/inject`, `<Teleport>`, `<Transition>`, named/scoped slots, `defineAsyncComponent`, `onErrorCaptured`, deep watchers, barrel re-exports y cadenas de importación de 4+ niveles.
+    - Validación de datos con **Zod** (`z.infer<>`, genéricos TS complejos, `safeParse`, error type narrowing).
+    - Persistencia CRUD completa en **localStorage** con verificación directa vía `page.evaluate`.
+    - Componentes avanzados: `ContactForm` (v-model custom + template refs), `ContactList` (scoped slots + HTML5 drag-and-drop), `ContactCard` (named slots + emits tipados), `ContactModal` (Teleport + Transition), `TabPanel` (provide/inject), `AccordionItem` (inject + Transition animada), `AsyncStats` (defineAsyncComponent), `ErrorBoundary` (onErrorCaptured).
+
+- **Soporte de Paquetes Scoped (`@scope/pkg`)**:
+    - Nuevo `parseModuleSpecifier()` para resolver correctamente `@vueuse/core`, `@scope/pkg/subpath`, etc.
+    - Nuevo `resolveExportValue()` para exports condicionales anidados (`import > browser > module > default > require`).
+    - Fix crítico en `isExternalModule()`: `alias.replace('*', '')` en lugar de `replace('/*', '')` para preservar el separador `/` y evitar que `@vueuse/core` matchee el alias `@/*`.
+    - Soporte para paquetes CJS-only (condición `require` como fallback).
+
+- **Suite E2E Playwright con múltiples navegadores**:
+    - 354 tests en 6 configuraciones: Desktop Chrome, Desktop Firefox, Mobile Chrome (Pixel 5, Galaxy S9+), y emulación de iPhone 12 e iPad Pro.
+    - `global-setup` con detección de cambios por mtime — solo recompila archivos modificados.
+    - Ejecución paralela: `fullyParallel: true` + `workers: 4`, reduciendo el tiempo total de ~15 min a ~1 min.
+
+### 🔧 Mejoras
+
+- **Rendimiento del Pipeline E2E**:
+    - `global-setup.ts` ahora compara `mtime` fuente vs compilado antes de recompilar, eliminando ~2.5 min de overhead por ejecución.
+    - `playwright.config.ts`: `fullyParallel: true` con 4 workers en paralelo.
+
+- **Linter Nodes (ESLintNode, OxlintNode, TailwindNode)**:
+    - Mensajes de error mejorados y construcción de argumentos CLI más clara.
+    - `OxlintNode` agrega soporte para `tsconfigPath`.
+
+### 🐛 Correcciones
+
+- **Resolución de alias con paquetes scoped**: el patrón `@/*` ya no matchea incorrectamente a `@vueuse/core` ni otros paquetes `@scope/pkg`.
+- **Exports condicionales anidados**: resuelve correctamente estructuras como `{ import: { types: '...', default: './index.mjs' } }`.
+- **Modal de SweetAlert2 en mobile**: `click({ force: true })` en `.swal2-confirm` para superar la intercepción del contenedor en viewports táctiles.
+
+### 📦 Dependencias
+
+- Añadido `zod ^4.3.6` (devDependency) para validación de esquemas en los tests e2e.
+
+---
+
 ## [2.4.1] - 2026-03-08
 
 ### ✨ Nuevas Características
