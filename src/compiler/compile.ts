@@ -787,13 +787,17 @@ class SmartCompilationCache {
 
         try {
             // Ejecutar todas las verificaciones independientes en paralelo
-            const [currentContentHash, currentDependencyHash, fileStat, _outputStat] =
-                await Promise.all([
-                    this.generateContentHash(filePath),
-                    this.generateDependencyHash(),
-                    stat(filePath),
-                    stat(entry.outputPath),
-                ]);
+            const [
+                currentContentHash,
+                currentDependencyHash,
+                fileStat,
+                _outputStat,
+            ] = await Promise.all([
+                this.generateContentHash(filePath),
+                this.generateDependencyHash(),
+                stat(filePath),
+                stat(entry.outputPath),
+            ]);
 
             // Los hashes síncronos son baratos, evaluarlos tras el await
             const currentConfigHash = this.generateConfigHash();
@@ -1399,7 +1403,9 @@ async function displayCompilationSummary(
     logger.info(chalkLib.bold.cyan('📊 Resumen de Compilación'));
     logger.info(chalkLib.gray(summaryLine)); // ⏱️ Tiempo total con formato elegante
     if (totalTime) {
-        logger.info(chalkLib.bold(`⏱️  Tiempo Total: ${chalkLib.green(totalTime)}`));
+        logger.info(
+            chalkLib.bold(`⏱️  Tiempo Total: ${chalkLib.green(totalTime)}`),
+        );
         logger.info('');
     } // 🔧 Estadísticas por etapa con mejor formato
     if (compilationResults.length > 0) {
@@ -1414,7 +1420,8 @@ async function displayCompilationSummary(
 
             // Iconos y colores dinámicos por etapa
             const stageIcon = getStageIcon(result.stage);
-            const statusColor = result.errors === 0 ? chalkLib.green : chalkLib.red;
+            const statusColor =
+                result.errors === 0 ? chalkLib.green : chalkLib.red;
             const progressBar = createProgressBarWithPercentage(
                 successRate,
                 20,
@@ -1512,7 +1519,9 @@ async function displayCompilationSummary(
         // Estadísticas con iconos y colores modernos
         logger.info('');
         logger.info(chalkLib.bold('🎯 Resultados:'));
-        logger.info(`   📁 Archivos afectados: ${chalkLib.cyan.bold(totalFiles)}`);
+        logger.info(
+            `   📁 Archivos afectados: ${chalkLib.cyan.bold(totalFiles)}`,
+        );
         logger.info(
             `   ${totalErrors > 0 ? chalkLib.red('●') : chalkLib.green('○')} Errores: ${totalErrors > 0 ? chalkLib.red.bold(totalErrors) : chalkLib.green.bold('0')}`,
         );
@@ -1562,7 +1571,9 @@ async function displayCompilationSummary(
         logger.info(chalkLib.bold.green('                ✨ ÉXITO'));
         logger.info(chalkLib.bold.green(successLine));
         logger.info('');
-        logger.info(chalkLib.green.bold('🎉 COMPILACIÓN COMPLETADA EXITOSAMENTE'));
+        logger.info(
+            chalkLib.green.bold('🎉 COMPILACIÓN COMPLETADA EXITOSAMENTE'),
+        );
         logger.info(
             chalkLib.green('   ¡No se encontraron errores ni advertencias!'),
         );
@@ -1630,7 +1641,9 @@ async function displayLinterErrors(errors: any[]): Promise<void> {
     logger.info('');
 
     if (totalErrors === 0 && totalWarnings === 0) {
-        logger.info(chalkLib.green.bold('✨ All checks passed! No issues found.'));
+        logger.info(
+            chalkLib.green.bold('✨ All checks passed! No issues found.'),
+        );
         return;
     }
 
@@ -1700,7 +1713,8 @@ async function displayFileErrorsGroup(
         e => e.severity === 'warning',
     ).length;
 
-    const statusIcon = errorCount > 0 ? chalkLib.red('✕') : chalkLib.yellow('⚠');
+    const statusIcon =
+        errorCount > 0 ? chalkLib.red('✕') : chalkLib.yellow('⚠');
     const fileIcon = filePath.endsWith('.vue')
         ? '🎨'
         : filePath.endsWith('.ts')
@@ -1892,7 +1906,8 @@ async function _displaySingleLinterError(
                 } else {
                     // Líneas de contexto
                     logger.info(
-                        chalkLib.blue(` ${prefix} │ `) + chalkLib.gray(currentLine),
+                        chalkLib.blue(` ${prefix} │ `) +
+                            chalkLib.gray(currentLine),
                     );
                 }
             }
@@ -2470,7 +2485,9 @@ export async function initCompile(
             }
             const chalkLib = await loadChalk();
             logger.info(
-                chalkLib.green(`✅ Compilación exitosa: ${path.basename(file)}`),
+                chalkLib.green(
+                    `✅ Compilación exitosa: ${path.basename(file)}`,
+                ),
             );
         }
 
@@ -2724,7 +2741,8 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
             const parsedLinterEnv = JSON.parse(linterENV);
             if (Array.isArray(parsedLinterEnv)) {
                 // Cargar dependencias de linting de forma lazy
-                const { ESLint: ESLintLib, OxLint: OxLintLib } = await loadLinter();
+                const { ESLint: ESLintLib, OxLint: OxLintLib } =
+                    await loadLinter();
                 for (const item of parsedLinterEnv) {
                     if (item.name.toLowerCase() === 'eslint') {
                         logger.info(

@@ -104,7 +104,9 @@ export const loadTypeScriptConfig = (
             );
             throw new Error(
                 `No se puede continuar sin un tsconfig.json válido. Error: ${error}`,
-                { cause: error },
+                {
+                    cause: error,
+                },
             );
         }
 

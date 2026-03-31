@@ -57,7 +57,10 @@ interface ValidationStats {
  */
 export class IntegrityValidator {
     private static instance: IntegrityValidator;
-    private cache = new Map<string, { result: IntegrityCheckResult; timestamp: number }>();
+    private cache = new Map<
+        string,
+        { result: IntegrityCheckResult; timestamp: number }
+    >();
     private readonly MAX_CACHE_SIZE = 100;
     private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutos
 
@@ -102,7 +105,7 @@ export class IntegrityValidator {
         // Revisar cache
         const cacheKey = this.getCacheKey(context, processed);
         const cached = this.cache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
             this.stats.cacheHits++;
             if (options.verbose) {
                 logger.info(`[IntegrityValidator] Cache hit for ${context}`);

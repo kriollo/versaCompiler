@@ -117,7 +117,9 @@ export class ESLintNode {
                     const { stdout, stderr, exitCode } = await execa(
                         this.binPath,
                         cliArgs,
-                        { reject: false },
+                        {
+                            reject: false,
+                        },
                     );
 
                     if (

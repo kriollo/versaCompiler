@@ -13,17 +13,17 @@ const PORT = 4173;
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
-    '.js':   'application/javascript; charset=utf-8',
-    '.mjs':  'application/javascript; charset=utf-8',
-    '.cjs':  'application/javascript; charset=utf-8',
-    '.css':  'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.mjs': 'application/javascript; charset=utf-8',
+    '.cjs': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
     '.json': 'application/json; charset=utf-8',
-    '.svg':  'image/svg+xml',
-    '.png':  'image/png',
-    '.ico':  'image/x-icon',
-    '.woff2':'font/woff2',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon',
+    '.woff2': 'font/woff2',
     '.woff': 'font/woff',
-    '.ttf':  'font/ttf',
+    '.ttf': 'font/ttf',
 };
 
 const server = http.createServer((req, res) => {

@@ -14,7 +14,9 @@ import { expect, test } from '@playwright/test';
 
 /** Espera a que Vue monte la app (atributo data-app-ready en body) */
 async function waitForApp(page: import('@playwright/test').Page) {
-    await page.waitForSelector('body[data-app-ready="true"]', { timeout: 15_000 });
+    await page.waitForSelector('body[data-app-ready="true"]', {
+        timeout: 15_000,
+    });
     // Asegurar que no hay errores de carga
     const errEl = await page.locator('#error');
     const errVisible = await errEl.isVisible();
@@ -35,7 +37,9 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Carga de la app', () => {
     test('monta sin errores y muestra el título', async ({ page }) => {
-        await expect(page.locator('h1').first()).toContainText('Import Test App');
+        await expect(page.locator('h1').first()).toContainText(
+            'Import Test App',
+        );
         await expect(page.locator('#error')).not.toBeVisible();
     });
 
@@ -47,7 +51,9 @@ test.describe('Carga de la app', () => {
         await expect(page.locator('h2').nth(3)).toContainText('pinia');
         await expect(page.locator('h2').nth(4)).toContainText('vue-router');
         await expect(page.locator('h2').nth(5)).toContainText('Alias');
-        await expect(page.locator('h2').nth(6)).toContainText('Import relativo');
+        await expect(page.locator('h2').nth(6)).toContainText(
+            'Import relativo',
+        );
         await expect(page.locator('h2').nth(7)).toContainText('Dynamic');
     });
 });
@@ -59,7 +65,9 @@ test.describe('Sección 1 — vue (named import, exports string)', () => {
         await expect(page.locator('text=× 2 = 0')).toBeVisible();
     });
 
-    test('botón + incrementa el contador y computed se actualiza', async ({ page }) => {
+    test('botón + incrementa el contador y computed se actualiza', async ({
+        page,
+    }) => {
         await page.locator('button', { hasText: '+' }).first().click();
         await expect(page.locator('text=× 2 = 2')).toBeVisible();
     });
@@ -84,13 +92,17 @@ test.describe('Sección 1 — vue (named import, exports string)', () => {
 
 test.describe('Sección 2 — sweetalert2 (default import, campo "module")', () => {
     test('el botón "Mostrar Swal" está visible', async ({ page }) => {
-        await expect(page.locator('button', { hasText: 'Mostrar Swal' })).toBeVisible();
+        await expect(
+            page.locator('button', { hasText: 'Mostrar Swal' }),
+        ).toBeVisible();
     });
 
     test('al hacer click abre el modal de SweetAlert2', async ({ page }) => {
         await page.locator('button', { hasText: 'Mostrar Swal' }).click();
         // SweetAlert2 crea un .swal2-container en el DOM
-        await expect(page.locator('.swal2-container')).toBeVisible({ timeout: 5_000 });
+        await expect(page.locator('.swal2-container')).toBeVisible({
+            timeout: 5_000,
+        });
         await expect(page.locator('.swal2-title')).toContainText('¡Funciona!');
         // Cerrar
         await page.locator('.swal2-confirm').click({ force: true });
@@ -124,7 +136,9 @@ test.describe('Sección 3 — @vueuse/core (paquete scoped @scope/pkg)', () => {
         await expect(input).toHaveValue('TestValue123');
     });
 
-    test('useMouse actualiza coordenadas al mover el ratón', async ({ page }) => {
+    test('useMouse actualiza coordenadas al mover el ratón', async ({
+        page,
+    }) => {
         // Obtener valor inicial
         const li = page.locator('li').filter({ hasText: 'useMouse → x:' });
         const before = await li.textContent();
@@ -166,7 +180,9 @@ test.describe('Sección 4 — pinia (exports condicionales anidados)', () => {
 // ── 5. vue-router — exports condicionales anidados ────────────────────────────
 
 test.describe('Sección 5 — vue-router (exports condicionales anidados)', () => {
-    test('RouterLink importado correctamente (muestra ✅)', async ({ page }) => {
+    test('RouterLink importado correctamente (muestra ✅)', async ({
+        page,
+    }) => {
         const section = page.locator('section').nth(4);
         await expect(section.locator('p')).toContainText('✅');
     });
@@ -188,7 +204,9 @@ test.describe('Sección 6 — alias e@/* (import de componente local)', () => {
 // ── 7. Import relativo ────────────────────────────────────────────────────────
 
 test.describe('Sección 7 — import relativo (./operacionesMatematicas.vue)', () => {
-    test('el componente OperacionesMatematicas se renderiza', async ({ page }) => {
+    test('el componente OperacionesMatematicas se renderiza', async ({
+        page,
+    }) => {
         const section = page.locator('section').nth(6);
         await expect(section).toBeVisible();
         const children = await section.locator('*').count();
@@ -203,7 +221,9 @@ test.describe('Sección 8 — dynamic import()', () => {
         const section = page.locator('section').nth(7);
         await expect(section.locator('p.font-mono')).toContainText(
             '✅ pinia cargado dinámicamente',
-            { timeout: 10_000 },
+            {
+                timeout: 10_000,
+            },
         );
     });
 });
@@ -211,7 +231,10 @@ test.describe('Sección 8 — dynamic import()', () => {
 // ── Responsive / Mobile ──────────────────────────────────────────────────────
 
 test.describe('Layout responsive', () => {
-    test('todas las secciones son visibles sin overflow horizontal', async ({ page, viewport }) => {
+    test('todas las secciones son visibles sin overflow horizontal', async ({
+        page,
+        viewport,
+    }) => {
         const sections = await page.locator('section').all();
         expect(sections.length).toBe(8);
 
@@ -220,7 +243,9 @@ test.describe('Layout responsive', () => {
             // Verificar que no hay overflow horizontal (x no excede el viewport)
             const box = await section.boundingBox();
             if (box && viewport) {
-                expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 10); // +10 tolerancia
+                expect(box.x + box.width).toBeLessThanOrEqual(
+                    viewport.width + 10,
+                ); // +10 tolerancia
             }
         }
     });
@@ -231,7 +256,9 @@ test.describe('Layout responsive', () => {
         await expect(page.locator('text=× 2 = 2')).toBeVisible();
     });
 
-    test('el botón de SweetAlert2 es visible y tiene tamaño adecuado', async ({ page }) => {
+    test('el botón de SweetAlert2 es visible y tiene tamaño adecuado', async ({
+        page,
+    }) => {
         const btn = page.locator('button', { hasText: 'Mostrar Swal' });
         await expect(btn).toBeVisible();
         const box = await btn.boundingBox();

@@ -6,7 +6,12 @@ const { env } = process;
 import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
 
-import { clearCompilationState, getOutputPath, initCompile, normalizeRuta } from '../compiler/compile';
+import {
+    clearCompilationState,
+    getOutputPath,
+    initCompile,
+    normalizeRuta,
+} from '../compiler/compile';
 import { promptUser } from '../utils/promptUser';
 
 import { emitirCambios } from './browserSync';
@@ -494,9 +499,7 @@ export async function initChokidar(bs: any) {
             const chalkInstance = await loadChalk();
             logger.info(
                 chalkInstance.green(
-                    `👀 : Listo para observar \n${fileWatch
-                        .map((item: string) => `${item}`)
-                        .join('\n')}\n`,
+                    `👀 : Listo para observar \n${fileWatch.map((item: string) => `${item}`).join('\n')}\n`,
                 ),
             );
 

@@ -1,101 +1,103 @@
 <!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VersaCompiler — Import Test E2E</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>VersaCompiler — Import Test E2E</title>
 
-    <!--
+        <!--
         ImportMap: resuelve bare specifiers que pueda usar algún módulo
         que no se haya transformado completamente.
         Los imports compilados ya usan rutas absolutas (/node_modules/...),
         así que el importmap es un safety net.
     -->
-    <script type="importmap">
-    {
-        "imports": {
-            "vue":               "/node_modules/vue/dist/vue.esm-browser.js",
-            "pinia":             "/node_modules/pinia/dist/pinia.esm-browser.js",
-            "vue-router":        "/node_modules/vue-router/dist/vue-router.esm-browser.js",
-            "@vue/devtools-api": "/e2e/devtools-stub.mjs",
-            "@vueuse/shared":    "/node_modules/.pnpm/@vueuse+shared@14.2.1_vue@3.5.31_typescript@6.0.2_/node_modules/@vueuse/shared/dist/index.js"
-        }
-    }
-    </script>
+        <script type="importmap">
+            {
+                "imports": {
+                    "vue": "/node_modules/vue/dist/vue.esm-browser.js",
+                    "pinia": "/node_modules/pinia/dist/pinia.esm-browser.js",
+                    "vue-router": "/node_modules/vue-router/dist/vue-router.esm-browser.js",
+                    "@vue/devtools-api": "/e2e/devtools-stub.mjs",
+                    "@vueuse/shared": "/node_modules/.pnpm/@vueuse+shared@14.2.1_vue@3.5.31_typescript@6.0.2_/node_modules/@vueuse/shared/dist/index.js"
+                }
+            }
+        </script>
 
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: system-ui, sans-serif;
-            background: #f9fafb;
-            color: #111827;
-        }
-        #app {
-            max-width: 860px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-        #loading {
-            text-align: center;
-            padding: 3rem;
-            color: #6b7280;
-            font-size: 1.1rem;
-        }
-        #error {
-            color: #dc2626;
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            border-radius: 6px;
-            padding: 1rem;
-            margin: 1rem;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 0.85rem;
-        }
-    </style>
-</head>
-<body>
-    <div id="loading">⏳ Cargando app de prueba...</div>
-    <div id="app"></div>
-    <div id="error" style="display:none"></div>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family: system-ui, sans-serif;
+                background: #f9fafb;
+                color: #111827;
+            }
+            #app {
+                max-width: 860px;
+                margin: 0 auto;
+                padding: 1rem;
+            }
+            #loading {
+                text-align: center;
+                padding: 3rem;
+                color: #6b7280;
+                font-size: 1.1rem;
+            }
+            #error {
+                color: #dc2626;
+                background: #fef2f2;
+                border: 1px solid #fca5a5;
+                border-radius: 6px;
+                padding: 1rem;
+                margin: 1rem;
+                white-space: pre-wrap;
+                font-family: monospace;
+                font-size: 0.85rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="loading">⏳ Cargando app de prueba...</div>
+        <div id="app"></div>
+        <div id="error" style="display: none"></div>
 
-    <script type="module">
-        // Importar Vue y plugins desde rutas absolutas (igual que el compilador)
-        import { createApp }    from '/node_modules/vue/dist/vue.esm-browser.js';
-        import { createPinia }  from '/node_modules/pinia/dist/pinia.esm-browser.js';
-        import {
-            createRouter,
-            createMemoryHistory,
-        } from '/node_modules/vue-router/dist/vue-router.esm-browser.js';
+        <script type="module">
+            // Importar Vue y plugins desde rutas absolutas (igual que el compilador)
+            import { createApp } from '/node_modules/vue/dist/vue.esm-browser.js';
+            import { createPinia } from '/node_modules/pinia/dist/pinia.esm-browser.js';
+            import {
+                createRouter,
+                createMemoryHistory,
+            } from '/node_modules/vue-router/dist/vue-router.esm-browser.js';
 
-        // Componente compilado por VersaCompiler (el que estamos probando)
-        import App from '/public/importTestApp.js';
+            // Componente compilado por VersaCompiler (el que estamos probando)
+            import App from '/public/importTestApp.js';
 
-        const errEl = document.getElementById('error');
-        const loadEl = document.getElementById('loading');
+            const errEl = document.getElementById('error');
+            const loadEl = document.getElementById('loading');
 
-        try {
-            const pinia = createPinia();
-            const router = createRouter({
-                history: createMemoryHistory(),
-                routes: [{ path: '/', component: { template: '<span/>' } }],
-            });
+            try {
+                const pinia = createPinia();
+                const router = createRouter({
+                    history: createMemoryHistory(),
+                    routes: [{ path: '/', component: { template: '<span/>' } }],
+                });
 
-            const app = createApp(App);
-            app.use(pinia);
-            app.use(router);
-            app.mount('#app');
+                const app = createApp(App);
+                app.use(pinia);
+                app.use(router);
+                app.mount('#app');
 
-            loadEl.remove();
-            // Señal para Playwright de que la app montó correctamente
-            document.body.setAttribute('data-app-ready', 'true');
-        } catch (err) {
-            loadEl.remove();
-            errEl.style.display = 'block';
-            errEl.textContent = `[ERROR] ${err.message}\n\n${err.stack}`;
-            console.error(err);
-        }
-    </script>
-</body>
+                loadEl.remove();
+                // Señal para Playwright de que la app montó correctamente
+                document.body.setAttribute('data-app-ready', 'true');
+            } catch (err) {
+                loadEl.remove();
+                errEl.style.display = 'block';
+                errEl.textContent = `[ERROR] ${err.message}\n\n${err.stack}`;
+                console.error(err);
+            }
+        </script>
+    </body>
 </html>

@@ -12,9 +12,9 @@ const ROOT = process.cwd();
 const COMPILER = 'node_modules/.bin/tsx src/main.ts';
 
 interface FileSpec {
-    src: string;         // fuente relativo a ROOT
+    src: string; // fuente relativo a ROOT
     expectedOut: string; // donde el compilador deja la salida
-    neededAt?: string;   // si hay que copiarlo a otra ruta
+    neededAt?: string; // si hay que copiarlo a otra ruta
 }
 
 const FILES: FileSpec[] = [
@@ -67,7 +67,9 @@ export default async function globalSetup(): Promise<void> {
 
         const outPath = join(ROOT, file.expectedOut);
         if (!existsSync(outPath)) {
-            throw new Error(`Compilación fallida: esperado en ${file.expectedOut}`);
+            throw new Error(
+                `Compilación fallida: esperado en ${file.expectedOut}`,
+            );
         }
 
         if (file.neededAt) {

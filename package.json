@@ -2,12 +2,27 @@
     "name": "versacompiler",
     "version": "2.4.1",
     "description": "Una herramienta para compilar y minificar archivos .vue, .js y .ts para proyectos de Vue 3 con soporte para TypeScript.",
-    "main": "dist/main.js",
+    "keywords": [
+        "compiler",
+        "linter",
+        "minifier",
+        "typescript",
+        "versacompiler",
+        "vue",
+        "vue3"
+    ],
+    "homepage": "https://github.com/kriollo/versaCompiler#readme",
+    "bugs": {
+        "url": "https://github.com/kriollo/versaCompiler/issues"
+    },
+    "license": "MIT",
+    "author": "Jorge Jara H (kriollone@gmail.com)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kriollo/versaCompiler.git"
+    },
     "bin": {
         "versacompiler": "dist/main.js"
-    },
-    "publishConfig": {
-        "access": "public"
     },
     "files": [
         "dist",
@@ -15,6 +30,10 @@
         "README.md"
     ],
     "type": "module",
+    "main": "dist/main.js",
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "dev": "tsx --watch src/main.ts --watch --verbose --tailwind",
         "file": "tsx src/main.ts ",
@@ -32,25 +51,6 @@
         "lint": "oxlint --fix --config .oxlintrc.json",
         "lint:eslint": "eslint --ext .js,.ts,.vue src/ --fix"
     },
-    "keywords": [
-        "vue",
-        "compiler",
-        "minifier",
-        "vue3",
-        "versacompiler",
-        "typescript",
-        "linter"
-    ],
-    "author": "Jorge Jara H (kriollone@gmail.com)",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/kriollo/versaCompiler.git"
-    },
-    "bugs": {
-        "url": "https://github.com/kriollo/versaCompiler/issues"
-    },
-    "homepage": "https://github.com/kriollo/versaCompiler#readme",
     "dependencies": {
         "@vue/compiler-dom": "^3.5.31",
         "@vue/reactivity": "^3.5.31",

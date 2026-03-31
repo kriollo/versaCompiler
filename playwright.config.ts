@@ -6,7 +6,10 @@ export default defineConfig({
     fullyParallel: false, // globalSetup compila en serie primero
     retries: 1,
     timeout: 30_000,
-    reporter: [['html', { outputFolder: 'playwright-report', open: 'never' }], ['list']],
+    reporter: [
+        ['html', { outputFolder: 'playwright-report', open: 'never' }],
+        ['list'],
+    ],
 
     webServer: {
         command: 'node e2e/server.mjs',

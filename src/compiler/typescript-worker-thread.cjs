@@ -173,10 +173,16 @@ function getOrResetLanguageService(compilerOptions) {
 
     if (needsReset) {
         if (_persistentLS) {
-            try { _persistentLS.dispose(); } catch { /* ignore */ }
+            try {
+                _persistentLS.dispose();
+            } catch {
+                /* ignore */
+            }
             _persistentLS = null;
         }
-        _persistentHost = new WorkerTypeScriptLanguageServiceHost(compilerOptions);
+        _persistentHost = new WorkerTypeScriptLanguageServiceHost(
+            compilerOptions,
+        );
         _persistentLS = ts.createLanguageService(_persistentHost);
         _persistentCompilerOptionsStr = optionsStr;
         _tasksSinceReset = 0;
@@ -200,7 +206,8 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
         }
 
         // Obtener o crear Language Service persistente (rápido después del primer uso)
-        const { host, ls: languageService } = getOrResetLanguageService(compilerOptions);
+        const { host, ls: languageService } =
+            getOrResetLanguageService(compilerOptions);
 
         // Para archivos Vue, crear un archivo virtual .ts
         if (fileName.endsWith('.vue')) {

@@ -640,7 +640,13 @@ export function resolveExportValue(
     if (typeof exportVal === 'string') return exportVal;
     if (typeof exportVal === 'object' && exportVal !== null) {
         const obj = exportVal as Record<string, unknown>;
-        for (const key of ['import', 'browser', 'module', 'default', 'require']) {
+        for (const key of [
+            'import',
+            'browser',
+            'module',
+            'default',
+            'require',
+        ]) {
             if (obj[key] !== undefined) {
                 const resolved = resolveExportValue(obj[key], depth + 1);
                 if (resolved) return resolved;

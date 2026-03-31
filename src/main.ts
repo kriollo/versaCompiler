@@ -86,7 +86,8 @@ async function main() {
     let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
         .scriptName('versa')
         .usage(
-            chalkInstance.blue('VersaCompiler') + ' - Compilador de archivos Vue/TS/JS',
+            chalkInstance.blue('VersaCompiler') +
+                ' - Compilador de archivos Vue/TS/JS',
         )
         .option('init', {
             type: 'boolean',

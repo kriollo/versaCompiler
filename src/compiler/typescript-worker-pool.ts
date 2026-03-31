@@ -188,7 +188,8 @@ export class TypeScriptWorkerPool {
                 // Verificar límites de memoria y reciclaje automático.
                 // Solo reciclar workers INACTIVOS para evitar rechazar tareas en vuelo.
                 // Los workers con tareas pendientes se reciclan vía drainQueue cuando quedan libres.
-                const isIdle = !poolWorker.busy && poolWorker.pendingTasks.size === 0;
+                const isIdle =
+                    !poolWorker.busy && poolWorker.pendingTasks.size === 0;
                 if (isIdle && this.shouldRecycleWorker(poolWorker)) {
                     const reason = this.getRecycleReason(poolWorker);
                     console.warn(
@@ -845,9 +846,7 @@ export class TypeScriptWorkerPool {
         const waitMs = Date.now() - queued.queuedAt;
         if (waitMs > 30000) {
             // queued.reject incluye failedTasks++ en el wrapper (ver typeCheck())
-            queued.reject(
-                new Error(`Queue task expired after ${waitMs}ms`),
-            );
+            queued.reject(new Error(`Queue task expired after ${waitMs}ms`));
             // Continuar drenando la cola con la siguiente tarea
             setImmediate(() => this.drainQueue(poolWorker));
             return;
@@ -950,7 +949,9 @@ export class TypeScriptWorkerPool {
     ): Promise<TypeCheckResult> {
         // Si el worker alcanzó su límite de tareas, encolar para reciclaje
         if (poolWorker.taskCounter >= this.MAX_TASKS_PER_WORKER) {
-            throw new Error(`Worker ${poolWorker.id} ha alcanzado el límite de tareas`);
+            throw new Error(
+                `Worker ${poolWorker.id} ha alcanzado el límite de tareas`,
+            );
         }
 
         return new Promise<TypeCheckResult>((resolve, reject) => {

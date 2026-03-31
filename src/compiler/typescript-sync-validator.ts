@@ -330,7 +330,11 @@ export const validateTypesWithLanguageService = (
         } catch {
             return { diagnostics: [], hasErrors: false };
         } finally {
-            try { languageService.dispose(); } catch { /* ignore dispose errors */ }
+            try {
+                languageService.dispose();
+            } catch {
+                /* ignore dispose errors */
+            }
         }
     } catch (error) {
         // En caso de error, devolver diagnóstico de error
