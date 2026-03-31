@@ -7,7 +7,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@': 'public',
+            '@': 'dist',
             'P@': 'public',
             'e@': 'examples',
         },
