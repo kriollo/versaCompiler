@@ -2177,6 +2177,31 @@ function extractLocalImports(code: string): string[] {
 }
 
 /**
+ * Comprueba si un archivo de salida está excluido de la inyección HMR
+ * según los patrones definidos en `hmrExclude` de la configuración.
+ *
+ * Acepta:
+ *  - Nombres de archivo exactos: `'early-init.js'`
+ *  - Sufijos de ruta:            `'js/early-init.js'`
+ *  - Globs simples con `*`:      `'*.legacy.js'`
+ */
+function isHmrExcluded(outPath: string): boolean {
+    const excludeList: string[] = JSON.parse(env.HMR_EXCLUDE || '[]');
+    if (excludeList.length === 0) return false;
+    const normalized = outPath.replace(/\\/g, '/');
+    const basename = path.posix.basename(normalized);
+    return excludeList.some(pattern => {
+        if (pattern.includes('*')) {
+            const regex = new RegExp(
+                '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') + '$',
+            );
+            return regex.test(basename) || regex.test(normalized);
+        }
+        return basename === pattern || normalized.endsWith('/' + pattern);
+    });
+}
+
+/**
  * Inyecta el shim de import.meta.hot al inicio de archivos JS compilados en modo dev.
  * Adicionalmente registra accept() para cada dependencia local: cuando una dependencia
  * se actualiza en versaHMR, el módulo actual se re-importa con timestamp nuevo,
@@ -2258,7 +2283,8 @@ async function compileWithPipeline(
     if (
         env.isPROD !== 'true' &&
         env.HMR !== 'false' &&
-        outPath.endsWith('.js')
+        outPath.endsWith('.js') &&
+        !isHmrExcluded(outPath)
     ) {
         pipelineCode = injectHmrShim(pipelineCode);
     }
@@ -2565,7 +2591,8 @@ async function compileJS(
     if (
         env.isPROD !== 'true' &&
         env.HMR !== 'false' &&
-        outPath.endsWith('.js')
+        outPath.endsWith('.js') &&
+        !isHmrExcluded(outPath)
     ) {
         code = injectHmrShim(code);
     }

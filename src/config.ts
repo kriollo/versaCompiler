@@ -3,4 +3,4 @@ export {
     type BundlerEntry,
     type LinterConfig,
     type VersaConfig,
-} from './servicios/versacompile.config.types';
+} from './servicios/versacompile.config.types.js';

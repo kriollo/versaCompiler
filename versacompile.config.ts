@@ -37,4 +37,5 @@ export default defineConfig({
             paths: ['src/'],
         },
     ],
+    hmr: false,
 });

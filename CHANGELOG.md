@@ -5,6 +5,16 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.5] - 2026-04-01
+
+### ✨ Nuevas Características
+
+- **`hmrExclude` en configuración**: nueva opción `hmrExclude?: string[]` en `versacompile.config.ts` para excluir archivos específicos de la inyección del shim HMR manteniendo el hot reload activo en el resto. Útil cuando un archivo compilado se carga con `<script src="...">` (sin `type="module"`) y produce `SyntaxError: Cannot use 'import.meta' outside a module`.
+  - Acepta nombres de archivo exactos (`'early-init.js'`), sufijos de ruta (`'js/early-init.js'`) o globs simples (`'*.legacy.js'`).
+  - `hmr: false` sigue disponible para deshabilitar el shim globalmente.
+
+---
+
 ## [2.6.4] - 2026-04-01
 
 ### 🐛 Correcciones

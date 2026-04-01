@@ -553,6 +553,8 @@ export async function readConfig(): Promise<boolean> {
         env.proxyUrl = String(tsConfig?.proxyConfig?.proxyUrl || '');
         env.AssetsOmit = String(tsConfig?.proxyConfig?.assetsOmit || false);
         env.linter = safeJsonStringify(tsConfig?.linter, 'false');
+        env.HMR = tsConfig?.hmr === false ? 'false' : 'true';
+        env.HMR_EXCLUDE = JSON.stringify(tsConfig?.hmrExclude ?? []);
         env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
         // Validar y limpiar rutas
