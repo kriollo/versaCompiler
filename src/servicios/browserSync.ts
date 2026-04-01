@@ -393,6 +393,63 @@ class BrowserSyncFileCache {
 // Instancia global del cache de archivos
 const fileCache = BrowserSyncFileCache.getInstance();
 
+// ─── HMR Import Rewriting ─────────────────────────────────────────────────────
+// Cuando un módulo se re-compila en watch mode, registramos su path con timestamp.
+// Al servir requests con ?t= (re-imports HMR), reescribimos los static imports de
+// ese archivo para que también incluyan ?t=, forzando al browser a cargar la nueva
+// versión en lugar de usar el módulo cacheado en su module registry.
+
+/** Map de path normalizado → timestamp de la última compilación exitosa */
+const recentHMRTimestamps = new Map<string, number>();
+
+/** TTL para limpiar entradas viejas del mapa (5 minutos) */
+const HMR_TIMESTAMP_TTL = 5 * 60 * 1000;
+
+/**
+ * Registra que un output file fue re-compilado en modo watch.
+ * Debe llamarse inmediatamente después de escribir el archivo a disco.
+ * @param outputPath - Path relativo del output compilado (ej: 'public/js/sampleFile.js')
+ */
+export function registerHMRUpdate(outputPath: string): void {
+    // Normalizar a path absoluto con / inicial (como lo ve el browser)
+    const normalized =
+        '/' + outputPath.replace(/\\/g, '/').replace(/^\.?\/+/, '');
+    recentHMRTimestamps.set(normalized, Date.now());
+
+    // Limpiar entradas viejas para evitar crecimiento ilimitado
+    const cutoff = Date.now() - HMR_TIMESTAMP_TTL;
+    for (const [key, ts] of recentHMRTimestamps) {
+        if (ts < cutoff) recentHMRTimestamps.delete(key);
+    }
+}
+
+/**
+ * Reescribe los static imports de un archivo JS para agregar ?t=<timestamp>
+ * a cualquier módulo que haya sido recientemente re-compilado.
+ * Esto fuerza al browser a crear un nuevo module record (URL diferente)
+ * en lugar de reusar el módulo cacheado del registry.
+ */
+function rewriteImportsForHMR(content: string): string {
+    if (recentHMRTimestamps.size === 0) return content;
+
+    // Reescribir: from '/path/to/file.js' → from '/path/to/file.js?t=<ts>'
+    // Handles: import ... from '...', export ... from '...'
+    // Solo paths absolutos (con /) → son los compilados por VersaCompiler
+    return content.replace(
+        /((?:from|import)\s+['"])(\/.+?\.js)(['""])/g,
+        (_match, prefix, importPath, suffix) => {
+            // Quitar ?t= previo si ya existe
+            const cleanPath = importPath.split('?')[0] as string;
+            const ts = recentHMRTimestamps.get(cleanPath);
+            if (ts) {
+                return `${prefix}${cleanPath}?t=${ts}${suffix}`;
+            }
+            return _match;
+        },
+    );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Lazy loading para chalk - pre-cargado para mejor rendimiento
 let chalk: any;
 let chalkPromise: Promise<any> | null = null;
@@ -494,6 +551,9 @@ export async function browserSyncServer(): Promise<any> {
                             ${snippet}${match}
                             <script
                                 type="module"
+                                src="/__versa/versaHMR.js"></script>
+                            <script
+                                type="module"
                                 src="/__versa/initHRM.js"></script>
                         `;
                     },
@@ -569,11 +629,26 @@ export async function browserSyncServer(): Promise<any> {
 
                     // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
                     if (req.url.startsWith('/__versa/')) {
-                        // ✨ OPTIMIZADO: Usar cache para archivos Versa
-                        const filePath = path.join(
+                        // ✨ SEGURIDAD: Prevenir path traversal normalizando y verificando el directorio
+                        const requestedRelative = req.url
+                            .replace('/__versa/', '')
+                            .split('?')[0]; // strip query string
+                        const resolvedFilePath = path.resolve(
                             relativeHrmPath,
-                            req.url.replace('/__versa/', ''),
+                            requestedRelative,
                         );
+                        const allowedBase = path.resolve(relativeHrmPath);
+                        if (
+                            !resolvedFilePath.startsWith(
+                                allowedBase + path.sep,
+                            ) &&
+                            resolvedFilePath !== allowedBase
+                        ) {
+                            res.statusCode = 403;
+                            res.end('// Forbidden');
+                            return;
+                        }
+                        const filePath = resolvedFilePath;
 
                         const cachedFile =
                             await fileCache.getOrReadFile(filePath);
@@ -609,8 +684,29 @@ export async function browserSyncServer(): Promise<any> {
 
                     // Si la URL comienza con /node_modules/, sirve los archivos de node_modules
                     if (req.url.startsWith('/node_modules/')) {
-                        // ✨ OPTIMIZADO: Usar cache para módulos de node_modules
-                        const modulePath = path.join(process.cwd(), req.url);
+                        // ✨ SEGURIDAD: Prevenir path traversal verificando que el path resuelto
+                        // permanece dentro de node_modules del proyecto
+                        const requestedRelative = req.url
+                            .replace('/node_modules/', '')
+                            .split('?')[0]; // strip query string
+                        const nodeModulesBase = path.resolve(
+                            process.cwd(),
+                            'node_modules',
+                        );
+                        const modulePath = path.resolve(
+                            nodeModulesBase,
+                            requestedRelative,
+                        );
+                        if (
+                            !modulePath.startsWith(
+                                nodeModulesBase + path.sep,
+                            ) &&
+                            modulePath !== nodeModulesBase
+                        ) {
+                            res.statusCode = 403;
+                            res.end('// Forbidden');
+                            return;
+                        }
 
                         const cachedFile =
                             await fileCache.getOrReadFile(modulePath);
@@ -643,6 +739,45 @@ export async function browserSyncServer(): Promise<any> {
                         }
                         return;
                     }
+
+                    // ── HMR re-import: reescribir imports para que el browser no use caché ──
+                    // Cuando el cliente hace import('/public/js/foo.js?t=123'), el browser crea
+                    // un nuevo module record para esa URL. Al evaluar el módulo, sus static imports
+                    // (ej: import { x } from '/public/js/bar.js') SIN timestamp reusan el módulo
+                    // cacheado del registry → se ve el código viejo.
+                    // Solución: interceptar estas requests y reescribir los imports del archivo
+                    // para que también lleven ?t= en los módulos recientemente modificados.
+                    const isHMRReimport =
+                        req.method === 'GET' &&
+                        req.url.includes('?t=') &&
+                        /\.js\?/.test(req.url) &&
+                        !req.url.startsWith('/__versa/') &&
+                        !req.url.startsWith('/node_modules/');
+
+                    if (isHMRReimport) {
+                        const urlPath = req.url.split('?')[0] as string;
+                        const filePath = path.join(process.cwd(), urlPath);
+                        try {
+                            const rawContent = await fs.readFile(
+                                filePath,
+                                'utf-8',
+                            );
+                            const rewritten = rewriteImportsForHMR(rawContent);
+                            res.setHeader(
+                                'Content-Type',
+                                'application/javascript; charset=utf-8',
+                            );
+                            res.setHeader(
+                                'Cache-Control',
+                                'no-cache, no-store, must-revalidate',
+                            );
+                            res.end(rewritten);
+                            return;
+                        } catch {
+                            // Archivo no encontrado, seguir al handler estático
+                        }
+                    }
+                    // ──────────────────────────────────────────────────────────────────────────
 
                     // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
                     const isAssets = req.url.match(

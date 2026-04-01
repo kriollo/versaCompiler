@@ -11,6 +11,9 @@
 
 import { hideErrorOverlay, showErrorOverlay } from './errorScreen.js';
 import { obtenerInstanciaVue } from './getInstanciaVue.js';
+
+// oxlint-disable-next-line import/no-unassigned-import -- side-effect: inicializa window.__versaHMR
+import './versaHMR.js';
 import { reloadComponent } from './VueHRM.js';
 
 /**
@@ -343,6 +346,27 @@ async function initSocket(retries = 0) {
         socket.on('reloadFull', () => window.location.reload()); // Obtener la instancia de Vue con toda la lógica integrada
         let vueInstance = await obtenerInstanciaVue();
 
+        // Exponer función de recarga Vue por path para que los shims de módulos
+        // puedan disparar una actualización de instancia Vue cuando una dependencia
+        // (sampleFile.js, etc.) se actualiza vía HMR propagation.
+        if (window.__versaHMR) {
+            window.__versaHMR._reloadVueByPath = async path => {
+                try {
+                    vueInstance = window.__VUE_APP__ || vueInstance;
+                    // normalizedPath sin slash inicial (reloadComponent usa origin + '/' + path)
+                    const normalizedPath = path.replace(/^\//, '');
+                    const nameFile =
+                        path.split('/').pop()?.replace('.js', '') ?? '';
+                    await reloadComponent(vueInstance, {
+                        normalizedPath,
+                        nameFile,
+                    });
+                } catch (err) {
+                    console.error('❌ _reloadVueByPath failed:', err);
+                }
+            };
+        }
+
         // Configurar listener para HMR de componentes Vue
         socket.on('HRMVue', async (/** @type {ComponentInfo} */ data) => {
             try {
@@ -372,12 +396,31 @@ async function initSocket(retries = 0) {
             console.log('🔄 HRMHelper recibido:', data);
             console.log('📋 Archivo modificado:', data.filePath);
 
+            // moduleId: identificador canónico del módulo en el registry
+            // El servidor lo envía como el path del output (ej: /public/utils/math.js)
+            const moduleId = data.moduleId || data.filePath;
+
             if (data?.strategy) {
                 switch (data.strategy) {
                     case 'self-accept': {
+                        // El módulo acepta su propio reemplazo (import.meta.hot.accept)
                         try {
                             const timestamp = Date.now();
-                            await import(`${data.filePath}?t=${timestamp}`);
+                            // Usar moduleId (path absoluto con /) en lugar de data.filePath (relativo)
+                            // data.filePath relativo resuelve mal desde /__versa/initHRM.js
+                            const newModule = await import(
+                                `${moduleId}?t=${timestamp}`
+                            );
+                            // También notificar al registry por si hay consumers adicionales
+                            const registry = window.__versaHMR;
+                            if (registry && registry.hasObservers(moduleId)) {
+                                const exportedValue =
+                                    newModule.default !== undefined
+                                        ? newModule.default
+                                        : newModule;
+                                registry.notifyUpdate(moduleId, exportedValue);
+                            }
+                            console.log(`✅ Self-accept HMR: ${moduleId}`);
                             return;
                         } catch (error) {
                             reportErrorToServer(
@@ -391,9 +434,48 @@ async function initSocket(retries = 0) {
                         break;
                     }
                     case 'propagate': {
+                        // Re-importar el módulo con cache-bust y notificar al registry
                         try {
                             const timestamp = Date.now();
-                            await import(`${data.filePath}?t=${timestamp}`);
+                            // Usar moduleId (path absoluto con /) en lugar de data.filePath (relativo)
+                            // data.filePath relativo resuelve mal desde /__versa/initHRM.js
+                            const newModule = await import(
+                                `${moduleId}?t=${timestamp}`
+                            );
+
+                            // Extraer el valor exportado (default o namespace)
+                            const exportedValue =
+                                newModule.default !== undefined
+                                    ? newModule.default
+                                    : newModule;
+
+                            // Notificar al registry de VersaHMR si hay observers registrados
+                            const registry = window.__versaHMR;
+                            if (registry && registry.hasObservers(moduleId)) {
+                                const notified = registry.notifyUpdate(
+                                    moduleId,
+                                    exportedValue,
+                                );
+                                if (notified) {
+                                    console.log(
+                                        `✅ HMR sin recarga: ${moduleId} actualizado via registry`,
+                                    );
+                                    return;
+                                }
+                                // Si los callbacks fallaron, hacer full-reload como safety net
+                                console.warn(
+                                    `⚠️ Callbacks del registry fallaron para ${moduleId}, haciendo full-reload`,
+                                );
+                                window.location.reload();
+                                return;
+                            }
+
+                            // Sin observers en registry → la re-importación ya actualizó
+                            // el módulo en el scope de ES modules del browser.
+                            // Los consumers que hicieron import dinámico obtendrán la nueva versión.
+                            console.log(
+                                `✅ HMR propagado: ${moduleId} (sin observers en registry, re-import completado)`,
+                            );
                             return;
                         } catch (error) {
                             reportErrorToServer(
@@ -403,8 +485,10 @@ async function initSocket(retries = 0) {
                                     : new Error(String(error)),
                                 data,
                             );
+                            // Fallback a full-reload en caso de error
+                            window.location.reload();
+                            return;
                         }
-                        break;
                     }
                     case 'full-reload':
                     default: {
@@ -453,18 +537,30 @@ async function initSocket(retries = 0) {
                         break;
 
                     case 'propagate':
-                        // Propagar la actualización a los importadores
+                        // Propagar la actualización: re-importar y notificar al registry
                         console.log(
                             '🔄 Propagando actualización a importadores',
                         );
                         try {
-                            // Invalidar el módulo en el cache del navegador
-                            // y dejar que los importadores se actualicen
                             const timestamp = Date.now();
-                            await import(`${data.filePath}?t=${timestamp}`);
-                            console.log(
-                                '✅ Actualización propagada exitosamente',
+                            const newModule = await import(
+                                `${data.filePath}?t=${timestamp}`
                             );
+                            const exportedValue =
+                                newModule.default !== undefined
+                                    ? newModule.default
+                                    : newModule;
+                            const registry = window.__versaHMR;
+                            if (registry && registry.hasObservers(moduleId)) {
+                                registry.notifyUpdate(moduleId, exportedValue);
+                                console.log(
+                                    '✅ Actualización propagada via registry',
+                                );
+                            } else {
+                                console.log(
+                                    '✅ Re-import completado (sin observers en registry)',
+                                );
+                            }
                             return;
                         } catch (error) {
                             console.error(

@@ -114,20 +114,23 @@ class OptimizedModuleManager {
 
     /**
      * ✨ NUEVO: Precarga módulos críticos en background
+     * Cada módulo se precarga de forma independiente con su propio try-catch
+     * para que un fallo individual no rechace toda la Promise raíz.
      */
     private async preloadCriticalModules(): Promise<void> {
-        try {
-            // Precargar módulos críticos de forma asíncrona
-            const preloadPromises = this.HOT_MODULES.map(moduleName =>
-                this.ensureModuleLoaded(moduleName).catch(() => {
-                    // Silenciar errores de precarga, se intentará cargar después
-                }),
-            );
-
-            await Promise.allSettled(preloadPromises);
-        } catch {
-            // Fallos en precarga no deben afectar la funcionalidad principal
-        }
+        const preloadPromises = this.HOT_MODULES.map(async moduleName => {
+            try {
+                await this.ensureModuleLoaded(moduleName);
+            } catch {
+                // Fallo individual no debe afectar otros módulos ni la Promise raíz
+                if (env.VERBOSE === 'true') {
+                    console.warn(
+                        `[ModuleManager] Precarga fallida para '${moduleName}', se intentará al primer uso`,
+                    );
+                }
+            }
+        });
+        await Promise.all(preloadPromises);
     }
 
     /**
@@ -449,25 +452,34 @@ class OptimizedModuleManager {
             currentSize > this.MAX_POOL_SIZE
         ) {
             // LRU: Ordenar por menos usado
-            const sortedModules = Array.from(this.usageStats.entries())
-                .sort((a, b) => a[1] - b[1]) // Ascendente por uso
-                .filter(([name]) => !this.HOT_MODULES.includes(name)); // No eliminar HOT_MODULES
+            const sortedModules = Array.from(this.usageStats.entries()).sort(
+                (a, b) => a[1] - b[1],
+            ); // Ascendente por uso
 
             // Eliminar módulos hasta estar por debajo del 70% del límite
             const targetMemory = this.MAX_POOL_MEMORY * 0.7;
             const targetSize = this.MAX_POOL_SIZE * 0.7;
+            const criticalPressure = currentMemory > this.MAX_POOL_MEMORY * 0.9;
 
             for (const [moduleName] of sortedModules) {
-                this.modulePool.delete(moduleName);
-                this.loadedModules.delete(moduleName);
-                this.usageStats.delete(moduleName);
-
                 const newMemory = this.getPoolMemoryUsage();
                 const newSize = this.modulePool.size;
 
                 if (newMemory <= targetMemory && newSize <= targetSize) {
                     break;
                 }
+
+                // HOT_MODULES solo se desalojan si la presión de memoria es crítica (>90%)
+                if (
+                    this.HOT_MODULES.includes(moduleName) &&
+                    !criticalPressure
+                ) {
+                    continue;
+                }
+
+                this.modulePool.delete(moduleName);
+                this.loadedModules.delete(moduleName);
+                this.usageStats.delete(moduleName);
             }
 
             if (env.VERBOSE === 'true') {
@@ -2146,6 +2158,63 @@ export async function runPipelineHotUpdate(
     return getBuildPipeline().hotUpdate({ path: filePath, type });
 }
 
+/**
+ * Extrae los imports locales (rutas absolutas con /) del código compilado.
+ * Solo imports estáticos de rutas absolutas del proyecto (excluye /node_modules/).
+ */
+function extractLocalImports(code: string): string[] {
+    const imports: string[] = [];
+    const importRegex =
+        /(?:from|import)\s+['"](\/((?!node_modules)[^'"?#]+\.js))['"]/g;
+    let match: RegExpExecArray | null;
+    while ((match = importRegex.exec(code)) !== null) {
+        const importPath = match[1];
+        if (importPath && !imports.includes(importPath)) {
+            imports.push(importPath);
+        }
+    }
+    return imports;
+}
+
+/**
+ * Inyecta el shim de import.meta.hot al inicio de archivos JS compilados en modo dev.
+ * Adicionalmente registra accept() para cada dependencia local: cuando una dependencia
+ * se actualiza en versaHMR, el módulo actual se re-importa con timestamp nuevo,
+ * forzando al browser a crear un nuevo module record con la dependencia actualizada.
+ * Solo se llama cuando env.isPROD !== 'true' y la salida es un archivo .js.
+ */
+function injectHmrShim(code: string): string {
+    const localImports = extractLocalImports(code);
+    // Detecta si es un Vue SFC (el compilador Vue inyecta 'data-versa-hmr-component')
+    const isVueComponent = code.includes('data-versa-hmr-component');
+    const depsAccept =
+        localImports.length > 0
+            ? localImports
+                  .map(dep => {
+                      if (isVueComponent) {
+                          // Vue SFC: tras actualizar dependencia, re-cargar instancia Vue en DOM
+                          return `    window.__versaHMR.accept(${JSON.stringify(dep)}, async () => { await window.__versaHMR._reloadVueByPath?.(_id); });`;
+                      }
+                      // Módulo JS/TS plano: re-importar con nuevo timestamp para actualizar module record
+                      return `    window.__versaHMR.accept(${JSON.stringify(dep)}, () => { import(_id + '?t=' + Date.now()); });`;
+                  })
+                  .join('\n') + '\n'
+            : '';
+    const shim = `/* VersaCompiler HMR shim [dev] */
+if (typeof window !== 'undefined' && window.__versaHMR) {
+  (() => {
+    const _id = new URL(import.meta.url).pathname;
+    import.meta.hot = {
+      accept(cb) { window.__versaHMR.accept(_id, typeof cb === 'function' ? cb : () => {}); },
+      invalidate() { window.__versaHMR._invalidate?.(_id); },
+      dispose(cb) { window.__versaHMR._onDispose?.(_id, cb); },
+      get data() { return window.__versaHMR._getHotData?.(_id) ?? {}; },
+    };
+${depsAccept}  })();
+}\n`;
+    return shim + code;
+}
+
 async function compileWithPipeline(
     inPath: string,
     outPath: string,
@@ -2180,7 +2249,11 @@ async function compileWithPipeline(
 
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
-    await writeFile(outPath, result.code, 'utf-8');
+    let pipelineCode = result.code;
+    if (env.isPROD !== 'true' && outPath.endsWith('.js')) {
+        pipelineCode = injectHmrShim(pipelineCode);
+    }
+    await writeFile(outPath, pipelineCode, 'utf-8');
 
     if (result.dependencies.length > 0) {
         smartCache.registerDependencies(inPath, result.dependencies);
@@ -2480,6 +2553,9 @@ async function compileJS(
     } // Escribir archivo final
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
+    if (env.isPROD !== 'true' && outPath.endsWith('.js')) {
+        code = injectHmrShim(code);
+    }
     await writeFile(outPath, code, 'utf-8');
 
     // Logs de timing detallados en modo verbose

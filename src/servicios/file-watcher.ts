@@ -1,4 +1,4 @@
-import { readdir, rm, stat, unlink } from 'node:fs/promises';
+import { readdir, readFile, rm, stat, unlink } from 'node:fs/promises';
 import * as path from 'node:path';
 import * as process from 'node:process';
 const { env } = process;
@@ -16,7 +16,7 @@ import {
 } from '../compiler/compile';
 import { promptUser } from '../utils/promptUser';
 
-import { emitirCambios } from './browserSync';
+import { emitirCambios, registerHMRUpdate } from './browserSync';
 import { logger } from './logger';
 
 // Lazy loading para chalk
@@ -26,6 +26,63 @@ async function loadChalk() {
         chalk = (await import('chalk')).default;
     }
     return chalk;
+}
+
+/**
+ * Analiza el contenido de un módulo JS compilado para determinar si es seguro
+ * hacer HMR sin full-reload. Un módulo es "simple" si:
+ * - Solo exporta funciones, constantes o valores (no clases con estado ni patrones singleton)
+ * - No usa new/class en el scope raíz (como estado global mutable)
+ *
+ * @param outputPath - Ruta del archivo compilado a analizar
+ * @returns 'propagate' si es seguro sin full-reload, 'full-reload' si no se puede determinar
+ */
+async function analyzeCompiledModuleStrategy(
+    outputPath: string,
+): Promise<'propagate' | 'full-reload'> {
+    try {
+        const content = await readFile(outputPath, 'utf8');
+
+        // Si el módulo fue compilado por VersaCompiler en modo dev, el shim HMR
+        // está inyectado y gestiona la estrategia de reemplazo vía versaHMR.
+        // No analizar el shim como side-effect — siempre es propagate.
+        if (content.startsWith('/* VersaCompiler HMR shim [dev] */')) {
+            return 'propagate';
+        }
+
+        // Si el módulo declara que acepta HMR, propagate es seguro
+        if (/import\.meta\.hot\.accept/.test(content)) {
+            return 'propagate';
+        }
+
+        // Heurística: módulos con solo exports de funciones/constantes son seguros
+        const hasExports =
+            /export\s+(const|let|function|async function|class\b)/.test(
+                content,
+            ) || /export\s+default/.test(content);
+
+        if (!hasExports) {
+            return 'full-reload';
+        }
+
+        // Señales de estado global mutable o efectos secundarios al import:
+        // new ClassName() en scope raíz, módulos con side-effects de init
+        const hasRootLevelSideEffects =
+            // new en scope raíz (fuera de funciones/clases) — detectar heurísticamente
+            /^\s*(?:const|let|var)\s+\w+\s*=\s*new\s+\w+/m.test(content) ||
+            // Llamadas a funciones en scope raíz que sugieren init
+            /^\s*(?:init|setup|bootstrap|start|connect|register)\s*\(/m.test(
+                content,
+            );
+
+        if (hasRootLevelSideEffects) {
+            return 'full-reload';
+        }
+
+        return 'propagate';
+    } catch {
+        return 'full-reload';
+    }
 }
 
 // ✨ NUEVO: Sistema de debouncing optimizado para watch mode
@@ -235,11 +292,26 @@ class WatchDebouncer {
                     const invalidated = graph.invalidate(change.filePath);
                     for (const invalidatedPath of invalidated) {
                         if (expandedChanges.has(invalidatedPath)) continue;
+                        // Usar la acción correcta según la extensión del archivo invalidado
+                        // en lugar de forzar 'reloadFull' para todos los importers
+                        const invalidatedExt = path
+                            .extname(invalidatedPath)
+                            .replace('.', '');
+                        const invalidatedAction =
+                            (
+                                {
+                                    vue: 'HRMVue',
+                                    ts: 'HRMHelper',
+                                    js: 'HRMHelper',
+                                    mjs: 'HRMHelper',
+                                    cjs: 'HRMHelper',
+                                } as Record<string, string>
+                            )[invalidatedExt] ?? 'reloadFull';
                         expandedChanges.set(invalidatedPath, {
                             filePath: invalidatedPath,
                             action: 'change',
                             timestamp: Date.now(),
-                            extensionAction: 'reloadFull',
+                            extensionAction: invalidatedAction,
                             isAdditionalFile: false,
                         });
                     }
@@ -301,6 +373,10 @@ class WatchDebouncer {
             }
             const result = await initCompile(change.filePath, true, 'watch');
             if (result.success) {
+                // Registrar el output para que el middleware HMR reescriba imports dependientes
+                if (result.output) {
+                    registerHMRUpdate(result.output);
+                }
                 let accion = result.action || change.extensionAction;
                 accion =
                     accion === 'extension' ? change.extensionAction : accion;
@@ -308,21 +384,41 @@ class WatchDebouncer {
                 if (accion === 'HRMHelper') {
                     if (pluginHmrReload === 'full') {
                         accion = 'reloadFull';
-                    }
-                    const graph = getPipelineModuleGraph();
-                    const node = graph?.getNode(change.filePath);
-                    const importers = node ? Array.from(node.importers) : [];
-                    const strategy =
-                        importers.length > 0 ? 'propagate' : 'full-reload';
-                    if (pluginHmrReload === 'module') {
-                        payload.strategy = 'propagate';
                     } else {
-                        payload.strategy = strategy;
+                        const graph = getPipelineModuleGraph();
+                        const node = graph?.getNode(change.filePath);
+                        const importers = node
+                            ? Array.from(node.importers)
+                            : [];
+
+                        // Determinar estrategia base:
+                        // Si el plugin dice 'module' → propagate garantizado
+                        // Si hay importers conocidos → propagate (los consumers actualizarán sus refs)
+                        // Si no hay importers → analizar el módulo compilado para detectar si es "simple"
+                        let strategy: 'propagate' | 'full-reload';
+                        if (pluginHmrReload === 'module') {
+                            strategy = 'propagate';
+                        } else if (importers.length > 0) {
+                            strategy = 'propagate';
+                        } else {
+                            // Sin importers conocidos: analizar el output compilado
+                            strategy = await analyzeCompiledModuleStrategy(
+                                result.output,
+                            );
+                        }
+
+                        // moduleId: path del output relativo al proyecto para que el cliente
+                        // pueda hacer lookup en VersaModuleRegistry
+                        const moduleId = result.output.startsWith('/')
+                            ? result.output
+                            : `/${result.output}`;
+
+                        payload = {
+                            moduleId,
+                            importers,
+                            strategy,
+                        };
                     }
-                    payload = {
-                        importers,
-                        ...payload,
-                    };
                 }
                 emitirCambios(
                     this.browserSyncInstance,

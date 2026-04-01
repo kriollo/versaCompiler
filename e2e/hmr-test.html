@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>VersaCompiler — HMR E2E Test Page</title>
+
+        <!--
+            ImportMap permite usar "vue" como bare specifier en los módulos.
+            El servidor estático sirve node_modules/ desde la raíz del proyecto.
+        -->
+        <script type="importmap">
+            {
+                "imports": {
+                    "vue": "/node_modules/vue/dist/vue.esm-browser.js",
+                    "@vue/devtools-api": "/e2e/devtools-stub.mjs"
+                }
+            }
+        </script>
+
+        <style>
+            body {
+                font-family: monospace;
+                background: #0f1117;
+                color: #e2e8f0;
+                margin: 0;
+                padding: 1rem;
+            }
+            #hmr-status {
+                padding: 0.5rem 1rem;
+                background: #1e2433;
+                border-left: 3px solid #4ade80;
+                margin-bottom: 1rem;
+            }
+            #hmr-status.error {
+                border-color: #f87171;
+            }
+            #app {
+                padding: 0.5rem;
+                background: #1e2433;
+            }
+        </style>
+    </head>
+    <body>
+        <!--
+            Sentinel: este elemento persiste mientras no haya page reload.
+            Los tests verifican que data-alive="true" siga presente tras HMR.
+        -->
+        <div id="reload-sentinel" data-alive="true" aria-hidden="true"></div>
+
+        <!-- Punto de montaje de la app Vue mínima -->
+        <div id="app"></div>
+
+        <!-- Indicador de estado legible para debugging -->
+        <div id="hmr-status">Initializing HMR test environment...</div>
+
+        <!--
+            IMPORTANTE: Este script es SÍNCRONO (no type="module").
+            Se ejecuta ANTES de que los módulos diferidos se carguen,
+            lo que garantiza que window.___browserSync___ esté disponible
+            cuando initHRM.js llama a initSocket() al cargar.
+        -->
+        <script>
+            (function setupHMRTestEnvironment() {
+                // ── Mock Socket (mínimo EventEmitter compatible con initHRM.js) ──────────
+                const _listeners = Object.create(null);
+
+                const mockSocket = {
+                    connected: true,
+                    _listeners,
+
+                    /** Registra un listener de evento (servidor → cliente) */
+                    on(event, cb) {
+                        if (!_listeners[event]) _listeners[event] = [];
+                        _listeners[event].push(cb);
+                    },
+
+                    /** Elimina listeners de un evento (llamado por initHRM al re-inicializar) */
+                    off(event) {
+                        delete _listeners[event];
+                    },
+
+                    /** Emite al servidor (no-op en tests, solo cliente→servidor) */
+                    emit(_event, _data) {
+                        // no-op: en tests no hay servidor real
+                    },
+
+                    /**
+                     * Simula un evento entrante del servidor.
+                     * Retorna Promise que resuelve cuando todos los listeners async completan.
+                     * Playwright await-ea esta Promise via page.evaluate().
+                     */
+                    async trigger(event, data) {
+                        const cbs = _listeners[event]
+                            ? [..._listeners[event]]
+                            : [];
+                        for (const cb of cbs) {
+                            await cb(data);
+                        }
+                    },
+                };
+
+                window.__mockSocket = mockSocket;
+                window.___browserSync___ = { socket: mockSocket };
+
+                // ── Intercepción de window.location.reload ────────────────────────────
+                // Contar intentos de reload sin ejecutarlo realmente
+                // (evita que los tests se rompan por reload inesperado)
+                window.__reloadCount = 0;
+                Object.defineProperty(window.location, 'reload', {
+                    configurable: true,
+                    writable: true,
+                    value: function interceptedReload() {
+                        window.__reloadCount++;
+                        console.warn(
+                            '[HMR-TEST] window.location.reload() interceptado. Count:',
+                            window.__reloadCount,
+                        );
+                    },
+                });
+
+                console.log(
+                    '[HMR-TEST] Mock socket y reload interceptor listos.',
+                );
+            })();
+        </script>
+
+        <!--
+            Script de módulo: monta la app Vue y carga los scripts HMR.
+            Los módulos son diferidos, se ejecutan DESPUÉS del script síncrono anterior.
+        -->
+        <script type="module">
+            import { createApp, defineComponent, ref, h } from 'vue';
+
+            const statusEl = document.getElementById('hmr-status');
+
+            try {
+                // ── 1. Montar app Vue mínima ─────────────────────────────────────────
+                // Necesaria para que obtenerInstanciaVue() encuentre la instancia Vue
+                // sin hacer timeout (Vue 3 expone #app.__vue_app__ al montar)
+                const TestCounter = defineComponent({
+                    name: 'VersaHMRTestCounter',
+                    setup() {
+                        const count = ref(0);
+                        // Expuesto globalmente para que los tests puedan manipularlo
+                        window.__vueTestCounter = count;
+                        return { count };
+                    },
+                    render() {
+                        return h(
+                            'div',
+                            {
+                                id: 'vue-counter-root',
+                                'data-testid': 'hmr-counter',
+                                'data-count': this.count,
+                            },
+                            [
+                                h(
+                                    'span',
+                                    { id: 'count-display' },
+                                    `Count: ${this.count}`,
+                                ),
+                            ],
+                        );
+                    },
+                });
+
+                const app = createApp(TestCounter);
+                app.mount('#app');
+                // Vue 3 setea app._container.__vue_app__ = app internamente;
+                // también lo exponemos en window para getInstanciaVue.js
+                window.__VUE_APP__ = app;
+                window.__VUE_APP_INSTANCE__ = app;
+
+                // ── 2. Cargar sistema HMR ────────────────────────────────────────────
+                // versaHMR.js → inicializa window.__versaHMR (singleton)
+                await import('/__versa/versaHMR.js');
+
+                // initHRM.js → llama initSocket() que registra listeners en el mock socket
+                await import('/__versa/initHRM.js');
+
+                // ── 3. Esperar hasta que initSocket() registre el listener HRMHelper ─
+                // initSocket() es async (llama obtenerInstanciaVue internamente).
+                // El módulo export principal no awaitea initSocket(), así que
+                // debemos esperar a que el listener exista antes de señalar "ready".
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 12_000; // 12s máximo
+                    const poll = () => {
+                        const listeners = window.__mockSocket._listeners;
+                        if (
+                            listeners['HRMHelper'] &&
+                            listeners['HRMHelper'].length > 0
+                        ) {
+                            resolve(undefined);
+                        } else if (Date.now() > deadline) {
+                            reject(
+                                new Error(
+                                    'Timeout: HRMHelper listener no registrado en 12s',
+                                ),
+                            );
+                        } else {
+                            setTimeout(poll, 50);
+                        }
+                    };
+                    poll();
+                });
+
+                // ── 4. Señalar que el entorno está listo ─────────────────────────────
+                statusEl.textContent = 'HMR Ready ✓';
+                document.body.setAttribute('data-hmr-ready', 'true');
+
+                console.log('[HMR-TEST] Entorno listo.', {
+                    registry: window.__versaHMR?.getStats(),
+                    listeners: Object.keys(window.__mockSocket._listeners),
+                });
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.classList.add('error');
+                document.body.setAttribute('data-hmr-error', err.message);
+                console.error('[HMR-TEST] Error inicializando:', err);
+            }
+        </script>
+    </body>
+</html>

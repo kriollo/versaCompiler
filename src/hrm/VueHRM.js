@@ -222,7 +222,80 @@ function tryForceUpdate(instance) {
 }
 
 /**
- * Intenta actualizar un componente en el camino del árbol
+ * Limpia los caches internos de Vue para una definición de componente.
+ * Necesario para que Vue detecte el cambio de props/emits/options.
+ * @param {Object} appContext - Contexto de la app Vue (instance.appContext)
+ * @param {Object} componentDef - Definición del componente
+ */
+function clearVueCaches(appContext, componentDef) {
+    if (!appContext || !componentDef) return;
+    try {
+        appContext.propsCache?.delete(componentDef);
+        appContext.emitsCache?.delete(componentDef);
+        appContext.optionsCache?.delete(componentDef);
+    } catch {
+        // Los caches pueden no existir en todas las versiones de Vue
+    }
+}
+
+/**
+ * Actualiza una instancia de componente Vue en-place con la nueva definición.
+ * Muta el objeto `instance.type` directamente para que TODAS las referencias
+ * a la definición (incluidas las capturadas en closures de render functions
+ * de componentes padre que hacen import estático) vean la nueva versión.
+ *
+ * @param {Object} instance - Instancia Vue del componente a actualizar
+ * @param {Object} newComponentDef - Nueva definición del componente
+ * @returns {boolean} true si la actualización fue exitosa
+ */
+function updateInstanceInPlace(instance, newComponentDef) {
+    if (!instance || !newComponentDef) return false;
+
+    const oldDef = instance.type;
+    if (!oldDef || typeof oldDef !== 'object') return false;
+
+    // 1. Mutar la definición existente en-place.
+    //    Object.assign copia propiedades enumerables; copiamos render/setup
+    //    explícitamente porque pueden no ser enumerables en algunos builds.
+    Object.assign(oldDef, newComponentDef);
+    if (newComponentDef.render) oldDef.render = newComponentDef.render;
+    if (newComponentDef.setup) oldDef.setup = newComponentDef.setup;
+    if (newComponentDef.ssrRender) oldDef.ssrRender = newComponentDef.ssrRender;
+
+    // 2. Actualizar instance.render directamente.
+    //    Vue almacena la referencia a la render function en instance.render durante
+    //    el mount (handleSetupResult), y es ESA la que llama en cada patch.
+    //    Cambiar solo instance.type.render NO es suficiente — hay que actualizar
+    //    también instance.render para que el próximo update use la nueva template.
+    if (newComponentDef.render && typeof instance.render !== 'undefined') {
+        instance.render = newComponentDef.render;
+    }
+
+    // 3. Limpiar caches internos de Vue para que re-evalúe props/emits/options.
+    clearVueCaches(instance.appContext, oldDef);
+
+    // 4. Forzar actualización de ESTA instancia directamente (no solo del padre).
+    //    Incrementar versaComponentKey para triggear el :key del template.
+    if (instance.ctx?._.setupState?.versaComponentKey !== undefined) {
+        instance.ctx._.setupState.versaComponentKey++;
+    }
+    if (typeof instance.update === 'function') {
+        instance.update();
+        return true;
+    }
+    if (instance.proxy && typeof instance.proxy.$forceUpdate === 'function') {
+        instance.proxy.$forceUpdate();
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Intenta actualizar un componente en el camino del árbol.
+ * Ahora usa mutación in-place de la definición + limpieza de caches Vue,
+ * en lugar de reemplazar la referencia en el mapa de components del padre.
+ *
  * @param {TreeNode[]} path - Camino de nodos desde el componente hasta la raíz
  * @param {Object} newComponent - Nuevo componente a usar
  * @param {string} componentName - Nombre del componente
@@ -235,7 +308,25 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
         return false;
     }
 
-    // Recorrer el path desde el padre hacia la raíz (saltando el primer elemento que es el propio componente)
+    // path[0] es el nodo del propio componente a actualizar.
+    // Intentar actualización directa en la instancia del componente.
+    const targetNode = path[0];
+    if (targetNode?.instancia) {
+        const updated = updateInstanceInPlace(
+            targetNode.instancia,
+            newComponent,
+        );
+        if (updated) {
+            // También forzar actualización del padre para que el vdom se reconcilie.
+            const parentNode = path[1];
+            if (parentNode?.instancia && !parentNode.isRoot) {
+                tryForceUpdate(parentNode.instancia);
+            }
+            return true;
+        }
+    }
+
+    // Fallback: recorrer hacia el padre si el nodo propio no es accesible.
     for (let i = 1; i < path.length; i++) {
         const parent = path[i];
 
@@ -244,19 +335,29 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
             return true;
         }
 
-        if (!parent || !parent.instancia) {
+        if (!parent?.instancia) {
             console.error('❌ Nodo padre no válido en el camino:', parent);
-            continue; // Continúa con el siguiente padre en lugar de fallar
+            continue;
         }
 
-        // Actualizar la instancia del componente
         const componentsDefinition =
             parent.instancia?.type?.components || parent.instancia?.components;
 
         if (componentsDefinition && componentsDefinition[componentName]) {
-            componentsDefinition[componentName] = newComponent;
+            // Mutar la definición existente en el mapa del padre también,
+            // para que nuevas instancias del componente creadas después se usen
+            // con la definición actualizada.
+            const existingDef = componentsDefinition[componentName];
+            if (existingDef && typeof existingDef === 'object') {
+                Object.assign(existingDef, newComponent);
+                if (newComponent.render)
+                    existingDef.render = newComponent.render;
+                if (newComponent.setup) existingDef.setup = newComponent.setup;
+                clearVueCaches(parent.instancia.appContext, existingDef);
+            } else {
+                componentsDefinition[componentName] = newComponent;
+            }
 
-            // Forzar actualización de la instancia padre
             return (
                 tryForceUpdate(parent.instancia) ||
                 tryForceUpdate(parent.instancia.proxy)
@@ -296,6 +397,18 @@ export async function reloadComponent(App, Component) {
         const urlOrigin = `${newBaseUrl.origin}/${relativePath}`;
         const timestamp = Date.now();
         const moduleUrl = `${urlOrigin}?t=${timestamp}`;
+
+        // Eliminar style tags del ciclo HMR anterior para este componente
+        // para evitar acumulación de estilos duplicados en el documento.
+        const componentName_clean = componentName.replace(
+            /[^a-zA-Z0-9_-]/g,
+            '',
+        );
+        document
+            .querySelectorAll(
+                `[data-versa-hmr-component="${componentName_clean}"]`,
+            )
+            .forEach(el => el.remove());
 
         const module = await import(moduleUrl);
 

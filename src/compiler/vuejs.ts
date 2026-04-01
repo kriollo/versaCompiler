@@ -96,22 +96,40 @@ class VueHMRInjectionCache {
             );
         }
 
-        // Inyectar :key en el template
-        injectedData = injectedData.replace(
-            /(<template[^>]*>[\s\S]*?)(<(\w+)([^>]*?))(\/?>)/,
-            (match, p1, p2, p3, p4, p5) => {
-                if (p4.includes(':key=') || p4.includes('key=')) {
-                    return match;
+        // Inyectar :key en el primer elemento hijo del template.
+        // Dos pasos para evitar backtracking catastrófico (ReDoS) que ocurría con
+        // el pattern combinado /(<template[^>]*>[\s\S]*?)(<(\w+)([^>]*?))(\/?>)/
+        const templateTagMatch = /(<template[^>]*>)/.exec(injectedData);
+        if (templateTagMatch) {
+            const templateEnd =
+                templateTagMatch.index + templateTagMatch[0].length;
+            const afterTemplate = injectedData.slice(templateEnd);
+            // Buscar el primer tag de elemento (ignora espacios/comentarios) justo después del <template>
+            const firstChildMatch = /^(\s*)(<(\w+)([^>]*?)(\/?>))/.exec(
+                afterTemplate,
+            );
+            if (firstChildMatch) {
+                const [
+                    ,
+                    whitespace = '',
+                    fullTag = '',
+                    tagName,
+                    attrs = '',
+                    closing,
+                ] = firstChildMatch;
+                if (!attrs.includes(':key=') && !attrs.includes('key=')) {
+                    const isSelfClosing = closing === '/>';
+                    const newTag = isSelfClosing
+                        ? `<${tagName}${attrs} :key="versaComponentKey" />`
+                        : `<${tagName}${attrs} :key="versaComponentKey">`;
+                    injectedData =
+                        injectedData.slice(0, templateEnd) +
+                        whitespace +
+                        newTag +
+                        afterTemplate.slice(whitespace.length + fullTag.length);
                 }
-
-                const isSelfClosing = p5 === '/>';
-                if (isSelfClosing) {
-                    return `${p1}<${p3}${p4} :key="versaComponentKey" />`;
-                } else {
-                    return `${p1}<${p3}${p4} :key="versaComponentKey">`;
-                }
-            },
-        );
+            }
+        }
 
         // Cachear resultado
         this.cache.set(cacheKey, {
@@ -214,7 +232,6 @@ export const preCompileVue = async (
     scriptInfo?: {
         startLine: number;
         content: string;
-        originalData: string;
     };
 }> => {
     try {
@@ -228,9 +245,6 @@ export const preCompileVue = async (
                 scriptInfo: undefined,
             };
         }
-
-        // Guardar el código original antes de inyectar HMR
-        const originalData = data;
 
         if (!isProd) {
             const { injectedData } =
@@ -418,10 +432,14 @@ export const preCompileVue = async (
             });
         });
 
+        // data-versa-hmr-component permite a VueHRM.js eliminar style tags
+        // de ciclos HMR anteriores para evitar acumulación de estilos duplicados.
+        const sanitizedForAttr = fileName.replace(/[^a-zA-Z0-9_-]/g, '');
         const insertStyles = compiledStyles.length
             ? `(function(){
                     let styleTag = document.createElement('style');
                     styleTag.setAttribute('data-v-${id}', '');
+                    styleTag.setAttribute('data-versa-hmr-component', '${sanitizedForAttr}');
                     styleTag.innerHTML = \`${compiledStyles.map((s: any) => s.code).join('\n')}\`;
                     document.head.appendChild(styleTag);
                 })();`
@@ -515,6 +533,8 @@ export const preCompileVue = async (
         output = `${output}\n${finishComponent}`;
 
         // 🚀 OPTIMIZACIÓN CRÍTICA: Evitar crear scriptInfo si no hay script
+        // originalData NO se incluye en scriptInfo para evitar retener la cadena completa
+        // del .vue en memoria. Se pasa por separado como sourceCode en parseTypeScriptErrors.
         const result: {
             lang: 'ts' | 'js';
             error: null;
@@ -522,7 +542,6 @@ export const preCompileVue = async (
             scriptInfo?: {
                 startLine: number;
                 content: string;
-                originalData: string;
             };
         } = {
             lang: finalCompiledScript.lang,
@@ -537,7 +556,6 @@ export const preCompileVue = async (
                     (descriptor.script || descriptor.scriptSetup)!.loc?.start
                         .line || 1,
                 content: (descriptor.script || descriptor.scriptSetup)!.content,
-                originalData: originalData, // String directa, no closure
             };
         }
 
