@@ -131,10 +131,31 @@ export class OxlintNode {
                         }
                     }
 
-                    results[format] =
-                        format === 'json' || format === 'sarif'
-                            ? JSON.parse(stdout || '{}')
-                            : stdout;
+                    if (format === 'json' || format === 'sarif') {
+                        const raw = stdout || '';
+                        const looksLikeJson =
+                            raw.trimStart().startsWith('{') ||
+                            raw.trimStart().startsWith('[');
+                        if (!looksLikeJson) {
+                            // OxLint falló antes de producir JSON (ej. config inválida, tsconfig ausente)
+                            const errMsg = (
+                                stderr ||
+                                raw ||
+                                'Salida vacía'
+                            ).trim();
+                            console.error(
+                                `OxLint no produjo JSON válido (formato '${format}'). Salida: ${errMsg}`,
+                            );
+                            results[format] = {
+                                error: errMsg,
+                                exitCode,
+                            };
+                        } else {
+                            results[format] = JSON.parse(raw);
+                        }
+                    } else {
+                        results[format] = stdout;
+                    }
                 } catch (error: any) {
                     console.error(
                         `Error ejecutando Oxlint para formato '${format}':`,

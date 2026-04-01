@@ -2255,7 +2255,11 @@ async function compileWithPipeline(
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
     let pipelineCode = result.code;
-    if (env.isPROD !== 'true' && outPath.endsWith('.js')) {
+    if (
+        env.isPROD !== 'true' &&
+        env.HMR !== 'false' &&
+        outPath.endsWith('.js')
+    ) {
         pipelineCode = injectHmrShim(pipelineCode);
     }
     await writeFile(outPath, pipelineCode, 'utf-8');
@@ -2558,7 +2562,11 @@ async function compileJS(
     } // Escribir archivo final
     const destinationDir = path.dirname(outPath);
     await mkdir(destinationDir, { recursive: true });
-    if (env.isPROD !== 'true' && outPath.endsWith('.js')) {
+    if (
+        env.isPROD !== 'true' &&
+        env.HMR !== 'false' &&
+        outPath.endsWith('.js')
+    ) {
         code = injectHmrShim(code);
     }
     await writeFile(outPath, code, 'utf-8');
@@ -3029,7 +3037,15 @@ export async function runLinter(showResult: boolean = false): Promise<boolean> {
                         );
                         const oxlintPromise = OxLintLib(item)
                             .then((oxlintResult: any) => {
-                                if (
+                                if (oxlintResult?.['json']?.error) {
+                                    // OxLint falló antes de generar JSON válido (ej. tsconfig inválido)
+                                    linterErrors.push({
+                                        file:
+                                            item.configFile || 'OxLint Config',
+                                        message: `OxLint no pudo ejecutarse: ${oxlintResult['json'].error}`,
+                                        severity: 'error',
+                                    });
+                                } else if (
                                     oxlintResult &&
                                     oxlintResult['json'] &&
                                     Array.isArray(

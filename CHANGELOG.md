@@ -5,6 +5,15 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.4] - 2026-04-01
+
+### 🐛 Correcciones
+
+- **`oxlint-node.ts` — falso positivo cuando OxLint no produce JSON válido**: cuando OxLint falla al iniciarse (ej. `tsconfig` inválido o ausente), escribe texto plano a `stdout` en lugar de JSON. La llamada a `JSON.parse()` lanzaba una excepción que era capturada silenciosamente, haciendo que el linter reportara "✅ No se encontraron errores" aunque nunca hubiera lint real. Fix: verificar si `stdout` empieza con `{` o `[` antes de parsear; si no, propagar el mensaje de error de OxLint como un resultado de error explícito.
+- **`compile.ts` — resultado de error de OxLint ignorado**: el bloque de procesamiento de resultados de OxLint solo manejaba el caso `diagnostics` array, ignorando silenciosamente el objeto `{ error, exitCode }` que se produce cuando OxLint falla. Fix: añadir rama `else if` que agrega el fallo de OxLint como entrada en `linterErrors`, convirtiendo el falso positivo en un error real visible.
+
+---
+
 ## [2.6.3] - 2026-04-01
 
 ### 🐛 Correcciones
