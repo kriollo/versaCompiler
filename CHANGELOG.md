@@ -5,6 +5,46 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.0] - 2026-03-31
+
+### ✨ Nuevas Características
+
+- **Hot Module Replacement completo para librerías JS/TS**:
+    - `versaHMR.js` — nuevo registry global `window.__versaHMR` con `accept()`, `notifyUpdate()`, `hasObservers()` y `_reloadVueByPath()`. Permite que cualquier módulo registre callbacks por dependencia.
+    - `extractLocalImports()` en `compile.ts` — extrae imports estáticos de rutas absolutas del proyecto (excluye `/node_modules/`) para inyectarlos como callbacks de aceptación.
+    - `injectHmrShim()` mejorado — genera `window.__versaHMR.accept(dep, cb)` por cada dependencia local detectada en el código compilado. Vue SFCs usan `_reloadVueByPath()` para actualizar la instancia en DOM; módulos JS/TS planos re-importan con `?t=` para actualizar el module record.
+    - `_reloadVueByPath` expuesto en `initHRM.js` — permite que los callbacks de shims re-utilicen el pipeline de `reloadComponent()` de Vue HMR.
+
+- **Propagación en cascada de actualizaciones**:
+    - Cuando `sampleFile.ts` cambia: el consumidor (`operacionesMatematicas.js`) detecta la actualización vía su `accept('/public/js/sampleFile.js', ...)` y re-carga su propia instancia Vue, actualizando los bindings en el DOM sin recarga de página.
+    - Middleware en `browserSync.ts` (`rewriteImportsForHMR`) reescribe imports en archivos servidos con `?t=` para propagar los timestamps hacia las sub-dependencias.
+
+- **`registerHMRUpdate()`** en `browserSync.ts`:
+    - Registra el path del archivo recién compilado en un mapa de timestamps con TTL de 5 min.
+    - El middleware de BrowserSync intercepta requests `*.js?t=*` y reescribe los imports internos con las marcas de tiempo de archivos recién actualizados.
+
+### 🔧 Mejoras
+
+- **`file-watcher.ts`**:
+    - `extensionAction` para importers invalidados ahora se deriva de la extensión del archivo (`.vue` → `HRMVue`, `.ts`/`.js` → `HRMHelper`) en lugar de ser fijo como `reloadFull`.
+    - `registerHMRUpdate(result.output)` se llama tras compilación exitosa en watch mode.
+
+- **`initHRM.js`**:
+    - Handler `HRMHelper` usa `moduleId` (path absoluto `/public/js/...`) en lugar de `data.filePath` (relativo) para los `import()` dinámicos, evitando el 404 que causaba `window.location.reload()`.
+    - `_reloadVueByPath` registrado en `window.__versaHMR` para que shims de Vue SFCs disparen updates de instancia.
+
+- **`VueHRM.js`**:
+    - Fix en `updateInstanceInPlace`: `typeof instance.render !== 'undefined'` (string literal) en lugar de `!== undefined`.
+
+### 🐛 Correcciones
+
+- **Librerías JS/TS**: modificar `sampleFile.ts` ya no causa recarga completa de página ni deja la app usando la versión anterior de las funciones.
+- **Vue SFCs con dependencias JS**: al cambiar una librería importada por un `.vue`, la instancia Vue en DOM se actualiza in-place (mismo mecanismo que HMR de `.vue` directo).
+- **`initHRM.js`**: import de side-effect `./versaHMR.js` suprimido correctamente con `// oxlint-disable-next-line import/no-unassigned-import`.
+- **`vuejs.ts`**: variable `originalData` sin usar eliminada.
+
+---
+
 ## [2.5.0] - 2026-03-31
 
 ### ✨ Nuevas Características

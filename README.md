@@ -3,15 +3,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=flat&logo=vuedotjs&logoColor=4FC08D)](https://vuejs.org/)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.6.0)
 
-> **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) integrado.**
+> **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) completo.**
 
 **VersaCompiler** es una herramienta de compilación diseñada para proyectos Vue 3 con soporte completo para TypeScript, JavaScript y todas las funcionalidades modernas que necesitas para desarrollo web.
 
 ## 🌟 Características Principales
 
 - ⚡ **Compilación ultra-rápida** - Workers paralelos y cache inteligente
-- 🔥 **HMR Automático (como Vite)** - Detección inteligente sin configuración manual, igual que Vite y esbuild
+- 🔥 **HMR Completo (como Vite)** - Vue SFCs, librerías JS/TS y propagación en cascada sin recarga de página
 - 🧩 **Soporte completo para Vue 3** - SFC, Composition API, script setup
 - 📝 **TypeScript avanzado** - Language Service, decorators, validación de tipos
 - 🔍 **Sistema de linting dual** - ESLint + OxLint con auto-fix
