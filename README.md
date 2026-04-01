@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=flat&logo=vuedotjs&logoColor=4FC08D)](https://vuejs.org/)
-[![Version](https://img.shields.io/badge/version-2.6.1-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.6.1)
+[![Version](https://img.shields.io/badge/version-2.6.2-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.6.2)
 
 > **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) completo.**
 
@@ -194,9 +194,9 @@ export default defineConfig({
 
 - `outDir`: Directorio de salida de los archivos compilados (ej: `'./dist'`)
 - `bundlers`: Array de entradas de bundling post-compilación (opcional, `false` para deshabilitar)
-  - `name`: Nombre del bundle
-  - `fileInput`: Archivo de entrada
-  - `fileOutput`: Archivo de salida
+    - `name`: Nombre del bundle
+    - `fileInput`: Archivo de entrada
+    - `fileOutput`: Archivo de salida
 
 #### `resolve`
 

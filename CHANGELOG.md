@@ -5,6 +5,15 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.2] - 2026-04-01
+
+### 🐛 Correcciones
+
+- **`dist/config.d.ts` ausente en builds publicados**: el script `build:types` usaba compilación incremental de TypeScript y, al limpiar `dist/` con `--co`, el caché `.tsbuildinfo` hacía que `tsc` omitiera la emisión de declaraciones. Fix: `incremental: false` en `tsconfig.declarations.json` para garantizar que los archivos `.d.ts` siempre se regeneren al compilar.
+- Esto eliminaba el error `TS7016` (`No se encontró ningún archivo de declaración para el módulo 'versacompiler/config'`) en proyectos consumidores.
+
+---
+
 ## [2.6.1] - 2026-04-01
 
 ### 🐛 Correcciones
