@@ -20,60 +20,62 @@ The fix is to set `position: absolute` on the `leave-active` class so leaving it
 - [ ] Test with rapid add/remove operations to verify smooth animations
 
 **Incorrect - Items jump instead of moving:**
+
 ```vue
 <template>
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="item in items" :key="item.id">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
+    <TransitionGroup name="list" tag="ul">
+        <li v-for="item in items" :key="item.id">
+            {{ item.name }}
+        </li>
+    </TransitionGroup>
 </template>
 
 <style>
-/* INCOMPLETE: Missing move class and position absolute */
-.list-enter-active,
-.list-leave-active {
-  transition: all 0.5s ease;
-}
+    /* INCOMPLETE: Missing move class and position absolute */
+    .list-enter-active,
+    .list-leave-active {
+        transition: all 0.5s ease;
+    }
 
-.list-enter-from,
-.list-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
+    .list-enter-from,
+    .list-leave-to {
+        opacity: 0;
+        transform: translateX(30px);
+    }
 </style>
 ```
 
 **Correct - Smooth move transitions:**
+
 ```vue
 <template>
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="item in items" :key="item.id">
-      {{ item.name }}
-    </li>
-  </TransitionGroup>
+    <TransitionGroup name="list" tag="ul">
+        <li v-for="item in items" :key="item.id">
+            {{ item.name }}
+        </li>
+    </TransitionGroup>
 </template>
 
 <style>
-/* CORRECT: Full set of classes for smooth animations */
+    /* CORRECT: Full set of classes for smooth animations */
 
-/* Apply transition to moving elements */
-.list-move,
-.list-enter-active,
-.list-leave-active {
-  transition: all 0.5s ease;
-}
+    /* Apply transition to moving elements */
+    .list-move,
+    .list-enter-active,
+    .list-leave-active {
+        transition: all 0.5s ease;
+    }
 
-.list-enter-from,
-.list-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
+    .list-enter-from,
+    .list-leave-to {
+        opacity: 0;
+        transform: translateX(30px);
+    }
 
-/* CRITICAL: Take leaving items out of layout flow */
-.list-leave-active {
-  position: absolute;
-}
+    /* CRITICAL: Take leaving items out of layout flow */
+    .list-leave-active {
+        position: absolute;
+    }
 </style>
 ```
 
@@ -111,8 +113,8 @@ With position: absolute:
 
 ```css
 .list-leave-active {
-  position: absolute;
-  width: 100%; /* Or specific width to maintain layout during leave */
+    position: absolute;
+    width: 100%; /* Or specific width to maintain layout during leave */
 }
 ```
 
@@ -120,11 +122,12 @@ With position: absolute:
 
 ```css
 .list-leave-active {
-  position: absolute;
-  z-index: -1; /* Optional: put behind other items */
+    position: absolute;
+    z-index: -1; /* Optional: put behind other items */
 }
 ```
 
 ## Reference
+
 - [Vue.js TransitionGroup Move Transitions](https://vuejs.org/guide/built-ins/transition-group.html#move-transitions)
 - [FLIP Animation Technique](https://aerotwist.com/blog/flip-your-animations/)

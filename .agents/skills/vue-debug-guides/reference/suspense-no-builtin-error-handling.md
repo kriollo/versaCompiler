@@ -12,16 +12,14 @@ Without explicit error handling, async errors in suspended components will propa
 
 ```vue
 <script setup>
-// No error handling - async errors will propagate uncaught
+    // No error handling - async errors will propagate uncaught
 </script>
 
 <template>
-  <Suspense>
-    <AsyncComponent />
-    <template #fallback>
-      Loading...
-    </template>
-  </Suspense>
+    <Suspense>
+        <AsyncComponent />
+        <template #fallback>Loading...</template>
+    </Suspense>
 </template>
 ```
 
@@ -29,29 +27,27 @@ Without explicit error handling, async errors in suspended components will propa
 
 ```vue
 <script setup>
-import { ref, onErrorCaptured } from 'vue'
-import AsyncComponent from './AsyncComponent.vue'
+    import { ref, onErrorCaptured } from 'vue';
+    import AsyncComponent from './AsyncComponent.vue';
 
-const error = ref(null)
+    const error = ref(null);
 
-onErrorCaptured((err) => {
-  error.value = err
-  return false // Prevent error from propagating further
-})
+    onErrorCaptured(err => {
+        error.value = err;
+        return false; // Prevent error from propagating further
+    });
 </script>
 
 <template>
-  <div v-if="error" class="error-state">
-    <p>Something went wrong: {{ error.message }}</p>
-    <button @click="error = null">Retry</button>
-  </div>
+    <div v-if="error" class="error-state">
+        <p>Something went wrong: {{ error.message }}</p>
+        <button @click="error = null">Retry</button>
+    </div>
 
-  <Suspense v-else>
-    <AsyncComponent />
-    <template #fallback>
-      Loading...
-    </template>
-  </Suspense>
+    <Suspense v-else>
+        <AsyncComponent />
+        <template #fallback>Loading...</template>
+    </Suspense>
 </template>
 ```
 
@@ -60,56 +56,56 @@ onErrorCaptured((err) => {
 ```vue
 <!-- ErrorBoundary.vue -->
 <script setup>
-import { ref, onErrorCaptured } from 'vue'
+    import { ref, onErrorCaptured } from 'vue';
 
-const props = defineProps({
-  fallback: {
-    type: String,
-    default: 'Something went wrong'
-  }
-})
+    const props = defineProps({
+        fallback: {
+            type: String,
+            default: 'Something went wrong',
+        },
+    });
 
-const emit = defineEmits(['error'])
+    const emit = defineEmits(['error']);
 
-const error = ref(null)
+    const error = ref(null);
 
-onErrorCaptured((err, instance, info) => {
-  error.value = { err, instance, info }
-  emit('error', { err, instance, info })
-  return false
-})
+    onErrorCaptured((err, instance, info) => {
+        error.value = { err, instance, info };
+        emit('error', { err, instance, info });
+        return false;
+    });
 
-const reset = () => {
-  error.value = null
-}
+    const reset = () => {
+        error.value = null;
+    };
 
-defineExpose({ reset })
+    defineExpose({ reset });
 </script>
 
 <template>
-  <slot v-if="!error" />
-  <slot v-else name="error" :error="error" :reset="reset">
-    <div class="error-boundary">
-      {{ fallback }}
-      <button @click="reset">Retry</button>
-    </div>
-  </slot>
+    <slot v-if="!error" />
+    <slot v-else name="error" :error="error" :reset="reset">
+        <div class="error-boundary">
+            {{ fallback }}
+            <button @click="reset">Retry</button>
+        </div>
+    </slot>
 </template>
 ```
 
 ```vue
 <!-- Usage -->
 <template>
-  <ErrorBoundary @error="logError">
-    <Suspense>
-      <AsyncDashboard />
-      <template #fallback>Loading dashboard...</template>
-    </Suspense>
+    <ErrorBoundary @error="logError">
+        <Suspense>
+            <AsyncDashboard />
+            <template #fallback>Loading dashboard...</template>
+        </Suspense>
 
-    <template #error="{ error, reset }">
-      <DashboardError :error="error" @retry="reset" />
-    </template>
-  </ErrorBoundary>
+        <template #error="{ error, reset }">
+            <DashboardError :error="error" @retry="reset" />
+        </template>
+    </ErrorBoundary>
 </template>
 ```
 

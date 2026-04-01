@@ -17,12 +17,13 @@ tags: [vue3, slots, scoped-slots, reserved-props, naming]
 - [ ] Remember only explicitly bound attributes become slot props
 
 **Incorrect Expectation:**
+
 ```vue
 <!-- ChildComponent.vue -->
 <template>
-  <div>
-    <slot name="header" title="Welcome"></slot>
-  </div>
+    <div>
+        <slot name="header" title="Welcome"></slot>
+    </div>
 </template>
 ```
 
@@ -39,18 +40,19 @@ tags: [vue3, slots, scoped-slots, reserved-props, naming]
 ```
 
 **If You Need to Pass a "Name" Value:**
+
 ```vue
 <!-- ChildComponent.vue -->
 <template>
-  <div>
-    <!-- Use a different prop name like 'slotName' or 'label' -->
-    <slot name="header" :label="slotLabel" :title="title"></slot>
-  </div>
+    <div>
+        <!-- Use a different prop name like 'slotName' or 'label' -->
+        <slot name="header" :label="slotLabel" :title="title"></slot>
+    </div>
 </template>
 
 <script setup>
-const slotLabel = 'header'
-const title = 'Welcome'
+    const slotLabel = 'header';
+    const title = 'Welcome';
 </script>
 ```
 
@@ -66,28 +68,31 @@ const title = 'Welcome'
 
 ## What Gets Passed as Slot Props
 
-| Attribute on `<slot>` | Passed to Parent? |
-|----------------------|-------------------|
-| `name` | No (reserved for slot identification) |
-| `:text="message"` | Yes, as `text` |
-| `:count="5"` | Yes, as `count` |
-| `v-bind="object"` | Yes, spreads object properties |
-| `class="..."` | No (not bound with `:`) |
+| Attribute on `<slot>` | Passed to Parent?                     |
+| --------------------- | ------------------------------------- |
+| `name`                | No (reserved for slot identification) |
+| `:text="message"`     | Yes, as `text`                        |
+| `:count="5"`          | Yes, as `count`                       |
+| `v-bind="object"`     | Yes, spreads object properties        |
+| `class="..."`         | No (not bound with `:`)               |
 
 ## Multiple Named Slots Example
 
 ```vue
 <!-- TabPanel.vue -->
 <template>
-  <div class="tabs">
-    <slot name="tab1" :active="activeTab === 1" :label="'First Tab'"></slot>
-    <slot name="tab2" :active="activeTab === 2" :label="'Second Tab'"></slot>
-  </div>
+    <div class="tabs">
+        <slot name="tab1" :active="activeTab === 1" :label="'First Tab'"></slot>
+        <slot
+            name="tab2"
+            :active="activeTab === 2"
+            :label="'Second Tab'"></slot>
+    </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-const activeTab = ref(1)
+    import { ref } from 'vue';
+    const activeTab = ref(1);
 </script>
 ```
 
@@ -106,4 +111,5 @@ const activeTab = ref(1)
 ```
 
 ## Reference
+
 - [Vue.js Slots - Scoped Slots](https://vuejs.org/guide/components/slots.html#scoped-slots)

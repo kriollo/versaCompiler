@@ -23,39 +23,41 @@ tags: [vue3, teleport, modal, overlay, positioning, responsive]
 When an ancestor has `transform`, `filter`, or `perspective`, fixed-position overlays can behave like they are locally positioned. Teleport escapes that context.
 
 **BAD:**
+
 ```vue
 <template>
-  <div class="animated-container">
-    <button @click="open = true">Open</button>
+    <div class="animated-container">
+        <button @click="open = true">Open</button>
 
-    <!-- Broken: fixed positioning is scoped to the transformed parent -->
-    <div v-if="open" class="modal">Modal</div>
-  </div>
+        <!-- Broken: fixed positioning is scoped to the transformed parent -->
+        <div v-if="open" class="modal">Modal</div>
+    </div>
 </template>
 
 <style>
-.animated-container {
-  transform: translateZ(0);
-}
+    .animated-container {
+        transform: translateZ(0);
+    }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-}
+    .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+    }
 </style>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <div class="animated-container">
-    <button @click="open = true">Open</button>
+    <div class="animated-container">
+        <button @click="open = true">Open</button>
 
-    <Teleport to="body">
-      <div v-if="open" class="modal">Modal</div>
-    </Teleport>
-  </div>
+        <Teleport to="body">
+            <div v-if="open" class="modal">Modal</div>
+        </Teleport>
+    </div>
 </template>
 ```
 
@@ -65,15 +67,15 @@ Use `:disabled` to render inline on mobile and teleport on larger screens:
 
 ```vue
 <script setup>
-import { useMediaQuery } from '@vueuse/core'
+    import { useMediaQuery } from '@vueuse/core';
 
-const isMobile = useMediaQuery('(max-width: 768px)')
+    const isMobile = useMediaQuery('(max-width: 768px)');
 </script>
 
 <template>
-  <Teleport to="body" :disabled="isMobile">
-    <nav class="sidebar">Navigation</nav>
-  </Teleport>
+    <Teleport to="body" :disabled="isMobile">
+        <nav class="sidebar">Navigation</nav>
+    </Teleport>
 </template>
 ```
 
@@ -83,9 +85,9 @@ Teleport changes DOM position, not the Vue component tree. Props, emits, slots, 
 
 ```vue
 <template>
-  <Teleport to="body">
-    <ChildPanel :message="message" @close="open = false" />
-  </Teleport>
+    <Teleport to="body">
+        <ChildPanel :message="message" @close="open = false" />
+    </Teleport>
 </template>
 ```
 
@@ -95,13 +97,13 @@ Teleports to the same target append in declaration order:
 
 ```vue
 <template>
-  <Teleport to="#notifications">
-    <div>First</div>
-  </Teleport>
+    <Teleport to="#notifications">
+        <div>First</div>
+    </Teleport>
 
-  <Teleport to="#notifications">
-    <div>Second</div>
-  </Teleport>
+    <Teleport to="#notifications">
+        <div>Second</div>
+    </Teleport>
 </template>
 ```
 

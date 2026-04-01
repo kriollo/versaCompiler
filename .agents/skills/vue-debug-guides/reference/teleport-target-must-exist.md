@@ -20,58 +20,62 @@ This is a common source of bugs when using modals, tooltips, or other teleported
 - [ ] Use Vue 3.5+ `defer` prop when target is rendered later in the same component tree
 
 **Incorrect:**
+
 ```vue
 <template>
-  <!-- ERROR: Target doesn't exist yet when Teleport mounts -->
-  <Teleport to="#modal-container">
-    <div class="modal">Modal content</div>
-  </Teleport>
+    <!-- ERROR: Target doesn't exist yet when Teleport mounts -->
+    <Teleport to="#modal-container">
+        <div class="modal">Modal content</div>
+    </Teleport>
 
-  <!-- Target is defined after the Teleport -->
-  <div id="modal-container"></div>
+    <!-- Target is defined after the Teleport -->
+    <div id="modal-container"></div>
 </template>
 ```
 
 **Correct - Option 1: External container in index.html:**
+
 ```html
 <!-- index.html -->
 <body>
-  <div id="app"></div>
-  <!-- Container exists before Vue app mounts -->
-  <div id="modals"></div>
-  <div id="tooltips"></div>
+    <div id="app"></div>
+    <!-- Container exists before Vue app mounts -->
+    <div id="modals"></div>
+    <div id="tooltips"></div>
 </body>
 ```
 
 ```vue
 <template>
-  <!-- Safe: #modals exists before any Vue component mounts -->
-  <Teleport to="#modals">
-    <div v-if="showModal" class="modal">Modal content</div>
-  </Teleport>
+    <!-- Safe: #modals exists before any Vue component mounts -->
+    <Teleport to="#modals">
+        <div v-if="showModal" class="modal">Modal content</div>
+    </Teleport>
 </template>
 ```
 
 **Correct - Option 2: Teleport to body:**
+
 ```vue
 <template>
-  <!-- Safe: body always exists -->
-  <Teleport to="body">
-    <div v-if="showModal" class="modal">Modal content</div>
-  </Teleport>
+    <!-- Safe: body always exists -->
+    <Teleport to="body">
+        <div v-if="showModal" class="modal">Modal content</div>
+    </Teleport>
 </template>
 ```
 
 **Correct - Option 3: Vue 3.5+ defer prop:**
+
 ```vue
 <template>
-  <!-- Works in Vue 3.5+: defer resolves target after other parts mount -->
-  <Teleport defer to="#late-container">
-    <div class="modal">Modal content</div>
-  </Teleport>
+    <!-- Works in Vue 3.5+: defer resolves target after other parts mount -->
+    <Teleport defer to="#late-container">
+        <div class="modal">Modal content</div>
+    </Teleport>
 
-  <!-- Target rendered later in template -->
-  <div id="late-container"></div>
+    <!-- Target rendered later in template -->
+    <div id="late-container"></div>
 </template>
 ```
 
@@ -81,33 +85,36 @@ The `defer` prop only waits for elements rendered in the **same mount/update tic
 
 ```vue
 <template>
-  <!-- ERROR: defer won't help if target mounts asynchronously -->
-  <Teleport defer to="#async-container">
-    <div>Content</div>
-  </Teleport>
+    <!-- ERROR: defer won't help if target mounts asynchronously -->
+    <Teleport defer to="#async-container">
+        <div>Content</div>
+    </Teleport>
 
-  <!-- If this component loads asynchronously, defer won't work -->
-  <Suspense>
-    <AsyncComponent />  <!-- Contains #async-container -->
-  </Suspense>
+    <!-- If this component loads asynchronously, defer won't work -->
+    <Suspense>
+        <AsyncComponent />
+        <!-- Contains #async-container -->
+    </Suspense>
 </template>
 ```
 
 ## Common Patterns
 
 ### Recommended: Centralized Teleport Containers
+
 ```html
 <!-- index.html -->
 <body>
-  <div id="app"></div>
+    <div id="app"></div>
 
-  <!-- Teleport destinations outside Vue app -->
-  <div id="modals" aria-live="polite"></div>
-  <div id="notifications" aria-live="assertive"></div>
-  <div id="tooltips"></div>
+    <!-- Teleport destinations outside Vue app -->
+    <div id="modals" aria-live="polite"></div>
+    <div id="notifications" aria-live="assertive"></div>
+    <div id="tooltips"></div>
 </body>
 ```
 
 ## Reference
+
 - [Vue.js Teleport - Using with Vue-rendered Targets](https://vuejs.org/guide/built-ins/teleport.html#using-with-vue-rendered-targets)
 - [Vue.js Teleport - Deferred Teleport](https://vuejs.org/guide/built-ins/teleport.html#deferred-teleport)

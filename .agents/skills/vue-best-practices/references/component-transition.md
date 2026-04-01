@@ -22,24 +22,26 @@ tags: [vue3, transition, animation, performance, keys]
 `<Transition>` only supports one direct child. Wrap multiple nodes in a single element or component.
 
 **BAD:**
+
 ```vue
 <template>
-  <Transition name="fade">
-    <h3>Title</h3>
-    <p>Description</p>
-  </Transition>
+    <Transition name="fade">
+        <h3>Title</h3>
+        <p>Description</p>
+    </Transition>
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <Transition name="fade">
-    <div>
-      <h3>Title</h3>
-      <p>Description</p>
-    </div>
-  </Transition>
+    <Transition name="fade">
+        <div>
+            <h3>Title</h3>
+            <p>Description</p>
+        </div>
+    </Transition>
 </template>
 ```
 
@@ -48,22 +50,24 @@ tags: [vue3, transition, animation, performance, keys]
 Vue reuses the same DOM element when the tag type does not change. Add `key` so Vue treats it as a new element and triggers enter/leave.
 
 **BAD:**
+
 ```vue
 <template>
-  <Transition name="fade">
-    <p v-if="isActive">Active</p>
-    <p v-else>Inactive</p>
-  </Transition>
+    <Transition name="fade">
+        <p v-if="isActive">Active</p>
+        <p v-else>Inactive</p>
+    </Transition>
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <Transition name="fade" mode="out-in">
-    <p v-if="isActive" key="active">Active</p>
-    <p v-else key="inactive">Inactive</p>
-  </Transition>
+    <Transition name="fade" mode="out-in">
+        <p v-if="isActive" key="active">Active</p>
+        <p v-else key="inactive">Inactive</p>
+    </Transition>
 </template>
 ```
 
@@ -72,20 +76,22 @@ Vue reuses the same DOM element when the tag type does not change. Add `key` so 
 When swapping components or views, use `mode="out-in"` to prevent both from being visible at the same time.
 
 **BAD:**
+
 ```vue
 <template>
-  <Transition name="fade">
-    <component :is="currentView" />
-  </Transition>
+    <Transition name="fade">
+        <component :is="currentView" />
+    </Transition>
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <Transition name="fade" mode="out-in">
-    <component :is="currentView" :key="currentView" />
-  </Transition>
+    <Transition name="fade" mode="out-in">
+        <component :is="currentView" :key="currentView" />
+    </Transition>
 </template>
 ```
 
@@ -94,32 +100,36 @@ When swapping components or views, use `mode="out-in"` to prevent both from bein
 Avoid layout-triggering properties such as `height`, `margin`, or `top`. Use `transform` and `opacity` for smooth, GPU-friendly transitions.
 
 **BAD:**
+
 ```css
 .slide-enter-active,
 .slide-leave-active {
-  transition: height 0.3s ease;
+    transition: height 0.3s ease;
 }
 
 .slide-enter-from,
 .slide-leave-to {
-  height: 0;
+    height: 0;
 }
 ```
 
 **GOOD:**
+
 ```css
 .slide-enter-active,
 .slide-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
+    transition:
+        transform 0.3s ease,
+        opacity 0.3s ease;
 }
 
 .slide-enter-from {
-  transform: translateX(-12px);
-  opacity: 0;
+    transform: translateX(-12px);
+    opacity: 0;
 }
 
 .slide-leave-to {
-  transform: translateX(12px);
-  opacity: 0;
+    transform: translateX(12px);
+    opacity: 0;
 }
 ```

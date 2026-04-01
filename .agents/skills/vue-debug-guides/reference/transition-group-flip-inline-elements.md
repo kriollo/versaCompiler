@@ -20,84 +20,88 @@ This is a CSS limitation, not a Vue bug. CSS transforms (which FLIP uses interna
 - [ ] Check if inherited styles are setting `display: inline`
 
 **Incorrect - Inline elements break move animations:**
+
 ```vue
 <template>
-  <!-- BROKEN: span elements are inline by default -->
-  <TransitionGroup name="tag" tag="div" class="tag-container">
-    <span v-for="tag in tags" :key="tag.id" class="tag">
-      {{ tag.name }}
-    </span>
-  </TransitionGroup>
+    <!-- BROKEN: span elements are inline by default -->
+    <TransitionGroup name="tag" tag="div" class="tag-container">
+        <span v-for="tag in tags" :key="tag.id" class="tag">
+            {{ tag.name }}
+        </span>
+    </TransitionGroup>
 </template>
 
 <style>
-.tag-move {
-  transition: transform 0.3s ease;
-  /* This won't work because spans are inline! */
-}
+    .tag-move {
+        transition: transform 0.3s ease;
+        /* This won't work because spans are inline! */
+    }
 </style>
 ```
 
 **Correct - Use inline-block:**
+
 ```vue
 <template>
-  <TransitionGroup name="tag" tag="div" class="tag-container">
-    <span v-for="tag in tags" :key="tag.id" class="tag">
-      {{ tag.name }}
-    </span>
-  </TransitionGroup>
+    <TransitionGroup name="tag" tag="div" class="tag-container">
+        <span v-for="tag in tags" :key="tag.id" class="tag">
+            {{ tag.name }}
+        </span>
+    </TransitionGroup>
 </template>
 
 <style>
-.tag {
-  display: inline-block; /* REQUIRED for FLIP animations */
-}
+    .tag {
+        display: inline-block; /* REQUIRED for FLIP animations */
+    }
 
-.tag-move {
-  transition: transform 0.3s ease;
-}
+    .tag-move {
+        transition: transform 0.3s ease;
+    }
 </style>
 ```
 
 **Correct - Use flexbox container:**
+
 ```vue
 <template>
-  <TransitionGroup name="tag" tag="div" class="tag-container">
-    <span v-for="tag in tags" :key="tag.id" class="tag">
-      {{ tag.name }}
-    </span>
-  </TransitionGroup>
+    <TransitionGroup name="tag" tag="div" class="tag-container">
+        <span v-for="tag in tags" :key="tag.id" class="tag">
+            {{ tag.name }}
+        </span>
+    </TransitionGroup>
 </template>
 
 <style>
-.tag-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+    .tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
 
-/* Flex children are block-level, FLIP works automatically */
-.tag-move {
-  transition: transform 0.3s ease;
-}
+    /* Flex children are block-level, FLIP works automatically */
+    .tag-move {
+        transition: transform 0.3s ease;
+    }
 </style>
 ```
 
 **Correct - Use block elements:**
+
 ```vue
 <template>
-  <!-- div elements are block by default -->
-  <TransitionGroup name="item" tag="div">
-    <div v-for="item in items" :key="item.id" class="item">
-      {{ item.name }}
-    </div>
-  </TransitionGroup>
+    <!-- div elements are block by default -->
+    <TransitionGroup name="item" tag="div">
+        <div v-for="item in items" :key="item.id" class="item">
+            {{ item.name }}
+        </div>
+    </TransitionGroup>
 </template>
 
 <style>
-.item-move {
-  transition: transform 0.3s ease;
-}
+    .item-move {
+        transition: transform 0.3s ease;
+    }
 </style>
 ```
 
@@ -108,8 +112,8 @@ Per CSS specifications, the `transform` property does not apply to inline boxes.
 ```css
 /* Vue internally applies something like this during move */
 .item {
-  transform: translateX(-50px) translateY(-20px);
-  /* Then transitions to transform: none */
+    transform: translateX(-50px) translateY(-20px);
+    /* Then transitions to transform: none */
 }
 ```
 
@@ -133,20 +137,21 @@ The `.move` class must have `transform` in its `transition` property:
 ```css
 /* CORRECT */
 .list-move {
-  transition: transform 0.3s ease;
+    transition: transform 0.3s ease;
 }
 
 /* ALSO CORRECT */
 .list-move {
-  transition: all 0.3s ease; /* 'all' includes transform */
+    transition: all 0.3s ease; /* 'all' includes transform */
 }
 
 /* WRONG - transform not included */
 .list-move {
-  transition: opacity 0.3s ease; /* Move won't animate! */
+    transition: opacity 0.3s ease; /* Move won't animate! */
 }
 ```
 
 ## Reference
+
 - [Vue.js TransitionGroup Move Transitions](https://vuejs.org/guide/built-ins/transition-group.html#move-transitions)
 - [MDN CSS Transform - Formal Definition](https://developer.mozilla.org/en-US/docs/Web/CSS/transform#formal_definition)

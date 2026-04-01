@@ -20,137 +20,140 @@ In Vue 3's Composition API, lifecycle hooks like `onMounted`, `onUnmounted`, `on
 - [ ] Hooks CAN be in external functions if called synchronously from setup
 
 **Incorrect:**
+
 ```javascript
 // WRONG: Hook registered asynchronously - will NEVER execute
-import { onMounted } from 'vue'
+import { onMounted } from 'vue';
 
 export default {
-  async setup() {
-    // After await, we're in a different call stack
-    const data = await fetchInitialData()
+    async setup() {
+        // After await, we're in a different call stack
+        const data = await fetchInitialData();
 
-    // This hook will NOT be registered!
-    onMounted(() => {
-      console.log('This will never run')
-    })
-  }
-}
+        // This hook will NOT be registered!
+        onMounted(() => {
+            console.log('This will never run');
+        });
+    },
+};
 ```
 
 ```javascript
 // WRONG: Hook registered in setTimeout - will NEVER execute
-import { onMounted } from 'vue'
+import { onMounted } from 'vue';
 
 export default {
-  setup() {
-    setTimeout(() => {
-      // This is asynchronous - hook won't be registered!
-      onMounted(() => {
-        initializeChart()
-      })
-    }, 100)
-  }
-}
+    setup() {
+        setTimeout(() => {
+            // This is asynchronous - hook won't be registered!
+            onMounted(() => {
+                initializeChart();
+            });
+        }, 100);
+    },
+};
 ```
 
 ```javascript
 // WRONG: Hook registered in Promise callback
-import { onMounted } from 'vue'
+import { onMounted } from 'vue';
 
 export default {
-  setup() {
-    fetchConfig().then(() => {
-      // Asynchronous! This will silently fail
-      onMounted(() => {
-        applyConfig()
-      })
-    })
-  }
-}
+    setup() {
+        fetchConfig().then(() => {
+            // Asynchronous! This will silently fail
+            onMounted(() => {
+                applyConfig();
+            });
+        });
+    },
+};
 ```
 
 **Correct:**
+
 ```javascript
 // CORRECT: Hook registered synchronously at top level
-import { onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue';
 
 export default {
-  setup() {
-    const data = ref(null)
+    setup() {
+        const data = ref(null);
 
-    // Register hook synchronously FIRST
-    onMounted(async () => {
-      // Async operations are fine INSIDE the hook
-      data.value = await fetchInitialData()
-      initializeChart()
-    })
+        // Register hook synchronously FIRST
+        onMounted(async () => {
+            // Async operations are fine INSIDE the hook
+            data.value = await fetchInitialData();
+            initializeChart();
+        });
 
-    return { data }
-  }
-}
+        return { data };
+    },
+};
 ```
 
 ```vue
 <!-- CORRECT: <script setup> - hooks at top level -->
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+    import { onMounted, onUnmounted, ref } from 'vue';
 
-const isReady = ref(false)
+    const isReady = ref(false);
 
-// These are synchronous during script setup execution
-onMounted(() => {
-  isReady.value = true
-})
+    // These are synchronous during script setup execution
+    onMounted(() => {
+        isReady.value = true;
+    });
 
-onUnmounted(() => {
-  cleanup()
-})
+    onUnmounted(() => {
+        cleanup();
+    });
 </script>
 ```
 
 ```javascript
 // CORRECT: Hook in external function called synchronously from setup
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue';
 
 function useWindowResize(callback) {
-  // This is fine - it's called synchronously from setup
-  onMounted(() => {
-    window.addEventListener('resize', callback)
-  })
+    // This is fine - it's called synchronously from setup
+    onMounted(() => {
+        window.addEventListener('resize', callback);
+    });
 
-  onUnmounted(() => {
-    window.removeEventListener('resize', callback)
-  })
+    onUnmounted(() => {
+        window.removeEventListener('resize', callback);
+    });
 }
 
 export default {
-  setup() {
-    // Composable called synchronously - hooks will be registered
-    useWindowResize(handleResize)
-  }
-}
+    setup() {
+        // Composable called synchronously - hooks will be registered
+        useWindowResize(handleResize);
+    },
+};
 ```
 
 ## Multiple Hooks Are Allowed
 
 ```javascript
 // CORRECT: You can register the same hook multiple times
-import { onMounted } from 'vue'
+import { onMounted } from 'vue';
 
 export default {
-  setup() {
-    // Both will run, in order of registration
-    onMounted(() => {
-      initializeA()
-    })
+    setup() {
+        // Both will run, in order of registration
+        onMounted(() => {
+            initializeA();
+        });
 
-    onMounted(() => {
-      initializeB()
-    })
-  }
-}
+        onMounted(() => {
+            initializeB();
+        });
+    },
+};
 ```
 
 ## Reference
+
 - [Vue.js Lifecycle Hooks](https://vuejs.org/guide/essentials/lifecycle.html)
 - [Composition API Lifecycle Hooks](https://vuejs.org/api/composition-api-lifecycle.html)

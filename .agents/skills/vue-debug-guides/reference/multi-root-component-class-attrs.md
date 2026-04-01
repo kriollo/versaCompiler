@@ -16,9 +16,9 @@ When a Vue 3 component has multiple root elements, class and style bindings from
 ```vue
 <!-- ChildComponent.vue - WRONG: classes from parent won't apply -->
 <template>
-  <header>Header</header>
-  <main>Content</main>
-  <footer>Footer</footer>
+    <header>Header</header>
+    <main>Content</main>
+    <footer>Footer</footer>
 </template>
 
 <!-- Parent usage -->
@@ -31,16 +31,16 @@ When a Vue 3 component has multiple root elements, class and style bindings from
 ```vue
 <!-- ChildComponent.vue - CORRECT: explicitly bind $attrs.class -->
 <template>
-  <header>Header</header>
-  <main :class="$attrs.class" :style="$attrs.style">Content</main>
-  <footer>Footer</footer>
+    <header>Header</header>
+    <main :class="$attrs.class" :style="$attrs.style">Content</main>
+    <footer>Footer</footer>
 </template>
 
 <!-- Or bind all attrs to one element -->
 <template>
-  <header>Header</header>
-  <main v-bind="$attrs">Content</main>
-  <footer>Footer</footer>
+    <header>Header</header>
+    <main v-bind="$attrs">Content</main>
+    <footer>Footer</footer>
 </template>
 ```
 
@@ -48,15 +48,15 @@ When a Vue 3 component has multiple root elements, class and style bindings from
 
 ```vue
 <script setup>
-import { useAttrs } from 'vue'
-const attrs = useAttrs()
-// attrs.class and attrs.style are available
+    import { useAttrs } from 'vue';
+    const attrs = useAttrs();
+    // attrs.class and attrs.style are available
 </script>
 
 <template>
-  <header>Header</header>
-  <main :class="attrs.class">Content</main>
-  <footer>Footer</footer>
+    <header>Header</header>
+    <main :class="attrs.class">Content</main>
+    <footer>Footer</footer>
 </template>
 ```
 
@@ -66,20 +66,20 @@ For single-root components where you want to control attribute placement:
 
 ```vue
 <script>
-export default {
-  inheritAttrs: false
-}
+    export default {
+        inheritAttrs: false,
+    };
 </script>
 
 <script setup>
-import { useAttrs } from 'vue'
-const attrs = useAttrs()
+    import { useAttrs } from 'vue';
+    const attrs = useAttrs();
 </script>
 
 <template>
-  <div class="wrapper">
-    <input v-bind="attrs" />
-  </div>
+    <div class="wrapper">
+        <input v-bind="attrs" />
+    </div>
 </template>
 ```
 

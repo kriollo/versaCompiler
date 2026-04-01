@@ -18,34 +18,35 @@ tags: [vue3, transition, scoped-css, slot, reusable-component]
 - [ ] Test that transitions work when component is used in different contexts
 
 **Problematic Code:**
+
 ```vue
 <!-- MyFadeTransition.vue -->
 <template>
-  <Transition name="my-fade">
-    <slot />
-  </Transition>
+    <Transition name="my-fade">
+        <slot />
+    </Transition>
 </template>
 
 <!-- BAD: Scoped styles won't apply to slot content! -->
 <style scoped>
-.my-fade-enter-active,
-.my-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
+    .my-fade-enter-active,
+    .my-fade-leave-active {
+        transition: opacity 0.3s ease;
+    }
 
-.my-fade-enter-from,
-.my-fade-leave-to {
-  opacity: 0;
-}
+    .my-fade-enter-from,
+    .my-fade-leave-to {
+        opacity: 0;
+    }
 </style>
 ```
 
 ```vue
 <!-- Parent component using the transition -->
 <template>
-  <MyFadeTransition>
-    <div v-if="show">This won't animate!</div>
-  </MyFadeTransition>
+    <MyFadeTransition>
+        <div v-if="show">This won't animate!</div>
+    </MyFadeTransition>
 </template>
 
 <!--
@@ -55,25 +56,26 @@ applied by Vue won't match the scoped CSS selectors
 ```
 
 **Correct Code:**
+
 ```vue
 <!-- MyFadeTransition.vue -->
 <template>
-  <Transition name="my-fade">
-    <slot />
-  </Transition>
+    <Transition name="my-fade">
+        <slot />
+    </Transition>
 </template>
 
 <!-- GOOD: Unscoped styles apply to any element -->
 <style>
-.my-fade-enter-active,
-.my-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
+    .my-fade-enter-active,
+    .my-fade-leave-active {
+        transition: opacity 0.3s ease;
+    }
 
-.my-fade-enter-from,
-.my-fade-leave-to {
-  opacity: 0;
-}
+    .my-fade-enter-from,
+    .my-fade-leave-to {
+        opacity: 0;
+    }
 </style>
 ```
 
@@ -84,22 +86,22 @@ To avoid global style conflicts, use distinctive prefixes:
 ```vue
 <!-- FadeTransition.vue -->
 <template>
-  <Transition name="v-fade-transition">
-    <slot />
-  </Transition>
+    <Transition name="v-fade-transition">
+        <slot />
+    </Transition>
 </template>
 
 <style>
-/* Unique prefix reduces collision risk */
-.v-fade-transition-enter-active,
-.v-fade-transition-leave-active {
-  transition: opacity 0.3s ease;
-}
+    /* Unique prefix reduces collision risk */
+    .v-fade-transition-enter-active,
+    .v-fade-transition-leave-active {
+        transition: opacity 0.3s ease;
+    }
 
-.v-fade-transition-enter-from,
-.v-fade-transition-leave-to {
-  opacity: 0;
-}
+    .v-fade-transition-enter-from,
+    .v-fade-transition-leave-to {
+        opacity: 0;
+    }
 </style>
 ```
 
@@ -108,22 +110,22 @@ To avoid global style conflicts, use distinctive prefixes:
 ```vue
 <!-- FadeTransition.vue -->
 <template>
-  <Transition name="fade">
-    <slot />
-  </Transition>
+    <Transition name="fade">
+        <slot />
+    </Transition>
 </template>
 
 <style module>
-/* Use :global() for transition classes */
-:global(.fade-enter-active),
-:global(.fade-leave-active) {
-  transition: opacity 0.3s ease;
-}
+    /* Use :global() for transition classes */
+    :global(.fade-enter-active),
+    :global(.fade-leave-active) {
+        transition: opacity 0.3s ease;
+    }
 
-:global(.fade-enter-from),
-:global(.fade-leave-to) {
-  opacity: 0;
-}
+    :global(.fade-enter-from),
+    :global(.fade-leave-to) {
+        opacity: 0;
+    }
 </style>
 ```
 
@@ -134,26 +136,25 @@ Use the custom class props to apply scoped classes:
 ```vue
 <!-- FadeTransition.vue -->
 <template>
-  <Transition
-    :enter-active-class="$style.enterActive"
-    :leave-active-class="$style.leaveActive"
-    :enter-from-class="$style.enterFrom"
-    :leave-to-class="$style.leaveTo"
-  >
-    <slot />
-  </Transition>
+    <Transition
+        :enter-active-class="$style.enterActive"
+        :leave-active-class="$style.leaveActive"
+        :enter-from-class="$style.enterFrom"
+        :leave-to-class="$style.leaveTo">
+        <slot />
+    </Transition>
 </template>
 
 <style module>
-.enterActive,
-.leaveActive {
-  transition: opacity 0.3s ease;
-}
+    .enterActive,
+    .leaveActive {
+        transition: opacity 0.3s ease;
+    }
 
-.enterFrom,
-.leaveTo {
-  opacity: 0;
-}
+    .enterFrom,
+    .leaveTo {
+        opacity: 0;
+    }
 </style>
 ```
 
@@ -162,67 +163,71 @@ Use the custom class props to apply scoped classes:
 ```vue
 <!-- transitions/SlideTransition.vue -->
 <template>
-  <Transition
-    name="slide"
-    :mode="mode"
-    :appear="appear"
-    @before-enter="$emit('before-enter', $event)"
-    @enter="$emit('enter', $event)"
-    @after-enter="$emit('after-enter', $event)"
-    @before-leave="$emit('before-leave', $event)"
-    @leave="$emit('leave', $event)"
-    @after-leave="$emit('after-leave', $event)"
-  >
-    <slot />
-  </Transition>
+    <Transition
+        name="slide"
+        :mode="mode"
+        :appear="appear"
+        @before-enter="$emit('before-enter', $event)"
+        @enter="$emit('enter', $event)"
+        @after-enter="$emit('after-enter', $event)"
+        @before-leave="$emit('before-leave', $event)"
+        @leave="$emit('leave', $event)"
+        @after-leave="$emit('after-leave', $event)">
+        <slot />
+    </Transition>
 </template>
 
 <script setup>
-defineProps({
-  mode: {
-    type: String,
-    default: 'out-in',
-    validator: (v) => ['out-in', 'in-out', ''].includes(v)
-  },
-  appear: {
-    type: Boolean,
-    default: false
-  }
-})
+    defineProps({
+        mode: {
+            type: String,
+            default: 'out-in',
+            validator: v => ['out-in', 'in-out', ''].includes(v),
+        },
+        appear: {
+            type: Boolean,
+            default: false,
+        },
+    });
 
-defineEmits([
-  'before-enter', 'enter', 'after-enter',
-  'before-leave', 'leave', 'after-leave'
-])
+    defineEmits([
+        'before-enter',
+        'enter',
+        'after-enter',
+        'before-leave',
+        'leave',
+        'after-leave',
+    ]);
 </script>
 
 <!-- Unscoped so styles apply to slotted content -->
 <style>
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
+    .slide-enter-active,
+    .slide-leave-active {
+        transition:
+            transform 0.3s ease,
+            opacity 0.3s ease;
+    }
 
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(-20px);
-}
+    .slide-enter-from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
 
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
+    .slide-leave-to {
+        opacity: 0;
+        transform: translateX(20px);
+    }
 </style>
 ```
 
 Usage:
+
 ```vue
 <template>
-  <SlideTransition>
-    <div v-if="show" class="content">
-      This will properly animate!
-    </div>
-  </SlideTransition>
+    <SlideTransition>
+        <div v-if="show" class="content">This will properly animate!</div>
+    </SlideTransition>
 </template>
 ```
 
@@ -241,5 +246,6 @@ Vue's scoped styles work by adding a unique data attribute (e.g., `data-v-7ba5bd
 Slotted content comes from the parent component and gets the parent's data attribute, not the transition component's attribute. So the selectors never match.
 
 ## Reference
+
 - [Vue.js Reusable Transitions](https://vuejs.org/guide/built-ins/transition.html#reusable-transitions)
 - [Vue.js Scoped CSS](https://vuejs.org/api/sfc-css-features.html#scoped-css)

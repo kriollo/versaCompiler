@@ -3,7 +3,8 @@ title: TransitionGroup No Longer Renders Default Wrapper Element in Vue 3
 impact: MEDIUM
 impactDescription: Vue 2 to Vue 3 migration may break layouts relying on the default span wrapper
 type: gotcha
-tags: [vue3, transition-group, migration, vue2, breaking-change, wrapper-element]
+tags:
+    [vue3, transition-group, migration, vue2, breaking-change, wrapper-element]
 ---
 
 # TransitionGroup No Longer Renders Default Wrapper Element in Vue 3
@@ -20,11 +21,12 @@ If your code relies on the wrapper element for styling or layout, you must expli
 - [ ] Consider if the wrapper element is actually needed in Vue 3
 
 **Vue 2 Behavior (wrapper element by default):**
+
 ```vue
 <template>
-  <transition-group name="list">
-    <div v-for="item in items" :key="item.id">{{ item }}</div>
-  </transition-group>
+    <transition-group name="list">
+        <div v-for="item in items" :key="item.id">{{ item }}</div>
+    </transition-group>
 </template>
 
 <!-- Renders as: -->
@@ -35,11 +37,12 @@ If your code relies on the wrapper element for styling or layout, you must expli
 ```
 
 **Vue 3 Behavior (no wrapper by default):**
+
 ```vue
 <template>
-  <TransitionGroup name="list">
-    <div v-for="item in items" :key="item.id">{{ item }}</div>
-  </TransitionGroup>
+    <TransitionGroup name="list">
+        <div v-for="item in items" :key="item.id">{{ item }}</div>
+    </TransitionGroup>
 </template>
 
 <!-- Renders as (fragment): -->
@@ -49,12 +52,13 @@ If your code relies on the wrapper element for styling or layout, you must expli
 ```
 
 **Vue 3 - Explicitly specify wrapper:**
+
 ```vue
 <template>
-  <!-- Use tag prop to specify wrapper element -->
-  <TransitionGroup name="list" tag="ul">
-    <li v-for="item in items" :key="item.id">{{ item }}</li>
-  </TransitionGroup>
+    <!-- Use tag prop to specify wrapper element -->
+    <TransitionGroup name="list" tag="ul">
+        <li v-for="item in items" :key="item.id">{{ item }}</li>
+    </TransitionGroup>
 </template>
 
 <!-- Renders as: -->
@@ -69,35 +73,38 @@ If your code relies on the wrapper element for styling or layout, you must expli
 ### Layout Depending on Wrapper
 
 **Vue 2 code that breaks in Vue 3:**
+
 ```vue
 <template>
-  <transition-group class="grid-container" name="list">
-    <div v-for="item in items" :key="item.id">{{ item }}</div>
-  </transition-group>
+    <transition-group class="grid-container" name="list">
+        <div v-for="item in items" :key="item.id">{{ item }}</div>
+    </transition-group>
 </template>
 
 <style>
-.grid-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
+    .grid-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
 </style>
 ```
 
 In Vue 3, the class is not applied to anything because there's no wrapper element.
 
 **Fixed for Vue 3:**
+
 ```vue
 <template>
-  <TransitionGroup class="grid-container" name="list" tag="div">
-    <div v-for="item in items" :key="item.id">{{ item }}</div>
-  </TransitionGroup>
+    <TransitionGroup class="grid-container" name="list" tag="div">
+        <div v-for="item in items" :key="item.id">{{ item }}</div>
+    </TransitionGroup>
 </template>
 ```
 
 ### Semantic HTML Lists
 
 **Vue 2:**
+
 ```vue
 <transition-group tag="ul" name="list">
   <li v-for="item in items" :key="item.id">{{ item }}</li>
@@ -105,6 +112,7 @@ In Vue 3, the class is not applied to anything because there's no wrapper elemen
 ```
 
 **Vue 3 (same syntax, but now tag is more important):**
+
 ```vue
 <TransitionGroup tag="ul" name="list">
   <li v-for="item in items" :key="item.id">{{ item }}</li>
@@ -117,19 +125,19 @@ Vue 3's fragment support means you might not need a wrapper at all:
 
 ```vue
 <template>
-  <div class="parent-with-styles">
-    <!-- No tag needed if parent handles layout -->
-    <TransitionGroup name="fade">
-      <span v-for="item in items" :key="item.id">{{ item }}</span>
-    </TransitionGroup>
-  </div>
+    <div class="parent-with-styles">
+        <!-- No tag needed if parent handles layout -->
+        <TransitionGroup name="fade">
+            <span v-for="item in items" :key="item.id">{{ item }}</span>
+        </TransitionGroup>
+    </div>
 </template>
 
 <style>
-.parent-with-styles {
-  display: flex;
-  gap: 8px;
-}
+    .parent-with-styles {
+        display: flex;
+        gap: 8px;
+    }
 </style>
 ```
 
@@ -140,13 +148,16 @@ When using in-DOM templates (not SFCs), remember to use kebab-case:
 ```html
 <!-- In-DOM template -->
 <transition-group tag="ul" name="list">
-  <li v-for="item in items" :key="item.id">{{ item }}</li>
+    <li v-for="item in items" :key="item.id">{{ item }}</li>
 </transition-group>
 
 <!-- NOT -->
-<TransitionGroup tag="ul" name="list">  <!-- Won't work in DOM templates -->
+<TransitionGroup tag="ul" name="list">
+    <!-- Won't work in DOM templates -->
+</TransitionGroup>
 ```
 
 ## Reference
+
 - [Vue 3 Migration Guide - TransitionGroup Root Element](https://v3-migration.vuejs.org/breaking-changes/transition-group.html)
 - [Vue.js TransitionGroup](https://vuejs.org/guide/built-ins/transition-group.html)

@@ -20,68 +20,70 @@ This is a subtle but critical mistake that leads to composables that work with i
 - [ ] Test that composables update when their inputs change
 
 **Incorrect:**
+
 ```javascript
-import { ref, watchEffect, toValue } from 'vue'
+import { ref, watchEffect, toValue } from 'vue';
 
 export function useFetch(url) {
-  const data = ref(null)
-  const error = ref(null)
+    const data = ref(null);
+    const error = ref(null);
 
-  // WRONG: toValue called outside watchEffect
-  // This extracts the value ONCE and passes a static string
-  const urlValue = toValue(url)
+    // WRONG: toValue called outside watchEffect
+    // This extracts the value ONCE and passes a static string
+    const urlValue = toValue(url);
 
-  watchEffect(async () => {
-    try {
-      // urlValue is a static string - no dependency tracked!
-      const response = await fetch(urlValue)
-      data.value = await response.json()
-    } catch (e) {
-      error.value = e
-    }
-  })
+    watchEffect(async () => {
+        try {
+            // urlValue is a static string - no dependency tracked!
+            const response = await fetch(urlValue);
+            data.value = await response.json();
+        } catch (e) {
+            error.value = e;
+        }
+    });
 
-  return { data, error }
+    return { data, error };
 }
 
 // When used like this:
-const apiUrl = ref('/api/users')
-const { data } = useFetch(apiUrl)
+const apiUrl = ref('/api/users');
+const { data } = useFetch(apiUrl);
 
 // Later...
-apiUrl.value = '/api/products'  // useFetch will NOT refetch!
+apiUrl.value = '/api/products'; // useFetch will NOT refetch!
 ```
 
 **Correct:**
+
 ```javascript
-import { ref, watchEffect, toValue } from 'vue'
+import { ref, watchEffect, toValue } from 'vue';
 
 export function useFetch(url) {
-  const data = ref(null)
-  const error = ref(null)
+    const data = ref(null);
+    const error = ref(null);
 
-  watchEffect(async () => {
-    // CORRECT: toValue called INSIDE watchEffect
-    // Vue tracks this as a dependency
-    const urlValue = toValue(url)
+    watchEffect(async () => {
+        // CORRECT: toValue called INSIDE watchEffect
+        // Vue tracks this as a dependency
+        const urlValue = toValue(url);
 
-    try {
-      const response = await fetch(urlValue)
-      data.value = await response.json()
-    } catch (e) {
-      error.value = e
-    }
-  })
+        try {
+            const response = await fetch(urlValue);
+            data.value = await response.json();
+        } catch (e) {
+            error.value = e;
+        }
+    });
 
-  return { data, error }
+    return { data, error };
 }
 
 // Now when used:
-const apiUrl = ref('/api/users')
-const { data } = useFetch(apiUrl)
+const apiUrl = ref('/api/users');
+const { data } = useFetch(apiUrl);
 
 // Later...
-apiUrl.value = '/api/products'  // useFetch WILL refetch!
+apiUrl.value = '/api/products'; // useFetch WILL refetch!
 ```
 
 ## The Same Applies to Direct Ref Access
@@ -89,21 +91,21 @@ apiUrl.value = '/api/products'  // useFetch WILL refetch!
 ```javascript
 // WRONG: Accessing .value outside the effect
 export function useDebounce(source, delay = 300) {
-  // This captures the initial value, not a reactive dependency
-  const initialValue = source.value  // or toValue(source)
+    // This captures the initial value, not a reactive dependency
+    const initialValue = source.value; // or toValue(source)
 
-  watchEffect(() => {
-    // initialValue is static - this only runs once
-    console.log('Value:', initialValue)
-  })
+    watchEffect(() => {
+        // initialValue is static - this only runs once
+        console.log('Value:', initialValue);
+    });
 }
 
 // CORRECT: Access inside the effect
 export function useDebounce(source, delay = 300) {
-  watchEffect(() => {
-    // Vue tracks source.value or toValue(source) as dependency
-    console.log('Value:', toValue(source))
-  })
+    watchEffect(() => {
+        // Vue tracks source.value or toValue(source) as dependency
+        console.log('Value:', toValue(source));
+    });
 }
 ```
 
@@ -112,22 +114,22 @@ export function useDebounce(source, delay = 300) {
 For `watch()`, wrap `toValue()` in a getter:
 
 ```javascript
-import { ref, watch, toValue } from 'vue'
+import { ref, watch, toValue } from 'vue';
 
 export function useLocalStorage(key, defaultValue) {
-  const data = ref(defaultValue)
+    const data = ref(defaultValue);
 
-  // CORRECT: Use getter function with watch
-  watch(
-    () => toValue(key),  // Getter calls toValue, tracks dependency
-    (newKey) => {
-      const stored = localStorage.getItem(newKey)
-      data.value = stored ? JSON.parse(stored) : defaultValue
-    },
-    { immediate: true }
-  )
+    // CORRECT: Use getter function with watch
+    watch(
+        () => toValue(key), // Getter calls toValue, tracks dependency
+        newKey => {
+            const stored = localStorage.getItem(newKey);
+            data.value = stored ? JSON.parse(stored) : defaultValue;
+        },
+        { immediate: true },
+    );
 
-  return data
+    return data;
 }
 ```
 
@@ -137,15 +139,15 @@ Vue's reactivity tracking works by detecting property accesses during effect exe
 
 ```javascript
 watchEffect(() => {
-  // When this runs, Vue is "recording" what reactive sources are accessed
-  const value = someRef.value  // Vue records: "this effect depends on someRef"
-})
+    // When this runs, Vue is "recording" what reactive sources are accessed
+    const value = someRef.value; // Vue records: "this effect depends on someRef"
+});
 
 // But if you extract the value before:
-const value = someRef.value  // Vue isn't recording yet
+const value = someRef.value; // Vue isn't recording yet
 watchEffect(() => {
-  console.log(value)  // Just using a plain JavaScript variable
-})
+    console.log(value); // Just using a plain JavaScript variable
+});
 ```
 
 `toValue()` works the same way - it accesses `.value` internally, so it must happen during effect execution for tracking to work.
@@ -160,23 +162,24 @@ When accepting `MaybeRefOrGetter` inputs:
 
 ```javascript
 export function useMyComposable(input) {
-  // Store raw - don't extract value here
-  // const value = toValue(input)  // WRONG
+    // Store raw - don't extract value here
+    // const value = toValue(input)  // WRONG
 
-  const result = computed(() => {
-    // Extract value inside reactive context
-    return transform(toValue(input))  // CORRECT
-  })
+    const result = computed(() => {
+        // Extract value inside reactive context
+        return transform(toValue(input)); // CORRECT
+    });
 
-  watchEffect(() => {
-    // Extract value inside reactive context
-    doSomething(toValue(input))  // CORRECT
-  })
+    watchEffect(() => {
+        // Extract value inside reactive context
+        doSomething(toValue(input)); // CORRECT
+    });
 
-  return { result }
+    return { result };
 }
 ```
 
 ## Reference
+
 - [Vue.js Reactivity API - toValue](https://vuejs.org/api/reactivity-utilities.html#tovalue)
 - [Vue.js Composables - Accepting Ref Arguments](https://vuejs.org/guide/reusability/composables.html#accepting-reactive-state)

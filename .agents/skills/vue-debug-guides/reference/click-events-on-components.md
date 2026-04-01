@@ -19,19 +19,20 @@ tags: [vue3, events, components, emit, click, migration]
 - [ ] For multi-root components, explicitly bind `$attrs` or emit events
 
 **Incorrect:**
+
 ```html
 <!-- WRONG: Expecting native click to work on custom component -->
 <template>
-  <MyButton @click="handleClick">Click me</MyButton>
-  <!-- This may not work as expected! -->
+    <MyButton @click="handleClick">Click me</MyButton>
+    <!-- This may not work as expected! -->
 </template>
 ```
 
 ```html
 <!-- WRONG: Vue 2 .native modifier doesn't exist in Vue 3 -->
 <template>
-  <MyButton @click.native="handleClick">Click me</MyButton>
-  <!-- Error in Vue 3: .native modifier removed -->
+    <MyButton @click.native="handleClick">Click me</MyButton>
+    <!-- Error in Vue 3: .native modifier removed -->
 </template>
 ```
 
@@ -39,29 +40,30 @@ tags: [vue3, events, components, emit, click, migration]
 <!-- WRONG: Multi-root component with no attr binding -->
 <!-- MyButton.vue -->
 <template>
-  <span>Icon</span>
-  <button>{{ label }}</button>
-  <!-- No root element to receive click! -->
+    <span>Icon</span>
+    <button>{{ label }}</button>
+    <!-- No root element to receive click! -->
 </template>
 ```
 
 **Correct:**
+
 ```html
 <!-- CORRECT: Child component emits the click event -->
 <!-- MyButton.vue -->
 <template>
-  <button @click="$emit('click', $event)">
-    <slot></slot>
-  </button>
+    <button @click="$emit('click', $event)">
+        <slot></slot>
+    </button>
 </template>
 
 <script setup>
-defineEmits(['click'])
+    defineEmits(['click']);
 </script>
 
 <!-- Parent.vue -->
 <template>
-  <MyButton @click="handleClick">Click me</MyButton>
+    <MyButton @click="handleClick">Click me</MyButton>
 </template>
 ```
 
@@ -69,15 +71,15 @@ defineEmits(['click'])
 <!-- CORRECT: Single root element with automatic fallthrough -->
 <!-- MyButton.vue -->
 <template>
-  <button>
-    <slot></slot>
-  </button>
-  <!-- @click from parent automatically falls through to button -->
+    <button>
+        <slot></slot>
+    </button>
+    <!-- @click from parent automatically falls through to button -->
 </template>
 
 <!-- Parent.vue -->
 <template>
-  <MyButton @click="handleClick">Click me</MyButton>
+    <MyButton @click="handleClick">Click me</MyButton>
 </template>
 ```
 
@@ -85,16 +87,16 @@ defineEmits(['click'])
 <!-- CORRECT: Multi-root component with explicit $attrs binding -->
 <!-- MyButton.vue -->
 <template>
-  <span>Icon</span>
-  <button v-bind="$attrs">
-    <slot></slot>
-  </button>
+    <span>Icon</span>
+    <button v-bind="$attrs">
+        <slot></slot>
+    </button>
 </template>
 
 <script setup>
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 ```
 
@@ -123,13 +125,13 @@ defineOptions({
 
 ```javascript
 // In Vue 3, if you declare an event in emits:
-defineEmits(['click'])
+defineEmits(['click']);
 
 // Then @click on the component ONLY listens to emitted events
 // NOT native click events
 
 // If you don't declare 'click' in emits:
-defineEmits(['custom-event'])
+defineEmits(['custom-event']);
 
 // Then @click on single-root component will:
 // 1. Fall through to root element as native listener
@@ -140,22 +142,22 @@ defineEmits(['custom-event'])
 
 ```vue
 <script setup>
-// Define what events this component emits
-const emit = defineEmits(['click', 'update', 'delete'])
+    // Define what events this component emits
+    const emit = defineEmits(['click', 'update', 'delete']);
 
-function handleClick(event) {
-  // Do component logic
-  processClick()
+    function handleClick(event) {
+        // Do component logic
+        processClick();
 
-  // Then emit to parent
-  emit('click', event)
-}
+        // Then emit to parent
+        emit('click', event);
+    }
 </script>
 
 <template>
-  <button @click="handleClick">
-    <slot></slot>
-  </button>
+    <button @click="handleClick">
+        <slot></slot>
+    </button>
 </template>
 ```
 
@@ -175,6 +177,7 @@ function handleClick(event) {
 ```
 
 ## Reference
+
 - [Vue.js Component Events](https://vuejs.org/guide/components/events.html)
 - [Vue.js Fallthrough Attributes](https://vuejs.org/guide/components/attrs.html)
 - [Vue 3 Migration - .native Modifier Removed](https://v3-migration.vuejs.org/breaking-changes/v-on-native-modifier-removed.html)

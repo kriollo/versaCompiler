@@ -18,40 +18,42 @@ tags: [vue3, slots, component-composition, wrapper-components, slot-forwarding]
 - [ ] Handle cases where slotProps might be undefined
 
 **Basic Slot Forwarding Pattern:**
+
 ```vue
 <!-- EnhancedButton.vue - Wrapper component -->
 <script setup>
-import BaseButton from './BaseButton.vue'
+    import BaseButton from './BaseButton.vue';
 </script>
 
 <template>
-  <div class="button-wrapper">
-    <BaseButton v-bind="$attrs">
-      <!-- Forward all slots to BaseButton -->
-      <template v-for="(_, slotName) in $slots" v-slot:[slotName]="slotProps">
-        <slot :name="slotName" v-bind="slotProps ?? {}" />
-      </template>
-    </BaseButton>
-  </div>
+    <div class="button-wrapper">
+        <BaseButton v-bind="$attrs">
+            <!-- Forward all slots to BaseButton -->
+            <template
+                v-for="(_, slotName) in $slots"
+                v-slot:[slotName]="slotProps">
+                <slot :name="slotName" v-bind="slotProps ?? {}" />
+            </template>
+        </BaseButton>
+    </div>
 </template>
 ```
 
 **Usage:**
+
 ```vue
 <script setup>
-import EnhancedButton from './EnhancedButton.vue'
+    import EnhancedButton from './EnhancedButton.vue';
 </script>
 
 <template>
-  <!-- Slots pass through to BaseButton -->
-  <EnhancedButton>
-    <template #icon>
-      <IconCheck />
-    </template>
-    <template #default>
-      Click me
-    </template>
-  </EnhancedButton>
+    <!-- Slots pass through to BaseButton -->
+    <EnhancedButton>
+        <template #icon>
+            <IconCheck />
+        </template>
+        <template #default>Click me</template>
+    </EnhancedButton>
 </template>
 ```
 
@@ -62,20 +64,22 @@ When the child component provides slot props, you must forward them:
 ```vue
 <!-- DataTableWrapper.vue -->
 <script setup>
-import DataTable from './DataTable.vue'
+    import DataTable from './DataTable.vue';
 
-const props = defineProps(['data'])
+    const props = defineProps(['data']);
 </script>
 
 <template>
-  <div class="table-container">
-    <DataTable :items="data">
-      <!-- Forward slots including scoped slot props -->
-      <template v-for="(_, slotName) in $slots" v-slot:[slotName]="slotProps">
-        <slot :name="slotName" v-bind="slotProps ?? {}" />
-      </template>
-    </DataTable>
-  </div>
+    <div class="table-container">
+        <DataTable :items="data">
+            <!-- Forward slots including scoped slot props -->
+            <template
+                v-for="(_, slotName) in $slots"
+                v-slot:[slotName]="slotProps">
+                <slot :name="slotName" v-bind="slotProps ?? {}" />
+            </template>
+        </DataTable>
+    </div>
 </template>
 ```
 
@@ -97,13 +101,13 @@ Some scenarios require checking if slotProps exists:
 
 ```vue
 <template>
-  <ChildComponent>
-    <template v-for="(_, name) in $slots" v-slot:[name]="slotProps">
-      <!-- Handle both scoped and non-scoped slots -->
-      <slot v-if="slotProps" :name="name" v-bind="slotProps" />
-      <slot v-else :name="name" />
-    </template>
-  </ChildComponent>
+    <ChildComponent>
+        <template v-for="(_, name) in $slots" v-slot:[name]="slotProps">
+            <!-- Handle both scoped and non-scoped slots -->
+            <slot v-if="slotProps" :name="name" v-bind="slotProps" />
+            <slot v-else :name="name" />
+        </template>
+    </ChildComponent>
 </template>
 ```
 
@@ -113,31 +117,32 @@ If you only want to forward certain slots:
 
 ```vue
 <template>
-  <ChildComponent>
-    <!-- Only forward header and footer slots -->
-    <template v-if="$slots.header" #header="slotProps">
-      <slot name="header" v-bind="slotProps ?? {}" />
-    </template>
+    <ChildComponent>
+        <!-- Only forward header and footer slots -->
+        <template v-if="$slots.header" #header="slotProps">
+            <slot name="header" v-bind="slotProps ?? {}" />
+        </template>
 
-    <template v-if="$slots.footer" #footer="slotProps">
-      <slot name="footer" v-bind="slotProps ?? {}" />
-    </template>
+        <template v-if="$slots.footer" #footer="slotProps">
+            <slot name="footer" v-bind="slotProps ?? {}" />
+        </template>
 
-    <!-- Default slot handled differently -->
-    <slot />
-  </ChildComponent>
+        <!-- Default slot handled differently -->
+        <slot />
+    </ChildComponent>
 </template>
 ```
 
 ## Common Mistakes
 
-| Mistake | Problem | Solution |
-|---------|---------|----------|
-| Not using `v-bind="slotProps"` | Scoped slot data lost | Always bind slotProps |
-| Forgetting `?? {}` or null check | Error when slotProps undefined | Add nullish coalescing |
-| Static slot names in loop | Only forwards one slot | Use `v-slot:[slotName]` dynamic syntax |
-| Missing `v-for` key warning | Vue warning (non-critical) | Keys not needed for slot functions |
+| Mistake                          | Problem                        | Solution                               |
+| -------------------------------- | ------------------------------ | -------------------------------------- |
+| Not using `v-bind="slotProps"`   | Scoped slot data lost          | Always bind slotProps                  |
+| Forgetting `?? {}` or null check | Error when slotProps undefined | Add nullish coalescing                 |
+| Static slot names in loop        | Only forwards one slot         | Use `v-slot:[slotName]` dynamic syntax |
+| Missing `v-for` key warning      | Vue warning (non-critical)     | Keys not needed for slot functions     |
 
 ## Reference
+
 - [Vue Land FAQ - Forwarding Slots](https://vue-land.github.io/faq/forwarding-slots)
 - [Vue.js Slots - Scoped Slots](https://vuejs.org/guide/components/slots.html#scoped-slots)

@@ -18,53 +18,57 @@ tags: [vue3, events, modifiers, v-on, click, form]
 - [ ] Test event behavior on both the element and its children
 
 **Incorrect:**
+
 ```html
 <!-- WRONG: Unintended behavior - prevents clicks on children too -->
 <template>
-  <div @click.prevent.self="handleClick">
-    <button>Child Button</button> <!-- Default also prevented here! -->
-  </div>
+    <div @click.prevent.self="handleClick">
+        <button>Child Button</button>
+        <!-- Default also prevented here! -->
+    </div>
 </template>
 ```
 
 ```html
 <!-- WRONG: Assuming order doesn't matter -->
 <template>
-  <!-- Developer expects only self clicks to be handled -->
-  <!-- But .prevent runs first, affecting all clicks -->
-  <a href="/page" @click.prevent.self="navigate">
-    <span>Click me</span>
-  </a>
+    <!-- Developer expects only self clicks to be handled -->
+    <!-- But .prevent runs first, affecting all clicks -->
+    <a href="/page" @click.prevent.self="navigate">
+        <span>Click me</span>
+    </a>
 </template>
 ```
 
 **Correct:**
+
 ```html
 <!-- CORRECT: Only prevent default on the element itself -->
 <template>
-  <div @click.self.prevent="handleClick">
-    <button>Child Button</button> <!-- Default NOT prevented here -->
-  </div>
+    <div @click.self.prevent="handleClick">
+        <button>Child Button</button>
+        <!-- Default NOT prevented here -->
+    </div>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Prevent default on element and children -->
 <template>
-  <form @submit.prevent.self="onSubmit">
-    <button type="submit">Submit</button>
-  </form>
+    <form @submit.prevent.self="onSubmit">
+        <button type="submit">Submit</button>
+    </form>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Explicit intent with separate handlers when needed -->
 <template>
-  <div @click.self="handleSelfClick">
-    <button @click.prevent="handleChildClick">
-      Child with prevented default
-    </button>
-  </div>
+    <div @click.self="handleSelfClick">
+        <button @click.prevent="handleChildClick">
+            Child with prevented default
+        </button>
+    </div>
 </template>
 ```
 
@@ -98,4 +102,5 @@ tags: [vue3, events, modifiers, v-on, click, form]
 ```
 
 ## Reference
+
 - [Vue.js Event Handling - Event Modifiers](https://vuejs.org/guide/essentials/event-handling.html#event-modifiers)

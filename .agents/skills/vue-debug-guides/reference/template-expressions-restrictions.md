@@ -21,73 +21,75 @@ Template interpolation `{{ }}` and directive bindings evaluate JavaScript expres
 - [ ] Use `v-if`/`v-else` directives for conditional rendering
 
 **Incorrect:**
+
 ```vue
 <template>
-  <!-- ERROR: Variable declaration is a statement, not expression -->
-  <p>{{ var greeting = 'Hello' }}</p>
-  <p>{{ let x = 1 }}</p>
-  <p>{{ const name = 'Vue' }}</p>
+    <!-- ERROR: Variable declaration is a statement, not expression -->
+    <p>{{ var greeting = 'Hello' }}</p>
+    <p>{{ let x = 1 }}</p>
+    <p>{{ const name = 'Vue' }}</p>
 
-  <!-- ERROR: if statement not allowed -->
-  <p>{{ if (ok) { return message } }}</p>
-  <p>{{ if (user) return user.name }}</p>
+    <!-- ERROR: if statement not allowed -->
+    <p>{{ if (ok) { return message } }}</p>
+    <p>{{ if (user) return user.name }}</p>
 
-  <!-- ERROR: Multiple statements not allowed -->
-  <p>{{ count++; return count }}</p>
-  <p>{{ items.push(newItem); items.length }}</p>
+    <!-- ERROR: Multiple statements not allowed -->
+    <p>{{ count++; return count }}</p>
+    <p>{{ items.push(newItem); items.length }}</p>
 
-  <!-- ERROR: for/while loops not allowed -->
-  <p>{{ for (let i = 0; i < 5; i++) { } }}</p>
+    <!-- ERROR: for/while loops not allowed -->
+    <p>{{ for (let i = 0; i < 5; i++) { } }}</p>
 </template>
 ```
 
 **Correct:**
+
 ```vue
 <template>
-  <!-- OK: Simple expressions -->
-  <p>{{ message }}</p>
-  <p>{{ count + 1 }}</p>
-  <p>{{ items.length }}</p>
+    <!-- OK: Simple expressions -->
+    <p>{{ message }}</p>
+    <p>{{ count + 1 }}</p>
+    <p>{{ items.length }}</p>
 
-  <!-- OK: Ternary operators for conditionals -->
-  <p>{{ ok ? 'YES' : 'NO' }}</p>
-  <p>{{ user ? user.name : 'Guest' }}</p>
-  <p>{{ score >= 60 ? 'Pass' : 'Fail' }}</p>
+    <!-- OK: Ternary operators for conditionals -->
+    <p>{{ ok ? 'YES' : 'NO' }}</p>
+    <p>{{ user ? user.name : 'Guest' }}</p>
+    <p>{{ score >= 60 ? 'Pass' : 'Fail' }}</p>
 
-  <!-- OK: Method/function calls -->
-  <p>{{ formatDate(date) }}</p>
-  <p>{{ items.filter(i => i.active).length }}</p>
+    <!-- OK: Method/function calls -->
+    <p>{{ formatDate(date) }}</p>
+    <p>{{ items.filter(i => i.active).length }}</p>
 
-  <!-- OK: Chained expressions -->
-  <p>{{ message.split('').reverse().join('') }}</p>
+    <!-- OK: Chained expressions -->
+    <p>{{ message.split('').reverse().join('') }}</p>
 
-  <!-- OK: Template literals -->
-  <p>{{ `Hello, ${name}!` }}</p>
+    <!-- OK: Template literals -->
+    <p>{{ `Hello, ${name}!` }}</p>
 
-  <!-- OK: Object/array expressions -->
-  <p>{{ { name: 'Vue', version: 3 } }}</p>
+    <!-- OK: Object/array expressions -->
+    <p>{{ { name: 'Vue', version: 3 } }}</p>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+    import { ref, computed } from 'vue';
 
-const ok = ref(true)
-const message = ref('Hello')
-const user = ref({ name: 'Alice' })
-const score = ref(85)
+    const ok = ref(true);
+    const message = ref('Hello');
+    const user = ref({ name: 'Alice' });
+    const score = ref(85);
 
-// Move complex logic to computed properties
-const greeting = computed(() => {
-  if (user.value) {
-    return `Welcome back, ${user.value.name}!`
-  }
-  return 'Hello, Guest!'
-})
+    // Move complex logic to computed properties
+    const greeting = computed(() => {
+        if (user.value) {
+            return `Welcome back, ${user.value.name}!`;
+        }
+        return 'Hello, Guest!';
+    });
 
-// Or use methods for reusable logic
-function formatDate(date) {
-  return new Date(date).toLocaleDateString()
-}
+    // Or use methods for reusable logic
+    function formatDate(date) {
+        return new Date(date).toLocaleDateString();
+    }
 </script>
 ```
 
@@ -95,20 +97,21 @@ function formatDate(date) {
 
 ```vue
 <template>
-  <!-- Instead of if/else in expressions, use v-if/v-else -->
-  <p v-if="user">Welcome, {{ user.name }}!</p>
-  <p v-else>Please log in</p>
+    <!-- Instead of if/else in expressions, use v-if/v-else -->
+    <p v-if="user">Welcome, {{ user.name }}!</p>
+    <p v-else>Please log in</p>
 
-  <!-- Instead of loops in expressions, use v-for -->
-  <ul>
-    <li v-for="item in items" :key="item.id">{{ item.name }}</li>
-  </ul>
+    <!-- Instead of loops in expressions, use v-for -->
+    <ul>
+        <li v-for="item in items" :key="item.id">{{ item.name }}</li>
+    </ul>
 
-  <!-- Conditional display without removing from DOM -->
-  <p v-show="isVisible">This toggles visibility</p>
+    <!-- Conditional display without removing from DOM -->
+    <p v-show="isVisible">This toggles visibility</p>
 </template>
 ```
 
 ## Reference
+
 - [Vue.js Template Syntax - Using JavaScript Expressions](https://vuejs.org/guide/essentials/template-syntax.html#using-javascript-expressions)
 - [Vue.js Conditional Rendering](https://vuejs.org/guide/essentials/conditional.html)

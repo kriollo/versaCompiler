@@ -21,16 +21,17 @@ tags: [vue3, keepalive, transition, memory-leak, animation]
 
 ```vue
 <template>
-  <!-- Known memory leak combination in some Vue versions -->
-  <Transition name="fade">
-    <KeepAlive>
-      <component :is="currentView" />
-    </KeepAlive>
-  </Transition>
+    <!-- Known memory leak combination in some Vue versions -->
+    <Transition name="fade">
+        <KeepAlive>
+            <component :is="currentView" />
+        </KeepAlive>
+    </Transition>
 </template>
 ```
 
 When switching between components repeatedly:
+
 - Component instances accumulate in memory
 - References prevent garbage collection
 - Memory usage grows with each switch
@@ -51,10 +52,10 @@ Use Chrome DevTools to detect the leak:
 
 ```vue
 <template>
-  <!-- No memory leak without Transition -->
-  <KeepAlive :max="5">
-    <component :is="currentView" />
-  </KeepAlive>
+    <!-- No memory leak without Transition -->
+    <KeepAlive :max="5">
+        <component :is="currentView" />
+    </KeepAlive>
 </template>
 ```
 
@@ -62,23 +63,26 @@ Use Chrome DevTools to detect the leak:
 
 ```vue
 <template>
-  <KeepAlive :max="5">
-    <component
-      :is="currentView"
-      :class="{ 'fade-enter': isTransitioning }"
-    />
-  </KeepAlive>
+    <KeepAlive :max="5">
+        <component
+            :is="currentView"
+            :class="{ 'fade-enter': isTransitioning }" />
+    </KeepAlive>
 </template>
 
 <style>
-.fade-enter {
-  animation: fadeIn 0.3s ease-in;
-}
+    .fade-enter {
+        animation: fadeIn 0.3s ease-in;
+    }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
 </style>
 ```
 
@@ -88,11 +92,11 @@ If you must use both, minimize impact with strict limits:
 
 ```vue
 <template>
-  <Transition name="fade" mode="out-in">
-    <KeepAlive :max="3">
-      <component :is="currentView" />
-    </KeepAlive>
-  </Transition>
+    <Transition name="fade" mode="out-in">
+        <KeepAlive :max="3">
+            <component :is="currentView" />
+        </KeepAlive>
+    </Transition>
 </template>
 ```
 
@@ -102,23 +106,23 @@ Force fresh instances when needed:
 
 ```vue
 <script setup>
-import { ref, computed } from 'vue'
+    import { ref, computed } from 'vue';
 
-const currentView = ref('Dashboard')
-const cacheKey = ref(0)
+    const currentView = ref('Dashboard');
+    const cacheKey = ref(0);
 
-function switchViewFresh(view) {
-  currentView.value = view
-  cacheKey.value++ // Force new instance
-}
+    function switchViewFresh(view) {
+        currentView.value = view;
+        cacheKey.value++; // Force new instance
+    }
 </script>
 
 <template>
-  <Transition name="fade" mode="out-in">
-    <KeepAlive :max="3">
-      <component :is="currentView" :key="cacheKey" />
-    </KeepAlive>
-  </Transition>
+    <Transition name="fade" mode="out-in">
+        <KeepAlive :max="3">
+            <component :is="currentView" :key="cacheKey" />
+        </KeepAlive>
+    </Transition>
 </template>
 ```
 
@@ -139,6 +143,7 @@ npm update vue
 5. **Keep Vue updated** - Bug fixes are released periodically
 
 ## Reference
+
 - [GitHub Issue #9842: Memory leak with transition and keep-alive](https://github.com/vuejs/vue/issues/9842)
 - [GitHub Issue #9840: Memory leak with transition and keep-alive](https://github.com/vuejs/vue/issues/9840)
 - [Vue.js KeepAlive Documentation](https://vuejs.org/guide/built-ins/keep-alive.html)

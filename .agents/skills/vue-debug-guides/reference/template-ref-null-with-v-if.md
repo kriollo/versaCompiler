@@ -20,104 +20,107 @@ This is especially tricky with `watchEffect` since it runs automatically and may
 - [ ] Use optional chaining (?.) when accessing ref properties in uncertain contexts
 
 **Incorrect:**
+
 ```vue
 <script setup>
-import { ref, watchEffect } from 'vue'
+    import { ref, watchEffect } from 'vue';
 
-const inputEl = ref(null)
-const showInput = ref(true)
+    const inputEl = ref(null);
+    const showInput = ref(true);
 
-// WRONG: No null check - will error when v-if is false
-watchEffect(() => {
-  inputEl.value.focus() // TypeError when showInput is false
-})
+    // WRONG: No null check - will error when v-if is false
+    watchEffect(() => {
+        inputEl.value.focus(); // TypeError when showInput is false
+    });
 </script>
 
 <template>
-  <input v-if="showInput" ref="inputEl" />
-  <button @click="showInput = !showInput">Toggle</button>
+    <input v-if="showInput" ref="inputEl" />
+    <button @click="showInput = !showInput">Toggle</button>
 </template>
 ```
 
 **Correct:**
+
 ```vue
 <script setup>
-import { ref, watchEffect } from 'vue'
+    import { ref, watchEffect } from 'vue';
 
-const inputEl = ref(null)
-const showInput = ref(true)
+    const inputEl = ref(null);
+    const showInput = ref(true);
 
-// CORRECT: Handle both mounted and unmounted states
-watchEffect(() => {
-  if (inputEl.value) {
-    inputEl.value.focus()
-  } else {
-    // Element not mounted yet, or unmounted by v-if
-    console.log('Input element not available')
-  }
-})
+    // CORRECT: Handle both mounted and unmounted states
+    watchEffect(() => {
+        if (inputEl.value) {
+            inputEl.value.focus();
+        } else {
+            // Element not mounted yet, or unmounted by v-if
+            console.log('Input element not available');
+        }
+    });
 </script>
 
 <template>
-  <input v-if="showInput" ref="inputEl" />
-  <button @click="showInput = !showInput">Toggle</button>
+    <input v-if="showInput" ref="inputEl" />
+    <button @click="showInput = !showInput">Toggle</button>
 </template>
 ```
 
 ```vue
 <script setup>
-import { ref, watch } from 'vue'
+    import { ref, watch } from 'vue';
 
-const inputEl = ref(null)
-const showInput = ref(true)
+    const inputEl = ref(null);
+    const showInput = ref(true);
 
-// CORRECT: Watch the ref and handle null explicitly
-watch(inputEl, (el) => {
-  if (el) {
-    el.focus()
-  }
-})
+    // CORRECT: Watch the ref and handle null explicitly
+    watch(inputEl, el => {
+        if (el) {
+            el.focus();
+        }
+    });
 </script>
 
 <template>
-  <input v-if="showInput" ref="inputEl" />
+    <input v-if="showInput" ref="inputEl" />
 </template>
 ```
 
 ```vue
 <script setup>
-import { useTemplateRef, watchEffect } from 'vue'
+    import { useTemplateRef, watchEffect } from 'vue';
 
-// Vue 3.5+ approach
-const input = useTemplateRef('my-input')
+    // Vue 3.5+ approach
+    const input = useTemplateRef('my-input');
 
-// CORRECT: Use optional chaining for safe access
-watchEffect(() => {
-  input.value?.focus()
-})
+    // CORRECT: Use optional chaining for safe access
+    watchEffect(() => {
+        input.value?.focus();
+    });
 </script>
 
 <template>
-  <input v-if="showInput" ref="my-input" />
+    <input v-if="showInput" ref="my-input" />
 </template>
 ```
 
 ```vue
 <script setup>
-import { ref, onMounted } from 'vue'
+    import { ref, onMounted } from 'vue';
 
-const inputEl = ref(null)
-const showInput = ref(true)
+    const inputEl = ref(null);
+    const showInput = ref(true);
 
-// ALTERNATIVE: Use v-show if you need consistent ref access
-// v-show keeps element in DOM, just hides it with CSS
+    // ALTERNATIVE: Use v-show if you need consistent ref access
+    // v-show keeps element in DOM, just hides it with CSS
 </script>
 
 <template>
-  <!-- Element always exists in DOM, ref is never null -->
-  <input v-show="showInput" ref="inputEl" />
+    <!-- Element always exists in DOM, ref is never null -->
+    <input v-show="showInput" ref="inputEl" />
 </template>
 ```
 
 ## Reference
+
 - [Vue.js Template Refs](https://vuejs.org/guide/essentials/template-refs.html)

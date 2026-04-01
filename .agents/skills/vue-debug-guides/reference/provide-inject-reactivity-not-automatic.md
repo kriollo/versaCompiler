@@ -20,65 +20,67 @@ tags: [vue3, provide-inject, reactivity, composition-api, options-api]
 ## The Gotcha: Primitives Lose Reactivity
 
 **Wrong - Primitive loses reactivity:**
+
 ```vue
 <!-- Provider.vue -->
 <script setup>
-import { ref, provide } from 'vue'
+    import { ref, provide } from 'vue';
 
-const count = ref(0)
+    const count = ref(0);
 
-// WRONG: Providing the unwrapped value loses reactivity
-provide('count', count.value) // Provides 0, not a reactive value
+    // WRONG: Providing the unwrapped value loses reactivity
+    provide('count', count.value); // Provides 0, not a reactive value
 
-function increment() {
-  count.value++ // Injector will NOT see this change
-}
+    function increment() {
+        count.value++; // Injector will NOT see this change
+    }
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup>
-import { inject } from 'vue'
+    import { inject } from 'vue';
 
-const count = inject('count') // Gets 0, forever static
+    const count = inject('count'); // Gets 0, forever static
 </script>
 
 <template>
-  <!-- This will always show 0 -->
-  <div>Count: {{ count }}</div>
+    <!-- This will always show 0 -->
+    <div>Count: {{ count }}</div>
 </template>
 ```
 
 **Correct - Provide the ref itself:**
+
 ```vue
 <!-- Provider.vue -->
 <script setup>
-import { ref, provide } from 'vue'
+    import { ref, provide } from 'vue';
 
-const count = ref(0)
+    const count = ref(0);
 
-// CORRECT: Provide the ref, not the value
-provide('count', count)
+    // CORRECT: Provide the ref, not the value
+    provide('count', count);
 
-function increment() {
-  count.value++ // Injector WILL see this change
-}
+    function increment() {
+        count.value++; // Injector WILL see this change
+    }
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup>
-import { inject } from 'vue'
+    import { inject } from 'vue';
 
-// The ref is injected as-is, maintaining reactivity
-const count = inject('count')
+    // The ref is injected as-is, maintaining reactivity
+    const count = inject('count');
 </script>
 
 <template>
-  <!-- Access .value in script, auto-unwrapped in template -->
-  <div>Count: {{ count }}</div>
+    <!-- Access .value in script, auto-unwrapped in template -->
+    <div>Count: {{ count }}</div>
 </template>
 ```
 
@@ -87,39 +89,41 @@ const count = inject('count')
 In Options API, the `provide` option with plain properties is NOT reactive:
 
 **Wrong - Options API without computed:**
+
 ```js
 export default {
-  data() {
-    return {
-      message: 'Hello'
-    }
-  },
-  // WRONG: This is NOT reactive
-  provide() {
-    return {
-      message: this.message // Provides 'Hello' as a static string
-    }
-  }
-}
+    data() {
+        return {
+            message: 'Hello',
+        };
+    },
+    // WRONG: This is NOT reactive
+    provide() {
+        return {
+            message: this.message, // Provides 'Hello' as a static string
+        };
+    },
+};
 ```
 
 **Correct - Use computed() in Options API:**
+
 ```js
-import { computed } from 'vue'
+import { computed } from 'vue';
 
 export default {
-  data() {
-    return {
-      message: 'Hello'
-    }
-  },
-  provide() {
-    return {
-      // CORRECT: Wrap in computed for reactivity
-      message: computed(() => this.message)
-    }
-  }
-}
+    data() {
+        return {
+            message: 'Hello',
+        };
+    },
+    provide() {
+        return {
+            // CORRECT: Wrap in computed for reactivity
+            message: computed(() => this.message),
+        };
+    },
+};
 ```
 
 ## Understanding Ref Behavior in Inject
@@ -129,31 +133,31 @@ When you provide a ref, it is injected as-is and NOT auto-unwrapped:
 ```vue
 <!-- Provider.vue -->
 <script setup>
-import { ref, provide } from 'vue'
+    import { ref, provide } from 'vue';
 
-const user = ref({ name: 'John' })
-provide('user', user)
+    const user = ref({ name: 'John' });
+    provide('user', user);
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup>
-import { inject } from 'vue'
+    import { inject } from 'vue';
 
-const user = inject('user')
+    const user = inject('user');
 
-// In script, access with .value
-console.log(user.value.name) // 'John'
+    // In script, access with .value
+    console.log(user.value.name); // 'John'
 
-function updateName(newName) {
-  user.value.name = newName // Works, but mutations should be in provider
-}
+    function updateName(newName) {
+        user.value.name = newName; // Works, but mutations should be in provider
+    }
 </script>
 
 <template>
-  <!-- In template, auto-unwrapped at top level -->
-  <div>{{ user.name }}</div>
+    <!-- In template, auto-unwrapped at top level -->
+    <div>{{ user.name }}</div>
 </template>
 ```
 
@@ -164,50 +168,52 @@ Reactive objects (created with `reactive()`) maintain reactivity when provided:
 ```vue
 <!-- Provider.vue -->
 <script setup>
-import { reactive, provide } from 'vue'
+    import { reactive, provide } from 'vue';
 
-const state = reactive({
-  count: 0,
-  message: 'Hello'
-})
+    const state = reactive({
+        count: 0,
+        message: 'Hello',
+    });
 
-provide('state', state)
+    provide('state', state);
 </script>
 ```
 
 ```vue
 <!-- Injector.vue -->
 <script setup>
-import { inject } from 'vue'
+    import { inject } from 'vue';
 
-const state = inject('state')
-// state.count and state.message are reactive
+    const state = inject('state');
+    // state.count and state.message are reactive
 </script>
 ```
 
 ## Common Mistake: Destructuring Breaks Reactivity
 
 **Wrong - Destructuring provided reactive state:**
+
 ```vue
 <script setup>
-import { inject } from 'vue'
+    import { inject } from 'vue';
 
-// WRONG: Destructuring loses reactivity
-const { count, message } = inject('state')
-// count and message are now static values
+    // WRONG: Destructuring loses reactivity
+    const { count, message } = inject('state');
+    // count and message are now static values
 </script>
 ```
 
 **Correct - Keep the reference intact:**
+
 ```vue
 <script setup>
-import { inject, toRefs } from 'vue'
+    import { inject, toRefs } from 'vue';
 
-const state = inject('state')
-// Use state.count and state.message directly
+    const state = inject('state');
+    // Use state.count and state.message directly
 
-// Or use toRefs if you need destructured reactive refs
-const { count, message } = toRefs(state)
+    // Or use toRefs if you need destructured reactive refs
+    const { count, message } = toRefs(state);
 </script>
 ```
 
@@ -221,6 +227,7 @@ If your injected value isn't updating:
 4. Use Vue DevTools to inspect the provided values
 
 ## Reference
+
 - [Vue.js Provide/Inject - Working with Reactivity](https://vuejs.org/guide/components/provide-inject.html#working-with-reactivity)
 - [How to make provide/inject reactive - LogRocket Blog](https://blog.logrocket.com/how-to-make-provide-inject-reactive/)
 - [GitHub Issue: Inject/Provide is not reactive](https://github.com/vuejs/vue/issues/7017)

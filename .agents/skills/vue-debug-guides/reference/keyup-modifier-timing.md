@@ -18,60 +18,62 @@ tags: [vue3, events, keyboard, modifiers, keyup, shortcuts]
 - [ ] Test keyboard shortcuts with proper key release order
 
 **Incorrect:**
+
 ```html
 <!-- WRONG: Expecting this to fire when Ctrl is released -->
 <template>
-  <input @keyup.ctrl="onCtrlRelease" />
-  <!-- This does NOT fire when you just release Ctrl! -->
-  <!-- It fires when you release ANY key while holding Ctrl -->
+    <input @keyup.ctrl="onCtrlRelease" />
+    <!-- This does NOT fire when you just release Ctrl! -->
+    <!-- It fires when you release ANY key while holding Ctrl -->
 </template>
 ```
 
 ```html
 <!-- WRONG: Misunderstanding keyup.ctrl behavior -->
 <template>
-  <div @keyup.ctrl="handleShortcut">
-    <!-- User presses Ctrl+S, releases Ctrl first, then S -->
-    <!-- Event does NOT fire because Ctrl wasn't held during S release -->
-  </div>
+    <div @keyup.ctrl="handleShortcut">
+        <!-- User presses Ctrl+S, releases Ctrl first, then S -->
+        <!-- Event does NOT fire because Ctrl wasn't held during S release -->
+    </div>
 </template>
 ```
 
 **Correct:**
+
 ```html
 <!-- CORRECT: User must hold Ctrl while releasing another key -->
 <template>
-  <input @keyup.ctrl.s="saveDocument" />
-  <!-- User presses Ctrl+S, then releases S while holding Ctrl -->
-  <!-- Event fires correctly -->
+    <input @keyup.ctrl.s="saveDocument" />
+    <!-- User presses Ctrl+S, then releases S while holding Ctrl -->
+    <!-- Event fires correctly -->
 </template>
 
 <script setup>
-function saveDocument(event) {
-  event.preventDefault()
-  // Save logic here
-}
+    function saveDocument(event) {
+        event.preventDefault();
+        // Save logic here
+    }
 </script>
 ```
 
 ```html
 <!-- CORRECT: Use keydown for more intuitive modifier behavior -->
 <template>
-  <div @keydown.ctrl.s="saveDocument">
-    <!-- keydown fires immediately when both keys are pressed -->
-    <!-- More intuitive for keyboard shortcuts -->
-  </div>
+    <div @keydown.ctrl.s="saveDocument">
+        <!-- keydown fires immediately when both keys are pressed -->
+        <!-- More intuitive for keyboard shortcuts -->
+    </div>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Use .exact for precise modifier control -->
 <template>
-  <!-- Only fires when ONLY Ctrl is pressed (no Shift, Alt, etc.) -->
-  <button @click.ctrl.exact="onCtrlClick">Ctrl+Click Only</button>
+    <!-- Only fires when ONLY Ctrl is pressed (no Shift, Alt, etc.) -->
+    <button @click.ctrl.exact="onCtrlClick">Ctrl+Click Only</button>
 
-  <!-- Fires with no system modifiers at all -->
-  <button @click.exact="onPlainClick">Plain Click Only</button>
+    <!-- Fires with no system modifiers at all -->
+    <button @click.exact="onPlainClick">Plain Click Only</button>
 </template>
 ```
 
@@ -95,10 +97,14 @@ function saveDocument(event) {
 
 ```html
 <!-- Available system modifiers -->
-<input @keyup.ctrl="..." />   <!-- Ctrl key -->
-<input @keyup.alt="..." />    <!-- Alt key (Option on Mac) -->
-<input @keyup.shift="..." />  <!-- Shift key -->
-<input @keyup.meta="..." />   <!-- Cmd on Mac, Windows key on PC -->
+<input @keyup.ctrl="..." />
+<!-- Ctrl key -->
+<input @keyup.alt="..." />
+<!-- Alt key (Option on Mac) -->
+<input @keyup.shift="..." />
+<!-- Shift key -->
+<input @keyup.meta="..." />
+<!-- Cmd on Mac, Windows key on PC -->
 ```
 
 ## The .exact Modifier
@@ -120,18 +126,18 @@ function saveDocument(event) {
 
 ```html
 <template>
-  <div
-    tabindex="0"
-    @keydown.ctrl.s.prevent="save"
-    @keydown.ctrl.z.prevent="undo"
-    @keydown.ctrl.shift.z.prevent="redo"
-  >
-    <!-- keydown is more reliable for keyboard shortcuts -->
-    <!-- Add .prevent to stop browser default (e.g., save dialog) -->
-  </div>
+    <div
+        tabindex="0"
+        @keydown.ctrl.s.prevent="save"
+        @keydown.ctrl.z.prevent="undo"
+        @keydown.ctrl.shift.z.prevent="redo">
+        <!-- keydown is more reliable for keyboard shortcuts -->
+        <!-- Add .prevent to stop browser default (e.g., save dialog) -->
+    </div>
 </template>
 ```
 
 ## Reference
+
 - [Vue.js Event Handling - Key Modifiers](https://vuejs.org/guide/essentials/event-handling.html#key-modifiers)
 - [Vue.js Event Handling - System Modifier Keys](https://vuejs.org/guide/essentials/event-handling.html#system-modifier-keys)

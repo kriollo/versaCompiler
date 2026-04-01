@@ -20,45 +20,47 @@ This happens because Vue only detects when the `model.value` reference itself ch
 - [ ] Consider using structuredClone for deeply nested objects
 
 **Incorrect - Mutation without event emission:**
+
 ```vue
 <script setup>
-// Child component with object v-model
-const model = defineModel<{ name: string; age: number }>()
+    // Child component with object v-model
+    const model = defineModel<{ name: string; age: number }>()
 
-function updateName(newName: string) {
-  // WRONG: This mutates the object in place
-  // Parent receives NO update:modelValue event!
-  model.value.name = newName
-}
+    function updateName(newName: string) {
+      // WRONG: This mutates the object in place
+      // Parent receives NO update:modelValue event!
+      model.value.name = newName
+    }
 
-function addToList() {
-  // WRONG: Push mutates the array
-  model.value.items.push('new item')  // Parent not notified
-}
+    function addToList() {
+      // WRONG: Push mutates the array
+      model.value.items.push('new item')  // Parent not notified
+    }
 </script>
 ```
 
 **Correct - Replace object reference to trigger event:**
+
 ```vue
 <script setup>
-const model = defineModel<{ name: string; age: number }>()
+    const model = defineModel<{ name: string; age: number }>()
 
-function updateName(newName: string) {
-  // CORRECT: Create new object reference
-  // This triggers update:modelValue event to parent
-  model.value = {
-    ...model.value,
-    name: newName
-  }
-}
+    function updateName(newName: string) {
+      // CORRECT: Create new object reference
+      // This triggers update:modelValue event to parent
+      model.value = {
+        ...model.value,
+        name: newName
+      }
+    }
 
-function addToList() {
-  // CORRECT: Create new array reference
-  model.value = {
-    ...model.value,
-    items: [...model.value.items, 'new item']
-  }
-}
+    function addToList() {
+      // CORRECT: Create new array reference
+      model.value = {
+        ...model.value,
+        items: [...model.value.items, 'new item']
+      }
+    }
 </script>
 ```
 
@@ -66,35 +68,35 @@ function addToList() {
 
 ```vue
 <script setup>
-const model = defineModel<{
-  user: {
-    address: {
-      city: string
+    const model = defineModel<{
+      user: {
+        address: {
+          city: string
+        }
+      }
+    }>()
+
+    // WRONG: Deep mutation
+    model.value.user.address.city = 'New York'
+
+    // CORRECT: Replace entire chain
+    model.value = {
+      ...model.value,
+      user: {
+        ...model.value.user,
+        address: {
+          ...model.value.user.address,
+          city: 'New York'
+        }
+      }
     }
-  }
-}>()
 
-// WRONG: Deep mutation
-model.value.user.address.city = 'New York'
-
-// CORRECT: Replace entire chain
-model.value = {
-  ...model.value,
-  user: {
-    ...model.value.user,
-    address: {
-      ...model.value.user.address,
-      city: 'New York'
+    // ALTERNATIVE: Use structuredClone for complex updates
+    function updateCity(city: string) {
+      const updated = structuredClone(model.value)
+      updated.user.address.city = city
+      model.value = updated  // New reference triggers event
     }
-  }
-}
-
-// ALTERNATIVE: Use structuredClone for complex updates
-function updateCity(city: string) {
-  const updated = structuredClone(model.value)
-  updated.user.address.city = city
-  model.value = updated  // New reference triggers event
-}
 </script>
 ```
 
@@ -104,22 +106,22 @@ When multiple updates occur rapidly, earlier changes can be lost:
 
 ```vue
 <script setup>
-const model = defineModel<{ a: string; b: string }>()
+    const model = defineModel<{ a: string; b: string }>()
 
-// CAUTION: Race condition if called in same tick
-function updateBothWrong() {
-  model.value = { ...model.value, a: 'new-a' }  // First update
-  model.value = { ...model.value, b: 'new-b' }  // May use stale model.value!
-}
+    // CAUTION: Race condition if called in same tick
+    function updateBothWrong() {
+      model.value = { ...model.value, a: 'new-a' }  // First update
+      model.value = { ...model.value, b: 'new-b' }  // May use stale model.value!
+    }
 
-// CORRECT: Batch updates into single assignment
-function updateBothCorrect() {
-  model.value = {
-    ...model.value,
-    a: 'new-a',
-    b: 'new-b'
-  }
-}
+    // CORRECT: Batch updates into single assignment
+    function updateBothCorrect() {
+      model.value = {
+        ...model.value,
+        a: 'new-a',
+        b: 'new-b'
+      }
+    }
 </script>
 ```
 
@@ -129,20 +131,21 @@ For complex objects, consider VueUse:
 
 ```vue
 <script setup>
-import { useVModel } from '@vueuse/core'
+    import { useVModel } from '@vueuse/core'
 
-const props = defineProps<{ modelValue: { name: string } }>()
-const emit = defineEmits(['update:modelValue'])
+    const props = defineProps<{ modelValue: { name: string } }>()
+    const emit = defineEmits(['update:modelValue'])
 
-// Deep tracking with passive updates
-const model = useVModel(props, 'modelValue', emit, { deep: true, passive: true })
+    // Deep tracking with passive updates
+    const model = useVModel(props, 'modelValue', emit, { deep: true, passive: true })
 
-// Now direct mutations work
-model.value.name = 'New Name'  // Properly syncs with parent
+    // Now direct mutations work
+    model.value.name = 'New Name'  // Properly syncs with parent
 </script>
 ```
 
 ## Reference
+
 - [Vue.js Component v-model](https://vuejs.org/guide/components/v-model.html)
 - [GitHub Discussion: defineModel with objects](https://github.com/orgs/vuejs/discussions/10538)
 - [SIMPL Engineering: Vue defineModel Pitfalls](https://engineering.simpl.de/post/vue_definemodel/)

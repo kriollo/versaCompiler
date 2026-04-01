@@ -48,27 +48,26 @@ defineProps(['label'])
 ```vue
 <!-- BaseInput.vue - CORRECT: attrs bound to input element -->
 <script setup>
-defineProps(['label'])
+    defineProps(['label']);
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 
 <template>
-  <div class="input-wrapper">
-    <label>{{ label }}</label>
-    <input type="text" v-bind="$attrs" />
-  </div>
+    <div class="input-wrapper">
+        <label>{{ label }}</label>
+        <input type="text" v-bind="$attrs" />
+    </div>
 </template>
 
 <!-- Parent usage -->
 <BaseInput
-  id="email"
-  placeholder="Enter email"
-  aria-describedby="email-help"
-  @focus="handleFocus"
-/>
+    id="email"
+    placeholder="Enter email"
+    aria-describedby="email-help"
+    @focus="handleFocus" />
 
 <!--
   RESULT: Attrs correctly applied to input
@@ -86,9 +85,9 @@ defineOptions({
 
 ```vue
 <script setup>
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 ```
 
@@ -96,13 +95,13 @@ defineOptions({
 
 ```vue
 <script>
-export default {
-  inheritAttrs: false
-}
+    export default {
+        inheritAttrs: false,
+    };
 </script>
 
 <script setup>
-// Your setup code here
+    // Your setup code here
 </script>
 ```
 
@@ -110,10 +109,10 @@ export default {
 
 ```vue
 <script>
-export default {
-  inheritAttrs: false,
-  // other options...
-}
+    export default {
+        inheritAttrs: false,
+        // other options...
+    };
 </script>
 ```
 
@@ -123,32 +122,32 @@ export default {
 
 ```vue
 <script setup>
-import { useAttrs, computed } from 'vue'
+    import { useAttrs, computed } from 'vue';
 
-defineProps({
-  label: String,
-  error: String
-})
+    defineProps({
+        label: String,
+        error: String,
+    });
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 
-const attrs = useAttrs()
+    const attrs = useAttrs();
 
-// Separate class/style for wrapper vs input
-const inputAttrs = computed(() => {
-  const { class: _, style: __, ...rest } = attrs
-  return rest
-})
+    // Separate class/style for wrapper vs input
+    const inputAttrs = computed(() => {
+        const { class: _, style: __, ...rest } = attrs;
+        return rest;
+    });
 </script>
 
 <template>
-  <div class="form-field" :class="{ 'has-error': error }">
-    <label v-if="label">{{ label }}</label>
-    <input v-bind="inputAttrs" />
-    <span v-if="error" class="error">{{ error }}</span>
-  </div>
+    <div class="form-field" :class="{ 'has-error': error }">
+        <label v-if="label">{{ label }}</label>
+        <input v-bind="inputAttrs" />
+        <span v-if="error" class="error">{{ error }}</span>
+    </div>
 </template>
 ```
 
@@ -156,25 +155,29 @@ const inputAttrs = computed(() => {
 
 ```vue
 <script setup>
-defineProps({
-  icon: String,
-  iconPosition: {
-    type: String,
-    default: 'left'
-  }
-})
+    defineProps({
+        icon: String,
+        iconPosition: {
+            type: String,
+            default: 'left',
+        },
+    });
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 
 <template>
-  <button class="icon-button" v-bind="$attrs">
-    <span v-if="icon && iconPosition === 'left'" class="icon">{{ icon }}</span>
-    <slot />
-    <span v-if="icon && iconPosition === 'right'" class="icon">{{ icon }}</span>
-  </button>
+    <button class="icon-button" v-bind="$attrs">
+        <span v-if="icon && iconPosition === 'left'" class="icon">
+            {{ icon }}
+        </span>
+        <slot />
+        <span v-if="icon && iconPosition === 'right'" class="icon">
+            {{ icon }}
+        </span>
+    </button>
 </template>
 ```
 
@@ -182,29 +185,28 @@ defineOptions({
 
 ```vue
 <script setup>
-defineProps({
-  to: String,
-  external: Boolean
-})
+    defineProps({
+        to: String,
+        external: Boolean,
+    });
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 
 <template>
-  <a
-    v-if="external"
-    :href="to"
-    target="_blank"
-    rel="noopener noreferrer"
-    v-bind="$attrs"
-  >
-    <slot />
-  </a>
-  <router-link v-else :to="to" v-bind="$attrs">
-    <slot />
-  </router-link>
+    <a
+        v-if="external"
+        :href="to"
+        target="_blank"
+        rel="noopener noreferrer"
+        v-bind="$attrs">
+        <slot />
+    </a>
+    <router-link v-else :to="to" v-bind="$attrs">
+        <slot />
+    </router-link>
 </template>
 ```
 
@@ -217,9 +219,9 @@ defineOptions({
 ```vue
 <!-- SimpleCard.vue - No need for inheritAttrs: false -->
 <template>
-  <article class="card">
-    <slot />
-  </article>
+    <article class="card">
+        <slot />
+    </article>
 </template>
 <!-- Passing class, id, or data-* to the root article is fine -->
 ```

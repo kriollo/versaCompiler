@@ -3,7 +3,21 @@ title: Single-File Component Structure, Styling, and Template Patterns
 impact: MEDIUM
 impactDescription: Consistent SFC structure and styling choices improve maintainability, tooling support, and render performance
 type: best-practice
-tags: [vue3, sfc, scoped-css, styles, build-tools, performance, template, v-html, v-for, computed, v-if, v-show]
+tags:
+    [
+        vue3,
+        sfc,
+        scoped-css,
+        styles,
+        build-tools,
+        performance,
+        template,
+        v-html,
+        v-for,
+        computed,
+        v-if,
+        v-show,
+    ]
 ---
 
 # Single-File Component Structure, Styling, and Template Patterns
@@ -26,6 +40,7 @@ tags: [vue3, sfc, scoped-css, styles, build-tools, performance, template, v-html
 ## Colocate template, script, and styles
 
 **BAD:**
+
 ```
 components/
 ├── UserCard.vue
@@ -34,58 +49,61 @@ components/
 ```
 
 **GOOD:**
+
 ```vue
 <!-- components/UserCard.vue -->
 <script setup>
-import { computed } from 'vue'
+    import { computed } from 'vue';
 
-const props = defineProps({
-  user: { type: Object, required: true }
-})
+    const props = defineProps({
+        user: { type: Object, required: true },
+    });
 
-const displayName = computed(() =>
-  `${props.user.firstName} ${props.user.lastName}`
-)
+    const displayName = computed(
+        () => `${props.user.firstName} ${props.user.lastName}`,
+    );
 </script>
 
 <template>
-  <div class="user-card">
-    <h3 class="name">{{ displayName }}</h3>
-  </div>
+    <div class="user-card">
+        <h3 class="name">{{ displayName }}</h3>
+    </div>
 </template>
 
 <style scoped>
-.user-card {
-  padding: 1rem;
-}
+    .user-card {
+        padding: 1rem;
+    }
 
-.name {
-  margin: 0;
-}
+    .name {
+        margin: 0;
+    }
 </style>
 ```
 
 ## Use PascalCase for component names
 
 **BAD:**
+
 ```vue
 <script setup>
-import userProfile from './user-profile.vue'
+    import userProfile from './user-profile.vue';
 </script>
 
 <template>
-  <user-profile :user="currentUser" />
+    <user-profile :user="currentUser" />
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <script setup>
-import UserProfile from './UserProfile.vue'
+    import UserProfile from './UserProfile.vue';
 </script>
 
 <template>
-  <UserProfile :user="currentUser" />
+    <UserProfile :user="currentUser" />
 </template>
 ```
 
@@ -101,8 +119,10 @@ import UserProfile from './UserProfile.vue'
 
 ```vue
 <style>
-/* ❌ leaks everywhere */
-button { border-radius: 999px; }
+    /* ❌ leaks everywhere */
+    button {
+        border-radius: 999px;
+    }
 </style>
 ```
 
@@ -110,7 +130,9 @@ button { border-radius: 999px; }
 
 ```vue
 <style scoped>
-.button { border-radius: 999px; }
+    .button {
+        border-radius: 999px;
+    }
 </style>
 ```
 
@@ -119,40 +141,56 @@ button { border-radius: 999px; }
 ```css
 /* src/assets/main.css */
 /* ✅ resets, tokens, typography, app-wide rules */
-:root { --radius: 999px; }
+:root {
+    --radius: 999px;
+}
 ```
 
 ### Use class selectors in scoped CSS
 
 **BAD:**
+
 ```vue
 <template>
-  <article>
-    <h1>{{ title }}</h1>
-    <p>{{ subtitle }}</p>
-  </article>
+    <article>
+        <h1>{{ title }}</h1>
+        <p>{{ subtitle }}</p>
+    </article>
 </template>
 
 <style scoped>
-article { max-width: 800px; }
-h1 { font-size: 2rem; }
-p { line-height: 1.6; }
+    article {
+        max-width: 800px;
+    }
+    h1 {
+        font-size: 2rem;
+    }
+    p {
+        line-height: 1.6;
+    }
 </style>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <article class="article">
-    <h1 class="article-title">{{ title }}</h1>
-    <p class="article-subtitle">{{ subtitle }}</p>
-  </article>
+    <article class="article">
+        <h1 class="article-title">{{ title }}</h1>
+        <p class="article-subtitle">{{ subtitle }}</p>
+    </article>
 </template>
 
 <style scoped>
-.article { max-width: 800px; }
-.article-title { font-size: 2rem; }
-.article-subtitle { line-height: 1.6; }
+    .article {
+        max-width: 800px;
+    }
+    .article-title {
+        font-size: 2rem;
+    }
+    .article-subtitle {
+        line-height: 1.6;
+    }
 </style>
 ```
 
@@ -162,37 +200,39 @@ For Vue 3.5+: use `useTemplateRef()` to access template refs.
 
 ```vue
 <script setup lang="ts">
-import { onMounted, useTemplateRef } from 'vue'
+    import { onMounted, useTemplateRef } from 'vue';
 
-const inputRef = useTemplateRef<HTMLInputElement>('input')
+    const inputRef = useTemplateRef<HTMLInputElement>('input');
 
-onMounted(() => {
-  inputRef.value?.focus()
-})
+    onMounted(() => {
+        inputRef.value?.focus();
+    });
 </script>
 
 <template>
-  <input ref="input" />
+    <input ref="input" />
 </template>
 ```
 
 ## Use camelCase in `:style` bindings
 
 **BAD:**
+
 ```vue
 <template>
-  <div :style="{ 'font-size': fontSize + 'px', 'background-color': bg }">
-    Content
-  </div>
+    <div :style="{ 'font-size': fontSize + 'px', 'background-color': bg }">
+        Content
+    </div>
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <div :style="{ fontSize: fontSize + 'px', backgroundColor: bg }">
-    Content
-  </div>
+    <div :style="{ fontSize: fontSize + 'px', backgroundColor: bg }">
+        Content
+    </div>
 </template>
 ```
 
@@ -229,15 +269,15 @@ It leads to unclear intent and unnecessary work.
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue'
+    import { computed } from 'vue';
 
-const activeUsers = computed(() => users.value.filter(u => u.active))
+    const activeUsers = computed(() => users.value.filter(u => u.active));
 </script>
 
 <template>
-  <li v-for="user in activeUsers" :key="user.id">
-    {{ user.name }}
-  </li>
+    <li v-for="user in activeUsers" :key="user.id">
+        {{ user.name }}
+    </li>
 </template>
 ```
 
@@ -255,56 +295,60 @@ const activeUsers = computed(() => users.value.filter(u => u.active))
 ## Never render untrusted HTML with `v-html`
 
 **BAD:**
+
 ```vue
 <template>
-  <!-- DANGEROUS: untrusted input can inject scripts -->
-  <article v-html="userProvidedContent"></article>
+    <!-- DANGEROUS: untrusted input can inject scripts -->
+    <article v-html="userProvidedContent"></article>
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <script setup>
-import { computed } from 'vue'
-import DOMPurify from 'dompurify'
+    import { computed } from 'vue'
+    import DOMPurify from 'dompurify'
 
-const props = defineProps<{
-  trustedHtml?: string
-  plainText: string
-}>()
+    const props = defineProps<{
+      trustedHtml?: string
+      plainText: string
+    }>()
 
-const safeHtml = computed(() => DOMPurify.sanitize(props.trustedHtml ?? ''))
+    const safeHtml = computed(() => DOMPurify.sanitize(props.trustedHtml ?? ''))
 </script>
 
 <template>
-  <!-- Preferred: escaped interpolation -->
-  <p>{{ props.plainText }}</p>
+    <!-- Preferred: escaped interpolation -->
+    <p>{{ props.plainText }}</p>
 
-  <!-- Only for trusted/sanitized HTML -->
-  <article v-html="safeHtml"></article>
+    <!-- Only for trusted/sanitized HTML -->
+    <article v-html="safeHtml"></article>
 </template>
 ```
 
 ## Choose `v-if` vs `v-show` by toggle behavior
 
 **BAD:**
+
 ```vue
 <template>
-  <!-- Frequent toggles with v-if cause repeated mount/unmount -->
-  <ComplexPanel v-if="isPanelOpen" />
+    <!-- Frequent toggles with v-if cause repeated mount/unmount -->
+    <ComplexPanel v-if="isPanelOpen" />
 
-  <!-- Rarely shown content with v-show pays initial render cost -->
-  <AdminPanel v-show="isAdmin" />
+    <!-- Rarely shown content with v-show pays initial render cost -->
+    <AdminPanel v-show="isAdmin" />
 </template>
 ```
 
 **GOOD:**
+
 ```vue
 <template>
-  <!-- Frequent toggles: keep in DOM, toggle display -->
-  <ComplexPanel v-show="isPanelOpen" />
+    <!-- Frequent toggles: keep in DOM, toggle display -->
+    <ComplexPanel v-show="isPanelOpen" />
 
-  <!-- Rare condition: lazy render only when true -->
-  <AdminPanel v-if="isAdmin" />
+    <!-- Rare condition: lazy render only when true -->
+    <AdminPanel v-if="isAdmin" />
 </template>
 ```

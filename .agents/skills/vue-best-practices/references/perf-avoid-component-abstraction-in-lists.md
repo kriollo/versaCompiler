@@ -21,25 +21,30 @@ Don't avoid abstraction entirely, but be mindful of component depth in frequentl
 - Focus optimization efforts on the most-rendered components
 
 **BAD:**
+
 ```vue
 <!-- BAD: Deep abstraction in list items -->
 <template>
-  <div class="user-list">
-    <!-- For 100 users: Creates 400 component instances -->
-    <UserCard v-for="user in users" :key="user.id" :user="user" />
-  </div>
+    <div class="user-list">
+        <!-- For 100 users: Creates 400 component instances -->
+        <UserCard v-for="user in users" :key="user.id" :user="user" />
+    </div>
 </template>
 
 <!-- UserCard.vue -->
 <template>
-  <Card>  <!-- Wrapper component #1 -->
-    <CardHeader>  <!-- Wrapper component #2 -->
-      <UserAvatar :src="user.avatar" />  <!-- Wrapper component #3 -->
-    </CardHeader>
-    <CardBody>  <!-- Wrapper component #4 -->
-      <Text>{{ user.name }}</Text>
-    </CardBody>
-  </Card>
+    <Card>
+        <!-- Wrapper component #1 -->
+        <CardHeader>
+            <!-- Wrapper component #2 -->
+            <UserAvatar :src="user.avatar" />
+            <!-- Wrapper component #3 -->
+        </CardHeader>
+        <CardBody>
+            <!-- Wrapper component #4 -->
+            <Text>{{ user.name }}</Text>
+        </CardBody>
+    </Card>
 </template>
 
 <!-- Each UserCard creates: Card + CardHeader + CardBody + UserAvatar + Text
@@ -47,39 +52,48 @@ Don't avoid abstraction entirely, but be mindful of component depth in frequentl
 ```
 
 **GOOD:**
+
 ```vue
 <!-- GOOD: Flattened structure in list items -->
 <template>
-  <div class="user-list">
-    <!-- For 100 users: Creates 100 component instances -->
-    <UserCard v-for="user in users" :key="user.id" :user="user" />
-  </div>
+    <div class="user-list">
+        <!-- For 100 users: Creates 100 component instances -->
+        <UserCard v-for="user in users" :key="user.id" :user="user" />
+    </div>
 </template>
 
 <!-- UserCard.vue - Flattened, uses native elements -->
 <template>
-  <div class="card">
-    <div class="card-header">
-      <img :src="user.avatar" :alt="user.name" class="avatar" />
+    <div class="card">
+        <div class="card-header">
+            <img :src="user.avatar" :alt="user.name" class="avatar" />
+        </div>
+        <div class="card-body">
+            <span class="user-name">{{ user.name }}</span>
+        </div>
     </div>
-    <div class="card-body">
-      <span class="user-name">{{ user.name }}</span>
-    </div>
-  </div>
 </template>
 
 <script setup>
-defineProps({
-  user: Object
-})
+    defineProps({
+        user: Object,
+    });
 </script>
 
 <style scoped>
-/* Styles that would have been in Card, CardHeader, etc. */
-.card { /* ... */ }
-.card-header { /* ... */ }
-.card-body { /* ... */ }
-.avatar { /* ... */ }
+    /* Styles that would have been in Card, CardHeader, etc. */
+    .card {
+        /* ... */
+    }
+    .card-header {
+        /* ... */
+    }
+    .card-body {
+        /* ... */
+    }
+    .avatar {
+        /* ... */
+    }
 </style>
 ```
 
@@ -111,24 +125,24 @@ defineProps({
 
 ```javascript
 // In development, profile component counts
-import { onMounted, getCurrentInstance } from 'vue'
+import { onMounted, getCurrentInstance } from 'vue';
 
 onMounted(() => {
-  const instance = getCurrentInstance()
-  let count = 0
+    const instance = getCurrentInstance();
+    let count = 0;
 
-  function countComponents(vnode) {
-    if (vnode.component) count++
-    if (vnode.children) {
-      vnode.children.forEach(child => {
-        if (child.component || child.children) countComponents(child)
-      })
+    function countComponents(vnode) {
+        if (vnode.component) count++;
+        if (vnode.children) {
+            vnode.children.forEach(child => {
+                if (child.component || child.children) countComponents(child);
+            });
+        }
     }
-  }
 
-  // Use Vue DevTools instead for accurate counts
-  console.log('Check Vue DevTools Components tab for instance counts')
-})
+    // Use Vue DevTools instead for accurate counts
+    console.log('Check Vue DevTools Components tab for instance counts');
+});
 ```
 
 ## Alternatives to Wrapper Components
@@ -150,10 +164,10 @@ onMounted(() => {
 
 ## Impact Calculation
 
-| List Size | Components per Item | Total Instances | Memory Impact |
-|-----------|---------------------|-----------------|---------------|
-| 100 items | 1 (flat) | 100 | Baseline |
-| 100 items | 3 (nested) | 300 | ~3x memory |
-| 100 items | 5 (deeply nested) | 500 | ~5x memory |
-| 1000 items | 1 (flat) | 1000 | High |
-| 1000 items | 5 (deeply nested) | 5000 | Very High |
+| List Size  | Components per Item | Total Instances | Memory Impact |
+| ---------- | ------------------- | --------------- | ------------- |
+| 100 items  | 1 (flat)            | 100             | Baseline      |
+| 100 items  | 3 (nested)          | 300             | ~3x memory    |
+| 100 items  | 5 (deeply nested)   | 500             | ~5x memory    |
+| 1000 items | 1 (flat)            | 1000            | High          |
+| 1000 items | 5 (deeply nested)   | 5000            | Very High     |

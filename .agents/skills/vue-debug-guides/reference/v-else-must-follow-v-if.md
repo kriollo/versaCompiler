@@ -23,97 +23,92 @@ In most modern Vue projects using Single File Components, this is caught at buil
 - [ ] If you need content between conditions, restructure using nested conditionals or computed
 
 **Incorrect:**
+
 ```html
 <!-- WRONG: v-else not immediately after v-if -->
 <template>
-  <div v-if="isLoggedIn">
-    Welcome back!
-  </div>
+    <div v-if="isLoggedIn">Welcome back!</div>
 
-  <p>Some other content in between</p>
+    <p>Some other content in between</p>
 
-  <div v-else>
-    <!-- This v-else is NOT recognized! It will ALWAYS render (unconditionally) -->
-    Please log in
-  </div>
+    <div v-else>
+        <!-- This v-else is NOT recognized! It will ALWAYS render (unconditionally) -->
+        Please log in
+    </div>
 </template>
 ```
 
 ```html
 <!-- WRONG: Comment or whitespace element between -->
 <template>
-  <span v-if="status === 'loading'">Loading...</span>
-  <!-- This comment breaks the chain! -->
-  <span v-else-if="status === 'error'">Error occurred</span>
-  <span v-else>Done</span>
+    <span v-if="status === 'loading'">Loading...</span>
+    <!-- This comment breaks the chain! -->
+    <span v-else-if="status === 'error'">Error occurred</span>
+    <span v-else>Done</span>
 </template>
 ```
 
 ```html
 <!-- WRONG: Text node between conditions -->
 <template>
-  <div v-if="showA">A</div>
-  Just some text here
-  <div v-else>B</div>  <!-- Not recognized, always renders -->
+    <div v-if="showA">A</div>
+    Just some text here
+    <div v-else>B</div>
+    <!-- Not recognized, always renders -->
 </template>
 ```
 
 **Correct:**
+
 ```html
 <!-- CORRECT: v-else immediately follows v-if -->
 <template>
-  <div v-if="isLoggedIn">
-    Welcome back!
-  </div>
-  <div v-else>
-    Please log in
-  </div>
+    <div v-if="isLoggedIn">Welcome back!</div>
+    <div v-else>Please log in</div>
 
-  <p>Some other content (placed after the conditional block)</p>
+    <p>Some other content (placed after the conditional block)</p>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Full v-if/v-else-if/v-else chain -->
 <template>
-  <span v-if="status === 'loading'">Loading...</span>
-  <span v-else-if="status === 'error'">Error: {{ errorMessage }}</span>
-  <span v-else-if="status === 'empty'">No data found</span>
-  <span v-else>{{ data }}</span>
+    <span v-if="status === 'loading'">Loading...</span>
+    <span v-else-if="status === 'error'">Error: {{ errorMessage }}</span>
+    <span v-else-if="status === 'empty'">No data found</span>
+    <span v-else>{{ data }}</span>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Using <template> for multiple elements per branch -->
 <template>
-  <template v-if="isLoggedIn">
-    <h1>Welcome back!</h1>
-    <p>Your dashboard</p>
-    <UserStats />
-  </template>
-  <template v-else>
-    <h1>Please log in</h1>
-    <LoginForm />
-  </template>
+    <template v-if="isLoggedIn">
+        <h1>Welcome back!</h1>
+        <p>Your dashboard</p>
+        <UserStats />
+    </template>
+    <template v-else>
+        <h1>Please log in</h1>
+        <LoginForm />
+    </template>
 </template>
 ```
 
 ```html
 <!-- CORRECT: Restructure if you need content between conditions -->
 <template>
-  <div class="conditional-section">
-    <div v-if="isLoggedIn">Welcome back!</div>
-    <div v-else>Please log in</div>
-  </div>
+    <div class="conditional-section">
+        <div v-if="isLoggedIn">Welcome back!</div>
+        <div v-else>Please log in</div>
+    </div>
 
-  <div class="always-shown">
-    Some other content
-  </div>
+    <div class="always-shown">Some other content</div>
 
-  <div class="another-conditional">
-    <div v-if="showMore">More info</div>
-    <div v-else>Click to expand</div>
-  </div>
+    <div class="another-conditional">
+        <div v-if="showMore">More info</div>
+        <div v-else>Click to expand</div>
+    </div>
 </template>
 ```
 
@@ -133,4 +128,5 @@ In most modern Vue projects using Single File Components, this is caught at buil
 ```
 
 ## Reference
+
 - [Vue.js Conditional Rendering - v-else](https://vuejs.org/guide/essentials/conditional.html#v-else)

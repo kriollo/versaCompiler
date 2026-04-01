@@ -20,19 +20,19 @@ When creating Vue plugins that add global properties, you MUST properly augment 
 // BAD - This OVERWRITES Vue types instead of augmenting!
 // types/vue.d.ts
 declare module 'vue' {
-  interface ComponentCustomProperties {
-    $translate: (key: string) => string
-  }
+    interface ComponentCustomProperties {
+        $translate: (key: string) => string;
+    }
 }
 
 // GOOD - The export {} makes this a module, so it AUGMENTS types
 // types/vue.d.ts
-export {}  // This line is CRITICAL!
+export {}; // This line is CRITICAL!
 
 declare module 'vue' {
-  interface ComponentCustomProperties {
-    $translate: (key: string) => string
-  }
+    interface ComponentCustomProperties {
+        $translate: (key: string) => string;
+    }
 }
 ```
 
@@ -40,48 +40,48 @@ declare module 'vue' {
 
 ```typescript
 // plugins/i18n.ts
-import type { App, InjectionKey } from 'vue'
+import type { App, InjectionKey } from 'vue';
 
 export interface I18nOptions {
-  locale: string
-  messages: Record<string, Record<string, string>>
+    locale: string;
+    messages: Record<string, Record<string, string>>;
 }
 
 export interface I18nInstance {
-  translate: (key: string) => string
-  locale: string
+    translate: (key: string) => string;
+    locale: string;
 }
 
-export const i18nInjectionKey: InjectionKey<I18nInstance> = Symbol('i18n')
+export const i18nInjectionKey: InjectionKey<I18nInstance> = Symbol('i18n');
 
 export function createI18n(options: I18nOptions) {
-  const i18n: I18nInstance = {
-    translate(key: string) {
-      return options.messages[options.locale]?.[key] ?? key
-    },
-    locale: options.locale
-  }
+    const i18n: I18nInstance = {
+        translate(key: string) {
+            return options.messages[options.locale]?.[key] ?? key;
+        },
+        locale: options.locale,
+    };
 
-  return {
-    install(app: App) {
-      // For Composition API
-      app.provide(i18nInjectionKey, i18n)
+    return {
+        install(app: App) {
+            // For Composition API
+            app.provide(i18nInjectionKey, i18n);
 
-      // For Options API / templates
-      app.config.globalProperties.$t = i18n.translate
-      app.config.globalProperties.$i18n = i18n
-    }
-  }
+            // For Options API / templates
+            app.config.globalProperties.$t = i18n.translate;
+            app.config.globalProperties.$i18n = i18n;
+        },
+    };
 }
 
 // types/i18n.d.ts (or in the same file after export)
-export {}
+export {};
 
 declare module 'vue' {
-  interface ComponentCustomProperties {
-    $t: (key: string) => string
-    $i18n: I18nInstance
-  }
+    interface ComponentCustomProperties {
+        $t: (key: string) => string;
+        $i18n: I18nInstance;
+    }
 }
 ```
 
@@ -91,12 +91,12 @@ Some plugins augment `@vue/runtime-core` instead of `vue`:
 
 ```typescript
 // types/global.d.ts
-export {}
+export {};
 
 declare module '@vue/runtime-core' {
-  interface ComponentCustomProperties {
-    $myPlugin: MyPluginInstance
-  }
+    interface ComponentCustomProperties {
+        $myPlugin: MyPluginInstance;
+    }
 }
 ```
 
@@ -106,14 +106,14 @@ Both approaches work, but `'vue'` is more common in application code.
 
 ```json
 {
-  "compilerOptions": {
-    // ...
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.vue",
-    "types/**/*.d.ts"  // Include your declaration files
-  ]
+    "compilerOptions": {
+        // ...
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.vue",
+        "types/**/*.d.ts" // Include your declaration files
+    ]
 }
 ```
 
@@ -123,14 +123,14 @@ If publishing a plugin as a package:
 
 ```json
 {
-  "name": "my-vue-plugin",
-  "types": "./dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/index.mjs"
+    "name": "my-vue-plugin",
+    "types": "./dist/types/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "import": "./dist/index.mjs"
+        }
     }
-  }
 }
 ```
 

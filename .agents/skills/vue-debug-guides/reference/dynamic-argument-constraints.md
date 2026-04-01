@@ -21,6 +21,7 @@ Dynamic arguments allow runtime determination of which attribute or event to bin
 - [ ] Use `null` to explicitly remove a binding
 
 **Incorrect:**
+
 ```vue
 <template>
   <!-- ERROR: Spaces and quotes not allowed in dynamic arguments -->
@@ -44,47 +45,48 @@ const someAttr = 'href'
 ```
 
 **Correct:**
+
 ```vue
 <template>
-  <!-- OK: Simple variable reference -->
-  <a :[attributeName]="url">Link</a>
+    <!-- OK: Simple variable reference -->
+    <a :[attributeName]="url">Link</a>
 
-  <!-- OK: Use computed property for complex expressions -->
-  <a :[dynamicAttr]="value">Link</a>
+    <!-- OK: Use computed property for complex expressions -->
+    <a :[dynamicAttr]="value">Link</a>
 
-  <!-- OK: null removes the binding -->
-  <button :[disabledAttr]="isDisabled">Submit</button>
+    <!-- OK: null removes the binding -->
+    <button :[disabledAttr]="isDisabled">Submit</button>
 
-  <!-- OK: Dynamic event names -->
-  <button @[eventName]="handler">Click</button>
+    <!-- OK: Dynamic event names -->
+    <button @[eventName]="handler">Click</button>
 
-  <!-- OK: In SFCs, case is preserved -->
-  <a :[someAttr]="url">Link</a>
+    <!-- OK: In SFCs, case is preserved -->
+    <a :[someAttr]="url">Link</a>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+    import { ref, computed } from 'vue';
 
-// Simple string variable
-const attributeName = ref('href')
-const url = ref('https://vuejs.org')
+    // Simple string variable
+    const attributeName = ref('href');
+    const url = ref('https://vuejs.org');
 
-// Complex expression via computed property
-const prefix = ref('data')
-const name = ref('id')
-const dynamicAttr = computed(() => `${prefix.value}-${name.value}`)
+    // Complex expression via computed property
+    const prefix = ref('data');
+    const name = ref('id');
+    const dynamicAttr = computed(() => `${prefix.value}-${name.value}`);
 
-// Conditional binding with null
-const isDisabled = ref(false)
-const disabledAttr = computed(() => isDisabled.value ? 'disabled' : null)
+    // Conditional binding with null
+    const isDisabled = ref(false);
+    const disabledAttr = computed(() => (isDisabled.value ? 'disabled' : null));
 
-// Dynamic events
-const useTouch = ref(false)
-const eventName = computed(() => useTouch.value ? 'touchstart' : 'click')
+    // Dynamic events
+    const useTouch = ref(false);
+    const eventName = computed(() => (useTouch.value ? 'touchstart' : 'click'));
 
-function handler() {
-  console.log('Event triggered')
-}
+    function handler() {
+        console.log('Event triggered');
+    }
 </script>
 ```
 
@@ -95,52 +97,53 @@ When writing templates directly in HTML (not SFCs), use lowercase:
 ```html
 <!-- In-DOM template (index.html) -->
 <div id="app">
-  <!-- Use lowercase to avoid browser issues -->
-  <a :[attrname]="url">Link</a>
+    <!-- Use lowercase to avoid browser issues -->
+    <a :[attrname]="url">Link</a>
 </div>
 
 <script type="module">
-import { createApp, ref } from 'vue'
+    import { createApp, ref } from 'vue';
 
-createApp({
-  setup() {
-    // Match the lowercase used in template
-    const attrname = ref('href')
-    const url = ref('https://vuejs.org')
-    return { attrname, url }
-  }
-}).mount('#app')
+    createApp({
+        setup() {
+            // Match the lowercase used in template
+            const attrname = ref('href');
+            const url = ref('https://vuejs.org');
+            return { attrname, url };
+        },
+    }).mount('#app');
 </script>
 ```
 
 ## SFC vs In-DOM Templates
 
-| Feature | SFC (.vue files) | In-DOM (HTML) |
-|---------|------------------|---------------|
-| Case sensitivity | Preserved | Lowercased by browser |
-| Dynamic arguments | Full support | Lowercase only |
-| Recommendation | Preferred | Use for progressive enhancement |
+| Feature           | SFC (.vue files) | In-DOM (HTML)                   |
+| ----------------- | ---------------- | ------------------------------- |
+| Case sensitivity  | Preserved        | Lowercased by browser           |
+| Dynamic arguments | Full support     | Lowercase only                  |
+| Recommendation    | Preferred        | Use for progressive enhancement |
 
 ## Valid Dynamic Argument Values
 
 ```vue
 <script setup>
-// String values - OK
-const attr1 = 'href'
-const attr2 = 'data-custom'
+    // String values - OK
+    const attr1 = 'href';
+    const attr2 = 'data-custom';
 
-// null - OK (removes binding)
-const attr3 = null
+    // null - OK (removes binding)
+    const attr3 = null;
 
-// undefined - OK (removes binding)
-const attr4 = undefined
+    // undefined - OK (removes binding)
+    const attr4 = undefined;
 
-// Numbers, objects, arrays - WARNING
-const attr5 = 123        // Warning: should be string
-const attr6 = { foo: 1 } // Warning: should be string
+    // Numbers, objects, arrays - WARNING
+    const attr5 = 123; // Warning: should be string
+    const attr6 = { foo: 1 }; // Warning: should be string
 </script>
 ```
 
 ## Reference
+
 - [Vue.js Template Syntax - Dynamic Arguments](https://vuejs.org/guide/essentials/template-syntax.html#dynamic-arguments)
 - [Vue.js Template Syntax - Dynamic Argument Value Constraints](https://vuejs.org/guide/essentials/template-syntax.html#dynamic-argument-value-constraints)

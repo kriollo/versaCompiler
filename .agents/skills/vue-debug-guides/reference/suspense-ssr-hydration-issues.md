@@ -7,6 +7,7 @@
 ## Why This Matters
 
 In SSR applications, hydration mismatches cause:
+
 - Visual flickering as the client re-renders
 - Loss of state in affected components
 - Console warnings in development (silent failures in production)
@@ -17,21 +18,19 @@ In SSR applications, hydration mismatches cause:
 
 ```vue
 <template>
-  <!-- Async component directly in Suspense can fail hydration -->
-  <Suspense>
-    <AsyncDashboard />
-    <template #fallback>
-      Loading...
-    </template>
-  </Suspense>
+    <!-- Async component directly in Suspense can fail hydration -->
+    <Suspense>
+        <AsyncDashboard />
+        <template #fallback>Loading...</template>
+    </Suspense>
 </template>
 
 <script setup>
-import { defineAsyncComponent } from 'vue'
+    import { defineAsyncComponent } from 'vue';
 
-const AsyncDashboard = defineAsyncComponent(
-  () => import('./Dashboard.vue')
-)
+    const AsyncDashboard = defineAsyncComponent(
+        () => import('./Dashboard.vue'),
+    );
 </script>
 ```
 
@@ -41,18 +40,18 @@ const AsyncDashboard = defineAsyncComponent(
 
 ```vue
 <template>
-  <!-- Each async component wrapped in its own Suspense -->
-  <div class="dashboard">
-    <Suspense>
-      <AsyncHeader />
-      <template #fallback><HeaderSkeleton /></template>
-    </Suspense>
+    <!-- Each async component wrapped in its own Suspense -->
+    <div class="dashboard">
+        <Suspense>
+            <AsyncHeader />
+            <template #fallback><HeaderSkeleton /></template>
+        </Suspense>
 
-    <Suspense>
-      <AsyncContent />
-      <template #fallback><ContentSkeleton /></template>
-    </Suspense>
-  </div>
+        <Suspense>
+            <AsyncContent />
+            <template #fallback><ContentSkeleton /></template>
+        </Suspense>
+    </div>
 </template>
 ```
 
@@ -60,19 +59,17 @@ const AsyncDashboard = defineAsyncComponent(
 
 ```vue
 <template>
-  <!-- Prevent SSR for problematic async components -->
-  <ClientOnly>
-    <Suspense>
-      <AsyncDashboard />
-      <template #fallback>
-        Loading dashboard...
-      </template>
-    </Suspense>
+    <!-- Prevent SSR for problematic async components -->
+    <ClientOnly>
+        <Suspense>
+            <AsyncDashboard />
+            <template #fallback>Loading dashboard...</template>
+        </Suspense>
 
-    <template #fallback>
-      <DashboardSkeleton />
-    </template>
-  </ClientOnly>
+        <template #fallback>
+            <DashboardSkeleton />
+        </template>
+    </ClientOnly>
 </template>
 ```
 
@@ -80,19 +77,19 @@ const AsyncDashboard = defineAsyncComponent(
 
 ```vue
 <script setup>
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+    import { useQuery, useQueryClient } from '@tanstack/vue-query';
 
-// IMPORTANT: All useQuery calls must be BEFORE any await
-const { data, suspense } = useQuery({
-  queryKey: ['dashboard'],
-  queryFn: fetchDashboardData,
-  staleTime: 1000 * 60 * 5, // 5 minutes - prevents refetch after hydration
-})
+    // IMPORTANT: All useQuery calls must be BEFORE any await
+    const { data, suspense } = useQuery({
+        queryKey: ['dashboard'],
+        queryFn: fetchDashboardData,
+        staleTime: 1000 * 60 * 5, // 5 minutes - prevents refetch after hydration
+    });
 
-// Wait for suspense AFTER all useQuery calls
-await suspense()
+    // Wait for suspense AFTER all useQuery calls
+    await suspense();
 
-// Now safe to use data
+    // Now safe to use data
 </script>
 ```
 
@@ -100,47 +97,47 @@ await suspense()
 
 ```vue
 <script setup>
-import { ref, onErrorCaptured, onMounted } from 'vue'
+    import { ref, onErrorCaptured, onMounted } from 'vue';
 
-const hydrationError = ref(false)
-const isClient = ref(false)
+    const hydrationError = ref(false);
+    const isClient = ref(false);
 
-onMounted(() => {
-  isClient.value = true
-})
+    onMounted(() => {
+        isClient.value = true;
+    });
 
-onErrorCaptured((err) => {
-  if (err.message?.includes('hydration')) {
-    hydrationError.value = true
-    return false
-  }
-})
+    onErrorCaptured(err => {
+        if (err.message?.includes('hydration')) {
+            hydrationError.value = true;
+            return false;
+        }
+    });
 </script>
 
 <template>
-  <div v-if="hydrationError" class="hydration-recovery">
-    <!-- Force client-only re-render -->
-    <Suspense v-if="isClient">
-      <AsyncContent />
-      <template #fallback>Recovering...</template>
-    </Suspense>
-  </div>
+    <div v-if="hydrationError" class="hydration-recovery">
+        <!-- Force client-only re-render -->
+        <Suspense v-if="isClient">
+            <AsyncContent />
+            <template #fallback>Recovering...</template>
+        </Suspense>
+    </div>
 
-  <Suspense v-else>
-    <AsyncContent />
-    <template #fallback>Loading...</template>
-  </Suspense>
+    <Suspense v-else>
+        <AsyncContent />
+        <template #fallback>Loading...</template>
+    </Suspense>
 </template>
 ```
 
 ## Common SSR + Suspense Issues
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Hydration mismatch | Async chunk not loaded in time | Wrap with Suspense or use ClientOnly |
-| Empty flash on Safari | Slow chunk loading | Preload critical chunks, use skeleton |
-| useQuery after await error | Vue context lost after await | Put all useQuery calls before any await |
-| Immediate refetch after hydration | staleTime too low | Set appropriate staleTime value |
+| Issue                             | Cause                          | Solution                                |
+| --------------------------------- | ------------------------------ | --------------------------------------- |
+| Hydration mismatch                | Async chunk not loaded in time | Wrap with Suspense or use ClientOnly    |
+| Empty flash on Safari             | Slow chunk loading             | Preload critical chunks, use skeleton   |
+| useQuery after await error        | Vue context lost after await   | Put all useQuery calls before any await |
+| Immediate refetch after hydration | staleTime too low              | Set appropriate staleTime value         |
 
 ## Key Points
 

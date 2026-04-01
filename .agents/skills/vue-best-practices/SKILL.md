@@ -3,8 +3,8 @@ name: vue-best-practices
 description: MUST be used for Vue.js tasks. Strongly recommends Composition API with `<script setup>` and TypeScript as the standard approach. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.
 license: MIT
 metadata:
-  author: github.com/vuejs-ai
-  version: "18.0.0"
+    author: github.com/vuejs-ai
+    version: '18.0.0'
 ---
 
 # Vue Best Practices Workflow
@@ -12,6 +12,7 @@ metadata:
 Use this skill as an instruction set. Follow the workflow in order unless the user explicitly asks for a different order.
 
 ## Core Principles
+
 - **Keep state predictable:** one source of truth, derive everything else.
 - **Make data flow explicit:** Props down, Events up for most cases.
 - **Favor small, focused components:** easier to test, reuse, and maintain.
@@ -27,10 +28,10 @@ Use this skill as an instruction set. Follow the workflow in order unless the us
 ### 1.1 Must-read core references (required)
 
 - Before implementing any Vue task, make sure to read and apply these core references:
-  - `references/reactivity.md`
-  - `references/sfc.md`
-  - `references/component-data-flow.md`
-  - `references/composables.md`
+    - `references/reactivity.md`
+    - `references/sfc.md`
+    - `references/component-data-flow.md`
+    - `references/composables.md`
 - Keep these references in active working context for the entire task, not only when a specific issue appears.
 
 ### 1.2 Plan component boundaries before coding (required)
@@ -81,10 +82,10 @@ Entry/root and route view rule:
 - Keep entry/root and route view components thin: app shell/layout, provider wiring, and feature composition.
 - Do not place full feature implementations in entry/root/view components when those features contain independent parts.
 - For CRUD/list features (todo, table, catalog, inbox), split at least into:
-  - feature container component
-  - input/form component
-  - list (and/or item) component
-  - footer/actions or filter/status component
+    - feature container component
+    - input/form component
+    - list (and/or item) component
+    - footer/actions or filter/status component
 - Allow a single-file implementation only for very small throwaway demos; if chosen, explicitly justify why splitting is unnecessary.
 
 ### Component data flow
@@ -114,10 +115,10 @@ Do not add these by default. Load the matching reference only when the requireme
 - Built-in component `<Teleport>` for overlays/portals -> [component-teleport](references/component-teleport.md)
 - Built-in component `<Suspense>` for async subtree fallback boundaries -> [component-suspense](references/component-suspense.md)
 - Animation-related features: pick the simplest approach that matches the required motion behavior.
-  - Built-in component `<Transition>` for enter/leave effects -> [transition](references/component-transition.md)
-  - Built-in component `<TransitionGroup>` for animated list mutations -> [transition-group](references/component-transition-group.md)
-  - Class-based animation for non-enter/leave effects -> [animation-class-based-technique](references/animation-class-based-technique.md)
-  - State-driven animation for user-input-driven animation -> [animation-state-driven-technique](references/animation-state-driven-technique.md)
+    - Built-in component `<Transition>` for enter/leave effects -> [transition](references/component-transition.md)
+    - Built-in component `<TransitionGroup>` for animated list mutations -> [transition-group](references/component-transition-group.md)
+    - Class-based animation for non-enter/leave effects -> [animation-class-based-technique](references/animation-class-based-technique.md)
+    - State-driven animation for user-input-driven animation -> [animation-state-driven-technique](references/animation-state-driven-technique.md)
 
 ### 3.2 Less-common optional features
 

@@ -16,12 +16,12 @@ In Vue 3, fallthrough attributes overwrite explicitly set attributes on the root
 ```vue
 <!-- Parent.vue -->
 <template>
-  <Child msg="Passed from Parent" />
+    <Child msg="Passed from Parent" />
 </template>
 
 <!-- Child.vue - UNEXPECTED BEHAVIOR -->
 <template>
-  <GrandChild msg="Set in Child" />
+    <GrandChild msg="Set in Child" />
 </template>
 
 <!--
@@ -38,12 +38,12 @@ In Vue 3, fallthrough attributes overwrite explicitly set attributes on the root
 ```vue
 <!-- Parent.vue -->
 <template>
-  <Button data-testid="parent-button" />
+    <Button data-testid="parent-button" />
 </template>
 
 <!-- Button.vue - WRONG: explicit data-testid is overwritten -->
 <template>
-  <button data-testid="submit-btn">Submit</button>
+    <button data-testid="submit-btn">Submit</button>
 </template>
 
 <!-- Result: <button data-testid="parent-button">Submit</button> -->
@@ -57,14 +57,14 @@ In Vue 3, fallthrough attributes overwrite explicitly set attributes on the root
 ```vue
 <!-- Child.vue - CORRECT: Control attribute precedence -->
 <script setup>
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 
 <template>
-  <!-- v-bind="$attrs" FIRST, then explicit attribute -->
-  <GrandChild v-bind="$attrs" msg="Set in Child" />
+    <!-- v-bind="$attrs" FIRST, then explicit attribute -->
+    <GrandChild v-bind="$attrs" msg="Set in Child" />
 </template>
 
 <!--
@@ -77,23 +77,23 @@ defineOptions({
 
 ```vue
 <script setup>
-import { computed, useAttrs } from 'vue'
+    import { computed, useAttrs } from 'vue';
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 
-const attrs = useAttrs()
+    const attrs = useAttrs();
 
-// Filter out attributes you want to control explicitly
-const filteredAttrs = computed(() => {
-  const { msg, ...rest } = attrs
-  return rest
-})
+    // Filter out attributes you want to control explicitly
+    const filteredAttrs = computed(() => {
+        const { msg, ...rest } = attrs;
+        return rest;
+    });
 </script>
 
 <template>
-  <GrandChild v-bind="filteredAttrs" msg="Set in Child" />
+    <GrandChild v-bind="filteredAttrs" msg="Set in Child" />
 </template>
 ```
 
@@ -102,22 +102,22 @@ const filteredAttrs = computed(() => {
 ```vue
 <!-- Button.vue - BEST: Declare attributes you need to control -->
 <script setup>
-const props = defineProps({
-  dataTestid: {
-    type: String,
-    default: 'submit-btn'
-  }
-})
+    const props = defineProps({
+        dataTestid: {
+            type: String,
+            default: 'submit-btn',
+        },
+    });
 
-defineOptions({
-  inheritAttrs: false
-})
+    defineOptions({
+        inheritAttrs: false,
+    });
 </script>
 
 <template>
-  <button :data-testid="dataTestid" v-bind="$attrs">
-    <slot />
-  </button>
+    <button :data-testid="dataTestid" v-bind="$attrs">
+        <slot />
+    </button>
 </template>
 ```
 
@@ -128,12 +128,12 @@ Unlike other attributes, `class` and `style` merge rather than overwrite:
 ```vue
 <!-- Parent.vue -->
 <template>
-  <Button class="large" style="color: red" />
+    <Button class="large" style="color: red" />
 </template>
 
 <!-- Button.vue -->
 <template>
-  <button class="btn" style="padding: 10px">Submit</button>
+    <button class="btn" style="padding: 10px">Submit</button>
 </template>
 
 <!--
@@ -149,8 +149,8 @@ When migrating components that rely on attribute precedence:
 1. Identify components that set explicit attributes on root elements
 2. Check if parent components pass the same attributes
 3. If explicit values should take precedence:
-   - Add `inheritAttrs: false`
-   - Use `v-bind="$attrs"` before explicit attributes
+    - Add `inheritAttrs: false`
+    - Use `v-bind="$attrs"` before explicit attributes
 
 ## References
 

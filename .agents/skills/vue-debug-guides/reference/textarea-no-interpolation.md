@@ -20,53 +20,55 @@ Unlike v-model which provides two-way binding, interpolation only renders the in
 - [ ] Add linting rules to catch this pattern if possible
 
 **Incorrect:**
+
 ```html
 <script setup>
-import { ref } from 'vue'
+    import { ref } from 'vue';
 
-const message = ref('Hello World')
+    const message = ref('Hello World');
 </script>
 
 <template>
-  <!-- WRONG: One-way binding only! Shows initial value but edits don't update ref -->
-  <textarea>{{ message }}</textarea>
+    <!-- WRONG: One-way binding only! Shows initial value but edits don't update ref -->
+    <textarea>{{ message }}</textarea>
 
-  <!-- Also WRONG: User can type but changes are lost -->
-  <textarea>{{ userBio }}</textarea>
+    <!-- Also WRONG: User can type but changes are lost -->
+    <textarea>{{ userBio }}</textarea>
 
-  <!-- The textarea displays content but ref never updates -->
+    <!-- The textarea displays content but ref never updates -->
 </template>
 ```
 
 **Correct:**
+
 ```html
 <script setup>
-import { ref } from 'vue'
+    import { ref } from 'vue';
 
-const message = ref('Hello World')
+    const message = ref('Hello World');
 </script>
 
 <template>
-  <!-- CORRECT: Use v-model for textarea -->
-  <textarea v-model="message"></textarea>
+    <!-- CORRECT: Use v-model for textarea -->
+    <textarea v-model="message"></textarea>
 
-  <!-- For read-only display, still use v-model or :value -->
-  <textarea v-model="message" readonly></textarea>
+    <!-- For read-only display, still use v-model or :value -->
+    <textarea v-model="message" readonly></textarea>
 
-  <!-- Or one-way binding with :value -->
-  <textarea :value="message" readonly></textarea>
+    <!-- Or one-way binding with :value -->
+    <textarea :value="message" readonly></textarea>
 </template>
 ```
 
 ```html
 <!-- With placeholder and other attributes -->
 <textarea
-  v-model="message"
-  placeholder="Enter your message..."
-  rows="5"
-  maxlength="500"
-></textarea>
+    v-model="message"
+    placeholder="Enter your message..."
+    rows="5"
+    maxlength="500"></textarea>
 ```
 
 ## Reference
+
 - [Vue.js Form Input Bindings - Multiline text](https://vuejs.org/guide/essentials/forms.html#multiline-text)

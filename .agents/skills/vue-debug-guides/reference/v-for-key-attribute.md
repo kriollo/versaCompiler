@@ -21,13 +21,14 @@ The `key` attribute tells Vue how your data relates to the DOM elements it rende
 - [ ] When using components in v-for, keys are mandatory, not optional
 
 **Incorrect:**
+
 ```html
 <!-- WRONG: No key provided -->
 <li v-for="item in items">{{ item.name }}</li>
 
 <!-- WRONG: Using array index as key - shifts when list changes -->
 <li v-for="(item, index) in items" :key="index">
-  <input v-model="item.value" />
+    <input v-model="item.value" />
 </li>
 
 <!-- WRONG: Object as key -->
@@ -35,7 +36,7 @@ The `key` attribute tells Vue how your data relates to the DOM elements it rende
 
 <!-- WRONG (Vue 3): Key on child instead of template -->
 <template v-for="item in items">
-  <li :key="item.id">{{ item.name }}</li>
+    <li :key="item.id">{{ item.name }}</li>
 </template>
 ```
 
@@ -47,38 +48,34 @@ The `key` attribute tells Vue how your data relates to the DOM elements it rende
 ```
 
 **Correct:**
+
 ```html
 <!-- CORRECT: Unique identifier as key -->
-<li v-for="item in items" :key="item.id">
-  {{ item.name }}
-</li>
+<li v-for="item in items" :key="item.id">{{ item.name }}</li>
 
 <!-- CORRECT: With components -->
-<MyComponent
-  v-for="item in items"
-  :key="item.id"
-  :item="item"
-/>
+<MyComponent v-for="item in items" :key="item.id" :item="item" />
 
 <!-- CORRECT (Vue 3): Key on template tag -->
 <template v-for="item in items" :key="item.id">
-  <li>{{ item.name }}</li>
-  <span>{{ item.description }}</span>
+    <li>{{ item.name }}</li>
+    <span>{{ item.description }}</span>
 </template>
 
 <!-- CORRECT: With stateful elements -->
 <div v-for="user in users" :key="user.id">
-  <input v-model="user.email" />
-  <select v-model="user.role">
-    <option value="admin">Admin</option>
-    <option value="user">User</option>
-  </select>
+    <input v-model="user.email" />
+    <select v-model="user.role">
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+    </select>
 </div>
 ```
 
 ## When Keys Are Critical
 
 Keys are absolutely required when v-for loops contain:
+
 - Components with local state
 - Form elements (`<input>`, `<select>`, `<textarea>`)
 - Elements with initialization logic (mounted/created hooks)
@@ -86,5 +83,6 @@ Keys are absolutely required when v-for loops contain:
 - Direct DOM manipulation
 
 ## Reference
+
 - [Vue.js List Rendering - Key](https://vuejs.org/guide/essentials/list.html#maintaining-state-with-key)
 - [Vue 3 Migration Guide - Key on Template](https://v3-migration.vuejs.org/breaking-changes/key-attribute)
