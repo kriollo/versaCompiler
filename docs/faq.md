@@ -62,19 +62,22 @@ npm run build
 
 ### ¿Dónde va el archivo de configuración?
 
-Crea `versacompile.config.ts` en la raíz de tu proyecto:
+Crea `versacompile.config.ts` en la raíz de tu proyecto. Usa `defineConfig` para autocompletado TypeScript:
 
 ```typescript
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
         },
     },
-};
+});
 ```
 
 ### ¿Puedo usar con proyectos existentes?
@@ -103,11 +106,41 @@ versacompiler --watch --typeCheck
 - ✅ **Componentes Vue** con preservación de estado
 - ✅ **TypeScript/JavaScript** con actualizaciones instantáneas
 - ✅ **CSS/TailwindCSS** con inyección en tiempo real
-- ✅ **Keys únicas** para identificación de componentes
+- ✅ **Propagación en cascada** — si una librería JS cambia, sus consumidores se actualizan sin recargar página
 
 ```bash
 # HMR automático en modo watch
 versacompiler --watch
+```
+
+### ¿Puedo deshabilitar el shim HMR en archivos específicos?
+
+Sí. Usa `hmrExclude` en tu config para excluir archivos puntuales sin afectar al resto:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    hmrExclude: [
+        'early-init.js',   // nombre exacto
+        '*.legacy.js',     // glob simple
+    ],
+});
+```
+
+Esto es útil cuando un archivo se carga con `<script src="...">` (sin `type="module"`) y el shim produce `SyntaxError: Cannot use 'import.meta' outside a module`.
+
+Para deshabilitar HMR **globalmente** (ej. librería Node.js sin browser):
+
+```typescript
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    hmr: false,
+});
 ```
 
 ### ¿Qué es la validación de integridad? (v2.4.0+)
@@ -203,15 +236,19 @@ versacompiler --typeCheck --file src/types/api.ts
 
 ### ¿Puedo usar un proxy para API?
 
-Sí, configura `proxyConfig` en tu archivo de configuración:
+Sí, configura `server.proxyUrl` en tu archivo de configuración:
 
 ```typescript
-export default {
-    proxyConfig: {
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: {
         proxyUrl: 'http://localhost:8080',
         assetsOmit: true,
     },
-};
+});
 ```
 
 ## 📝 TypeScript y Vue
@@ -260,6 +297,20 @@ Sí, VersaCompiler incluye un sistema avanzado de workers para TypeScript:
 - ✅ **Language Service Host** optimizado
 - ✅ **Filtrado de errores** específicos de decorators
 
+Controla el número de workers con `typeCheckOptions.maxWorkers` en tu config:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    typeCheckOptions: {
+        maxWorkers: 2,
+    },
+});
+```
+
 ### ¿Puedo usar decorators de TypeScript?
 
 Absolutamente. VersaCompiler tiene soporte completo para decorators:
@@ -276,19 +327,35 @@ Absolutamente. VersaCompiler tiene soporte completo para decorators:
 
 ### ¿Funcionan los path aliases?
 
-Sí, configúralos en `pathsAlias` y también en tu `tsconfig.json`:
+Sí, configura los aliases en `resolve.alias` de tu config:
 
 ```typescript
-export default {
-    compilerOptions: {
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@components/*': ['src/components/*'],
-            '@utils/*': ['src/utils/*'],
-            '@components/*': ['src/components/*'],
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@components': 'src/components',
+            '@utils': 'src/utils',
         },
     },
-};
+});
+```
+
+Asegúrate también de tenerlos en `tsconfig.json`:
+
+```json
+{
+    "compilerOptions": {
+        "paths": {
+            "@/*": ["src/*"],
+            "@components/*": ["src/components/*"],
+            "@utils/*": ["src/utils/*"]
+        }
+    }
+}
 ```
 
 ## 🔍 Linting
@@ -435,8 +502,24 @@ npm install --save-dev oxlint      # Para OxLint
 ### HMR no funciona
 
 1. Verifica que usas `--watch`
-2. Comprueba que el puerto no está ocupado
-3. Asegúrate de que `proxyConfig` está bien configurado
+2. Comprueba que `server.proxyUrl` está correctamente configurado (o vacío si no usas proxy)
+3. Verifica que usas el formato Vite-style en la config (`root`, `build`, `resolve`)
+
+### Error `Cannot use 'import.meta' outside a module`
+
+El shim HMR usa `import.meta`, que solo funciona en archivos cargados con `type="module"`. Si un archivo se carga con `<script src="...">` simple, añádelo a `hmrExclude`:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    hmrExclude: ['nombre-del-archivo.js'],
+});
+```
+
+Si el problema afecta a todos los archivos, usa `hmr: false`.
 
 ### Compilación muy lenta
 

@@ -10,18 +10,22 @@ Esta guía contiene ejemplos prácticos para casos de uso comunes con VersaCompi
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@components/*': ['src/components/*'],
-            '@utils/*': ['src/utils/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@components': 'src/components',
+            '@utils': 'src/utils',
         },
     },
-    proxyConfig: {
+    tsconfig: './tsconfig.json',
+    server: {
         proxyUrl: '',
         assetsOmit: true,
     },
@@ -32,14 +36,9 @@ export default {
             configFile: './eslint.config.js',
             fix: true,
             paths: ['src/'],
-            eslintConfig: {
-                cache: true,
-                formats: ['stylish'],
-                maxWarnings: 0,
-            },
         },
     ],
-};
+});
 ```
 
 **Comandos de desarrollo:**
@@ -59,22 +58,24 @@ versacompiler --all --prod --cleanOutput
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@styles/*': ['src/styles/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@styles': 'src/styles',
         },
     },
+    tsconfig: './tsconfig.json',
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
         output: './public/css/output.css',
-        minify: true, // Para producción
-        content: ['./src/**/*.{vue,js,ts}'], // Archivos a escanear
     },
     linter: [
         {
@@ -83,13 +84,9 @@ export default {
             configFile: './.oxlintrc.json',
             fix: true,
             paths: ['src/'],
-            oxlintConfig: {
-                quiet: false,
-                tsconfigPath: './tsconfig.json',
-            },
         },
     ],
-};
+});
 ```
 
 **Comandos específicos para TailwindCSS:**
@@ -108,24 +105,21 @@ versacompiler --all --prod --tailwind
 versacompiler --all --prod --tailwind --checkIntegrity
 ```
 
-### Proyecto con Validación de Integridad para Deploy (v2.4.0+)
+### Proyecto con Validación de Integridad para Deploy
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-        },
     },
-    validationOptions: {
-        skipSyntaxCheck: false, // Validación completa de sintaxis
-        verbose: true, // Logging detallado
-        throwOnError: true, // Fallar build si hay errores
+    resolve: {
+        alias: { '@': 'src' },
     },
+    tsconfig: './tsconfig.json',
     linter: [
         {
             name: 'eslint',
@@ -133,10 +127,6 @@ export default {
             configFile: './eslint.config.js',
             fix: false, // No auto-fix en producción
             paths: ['src/'],
-            eslintConfig: {
-                cache: false, // Sin cache en CI/CD
-                maxWarnings: 0, // Cero warnings permitidos
-            },
         },
         {
             name: 'oxlint',
@@ -144,10 +134,10 @@ export default {
             configFile: './.oxlintrc.json',
             fix: false,
             paths: ['src/'],
-            oxlintConfig: {
-                quiet: false, // Mostrar todos los errores
-                tsconfigPath: './tsconfig.json',
-            },
+        },
+    ],
+});
+```
         },
     ],
 };
@@ -188,18 +178,22 @@ versacompiler --all --prod --checkIntegrity --yes
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@api/*': ['src/api/*'],
-            '@types/*': ['src/types/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@api': 'src/api',
+            '@types': 'src/types',
         },
     },
-    proxyConfig: {
+    tsconfig: './tsconfig.json',
+    server: {
         proxyUrl: 'http://localhost:8080',
         assetsOmit: true,
     },
@@ -210,11 +204,6 @@ export default {
             configFile: './eslint.config.js',
             fix: true,
             paths: ['src/'],
-            eslintConfig: {
-                cache: true,
-                quiet: false,
-                formats: ['stylish'],
-            },
         },
         {
             name: 'oxlint',
@@ -222,13 +211,9 @@ export default {
             configFile: './.oxlintrc.json',
             fix: false,
             paths: ['src/api/', 'src/types/'],
-            oxlintConfig: {
-                tsconfigPath: './tsconfig.json',
-                quiet: true,
-            },
         },
     ],
-};
+});
 ```
 
 **Comandos para desarrollo con API:**
@@ -244,32 +229,95 @@ versacompiler --all --typeCheck
 versacompiler --linter
 ```
 
+### Proyecto con HMR Parcial (`hmrExclude`)
+
+Cuando algunos archivos se cargan con `<script src="...">` (no como módulo ES) y no deben recibir el shim HMR:
+
+```typescript
+// versacompile.config.ts
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
+        outDir: './public/js',
+    },
+    resolve: {
+        alias: { '@': 'src' },
+    },
+    tsconfig: './tsconfig.json',
+    server: {
+        proxyUrl: 'http://localhost:8080',
+        assetsOmit: true,
+    },
+    // Excluir solo archivos puntuales del shim HMR
+    hmrExclude: [
+        'early-init.js',     // se carga con <script src="..."> sin type=module
+        '*.legacy.js',       // archivos legacy que no soportan import.meta
+    ],
+});
+```
+
+Todos los demás archivos siguen recibiendo HMR normalmente.
+
+### Proyecto de Librería Node.js (sin HMR)
+
+Cuando compilas una librería o CLI Node.js donde ningún archivo necesita HMR:
+
+```typescript
+// versacompile.config.ts
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
+        outDir: './dist',
+    },
+    resolve: {
+        alias: { '@': 'src' },
+    },
+    tsconfig: './tsconfig.json',
+    hmr: false,   // deshabilita el shim HMR en todos los archivos
+    linter: [
+        {
+            name: 'oxlint',
+            bin: './node_modules/.bin/oxlint',
+            configFile: './.oxlintrc.json',
+            fix: false,
+            paths: ['src/'],
+        },
+    ],
+});
+```
+
 ### Proyecto con Bundling
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-        },
+        bundlers: [
+            {
+                name: 'appLoader',
+                fileInput: './dist/module/appLoader.js',
+                fileOutput: './dist/module/appLoader.prod.js',
+            },
+            {
+                name: 'components',
+                fileInput: './dist/components/index.js',
+                fileOutput: './dist/components.bundle.js',
+            },
+        ],
     },
-    bundlers: [
-        {
-            name: 'appLoader',
-            fileInput: './dist/module/appLoader.js',
-            fileOutput: './dist/module/appLoader.prod.js',
-        },
-        {
-            name: 'components',
-            fileInput: './dist/components/index.js',
-            fileOutput: './dist/components.bundle.js',
-        },
-    ],
-};
+    resolve: {
+        alias: { '@': 'src' },
+    },
+    tsconfig: './tsconfig.json',
+});
 ```
 
 ## 📁 Estructuras de Proyecto
@@ -389,7 +437,11 @@ jobs:
 ### Linting Dual (ESLint + OxLint)
 
 ```typescript
-export default {
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
     linter: [
         {
             name: 'eslint',
@@ -406,38 +458,49 @@ export default {
             paths: ['src/'],
         },
     ],
-};
+});
 ```
 
 ### Múltiples Aliases
 
 ```typescript
-export default {
-    compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@components/*': ['src/components/*'],
-            '@views/*': ['src/views/*'],
-            '@utils/*': ['src/utils/*'],
-            '@assets/*': ['src/assets/*'],
-            'P@/*': ['public/*'],
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@components': 'src/components',
+            '@views': 'src/views',
+            '@utils': 'src/utils',
+            '@assets': 'src/assets',
+            'P@': 'public',
         },
     },
-};
+});
 ```
 
 ### Observación de Archivos Adicionales
 
 ```typescript
-export default {
-    aditionalWatch: [
-        './app/templates/**/*.twig',
-        './config/**/*.json',
-        './data/**/*.yaml',
-    ],
-};
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: {
+        proxyUrl: 'http://localhost:8080',
+        assetsOmit: true,
+        watch: {
+            additional: [
+                './app/templates/**/*.twig',
+                './config/**/*.json',
+                './data/**/*.yaml',
+            ],
+        },
+    },
+});
 ```
 
 ## 📝 Archivos de Configuración Relacionados

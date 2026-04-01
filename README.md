@@ -181,6 +181,7 @@ export default defineConfig({
     typeCheckOptions: {
         maxWorkers: 2,
     },
+    hmrExclude: ['nohrm.js'],
 });
 ```
 
@@ -232,6 +233,56 @@ Array de configuraciones de linters. Usar `false` para deshabilitar todos:
 #### `typeCheckOptions`
 
 - `maxWorkers`: Máximo número de worker threads para verificación de tipos (por defecto: depende del número de CPUs)
+
+#### `hmr` _(opcional)_
+
+Controla si VersaCompiler inyecta el shim HMR en los archivos `.js` compilados.
+
+- `true` _(por defecto)_: todos los archivos compilados reciben el shim HMR en modo desarrollo
+- `false`: deshabilita la inyección **globalmente** — útil para builds de librería Node.js o cuando ningún archivo debe tener HMR
+
+```typescript
+// Deshabilitar HMR globalmente (ej. librería CLI / Node.js)
+export default defineConfig({
+    // ...
+    hmr: false,
+});
+```
+
+> **Nota**: Para deshabilitar HMR solo en archivos puntuales (mientras el resto sigue con HMR activo), usa `hmrExclude` en su lugar.
+
+#### `hmrExclude` _(opcional)_
+
+Lista de patrones para excluir archivos **de salida** específicos de la inyección del shim HMR, sin afectar al resto.
+
+Esto es útil cuando un archivo compilado se carga con `<script src="...">` en lugar de `<script type="module" src="...">`, lo que causaría el error:
+```
+SyntaxError: Cannot use 'import.meta' outside a module
+```
+
+**Patrones aceptados:**
+
+| Patrón | Ejemplo | Coincide con |
+| --- | --- | --- |
+| Nombre exacto | `'early-init.js'` | Cualquier archivo con ese nombre |
+| Sufijo de ruta | `'js/early-init.js'` | Ruta que termina con ese sufijo |
+| Glob simple (`*`) | `'*.legacy.js'` | Archivos que coincidan con el patrón |
+
+```typescript
+export default defineConfig({
+    // ...
+    hmrExclude: [
+        'early-init.js',      // nombre exacto
+        'vendor/polyfills.js', // sufijo de ruta
+        '*.legacy.js',         // glob simple
+    ],
+});
+```
+
+Al iniciar en modo `--watch`, si `hmrExclude` tiene entradas, VersaCompiler mostrará:
+```
+[HMR] Exclusiones activas: ['early-init.js', '*.legacy.js']
+```
 
 ## 🎯 Ejemplos de Uso
 
@@ -357,6 +408,8 @@ versacompiler --tailwind --verbose
 - **TypeScript/JavaScript**: Recarga inteligente de módulos sin perder contexto
 - **CSS/TailwindCSS**: Inyección de estilos en tiempo real
 - **Key-based updates**: Sistema de keys únicos para identificación de componentes
+- **`hmr: false`**: Deshabilita la inyección del shim HMR globalmente (para builds de librería Node.js)
+- **`hmrExclude`**: Excluye archivos específicos del shim HMR. Acepta nombres exactos, sufijos de ruta y globs simples (`*.legacy.js`)
 
 ### 🚀 Sistema de Compilación Avanzado
 
@@ -541,6 +594,27 @@ export default defineConfig({
 ```bash
 # Reiniciar con limpieza de cache
 versacompiler --watch --cleanCache
+```
+
+#### ⚠️ Error: `Cannot use 'import.meta' outside a module` en un archivo JS
+
+Este error ocurre cuando un archivo compilado con el shim HMR se carga sin `type="module"`. Usa `hmrExclude` para excluirlo:
+
+```typescript
+// versacompile.config.ts
+export default defineConfig({
+    // ...
+    hmrExclude: ['early-init.js'],
+});
+```
+
+Si el problema afecta a **todos** los archivos (ej. proyecto Node.js), deshabilita HMR globalmente:
+
+```typescript
+export default defineConfig({
+    // ...
+    hmr: false,
+});
 ```
 
 #### 🐌 Compilación o linting muy lento

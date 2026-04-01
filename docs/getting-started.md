@@ -186,18 +186,24 @@ versacompiler src/components/ --verbose
 
 ### Configuración Básica
 
+Usa el helper `defineConfig` para obtener autocompletado TypeScript:
+
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
         },
     },
-    proxyConfig: {
+    tsconfig: './tsconfig.json',
+    server: {
         proxyUrl: '',
         assetsOmit: true,
     },
@@ -210,13 +216,12 @@ export default {
             paths: ['src/'],
         },
     ],
-    // Configuración de TailwindCSS
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
         output: './public/css/output.css',
     },
-};
+});
 ```
 
 ### Configuraciones Comunes
@@ -224,18 +229,26 @@ export default {
 #### Para proyectos con API backend:
 
 ```typescript
-export default {
-    proxyConfig: {
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: {
         proxyUrl: 'http://localhost:8080', // Tu servidor backend
         assetsOmit: true,
     },
-};
+});
 ```
 
 #### Para equipos grandes (linting estricto):
 
 ```typescript
-export default {
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
     linter: [
         {
             name: 'eslint',
@@ -243,11 +256,6 @@ export default {
             configFile: './eslint.config.js',
             fix: true,
             paths: ['src/'],
-            rules: {
-                '@typescript-eslint/no-unused-vars': 'error',
-                '@typescript-eslint/explicit-function-return-type': 'warn',
-                'vue/component-definition-name-casing': ['error', 'PascalCase'],
-            },
         },
         {
             name: 'oxlint',
@@ -255,19 +263,19 @@ export default {
             configFile: './.oxlintrc.json',
             fix: true,
             paths: ['src/'],
-            rules: {
-                'no-unused-vars': 'error',
-                'no-console': 'warn',
-            },
         },
     ],
-};
+});
 ```
 
 #### Para desarrollo rápido (menos verificaciones):
 
 ```typescript
-export default {
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
     linter: [
         {
             name: 'oxlint', // Solo OxLint (más rápido)
@@ -277,28 +285,28 @@ export default {
             paths: ['src/'],
         },
     ],
-};
+});
 ```
 
 #### Para proyectos con TypeScript estricto:
 
 ```typescript
-export default {
-    compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@components/*': ['src/components/*'],
-            '@utils/*': ['src/utils/*'],
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@components': 'src/components',
+            '@utils': 'src/utils',
         },
-        // Habilitar decoradores experimentales
-        experimentalDecorators: true,
-        emitDecoratorMetadata: true,
     },
-    // Usar workers para TypeScript (mejor performance)
-    useWorkers: true,
-};
+    tsconfig: './tsconfig.json',
+    typeCheckOptions: {
+        maxWorkers: 2, // workers para verificación de tipos
+    },
+});
 ```
 
 ## 🔥 Desarrollo con HMR
@@ -326,40 +334,61 @@ versacompiler --watch
 - ✅ **Assets** - Actualización automática de recursos
 - ✅ **CSS Modules/SCSS** - Soporte completo con HMR
 
-### TypeScript Workers para HMR
-
-VersaCompiler utiliza **TypeScript Workers** para mejorar la performance del HMR:
-
-```typescript
-// versacompile.config.ts
-export default {
-    // Habilitar workers para mejor performance
-    useWorkers: true,
-    compilerOptions: {
-        // ... otras opciones
-    },
-};
-```
-
 ### Funcionalidades avanzadas de HMR:
 
 - 🔄 **Cache inteligente** - Solo recompila archivos modificados
 - ⚡ **Validación en paralelo** - TypeScript workers independientes
 - 🎨 **Hot reload de estilos** - TailwindCSS y CSS Modules
 - 🧩 **Preservación de estado** - Vue Composition API y Options API
+- 🛡️ **`hmr: false`** - Deshabilita el shim HMR globalmente (para Node.js/librerías)
+- 🎯 **`hmrExclude`** - Excluye archivos específicos del shim HMR
+
+### Excluir archivos del shim HMR:
+
+Si un archivo compilado se carga con `<script src="...">` (sin `type="module"`), el shim HMR produce:
+```
+SyntaxError: Cannot use 'import.meta' outside a module
+```
+
+Solución: añade ese archivo a `hmrExclude`:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: { proxyUrl: '', assetsOmit: true },
+    hmrExclude: ['early-init.js', '*.legacy.js'],
+});
+```
+
+Para deshabilitar HMR completamente en todos los archivos:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    hmr: false,
+});
+```
 
 ### Si HMR no funciona:
 
 ```typescript
-// Verificar configuración
-export default {
-    proxyConfig: {
+// Verificar configuración en versacompile.config.ts
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: {
         proxyUrl: '', // Vacío si no usas proxy
         assetsOmit: true,
     },
-    // Asegurar puerto libre
-    port: 3000, // o cambiar si está ocupado
-};
+});
 ```
 
 ### Debug de HMR:

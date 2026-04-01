@@ -8,21 +8,22 @@ Esta documentación cubre las funciones principales disponibles en VersaCompiler
 
 ### Archivo de Configuración
 
-VersaCompiler utiliza un archivo `versacompile.config.ts` simple sin funciones helper:
+VersaCompiler utiliza un archivo `versacompile.config.ts` con el helper `defineConfig` para autocompletado TypeScript:
 
 ```typescript
 // versacompile.config.ts
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-        },
+    },
+    resolve: {
+        alias: { '@': 'src' },
     },
     // ... resto de configuración
-};
+});
 ```
 
 ## CLI API
@@ -80,32 +81,71 @@ versacompiler --all --verbose
 
 ## Estructura de Configuración
 
-### CompilerOptions
+### VersaConfig (configuración pública)
 
 ```typescript
-interface CompilerOptions {
-    sourceRoot: string; // Directorio fuente
-    outDir: string; // Directorio de salida
-    pathsAlias: Record<string, string[]>; // Aliases de paths
-}
-```
+interface VersaConfig {
+    /** Directorio raíz de los archivos fuente */
+    root: string;
 
-### ProxyConfig
+    /** Opciones de salida de la compilación */
+    build: {
+        outDir: string;
+        bundlers?: BundlerConfig[] | false;
+    };
 
-```typescript
-interface ProxyConfig {
-    proxyUrl: string; // URL del proxy
-    assetsOmit: boolean; // Omitir assets
-}
-```
+    /** Resolución de módulos e imports */
+    resolve: {
+        alias: Record<string, string | string[]>;
+    };
 
-### TailwindConfig
+    /** Configuración del servidor de desarrollo */
+    server?: {
+        proxyUrl?: string;
+        assetsOmit?: boolean;
+        watch?: {
+            additional?: string[];
+        };
+    };
 
-```typescript
-interface TailwindConfig {
-    bin: string; // Ruta al binario
-    input: string; // Archivo CSS entrada
-    output: string; // Archivo CSS salida
+    /** Globs adicionales a observar (alternativa a server.watch) */
+    watch?: {
+        additional?: string[];
+    };
+
+    /** Ruta al tsconfig.json del proyecto */
+    tsconfig?: string;
+
+    /** Configuración de TailwindCSS (false para deshabilitar) */
+    tailwindConfig?: {
+        bin: string;
+        input: string;
+        output: string;
+    } | false;
+
+    /** Array de configuraciones de linters (false para deshabilitar) */
+    linter?: LinterConfig[] | false;
+
+    /** Opciones del pool de workers TypeScript */
+    typeCheckOptions?: {
+        maxWorkers?: number;
+    };
+
+    /**
+     * Controla la inyección del shim HMR en archivos compilados.
+     * `false` deshabilita globalmente (ej. builds de librería Node.js).
+     * Para excluir archivos individuales usa `hmrExclude`.
+     * @default true
+     */
+    hmr?: boolean;
+
+    /**
+     * Lista de patrones de archivos de salida que NO recibirán el shim HMR.
+     * Acepta nombres exactos ('early-init.js'), sufijos de ruta ('js/early-init.js')
+     * o globs simples ('*.legacy.js').
+     * @default []
+     */
+    hmrExclude?: string[];
 }
 ```
 
@@ -114,34 +154,10 @@ interface TailwindConfig {
 ```typescript
 interface LinterConfig {
     name: 'eslint' | 'oxlint'; // Nombre del linter
-    bin: string; // Ruta al binario
-    configFile: string; // Archivo de configuración
-    fix?: boolean; // Auto-fix errores
-    paths?: string[]; // Rutas a analizar
-    // Configuración específica de ESLint
-    eslintConfig?: {
-        cache?: boolean; // Habilitar cache
-        maxWarnings?: number; // Máximo warnings
-        quiet?: boolean; // Solo errores
-        formats?: ('json' | 'stylish' | 'compact')[]; // Formatos salida
-        deny?: string[]; // Reglas a denegar
-        allow?: string[]; // Reglas a permitir
-        noIgnore?: boolean; // Deshabilitar .eslintignore
-        ignorePath?: string; // Archivo ignore personalizado
-        ignorePattern?: string[]; // Patrones a ignorar
-    };
-    // Configuración específica de OxLint
-    oxlintConfig?: {
-        rules?: Record<string, any>; // Reglas personalizadas
-        plugins?: string[]; // Plugins de OxLint
-        deny?: string[]; // Reglas a denegar
-        allow?: string[]; // Reglas a permitir
-        tsconfigPath?: string; // Ruta a tsconfig.json
-        quiet?: boolean; // Solo errores
-        noIgnore?: boolean; // Deshabilitar ignore files
-        ignorePath?: string; // Archivo ignore personalizado
-        ignorePattern?: string[]; // Patrones a ignorar
-    };
+    bin: string;               // Ruta al binario
+    configFile: string;        // Archivo de configuración del linter
+    fix?: boolean;             // Auto-fix errores
+    paths?: string[];          // Rutas a analizar
 }
 ```
 
@@ -149,24 +165,19 @@ interface LinterConfig {
 
 ```typescript
 interface BundlerConfig {
-    name: string; // Nombre del bundle
-    fileInput: string; // Archivo de entrada
+    name: string;       // Nombre del bundle
+    fileInput: string;  // Archivo de entrada
     fileOutput: string; // Archivo de salida
 }
 ```
 
-## Configuración Completa
+### Helper `defineConfig`
 
 ```typescript
-interface VersaCompilerConfig {
-    tsconfig?: string;
-    compilerOptions?: CompilerOptions;
-    proxyConfig?: ProxyConfig;
-    aditionalWatch?: string[];
-    tailwindConfig?: TailwindConfig;
-    linter?: LinterConfig[];
-    bundlers?: BundlerConfig[];
-}
+import { defineConfig } from 'versacompiler/config';
+
+// Función de identidad con tipado completo para autocompletado en el editor
+const defineConfig: (config: VersaConfig) => VersaConfig;
 ```
 
 ## Funcionalidades

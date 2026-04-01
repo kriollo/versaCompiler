@@ -1,166 +1,370 @@
 # 🔧 Guía de Configuración
 
-## Introducción
+## Tabla de Contenidos
 
-VersaCompiler utiliza un archivo de configuración simple para definir las opciones de compilación. Esta guía cubre las opciones disponibles.
+1. [Archivo de Configuración](#-archivo-de-configuración)
+2. [Helper `defineConfig`](#-helper-defineconfig)
+3. [Referencia de Opciones](#-referencia-de-opciones)
+   - [root](#root-requerido)
+   - [build](#build-requerido)
+   - [resolve](#resolve-requerido)
+   - [server](#server-opcional)
+   - [watch](#watch-opcional)
+   - [tsconfig](#tsconfig-opcional)
+   - [tailwindConfig](#tailwindconfig-opcional)
+   - [linter](#linter-opcional)
+   - [typeCheckOptions](#typecheckoptions-opcional)
+   - [hmr](#hmr-opcional)
+   - [hmrExclude](#hmrexclude-opcional)
+4. [Ejemplo Completo](#-ejemplo-completo)
+5. [Comandos CLI](#-comandos-cli)
+6. [Troubleshooting](#-troubleshooting)
 
-## Archivo de Configuración
+---
 
-Crea un archivo `versacompile.config.ts` en la raíz de tu proyecto:
+## 📄 Archivo de Configuración
+
+Crea `versacompile.config.ts` en la raíz de tu proyecto. VersaCompiler lo detecta automáticamente.
 
 ```typescript
-// Configuración de VersaCompiler
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
         },
     },
-    // Resto de configuración...
+});
+```
+
+---
+
+## 🛠️ Helper `defineConfig`
+
+Importa `defineConfig` desde `versacompiler/config` para obtener **autocompletado TypeScript completo** en tu editor:
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    // ← autocompletado y validación de tipos aquí
+});
+```
+
+Si prefieres no usar el helper, también puedes exportar el objeto directamente:
+
+```typescript
+export default {
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
 };
 ```
 
-## Opciones de Configuración Disponibles
+---
 
-### compilerOptions
+## 📋 Referencia de Opciones
 
-- `sourceRoot`: Directorio de archivos fuente (por defecto: `'./src'`)
-- `outDir`: Directorio de salida (por defecto: `'./dist'`)
-- `pathsAlias`: Aliases para imports (ej: `'@/*': ['src/*']`)
+### `root` _(requerido)_
 
-### proxyConfig
-
-- `proxyUrl`: URL del proxy para desarrollo
-- `assetsOmit`: Omitir assets en el proxy
-
-### tailwindConfig
-
-- `bin`: Ruta al binario de TailwindCSS
-- `input`: Archivo CSS de entrada
-- `output`: Archivo CSS de salida
-
-### linter
-
-Array de configuraciones de linters avanzadas:
-
-#### Configuración Básica
-
-- `name`: Nombre del linter (`'eslint'` o `'oxlint'`)
-- `bin`: Ruta al binario del linter
-- `configFile`: Archivo de configuración del linter
-- `fix`: Auto-fix de errores detectados (opcional)
-- `paths`: Rutas específicas a analizar (opcional)
-
-#### Configuración Avanzada de ESLint
+Directorio raíz de los archivos fuente. Todos los archivos `.vue`, `.ts` y `.js` dentro de esta carpeta son candidatos a compilación.
 
 ```typescript
-{
-    name: 'eslint',
-    bin: './node_modules/.bin/eslint',
-    configFile: './eslint.config.js',
-    fix: true,
-    paths: ['src/', 'tests/'],
-    eslintConfig: {
-        cache: true,                    // Habilitar cache para velocidad
-        maxWarnings: 10,               // Máximo número de warnings
-        quiet: false,                  // Mostrar solo errores
-        formats: ['json', 'stylish'],  // Formatos de salida
-        deny: ['no-console'],          // Reglas a denegar
-        allow: ['no-unused-vars'],     // Reglas a permitir
-        noIgnore: false,               // Usar .eslintignore
-        ignorePath: './.eslintignore', // Archivo ignore personalizado
-        ignorePattern: ['*.test.js']   // Patrones a ignorar
-    }
-}
+root: './src',
 ```
 
-#### Configuración Avanzada de OxLint
+---
+
+### `build` _(requerido)_
+
+Opciones de salida de la compilación.
 
 ```typescript
-{
-    name: 'oxlint',
-    bin: './node_modules/.bin/oxlint',
-    configFile: './.oxlintrc.json',
-    fix: true,
-    paths: ['src/'],
-    oxlintConfig: {
-        rules: {                       // Reglas personalizadas
-            'no-unused-vars': 'error'
+build: {
+    outDir: './dist',   // directorio de salida (requerido)
+    bundlers: [         // bundling post-compilación (opcional)
+        {
+            name: 'appLoader',
+            fileInput: './dist/module/appLoader.js',
+            fileOutput: './dist/module/appLoader.prod.js',
         },
-        plugins: ['recommended'],      // Plugins de OxLint
-        deny: ['no-console'],          // Reglas a denegar
-        allow: ['no-unused-vars'],     // Reglas a permitir
-        tsconfigPath: './tsconfig.json', // Ruta a tsconfig
-        quiet: false,                  // Solo errores
-        noIgnore: false,               // Usar archivos ignore
-        ignorePath: './.oxlintignore', // Archivo ignore personalizado
-        ignorePattern: ['*.test.ts']   // Patrones a ignorar
-    }
-}
+    ],
+},
 ```
 
-### bundlers
+#### `build.outDir`
 
-Array de configuraciones de bundling:
+Directorio donde se escriben los archivos compilados. Se crea automáticamente si no existe.
 
-- `name`: Nombre del bundle
-- `fileInput`: Archivo de entrada
-- `fileOutput`: Archivo de salida
+#### `build.bundlers`
 
-### validationOptions (v2.4.0+)
-
-Opciones para el sistema de validación de integridad:
+Array de entradas de bundling ejecutadas después de la compilación principal. Usa `false` para deshabilitar:
 
 ```typescript
-validationOptions: {
-    skipSyntaxCheck: false,  // Omitir Check 4 (validación de sintaxis)
-    verbose: false,          // Logging detallado de validaciones
-    throwOnError: true       // Lanzar excepción al detectar error
-}
+build: {
+    outDir: './dist',
+    bundlers: false,   // deshabilitar bundling
+},
 ```
 
-**Opciones disponibles:**
+Cada entrada acepta:
 
-- `skipSyntaxCheck`: Si es `true`, omite la validación de sintaxis (Check 4) para optimizar performance. Por defecto: `false`
-- `verbose`: Si es `true`, muestra logging detallado de cada validación. Por defecto: `false`
-- `throwOnError`: Si es `true`, lanza una excepción cuando se detecta código corrupto. Si es `false`, solo retorna un resultado inválido. Por defecto: `true`
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `name` | `string` | Identificador del bundle |
+| `fileInput` | `string` | Archivo de entrada (relativo al proyecto) |
+| `fileOutput` | `string` | Archivo de salida |
 
-**Ejemplo de uso:**
+---
+
+### `resolve` _(requerido)_
+
+Resolución de módulos e imports.
 
 ```typescript
-export default {
-    // ... otras configuraciones
-    validationOptions: {
-        skipSyntaxCheck: false, // Ejecutar validación completa
-        verbose: true, // Ver detalles de cada validación
-        throwOnError: true, // Fallar build si hay errores
+resolve: {
+    alias: {
+        '@': 'src',          // @/utils → src/utils
+        'P@': 'public',      // P@/js → public/js
     },
-};
+},
 ```
 
-**Nota:** La validación de integridad se ejecuta automáticamente durante la compilación con el flag `--checkIntegrity`. Estas opciones controlan el comportamiento de las validaciones.
+#### `resolve.alias`
 
-## Ejemplo Completo
+Mapa de prefijos de alias a rutas reales. La clave es el prefijo sin `/*`; VersaCompiler añade automáticamente el soporte de subpaths.
 
 ```typescript
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+// ✅ Correcto
+alias: { '@': 'src', '@components': 'src/components' }
+
+// ❌ No usar /* en la clave
+alias: { '@/*': 'src/*' }
+```
+
+---
+
+### `server` _(opcional)_
+
+Configuración del servidor de desarrollo (BrowserSync).
+
+```typescript
+server: {
+    proxyUrl: 'http://localhost:8080',  // proxy a backend ('' para deshabilitar)
+    assetsOmit: true,                   // omitir assets del proxy
+    watch: {
+        additional: [                   // globs extra que disparan recarga
+            './app/templates/**/*.twig',
+            './resources/views/**/*.blade.php',
+        ],
+    },
+},
+```
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `proxyUrl` | `string` | URL del backend a proxear. Vacío (`''`) para modo standalone |
+| `assetsOmit` | `boolean` | Si `true`, los assets estáticos no pasan por el proxy |
+| `watch.additional` | `string[]` | Globs adicionales vigilados en modo `--watch` que disparan recarga completa |
+
+---
+
+### `watch` _(opcional)_
+
+Alternativa a `server.watch` para proyectos sin servidor:
+
+```typescript
+watch: {
+    additional: ['./templates/**/*.html'],
+},
+```
+
+---
+
+### `tsconfig` _(opcional)_
+
+Ruta al `tsconfig.json` del proyecto. VersaCompiler lo usa para resolución de tipos y verificación TypeScript.
+
+```typescript
+tsconfig: './tsconfig.json',
+```
+
+---
+
+### `tailwindConfig` _(opcional)_
+
+Configuración de TailwindCSS. Usa `false` para deshabilitar:
+
+```typescript
+tailwindConfig: {
+    bin: './node_modules/.bin/tailwindcss',
+    input: './src/css/input.css',
+    output: './public/css/output.css',
+},
+// o para deshabilitar:
+tailwindConfig: false,
+```
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `bin` | `string` | Ruta al binario de TailwindCSS |
+| `input` | `string` | Archivo CSS con directivas `@tailwind` |
+| `output` | `string` | Archivo CSS compilado de salida |
+
+---
+
+### `linter` _(opcional)_
+
+Array de configuraciones de linters. Usa `false` para deshabilitar todos:
+
+```typescript
+linter: [
+    {
+        name: 'eslint',
+        bin: './node_modules/.bin/eslint',
+        configFile: './eslint.config.js',
+        fix: false,
+        paths: ['src/'],
+    },
+    {
+        name: 'oxlint',
+        bin: './node_modules/.bin/oxlint',
+        configFile: './.oxlintrc.json',
+        fix: false,
+        paths: ['src/'],
+    },
+],
+```
+
+#### Campos comunes
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `name` | `'eslint' \| 'oxlint'` | Identificador del linter |
+| `bin` | `string` | Ruta al ejecutable |
+| `configFile` | `string` | Archivo de configuración del linter |
+| `fix` | `boolean` | Si `true`, auto-corrige errores detectados |
+| `paths` | `string[]` | Rutas a analizar (ej: `['src/']`) |
+
+---
+
+### `typeCheckOptions` _(opcional)_
+
+Controla el pool de workers TypeScript usado para verificación de tipos.
+
+```typescript
+typeCheckOptions: {
+    maxWorkers: 2,   // número máximo de worker threads
+},
+```
+
+| Campo | Tipo | Descripción |
+| --- | --- | --- |
+| `maxWorkers` | `number` | Límite de workers paralelos. Por defecto depende del número de CPUs |
+
+---
+
+### `hmr` _(opcional)_
+
+Controla si VersaCompiler inyecta el **shim HMR** en los archivos `.js` compilados durante el modo `--watch`.
+
+```typescript
+hmr: true,   // por defecto — todos los archivos reciben el shim
+hmr: false,  // deshabilita la inyección globalmente
+```
+
+**Cuándo usar `hmr: false`:**
+
+- Builds de librería Node.js (sin browser)
+- Proyectos donde ningún archivo se carga como módulo ES6
+- Entornos donde `import.meta` no está disponible
+
+> **Nota:** Para deshabilitar HMR solo en archivos puntuales sin afectar al resto, usa [`hmrExclude`](#hmrexclude-opcional).
+
+**Por defecto:** `true`
+
+---
+
+### `hmrExclude` _(opcional)_
+
+Lista de patrones de archivos de **salida** que no recibirán el shim HMR. El resto de archivos sigue recibiendo HMR normalmente.
+
+```typescript
+hmrExclude: [
+    'early-init.js',       // nombre exacto del archivo
+    'js/vendor.js',        // sufijo de ruta
+    '*.legacy.js',         // glob simple con *
+],
+```
+
+**Cuándo usarlo:**
+
+Cuando un archivo compilado se carga con `<script src="...">` (sin `type="module"`), el shim HMR introduce `import.meta` que causa:
+
+```
+SyntaxError: Cannot use 'import.meta' outside a module
+```
+
+Añadir ese archivo a `hmrExclude` evita la inyección del shim solo en él.
+
+#### Patrones aceptados
+
+| Tipo | Ejemplo | Coincide con |
+| --- | --- | --- |
+| Nombre exacto | `'early-init.js'` | Cualquier archivo cuyo nombre sea exactamente ese |
+| Sufijo de ruta | `'js/early-init.js'` | Archivos cuya ruta termina con ese sufijo |
+| Glob simple (`*`) | `'*.legacy.js'` | Archivos que coinciden con el patrón |
+
+#### Log de confirmación
+
+Al iniciar en modo `--watch` con entradas en `hmrExclude`, VersaCompiler muestra en consola:
+
+```
+[HMR] Exclusiones activas: ['early-init.js', '*.legacy.js']
+```
+
+Esto confirma que la config fue leída correctamente. Si no aparece el mensaje, revisa que tu config use el formato Vite-style (con `root`, `build`, `resolve`).
+
+**Por defecto:** `[]`
+
+---
+
+## 📝 Ejemplo Completo
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            'P@/*': ['public/*'],
+        bundlers: [
+            {
+                name: 'appLoader',
+                fileInput: './dist/module/appLoader.js',
+                fileOutput: './dist/module/appLoader.prod.js',
+            },
+        ],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            'P@': 'public',
         },
     },
-    proxyConfig: {
-        proxyUrl: '',
+    server: {
+        proxyUrl: 'http://localhost:8080',
         assetsOmit: true,
+        watch: {
+            additional: ['./app/templates/**/*.twig'],
+        },
     },
-    aditionalWatch: ['./app/templates/**/*.twig'],
+    tsconfig: './tsconfig.json',
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
@@ -182,38 +386,37 @@ export default {
             paths: ['src/'],
         },
     ],
-    bundlers: [
-        {
-            name: 'appLoader',
-            fileInput: './public/module/appLoader.js',
-            fileOutput: './public/module/appLoader.prod.js',
-        },
-    ],
-};
+    typeCheckOptions: {
+        maxWorkers: 2,
+    },
+    hmr: true,
+    hmrExclude: ['early-init.js', '*.legacy.js'],
+});
 ```
 
-## Comandos CLI
+---
 
-VersaCompiler ofrece una amplia gama de comandos CLI para diferentes flujos de trabajo:
+## 🖥️ Comandos CLI
 
-| Comando            | Alias | Descripción                                    |
-| ------------------ | ----- | ---------------------------------------------- |
-| `--init`           |       | Inicializar configuración del proyecto         |
-| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
-| `--all`            |       | Compilar todos los archivos del proyecto       |
-| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
-| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
-| `--prod`           | `-p`  | Modo producción con minificación               |
-| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
-| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
-| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
-| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
-| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos   |
-| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS |
-| `--linter`         |       | Habilitar/deshabilitar análisis de código      |
-| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
+| Comando | Alias | Descripción |
+| --- | --- | --- |
+| `--init` | | Inicializar configuración del proyecto |
+| `--watch` | `-w` | Modo observación con HMR y auto-recompilación |
+| `--all` | | Compilar todos los archivos del proyecto |
+| `--file <archivo>` | `-f` | Compilar un archivo específico |
+| `[archivos...]` | | Compilar múltiples archivos específicos |
+| `--prod` | `-p` | Modo producción con minificación |
+| `--verbose` | `-v` | Mostrar información detallada de compilación |
+| `--cleanOutput` | `-co` | Limpiar directorio de salida antes de compilar |
+| `--cleanCache` | `-cc` | Limpiar caché de compilación |
+| `--yes` | `-y` | Confirmar automáticamente todas las acciones |
+| `--typeCheck` | `-t` | Habilitar verificación de tipos TypeScript |
+| `--checkIntegrity` | `-ci` | Validar integridad del código compilado |
+| `--tailwind` | | Habilitar compilación TailwindCSS |
+| `--linter` | | Ejecutar análisis de código |
+| `--help` | `-h` | Mostrar ayuda y opciones disponibles |
 
-### Ejemplos de Uso Avanzado
+### Ejemplos de uso avanzado
 
 ```bash
 # Desarrollo con análisis completo
@@ -228,25 +431,59 @@ versacompiler --all --prod --cleanOutput --cleanCache --yes
 # Solo análisis de código
 versacompiler --linter --verbose
 
-# Solo verificación de tipos en archivos específicos
-versacompiler --typeCheck src/types/ src/components/
-
-# Compilación de múltiples archivos específicos
+# Compilación de múltiples archivos
 versacompiler src/main.ts src/App.vue src/router.ts
+
+# Build con validación de integridad (recomendado para deploy)
+versacompiler --all --prod --checkIntegrity --yes
 ```
 
-## Troubleshooting
+---
 
-### Problemas Comunes
+## 🚧 Troubleshooting
 
-#### Error de configuración
+### Error de configuración no encontrada
 
 ```bash
-# Verificar que el archivo de configuración tenga la sintaxis correcta
-node versacompile.config.ts
+# Verificar que el archivo existe en la raíz
+ls versacompile.config.ts
 
 # Inicializar configuración desde cero
 versacompiler --init
+```
+
+### `hmrExclude` no tiene efecto
+
+Verifica que tu config usa el **formato Vite-style** (`root`, `build`, `resolve`). Si usas el formato antiguo con `compilerOptions`, los campos `hmr`/`hmrExclude` son ignorados silenciosamente.
+
+```typescript
+// ✅ Formato correcto (Vite-style) — hmrExclude funciona
+import { defineConfig } from 'versacompiler/config';
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    hmrExclude: ['early-init.js'],
+});
+```
+
+Al arrancar en `--watch` deberías ver en consola:
+```
+[HMR] Exclusiones activas: ['early-init.js']
+```
+
+### El shim HMR produce `SyntaxError: Cannot use 'import.meta' outside a module`
+
+Usa `hmrExclude` para excluir el archivo afectado:
+
+```typescript
+hmrExclude: ['nombre-del-archivo.js'],
+```
+
+O deshabilita HMR globalmente si ningún archivo necesita HMR:
+
+```typescript
+hmr: false,
 ```
 
 #### Cache corrupto o problemas de rendimiento
