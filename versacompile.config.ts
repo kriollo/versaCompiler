@@ -7,7 +7,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@': 'dist',
+            '@': 'public',
             'P@': 'public',
             'e@': 'examples',
         },
@@ -29,13 +29,6 @@ export default defineConfig({
         output: './public/css/output.css',
     },
     linter: [
-        {
-            name: 'eslint',
-            bin: './node_modules/.bin/eslint',
-            configFile: './eslint.config.js',
-            fix: false,
-            paths: ['src/'],
-        },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',

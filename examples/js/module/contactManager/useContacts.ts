@@ -3,7 +3,12 @@
  * Prueba: watch deep, watchEffect, computed multi-dependencia, JSON parse/stringify
  */
 import { ref, computed, watch } from 'vue';
-import type { Contact, ContactFormData, ContactStats, ContactCategory } from './types';
+import type {
+    Contact,
+    ContactFormData,
+    ContactStats,
+    ContactCategory,
+} from './types';
 import { ContactListSchema } from './types';
 
 const LS_KEY = 'e2e-contacts';
@@ -16,7 +21,9 @@ function loadFromStorage(): Contact[] {
         const result = ContactListSchema.safeParse(parsed);
         if (result.success) return result.data;
         // Datos corruptos: lanzar error para que ErrorBoundary lo capture
-        throw new Error(`Datos de contactos corruptos: ${result.error.message}`);
+        throw new Error(
+            `Datos de contactos corruptos: ${result.error.message}`,
+        );
     } catch (e) {
         if (e instanceof SyntaxError) {
             throw new Error(`JSON inválido en localStorage: ${e.message}`);
@@ -31,7 +38,7 @@ export function useContacts() {
     // Deep watcher → persiste cualquier cambio en localStorage
     watch(
         contacts,
-        (val) => {
+        val => {
             localStorage.setItem(LS_KEY, JSON.stringify(val));
         },
         { deep: true },
@@ -39,11 +46,13 @@ export function useContacts() {
 
     // ── Computed con múltiples dependencias ──────────────────────────────
     const favoriteContacts = computed(() =>
-        contacts.value.filter((c) => c.favorite),
+        contacts.value.filter(c => c.favorite),
     );
 
     const recentContacts = computed(() =>
-        [...contacts.value].sort((a, b) => b.createdAt - a.createdAt).slice(0, 10),
+        [...contacts.value]
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(0, 10),
     );
 
     const stats = computed<ContactStats>(() => {
@@ -79,8 +88,11 @@ export function useContacts() {
         return contact;
     }
 
-    function updateContact(id: string, data: Partial<ContactFormData>): boolean {
-        const idx = contacts.value.findIndex((c) => c.id === id);
+    function updateContact(
+        id: string,
+        data: Partial<ContactFormData>,
+    ): boolean {
+        const idx = contacts.value.findIndex(c => c.id === id);
         if (idx === -1) return false;
         const updated = {
             ...contacts.value[idx],
@@ -95,21 +107,25 @@ export function useContacts() {
 
     function deleteContact(id: string): boolean {
         const before = contacts.value.length;
-        contacts.value = contacts.value.filter((c) => c.id !== id);
+        contacts.value = contacts.value.filter(c => c.id !== id);
         return contacts.value.length < before;
     }
 
     function toggleFavorite(id: string): boolean {
-        const idx = contacts.value.findIndex((c) => c.id === id);
+        const idx = contacts.value.findIndex(c => c.id === id);
         if (idx === -1) return false;
         const list = [...contacts.value];
-        list[idx] = { ...list[idx]!, favorite: !list[idx]!.favorite, updatedAt: Date.now() };
+        list[idx] = {
+            ...list[idx]!,
+            favorite: !list[idx]!.favorite,
+            updatedAt: Date.now(),
+        };
         contacts.value = list;
         return true;
     }
 
     function getById(id: string): Contact | undefined {
-        return contacts.value.find((c) => c.id === id);
+        return contacts.value.find(c => c.id === id);
     }
 
     return {

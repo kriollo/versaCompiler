@@ -349,7 +349,15 @@ async function main() {
                 try {
                     // Verificar si el archivo existe
                     await fs.access(file);
+                } catch {
+                    logger.error(
+                        chalk.red(`❌ El archivo '${file}' no existe.`),
+                    );
+                    hasErrors = true;
+                    continue;
+                }
 
+                try {
                     logger.info(chalk.blue(`🔄 Compilando: ${file}`));
                     const result = await compileFile(file);
 
@@ -363,9 +371,11 @@ async function main() {
                         );
                         hasErrors = true;
                     }
-                } catch {
+                } catch (err) {
                     logger.error(
-                        chalk.red(`❌ El archivo '${file}' no existe.`),
+                        chalk.red(
+                            `❌ Error al compilar '${file}': ${err instanceof Error ? err.message : String(err)}`,
+                        ),
                     );
                     hasErrors = true;
                 }

@@ -1,33 +1,33 @@
 <script setup lang="ts">
-/**
- * TabPanel.vue — Tabs con provide/inject para estado activo
- * Prueba: provide/inject, scoped slots para contenido de tabs
- */
-import { ref, provide, computed } from 'vue';
-import type { TabId } from '../contactStore';
+    /**
+     * TabPanel.vue — Tabs con provide/inject para estado activo
+     * Prueba: provide/inject, scoped slots para contenido de tabs
+     */
+    import { ref, provide, computed } from 'vue';
+    import type { TabId } from '../contactStore';
 
-interface Tab {
-    id: TabId;
-    label: string;
-    count?: number;
-}
+    interface Tab {
+        id: TabId;
+        label: string;
+        count?: number;
+    }
 
-interface Props {
-    tabs: Tab[];
-    modelValue: TabId;
-}
+    interface Props {
+        tabs: Tab[];
+        modelValue: TabId;
+    }
 
-const props = defineProps<Props>();
-const emit = defineEmits<{ 'update:modelValue': [TabId] }>();
+    const props = defineProps<Props>();
+    const emit = defineEmits<{ 'update:modelValue': [TabId] }>();
 
-const activeTab = computed(() => props.modelValue);
+    const activeTab = computed(() => props.modelValue);
 
-// provide para que AccordionItem u otros hijos puedan leer el tab activo
-provide('activeTab', activeTab);
+    // provide para que AccordionItem u otros hijos puedan leer el tab activo
+    provide('activeTab', activeTab);
 
-function selectTab(id: TabId) {
-    emit('update:modelValue', id);
-}
+    function selectTab(id: TabId) {
+        emit('update:modelValue', id);
+    }
 </script>
 
 <template>

@@ -1,76 +1,80 @@
 <script setup lang="ts">
-/**
- * ContactForm.vue — Formulario con v-model custom, template refs y validación zod
- * Prueba: template refs, v-model en FormField custom, error display, zod validation
- */
-import { ref, watch } from 'vue';
-import type { Contact, ContactFormData } from '../types';
-import { ContactFormSchema } from '../types';
-import { useValidation } from '../useValidation';
-import FormField from './FormField.vue';
+    /**
+     * ContactForm.vue — Formulario con v-model custom, template refs y validación zod
+     * Prueba: template refs, v-model en FormField custom, error display, zod validation
+     */
+    import { ref, watch } from 'vue';
+    import type { Contact, ContactFormData } from '../types';
+    import { ContactFormSchema } from '../types';
+    import { useValidation } from '../useValidation';
+    import FormField from './FormField.vue';
 
-interface Props {
-    initialData?: Partial<Contact>;
-}
-
-const props = defineProps<Props>();
-const emit = defineEmits<{
-    submit: [data: ContactFormData];
-    cancel: [];
-}>();
-
-// Template ref
-const nameInputRef = ref<InstanceType<typeof FormField> | null>(null);
-
-const { errors, validate, clearErrors } = useValidation(ContactFormSchema);
-
-// Estado del formulario
-const form = ref<ContactFormData>({
-    name: props.initialData?.name ?? '',
-    email: props.initialData?.email ?? '',
-    phone: props.initialData?.phone ?? '',
-    category: props.initialData?.category ?? 'personal',
-    notes: props.initialData?.notes ?? '',
-});
-
-// Watch initialData para actualizar cuando se cambia el contacto a editar
-watch(
-    () => props.initialData,
-    (newData) => {
-        if (newData) {
-            form.value = {
-                name: newData.name ?? '',
-                email: newData.email ?? '',
-                phone: newData.phone ?? '',
-                category: newData.category ?? 'personal',
-                notes: newData.notes ?? '',
-            };
-            clearErrors();
-        }
-    },
-    { deep: true },
-);
-
-const categoryOptions = [
-    { value: 'personal', label: 'Personal' },
-    { value: 'trabajo', label: 'Trabajo' },
-    { value: 'familia', label: 'Familia' },
-];
-
-function handleSubmit() {
-    if (validate(form.value)) {
-        emit('submit', form.value);
+    interface Props {
+        initialData?: Partial<Contact>;
     }
-}
 
-function handleCancel() {
-    clearErrors();
-    emit('cancel');
-}
+    const props = defineProps<Props>();
+    const emit = defineEmits<{
+        submit: [data: ContactFormData];
+        cancel: [];
+    }>();
+
+    // Template ref
+    const nameInputRef = ref<InstanceType<typeof FormField> | null>(null);
+
+    const { errors, validate, clearErrors } = useValidation(ContactFormSchema);
+
+    // Estado del formulario
+    const form = ref<ContactFormData>({
+        name: props.initialData?.name ?? '',
+        email: props.initialData?.email ?? '',
+        phone: props.initialData?.phone ?? '',
+        category: props.initialData?.category ?? 'personal',
+        notes: props.initialData?.notes ?? '',
+    });
+
+    // Watch initialData para actualizar cuando se cambia el contacto a editar
+    watch(
+        () => props.initialData,
+        newData => {
+            if (newData) {
+                form.value = {
+                    name: newData.name ?? '',
+                    email: newData.email ?? '',
+                    phone: newData.phone ?? '',
+                    category: newData.category ?? 'personal',
+                    notes: newData.notes ?? '',
+                };
+                clearErrors();
+            }
+        },
+        { deep: true },
+    );
+
+    const categoryOptions = [
+        { value: 'personal', label: 'Personal' },
+        { value: 'trabajo', label: 'Trabajo' },
+        { value: 'familia', label: 'Familia' },
+    ];
+
+    function handleSubmit() {
+        if (validate(form.value)) {
+            emit('submit', form.value);
+        }
+    }
+
+    function handleCancel() {
+        clearErrors();
+        emit('cancel');
+    }
 </script>
 
 <template>
-    <form @submit.prevent="handleSubmit" data-contact-form="true" novalidate class="space-y-4">
+    <form
+        @submit.prevent="handleSubmit"
+        data-contact-form="true"
+        novalidate
+        class="space-y-4">
         <FormField
             ref="nameInputRef"
             name="name"

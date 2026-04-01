@@ -183,7 +183,7 @@
             <h1
                 class="text-lg font-bold p-0 m-0 text-gray-800 dark:text-gray-100 flex">
                 <span class="text-red-500">VersaCompiler</span>
-                - VueJS App Loaderssss
+                - VueJS App Loaders
                 <loader v-if="showLoader" />
             </h1>
             <lineHr />

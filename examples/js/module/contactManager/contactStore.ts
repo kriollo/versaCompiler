@@ -21,7 +21,9 @@ export const useContactStore = defineStore('contactManager', () => {
     // ── Getters ────────────────────────────────────────────────────────────
     const isEditing = computed(() => editingContactId.value !== null);
     const sortLabel = computed(() =>
-        sortDir.value === 'asc' ? `↑ ${sortField.value}` : `↓ ${sortField.value}`,
+        sortDir.value === 'asc'
+            ? `↑ ${sortField.value}`
+            : `↓ ${sortField.value}`,
     );
 
     // ── Actions ────────────────────────────────────────────────────────────

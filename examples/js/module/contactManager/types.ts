@@ -8,7 +8,10 @@ import { z } from 'zod';
 
 export const ContactSchema = z.object({
     id: z.string().uuid(),
-    name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
+    name: z
+        .string()
+        .min(2, 'El nombre debe tener al menos 2 caracteres')
+        .max(100),
     email: z.string().email('Email inválido'),
     phone: z
         .string()

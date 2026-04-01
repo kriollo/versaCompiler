@@ -52,10 +52,22 @@ const FILES: FileSpec[] = [
 
     // ── App 2: Contact Manager ───────────────────────────────────────────────
     // Archivos raíz — van a dist/ directamente, no necesitan copia
-    { src: 'examples/js/module/contactManager/types.ts',        expectedOut: 'dist/types.js' },
-    { src: 'examples/js/module/contactManager/useValidation.ts', expectedOut: 'dist/useValidation.js' },
-    { src: 'examples/js/module/contactManager/useContacts.ts',  expectedOut: 'dist/useContacts.js' },
-    { src: 'examples/js/module/contactManager/contactStore.ts', expectedOut: 'dist/contactStore.js' },
+    {
+        src: 'examples/js/module/contactManager/types.ts',
+        expectedOut: 'dist/types.js',
+    },
+    {
+        src: 'examples/js/module/contactManager/useValidation.ts',
+        expectedOut: 'dist/useValidation.js',
+    },
+    {
+        src: 'examples/js/module/contactManager/useContacts.ts',
+        expectedOut: 'dist/useContacts.js',
+    },
+    {
+        src: 'examples/js/module/contactManager/contactStore.ts',
+        expectedOut: 'dist/contactStore.js',
+    },
 
     // Componentes hoja — se compilan flat a dist/, se copian a dist/components/
     {
@@ -155,5 +167,7 @@ export default async function globalSetup(): Promise<void> {
         }
     }
 
-    console.log(`\n✅ Archivos listos. (${compiled} compilados, ${skipped} sin cambios)\n`);
+    console.log(
+        `\n✅ Archivos listos. (${compiled} compilados, ${skipped} sin cambios)\n`,
+    );
 }

@@ -1,19 +1,19 @@
 <script setup lang="ts">
-/**
- * ContactModal.vue — Modal con Teleport + Transition + named slots
- * Prueba: <Teleport>, <Transition>, v-model open/close, named slots
- */
-interface Props {
-    title: string;
-}
+    /**
+     * ContactModal.vue — Modal con Teleport + Transition + named slots
+     * Prueba: <Teleport>, <Transition>, v-model open/close, named slots
+     */
+    interface Props {
+        title: string;
+    }
 
-defineProps<Props>();
+    defineProps<Props>();
 
-const isOpen = defineModel<boolean>({ default: false });
+    const isOpen = defineModel<boolean>({ default: false });
 
-function close() {
-    isOpen.value = false;
-}
+    function close() {
+        isOpen.value = false;
+    }
 </script>
 
 <template>
@@ -32,9 +32,11 @@ function close() {
                     class="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
                     @click.stop>
                     <!-- Header — named slot -->
-                    <div class="flex items-center justify-between px-5 py-4 border-b dark:border-gray-700">
+                    <div
+                        class="flex items-center justify-between px-5 py-4 border-b dark:border-gray-700">
                         <slot name="header">
-                            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                            <h2
+                                class="text-lg font-semibold text-gray-800 dark:text-gray-100">
                                 {{ title }}
                             </h2>
                         </slot>
@@ -69,12 +71,12 @@ function close() {
 </template>
 
 <style scoped>
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-    transition: opacity 0.2s ease;
-}
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-    opacity: 0;
-}
+    .modal-fade-enter-active,
+    .modal-fade-leave-active {
+        transition: opacity 0.2s ease;
+    }
+    .modal-fade-enter-from,
+    .modal-fade-leave-to {
+        opacity: 0;
+    }
 </style>

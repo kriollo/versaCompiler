@@ -1,28 +1,29 @@
 <script setup lang="ts">
-/**
- * AccordionItem.vue — Acordeón con inject + Transition animada
- * Prueba: inject desde padre, <Transition>, toggle con height animation
- */
-import { ref } from 'vue';
+    /**
+     * AccordionItem.vue — Acordeón con inject + Transition animada
+     * Prueba: inject desde padre, <Transition>, toggle con height animation
+     */
+    import { ref } from 'vue';
 
-interface Props {
-    title: string;
-    initialOpen?: boolean;
-}
+    interface Props {
+        title: string;
+        initialOpen?: boolean;
+    }
 
-const props = withDefaults(defineProps<Props>(), {
-    initialOpen: false,
-});
+    const props = withDefaults(defineProps<Props>(), {
+        initialOpen: false,
+    });
 
-const isOpen = ref(props.initialOpen);
+    const isOpen = ref(props.initialOpen);
 
-function toggle() {
-    isOpen.value = !isOpen.value;
-}
+    function toggle() {
+        isOpen.value = !isOpen.value;
+    }
 </script>
 
 <template>
-    <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div
+        class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <button
             @click="toggle"
             :aria-expanded="isOpen"
@@ -46,21 +47,21 @@ function toggle() {
 </template>
 
 <style scoped>
-.accordion-enter-active,
-.accordion-leave-active {
-    transition: all 0.25s ease;
-    overflow: hidden;
-}
+    .accordion-enter-active,
+    .accordion-leave-active {
+        transition: all 0.25s ease;
+        overflow: hidden;
+    }
 
-.accordion-enter-from,
-.accordion-leave-to {
-    max-height: 0;
-    opacity: 0;
-}
+    .accordion-enter-from,
+    .accordion-leave-to {
+        max-height: 0;
+        opacity: 0;
+    }
 
-.accordion-enter-to,
-.accordion-leave-from {
-    max-height: 200px;
-    opacity: 1;
-}
+    .accordion-enter-to,
+    .accordion-leave-from {
+        max-height: 200px;
+        opacity: 1;
+    }
 </style>

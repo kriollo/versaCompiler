@@ -2,8 +2,8 @@
  * Static file server para tests Playwright.
  * Sirve archivos desde la raíz del proyecto (node_modules/, public/, e2e/).
  */
-import http from 'http';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -35,7 +35,14 @@ const server = http.createServer((req, res) => {
         urlPath = '/e2e/index.html';
     }
 
-    const filePath = path.join(ROOT, urlPath);
+    // /__versa/ → archivos HMR del compilador (src/hrm/)
+    let filePath;
+    if (urlPath.startsWith('/__versa/')) {
+        const file = urlPath.slice('/__versa/'.length);
+        filePath = path.join(ROOT, 'src', 'hrm', file);
+    } else {
+        filePath = path.join(ROOT, urlPath);
+    }
 
     // Seguridad: evitar path traversal fuera de ROOT
     if (!filePath.startsWith(ROOT)) {
