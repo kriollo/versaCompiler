@@ -126,25 +126,37 @@ versacompiler --typeCheck --file src/types.ts
 
 ### 🔧 Archivo de configuración
 
-Crea un archivo `versacompile.config.ts` en la raíz de tu proyecto:
+Crea un archivo `versacompile.config.ts` en la raíz de tu proyecto usando `defineConfig` para autocompletado TypeScript:
 
 ```typescript
-// Archivo de configuración de VersaCompiler
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: {
         outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            'P@/*': ['public/*'],
+        bundlers: [
+            {
+                name: 'appLoader',
+                fileInput: './public/module/appLoader.js',
+                fileOutput: './public/module/appLoader.prod.js',
+            },
+        ],
+    },
+    resolve: {
+        alias: {
+            '@': 'src',
+            'P@': 'public',
         },
     },
-    proxyConfig: {
+    server: {
         proxyUrl: '',
         assetsOmit: true,
+        watch: {
+            additional: ['./app/templates/**/*.twig'],
+        },
     },
-    aditionalWatch: ['./app/templates/**/*.twig'],
+    tsconfig: './tsconfig.json',
     tailwindConfig: {
         bin: './node_modules/.bin/tailwindcss',
         input: './src/css/input.css',
@@ -166,62 +178,60 @@ export default {
             paths: ['src/'],
         },
     ],
-    bundlers: [
-        {
-            name: 'appLoader',
-            fileInput: './public/module/appLoader.js',
-            fileOutput: './public/module/appLoader.prod.js',
-        },
-    ],
-};
+    typeCheckOptions: {
+        maxWorkers: 2,
+    },
+});
 ```
 
 ### 📝 Opciones de configuración
 
-#### `compilerOptions`
+#### `root` _(requerido)_
 
-- `sourceRoot`: Directorio de archivos fuente (por defecto: `'./src'`)
-- `outDir`: Directorio de salida (por defecto: `'./dist'`)
-- `pathsAlias`: Aliases para imports (ej: `'@/*': ['src/*']`)
+- Directorio raíz de los archivos fuente (ej: `'./src'`)
 
-#### `proxyConfig`
+#### `build` _(requerido)_
 
-- `proxyUrl`: URL del proxy para desarrollo
-- `assetsOmit`: Omitir assets en el proxy
+- `outDir`: Directorio de salida de los archivos compilados (ej: `'./dist'`)
+- `bundlers`: Array de entradas de bundling post-compilación (opcional, `false` para deshabilitar)
+  - `name`: Nombre del bundle
+  - `fileInput`: Archivo de entrada
+  - `fileOutput`: Archivo de salida
+
+#### `resolve`
+
+- `alias`: Mapa de alias de imports. La clave es el prefijo del alias y el valor es la ruta que reemplaza (ej: `{ '@': 'src', 'P@': 'public' }`)
+
+#### `server`
+
+- `proxyUrl`: URL del proxy para desarrollo (ej: `'http://localhost:8000'`)
+- `assetsOmit`: Omitir assets estáticos del proxy (`true`/`false`)
+- `watch.additional`: Globs adicionales a vigilar que disparan recarga completa (ej: plantillas Twig, HTML)
+
+#### `tsconfig`
+
+- Ruta al `tsconfig.json` del proyecto (ej: `'./tsconfig.json'`)
 
 #### `tailwindConfig`
 
 - `bin`: Ruta al binario de TailwindCSS
-- `input`: Archivo CSS de entrada
-- `output`: Archivo CSS de salida
+- `input`: Archivo CSS de entrada con directivas Tailwind
+- `output`: Archivo CSS de salida compilado
+- Usar `false` para deshabilitar completamente
 
 #### `linter`
 
-Array de configuraciones de linters avanzadas:
+Array de configuraciones de linters. Usar `false` para deshabilitar todos:
 
 - `name`: Nombre del linter (`'eslint'` o `'oxlint'`)
 - `bin`: Ruta al binario del linter
 - `configFile`: Archivo de configuración del linter
-- `fix`: Auto-fix de errores detectados
-- `paths`: Rutas específicas a analizar
-- `eslintConfig`: Configuración específica de ESLint
-    - `cache`: Habilitar cache de ESLint
-    - `maxWarnings`: Máximo número de warnings
-    - `quiet`: Mostrar solo errores
-    - `formats`: Formatos de salida (`'json'`, `'stylish'`, `'compact'`)
-- `oxlintConfig`: Configuración específica de OxLint
-    - `rules`: Reglas personalizadas
-    - `plugins`: Plugins de OxLint
-    - `deny`: Reglas a denegar
-    - `allow`: Reglas a permitir
+- `fix`: Auto-fix de errores detectados (`true`/`false`)
+- `paths`: Rutas específicas a analizar (ej: `['src/']`)
 
-#### `bundlers`
+#### `typeCheckOptions`
 
-Array de configuraciones de bundling:
-
-- `name`: Nombre del bundle
-- `fileInput`: Archivo de entrada
-- `fileOutput`: Archivo de salida
+- `maxWorkers`: Máximo número de worker threads para verificación de tipos (por defecto: depende del número de CPUs)
 
 ## 🎯 Ejemplos de Uso
 
@@ -515,12 +525,17 @@ cat tsconfig.json | grep -A 10 "paths"
 
 ```typescript
 // Verificar configuración en versacompile.config.ts
-export default {
-    proxyConfig: {
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
+    server: {
         proxyUrl: '', // Vacío si no usas proxy backend
         assetsOmit: true,
     },
-};
+});
 ```
 
 ```bash
