@@ -5,6 +5,25 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.7] - 2026-04-01
+
+### 🐛 Correcciones
+
+- **`normalizeConfig` en `readConfig.ts` — `hmrExclude` ignorado en configs Vite-style**: cuando el archivo `versacompile.config.ts` usa el formato Vite (`root`, `build`, `resolve`, `server` sin `compilerOptions`), la función `normalizeConfig` construía el objeto de config interno **sin incluir `hmr` ni `hmrExclude`**. Esto causaba que `env.HMR_EXCLUDE` siempre fuera `'[]'`, haciendo que `isHmrExcluded` retornara `false` siempre. Fix: propagar `hmr` y `hmrExclude` en la rama Vite-style de `normalizeConfig`.
+- **Tipos `typeConfig` y `ViteStyleConfig` faltantes**: añadidos `hmr?: boolean` y `hmrExclude?: string[]` a ambos tipos para cierre correcto del tipado TypeScript.
+- **Log de confirmación de exclusiones HMR**: al iniciar, si `hmrExclude` tiene entradas, se muestra `[HMR] Exclusiones activas: [...]` para confirmar que la config fue leída correctamente.
+
+---
+
+## [2.6.6] - 2026-04-01
+
+### 🔧 Mejoras Internas
+
+- **`isHmrExcluded` movida a `transforms.ts`**: la función de comprobación de exclusión HMR fue movida de función privada en `compile.ts` a función exportada en `transforms.ts`, haciéndola testeable directamente.
+- **Tests para `isHmrExcluded`** (`tests/hmr-exclude.test.ts`): 12 casos de prueba que cubren nombre exacto, sufijo de ruta, glob simple, rutas Windows, rutas absolutas y múltiples patrones.
+
+---
+
 ## [2.6.5] - 2026-04-01
 
 ### ✨ Nuevas Características

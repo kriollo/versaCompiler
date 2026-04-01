@@ -48,6 +48,8 @@ export type ViteStyleConfig = {
     tailwindConfig?: typeConfig['tailwindConfig'];
     linter?: typeConfig['linter'];
     typeCheckOptions?: typeConfig['typeCheckOptions'];
+    hmr?: boolean;
+    hmrExclude?: string[];
 };
 
 export type typeConfig = {
@@ -76,6 +78,8 @@ export type typeConfig = {
     typeCheckOptions?: {
         maxWorkers?: number; // Número máximo de workers para type checking (default: 2)
     };
+    hmr?: boolean;
+    hmrExclude?: string[];
 };
 
 /**
@@ -281,6 +285,26 @@ export function validateConfigStructure(config: any): config is typeConfig {
         }
     }
 
+    // Validar hmr si existe
+    if (config.hmr !== undefined && typeof config.hmr !== 'boolean') {
+        logger.error('hmr debe ser un booleano');
+        return false;
+    }
+
+    // Validar hmrExclude si existe
+    if (config.hmrExclude !== undefined) {
+        if (!Array.isArray(config.hmrExclude)) {
+            logger.error('hmrExclude debe ser un array');
+            return false;
+        }
+        for (const pattern of config.hmrExclude) {
+            if (typeof pattern !== 'string') {
+                logger.error('Cada patrón en hmrExclude debe ser un string');
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
@@ -450,6 +474,8 @@ function normalizeConfig(input: any): typeConfig {
         linter: viteConfig?.linter,
         bundlers: viteConfig?.build?.bundlers,
         typeCheckOptions: viteConfig?.typeCheckOptions,
+        hmr: viteConfig?.hmr,
+        hmrExclude: viteConfig?.hmrExclude,
     };
 }
 
@@ -555,6 +581,11 @@ export async function readConfig(): Promise<boolean> {
         env.linter = safeJsonStringify(tsConfig?.linter, 'false');
         env.HMR = tsConfig?.hmr === false ? 'false' : 'true';
         env.HMR_EXCLUDE = JSON.stringify(tsConfig?.hmrExclude ?? []);
+        if (tsConfig?.hmrExclude && tsConfig.hmrExclude.length > 0) {
+            logger.info(
+                `[HMR] Exclusiones activas: ${JSON.stringify(tsConfig.hmrExclude)}`,
+            );
+        }
         env.tsconfigFile = tsConfig?.tsconfig || './tsconfig.json';
 
         // Validar y limpiar rutas

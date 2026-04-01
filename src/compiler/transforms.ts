@@ -945,6 +945,45 @@ const removeCodeTagImport = async (data: string): Promise<string> => {
     return data;
 };
 
+/**
+ * Comprueba si un archivo de salida está excluido de la inyección HMR
+ * según los patrones definidos en `hmrExclude` de la configuración (`env.HMR_EXCLUDE`).
+ *
+ * Acepta:
+ *  - Nombres de archivo exactos: `'early-init.js'`
+ *  - Sufijos de ruta:            `'js/early-init.js'`
+ *  - Globs simples con `*`:      `'*.legacy.js'`
+ */
+export function isHmrExcluded(outPath: string): boolean {
+    const excludeList: string[] = JSON.parse(env.HMR_EXCLUDE || '[]');
+    if (excludeList.length === 0) return false;
+    const normalized = outPath.replace(/\\/g, '/');
+    const basename = path.posix.basename(normalized);
+
+    if (env.VERBOSE === 'true') {
+        logger.info(
+            `[HMR] isHmrExcluded check — basename: "${basename}" outPath: "${normalized}" excludeList: ${JSON.stringify(excludeList)}`,
+        );
+    }
+
+    const excluded = excludeList.some(pattern => {
+        if (pattern.includes('*')) {
+            const regex = new RegExp(
+                '^' +
+                    pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') +
+                    '$',
+            );
+            return regex.test(basename) || regex.test(normalized);
+        }
+        return basename === pattern || normalized.endsWith('/' + pattern);
+    });
+
+    if (env.VERBOSE === 'true' && excluded) {
+        logger.info(`[HMR] Shim omitido para: "${basename}"`);
+    }
+    return excluded;
+}
+
 export async function estandarizaCode(
     code: string,
     file: string,
