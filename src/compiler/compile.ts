@@ -2184,6 +2184,11 @@ function extractLocalImports(code: string): string[] {
  * Solo se llama cuando env.isPROD !== 'true' y la salida es un archivo .js.
  */
 function injectHmrShim(code: string): string {
+    // Los scripts CLI con shebang no se ejecutan en browser: omitir el shim HMR
+    // para evitar que el shebang quede desplazado y cause SyntaxError en Node.js
+    if (code.startsWith('#!')) {
+        return code;
+    }
     const localImports = extractLocalImports(code);
     // Detecta si es un Vue SFC (el compilador Vue inyecta 'data-versa-hmr-component')
     const isVueComponent = code.includes('data-versa-hmr-component');

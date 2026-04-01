@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.1] - 2026-04-01
+
+### 🐛 Correcciones
+
+- **`injectHmrShim()` en `compile.ts`**: el shim HMR ya no se inyecta en archivos cuyo código compilado comienza con un shebang (`#!`). Esto evitaba que `dist/main.js` fuera ejecutable directamente con Node.js, ya que el shebang quedaba desplazado a la línea 13 y causaba un `SyntaxError: Invalid or unexpected token`.
+
+---
+
 ## [2.6.0] - 2026-03-31
 
 ### ✨ Nuevas Características
