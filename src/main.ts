@@ -425,8 +425,8 @@ async function main() {
         if (!argv.watch) {
             if (env.ENABLE_LINTER === 'true') {
                 const { runLinter } = await loadCompilerModule();
-                await runLinter(true);
-                globalProcess.exit(1);
+                const linterPassed = await runLinter(true);
+                globalProcess.exit(linterPassed ? 0 : 1);
             }
         }
         if (env.TAILWIND === 'true') {

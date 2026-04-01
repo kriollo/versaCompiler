@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.3] - 2026-04-01
+
+### 🐛 Correcciones
+
+- **`main.ts` — exit code incorrecto al ejecutar solo linter**: `globalProcess.exit(1)` era incondicional tras `runLinter()`, causando que `versacompiler --linter` siempre terminara con código 1 aunque no hubiera errores. Fix: usar el valor de retorno de `runLinter()` (`true` = sin errores → exit 0, `false` = hay errores → exit 1).
+
+---
+
 ## [2.6.2] - 2026-04-01
 
 ### 🐛 Correcciones

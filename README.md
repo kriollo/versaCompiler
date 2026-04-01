@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=flat&logo=vuedotjs&logoColor=4FC08D)](https://vuejs.org/)
-[![Version](https://img.shields.io/badge/version-2.6.2-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.6.2)
+[![Version](https://img.shields.io/badge/version-2.6.3-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.6.3)
 
 > **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) completo.**
 
