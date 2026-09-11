@@ -18,10 +18,12 @@ jobs:
 
             - uses: pnpm/action-setup@v4
 
+            # Sin cache: pnpm — ese cache de actions/setup-node necesita un
+            # pnpm-lock.yaml commiteado para generar la clave, y este repo
+            # no lo commitea (está en .gitignore).
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
-                  cache: pnpm
 
             # No hay pnpm-lock.yaml commiteado en este repo (está en
             # .gitignore), así que no se puede usar --frozen-lockfile.
@@ -54,10 +56,12 @@ jobs:
 
             - uses: pnpm/action-setup@v4
 
+            # Sin cache: pnpm — ese cache de actions/setup-node necesita un
+            # pnpm-lock.yaml commiteado para generar la clave, y este repo
+            # no lo commitea (está en .gitignore).
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
-                  cache: pnpm
 
             - name: Install dependencies
               run: pnpm install
