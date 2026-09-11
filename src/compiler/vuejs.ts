@@ -370,9 +370,12 @@ export const preCompileVue = async (
             );
 
             if (compiledTemplateResult.errors?.length > 0) {
-                logger.error(
-                    'Template compilation errors:',
-                    compiledTemplateResult.errors,
+                throw new Error(
+                    `Error al compilar la plantilla del componente Vue ${source}:\n${compiledTemplateResult.errors
+                        .map((e: any) =>
+                            typeof e === 'string' ? e : e.message,
+                        )
+                        .join('\n')}`,
                 );
             }
             templateCode = compiledTemplateResult.code;

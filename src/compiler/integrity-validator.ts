@@ -200,9 +200,12 @@ export class IntegrityValidator {
      * Check 1: Verificar que el código no esté vacío
      */
     private checkSize(code: string): boolean {
-        // Código debe tener al menos 10 caracteres y no ser solo whitespace
-        const trimmed = code.trim();
-        return trimmed.length >= 10;
+        // Solo verifica que no esté vacío o sea puro whitespace. Un umbral
+        // arbitrario (ej. >= 10 caracteres) rechazaba salidas minificadas
+        // legítimamente cortas, ej. "export{};" (9 chars) para un archivo
+        // de solo tipos. La validez sintáctica real la verifica checkSyntax
+        // (Check 4) con oxc-parser, no la longitud del string.
+        return code.trim().length > 0;
     }
 
     /**
@@ -228,7 +231,7 @@ export class IntegrityValidator {
         let escapeNext = false;
         let prevNonWhitespaceChar = ''; // Para detectar contexto de regex
 
-        for (let i = 0; i < code.length; ) {
+        for (let i = 0; i < code.length;) {
             const char = code[i];
             const nextChar = i < code.length - 1 ? code[i + 1] : '';
 

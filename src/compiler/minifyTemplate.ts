@@ -291,18 +291,20 @@ const minifyTemplate = (data: string, fileName: string) => {
                 {
                     skipSyntaxCheck: true, // No validar sintaxis (puede no ser JS puro)
                     verbose: process.env.VERBOSE === 'true',
-                    throwOnError: true, // Detener build si falla
+                    // Graceful degrade en vez de hard-fail (mismo patrón que
+                    // minify.ts): un falso positivo de la validación de
+                    // integridad no debe tumbar el build entero, solo
+                    // renunciar a la minificación de este template.
+                    throwOnError: false,
                 },
             );
 
             if (!validation.valid) {
-                logger.error(
-                    `❌ Validación de integridad fallida para template ${fileName}`,
-                    validation.errors.join(', '),
+                logger.warn(
+                    `⚠️  Validación de integridad fallida para template ${fileName}: ${validation.errors.join(', ')}`,
                 );
-                throw new Error(
-                    `Template integrity check failed for ${fileName}: ${validation.errors.join(', ')}`,
-                );
+                logger.warn(`   Usando template original sin minificar`);
+                return { code: data, error: null };
             }
 
             if (process.env.VERBOSE === 'true') {

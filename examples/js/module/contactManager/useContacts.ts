@@ -26,7 +26,9 @@ function loadFromStorage(): Contact[] {
         );
     } catch (e) {
         if (e instanceof SyntaxError) {
-            throw new Error(`JSON inválido en localStorage: ${e.message}`, { cause: e });
+            throw new Error(`JSON inválido en localStorage: ${e.message}`, {
+                cause: e,
+            });
         }
         throw e;
     }

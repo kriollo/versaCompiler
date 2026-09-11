@@ -19,7 +19,6 @@ import { getLoadedConfig } from '../servicios/readConfig';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
-import { integrityValidator } from './integrity-validator';
 import { BuildPipeline } from './pipeline/build-pipeline';
 import { createCorePlugins } from './pipeline/core-plugins';
 import { ModuleGraph } from './pipeline/module-graph';
@@ -521,28 +520,8 @@ async function loadLinter() {
     return moduleManagerRef().ensureModuleLoaded('linter');
 }
 
-async function loadMinify() {
-    return moduleManagerRef().ensureModuleLoaded('minify');
-}
-
-async function loadParser() {
-    return moduleManagerRef().ensureModuleLoaded('parser');
-}
-
 async function loadTailwind() {
     return moduleManagerRef().ensureModuleLoaded('tailwind');
-}
-
-async function loadTransforms() {
-    return moduleManagerRef().ensureModuleLoaded('transforms');
-}
-
-async function loadTypeScript() {
-    return moduleManagerRef().ensureModuleLoaded('typescript');
-}
-
-async function loadVue() {
-    return moduleManagerRef().ensureModuleLoaded('vue');
 }
 
 // ⚠️ Función eliminada: preloadAllModules()
@@ -2032,31 +2011,31 @@ export function getOutputPath(ruta: string) {
         return ruta.replace(/\.(vue|ts)$/, '.js');
     }
 
-    const normalizedRuta = path.normalize(ruta).replace(/\\/g, '/');
-    const normalizedSource = path.normalize(pathSource).replace(/\\/g, '/');
+    const normalizedRuta = path.resolve(ruta).replace(/\\/g, '/');
+    const absoluteSource = path
+        .resolve(process.cwd(), pathSource)
+        .replace(/\\/g, '/');
     const normalizedDist = path.normalize(pathDist).replace(/\\/g, '/');
 
-    let outputPath;
-    if (normalizedRuta.includes(normalizedSource)) {
-        const relativePath = normalizedRuta
-            .substring(
-                normalizedRuta.indexOf(normalizedSource) +
-                    normalizedSource.length,
-            )
-            .replace(/^[/\\]/, '');
+    // Verificar que normalizedRuta esté REALMENTE dentro de PATH_SOURCE
+    // (por segmento de ruta, resolviendo ambos a absolutos primero), no por
+    // substring: un `includes()` puro confundiría "src" con "my-src-app".
+    const relativeToSource = path.relative(absoluteSource, normalizedRuta);
+    const isInsideSource =
+        relativeToSource !== '' &&
+        !relativeToSource.startsWith('..') &&
+        !path.isAbsolute(relativeToSource);
 
+    let outputPath;
+    if (isInsideSource) {
         outputPath = path
-            .join(normalizedDist, relativePath)
+            .join(normalizedDist, relativeToSource)
             .replace(/\\/g, '/');
     } else {
         const fileName = path.basename(normalizedRuta);
         outputPath = path.join(normalizedDist, fileName).replace(/\\/g, '/');
     }
-    if (outputPath.includes('vue') || outputPath.includes('ts')) {
-        return outputPath.replace(/\.(vue|ts)$/, '.js');
-    } else {
-        return outputPath;
-    }
+    return outputPath.replace(/\.(vue|ts)$/, '.js');
 }
 
 // Optimización para modo watch: debouncing y cache de archivos

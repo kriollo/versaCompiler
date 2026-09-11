@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { preCompileVue } from '../src/compiler/vuejs';
-import { replaceAliasImportStatic } from '../src/compiler/transforms';
+import { estandarizaCode } from '../src/compiler/transforms';
 
 describe('Vue Production Imports - Components without Script', () => {
     const testDir = join(process.cwd(), 'temp', 'vue-prod-test');
@@ -57,11 +57,11 @@ describe('Vue Production Imports - Components without Script', () => {
         console.log('\n📦 Código compilado (antes de transforms):');
         console.log(data);
 
-        // Aplicar transformaciones de imports (orden correcto: file, code)
-        const transformedData = await replaceAliasImportStatic(
-            componentPath,
-            data,
-        );
+        // Aplicar transformaciones de imports vía estandarizaCode (la función
+        // que realmente corre en el pipeline de compilación)
+        const { code: transformedData, error: transformError } =
+            await estandarizaCode(data, componentPath);
+        expect(transformError).toBeNull();
 
         console.log('\n📦 Código compilado (después de transforms):');
         console.log(transformedData);
@@ -112,10 +112,9 @@ const handleClick = () => {
             throw new Error('Compiled data is null');
         }
 
-        const transformedData = await replaceAliasImportStatic(
-            componentPath,
-            data,
-        );
+        const { code: transformedData, error: transformError } =
+            await estandarizaCode(data, componentPath);
+        expect(transformError).toBeNull();
 
         console.log('\n📦 Component with script setup (transformed):');
         console.log(transformedData);
@@ -152,10 +151,9 @@ const handleClick = () => {
             throw new Error('Compiled data is null');
         }
 
-        const transformedData = await replaceAliasImportStatic(
-            componentPath,
-            data,
-        );
+        const { code: transformedData, error: transformError } =
+            await estandarizaCode(data, componentPath);
+        expect(transformError).toBeNull();
 
         console.log('\n📦 Development mode (transformed):');
         console.log(transformedData);
@@ -186,9 +184,9 @@ const handleClick = () => {
             throw new Error('First compilation failed');
         }
 
-        const transformed1 = await replaceAliasImportStatic(
-            componentPath,
+        const { code: transformed1 } = await estandarizaCode(
             compiled1,
+            componentPath,
         );
 
         // Segunda compilación - verificar consistencia
@@ -204,9 +202,9 @@ const handleClick = () => {
             throw new Error('Second compilation failed');
         }
 
-        const transformed2 = await replaceAliasImportStatic(
-            componentPath,
+        const { code: transformed2 } = await estandarizaCode(
             compiled2,
+            componentPath,
         );
 
         // Ambas compilaciones deben producir el mismo resultado

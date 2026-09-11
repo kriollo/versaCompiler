@@ -27,11 +27,11 @@ describe('IntegrityValidator', () => {
             );
         });
 
-        it('rechaza código demasiado pequeño (<10 caracteres)', () => {
+        it('rechaza código que es solo whitespace', () => {
             const result = integrityValidator.validate(
                 'const x = 1;',
-                'x=1',
-                'test:small',
+                '   \n\t  ',
+                'test:whitespace-only',
                 {
                     throwOnError: false,
                 },
@@ -39,6 +39,21 @@ describe('IntegrityValidator', () => {
 
             expect(result.valid).toBe(false);
             expect(result.checks.size).toBe(false);
+        });
+
+        it('acepta código válido aunque sea muy corto (<10 caracteres, ej. minificado)', () => {
+            // Bug real: un umbral arbitrario de >=10 caracteres rechazaba
+            // salidas minificadas legítimamente cortas como "export{};"
+            // (9 chars) para un archivo de solo tipos. checkSize solo debe
+            // verificar "no vacío", no una longitud mínima arbitraria.
+            const result = integrityValidator.validate(
+                'export type Foo = {};',
+                'export{};',
+                'test:short-but-valid',
+                { throwOnError: false, skipSyntaxCheck: true },
+            );
+
+            expect(result.checks.size).toBe(true);
         });
 
         it('acepta código válido de tamaño suficiente', () => {
@@ -158,7 +173,7 @@ describe('IntegrityValidator', () => {
             // Bug real: un '/' dentro de [...] no cierra el regex.
             // Sin el fix, esto se detecta como "corchete desbalanceado".
             const code =
-                "const ALLOWED_PATH_CHARS = /^[a-zA-Z0-9.\\-_/\\\\:@ ()[\\]]+$/;";
+                'const ALLOWED_PATH_CHARS = /^[a-zA-Z0-9.\\-_/\\\\:@ ()[\\]]+$/;';
             const result = integrityValidator.validate(
                 code,
                 code,

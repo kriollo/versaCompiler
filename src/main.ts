@@ -79,146 +79,148 @@ function stopCompile() {
 }
 
 async function main() {
-    // Load yargs dynamically
-    const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
-    const chalkInstance = await loadChalk();
-
-    let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
-        .scriptName('versa')
-        .usage(
-            chalkInstance.blue('VersaCompiler') +
-                ' - Compilador de archivos Vue/TS/JS',
-        )
-        .option('init', {
-            type: 'boolean',
-            description: 'Inicializar la configuración',
-        })
-        .option('watch', {
-            type: 'boolean',
-            description: 'Habilitar el modo de observación (watch)',
-            default: false, // Por defecto, el modo watch está habilitado
-        })
-        .alias('w', 'watch')
-        .option('all', {
-            type: 'boolean',
-            description: 'Compilar todos los archivos',
-        })
-        .option('file', {
-            type: 'string',
-            description: 'Compilar un archivo específico',
-            alias: 'f',
-        })
-        .option('prod', {
-            type: 'boolean',
-            description: 'Modo producción',
-        })
-        .alias('p', 'prod')
-        .option('verbose', {
-            type: 'boolean',
-            description: 'Habilitar salida detallada (verbose)',
-            default: false, // Por defecto, verbose está deshabilitado
-        })
-        .alias('v', 'verbose')
-        .alias('debug', 'verbose')
-        .option('cleanOutput', {
-            type: 'boolean',
-            description: 'Limpiar el directorio de salida antes de compilar',
-            default: false, // Por defecto, clean está deshabilitado
-        })
-        .alias('co', 'cleanOutput')
-        .option('cleanCache', {
-            type: 'boolean',
-            description: 'Limpiar el cache de compilación antes de compilar',
-            default: false, // Por defecto, clean está deshabilitado
-        })
-        .alias('cc', 'cleanCache')
-        .option('yes', {
-            type: 'boolean',
-            description:
-                'Confirmar automáticamente las acciones que requieren confirmación',
-            default: false, // Por defecto, no se confirma automáticamente
-        })
-        .alias('y', 'yes')
-        .option('typeCheck', {
-            type: 'boolean',
-            description:
-                'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=false',
-            default: false,
-        })
-        .alias('t', 'typeCheck')
-        .option('checkIntegrity', {
-            type: 'boolean',
-            description:
-                'Validar la integridad del código compilado (para builds de deploy). Por defecto --checkIntegrity=false',
-            default: false,
-        })
-        .alias('ci', 'checkIntegrity');
-
-    // Definir la opción tailwind dinámicamente
-    // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
-    if (env.tailwindcss !== 'false') {
-        yargInstance = yargInstance.option('tailwind', {
-            type: 'boolean',
-            description:
-                'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=false',
-            default: false,
-        });
-    }
-
-    if (env.linter !== 'false') {
-        yargInstance = yargInstance.option('linter', {
-            type: 'boolean',
-            description:
-                'Habilitar/Deshabilitar el linter. Por defecto --linter=false',
-            default: false,
-        });
-    }
-    interface CompileArgs {
-        init?: boolean;
-        watch?: boolean;
-        all?: boolean;
-        file?: string;
-        prod?: boolean;
-        verbose?: boolean;
-        cleanOutput?: boolean;
-        cleanCache?: boolean;
-        y?: boolean;
-        typeCheck?: boolean;
-        checkIntegrity?: boolean;
-        tailwind?: boolean;
-        linter?: boolean;
-        files?: string[];
-        _: (string | number)[];
-        $0: string;
-    }
-
-    interface YargsCommandBuilder {
-        positional(
-            key: string,
-            options: {
-                describe: string;
-                type: string;
-                array: boolean;
-            },
-        ): YargsCommandBuilder;
-    }
-
-    const argv = (await yargInstance
-        .help()
-        .alias('h', 'help')
-        .command(
-            '* [files...]',
-            'Compilar archivos específicos',
-            (yargsCmd: YargsCommandBuilder) => {
-                return yargsCmd.positional('files', {
-                    describe: 'Archivos para compilar',
-                    type: 'string',
-                    array: true,
-                });
-            },
-        )
-        .parse()) as CompileArgs;
     try {
+        // Load yargs dynamically
+        const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
+        const chalkInstance = await loadChalk();
+
+        let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
+            .scriptName('versa')
+            .usage(
+                chalkInstance.blue('VersaCompiler') +
+                    ' - Compilador de archivos Vue/TS/JS',
+            )
+            .option('init', {
+                type: 'boolean',
+                description: 'Inicializar la configuración',
+            })
+            .option('watch', {
+                type: 'boolean',
+                description: 'Habilitar el modo de observación (watch)',
+                default: false, // Por defecto, el modo watch está habilitado
+            })
+            .alias('w', 'watch')
+            .option('all', {
+                type: 'boolean',
+                description: 'Compilar todos los archivos',
+            })
+            .option('file', {
+                type: 'string',
+                description: 'Compilar un archivo específico',
+                alias: 'f',
+            })
+            .option('prod', {
+                type: 'boolean',
+                description: 'Modo producción',
+            })
+            .alias('p', 'prod')
+            .option('verbose', {
+                type: 'boolean',
+                description: 'Habilitar salida detallada (verbose)',
+                default: false, // Por defecto, verbose está deshabilitado
+            })
+            .alias('v', 'verbose')
+            .alias('debug', 'verbose')
+            .option('cleanOutput', {
+                type: 'boolean',
+                description:
+                    'Limpiar el directorio de salida antes de compilar',
+                default: false, // Por defecto, clean está deshabilitado
+            })
+            .alias('co', 'cleanOutput')
+            .option('cleanCache', {
+                type: 'boolean',
+                description:
+                    'Limpiar el cache de compilación antes de compilar',
+                default: false, // Por defecto, clean está deshabilitado
+            })
+            .alias('cc', 'cleanCache')
+            .option('yes', {
+                type: 'boolean',
+                description:
+                    'Confirmar automáticamente las acciones que requieren confirmación',
+                default: false, // Por defecto, no se confirma automáticamente
+            })
+            .alias('y', 'yes')
+            .option('typeCheck', {
+                type: 'boolean',
+                description:
+                    'Habilitar/Deshabilitar la verificación de tipos. Por defecto --typeCheck=false',
+                default: false,
+            })
+            .alias('t', 'typeCheck')
+            .option('checkIntegrity', {
+                type: 'boolean',
+                description:
+                    'Validar la integridad del código compilado (para builds de deploy). Por defecto --checkIntegrity=false',
+                default: false,
+            })
+            .alias('ci', 'checkIntegrity');
+
+        // Definir la opción tailwind dinámicamente
+        // Asumiendo que env.TAILWIND es una cadena que podría ser 'true', 'false', o undefined
+        if (env.tailwindcss !== 'false') {
+            yargInstance = yargInstance.option('tailwind', {
+                type: 'boolean',
+                description:
+                    'Habilitar/Deshabilitar compilación de Tailwind CSS. Por defecto --tailwind=false',
+                default: false,
+            });
+        }
+
+        if (env.linter !== 'false') {
+            yargInstance = yargInstance.option('linter', {
+                type: 'boolean',
+                description:
+                    'Habilitar/Deshabilitar el linter. Por defecto --linter=false',
+                default: false,
+            });
+        }
+        interface CompileArgs {
+            init?: boolean;
+            watch?: boolean;
+            all?: boolean;
+            file?: string;
+            prod?: boolean;
+            verbose?: boolean;
+            cleanOutput?: boolean;
+            cleanCache?: boolean;
+            y?: boolean;
+            typeCheck?: boolean;
+            checkIntegrity?: boolean;
+            tailwind?: boolean;
+            linter?: boolean;
+            files?: string[];
+            _: (string | number)[];
+            $0: string;
+        }
+
+        interface YargsCommandBuilder {
+            positional(
+                key: string,
+                options: {
+                    describe: string;
+                    type: string;
+                    array: boolean;
+                },
+            ): YargsCommandBuilder;
+        }
+
+        const argv = (await yargInstance
+            .help()
+            .alias('h', 'help')
+            .command(
+                '* [files...]',
+                'Compilar archivos específicos',
+                (yargsCmd: YargsCommandBuilder) => {
+                    return yargsCmd.positional('files', {
+                        describe: 'Archivos para compilar',
+                        type: 'string',
+                        array: true,
+                    });
+                },
+            )
+            .parse()) as CompileArgs;
         // 🎨 Header moderno y elegante
         const version = await getPackageVersion();
         const headerLine = '━'.repeat(60);
@@ -488,4 +490,7 @@ async function main() {
     }
 }
 
-main();
+main().catch(error => {
+    logger.error('Error fatal no controlado en main():', error);
+    globalProcess.exit(1);
+});

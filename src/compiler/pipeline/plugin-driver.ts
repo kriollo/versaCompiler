@@ -55,7 +55,10 @@ export class PluginDriver {
                 meta: currentMeta,
             });
             if (result.errors?.length) errors = errors.concat(result.errors);
-            if (result.contents) current = result.contents;
+            // Distinguir "el plugin no tocó el contenido" (contents ausente)
+            // de "el plugin produjo un output legítimamente vacío" (""),
+            // ej. un archivo .ts que solo tiene declaraciones de tipos.
+            if (result.contents !== undefined) current = result.contents;
             if (result.loader) currentLoader = result.loader;
             if (result.meta)
                 currentMeta = {

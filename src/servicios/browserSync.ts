@@ -546,7 +546,9 @@ export function createRequestMiddleware(
             } else {
                 const chalkInstance = await loadChalk();
                 logger.error(
-                    chalkInstance.red(`🚩 :Error al leer el archivo ${filePath}`),
+                    chalkInstance.red(
+                        `🚩 :Error al leer el archivo ${filePath}`,
+                    ),
                 );
                 res.statusCode = 404;
                 res.end('// Not found');
@@ -562,10 +564,7 @@ export function createRequestMiddleware(
                 .replace('/node_modules/', '')
                 .split('?')[0]; // strip query string
             const nodeModulesBase = path.resolve(projectRoot, 'node_modules');
-            const modulePath = path.resolve(
-                nodeModulesBase,
-                requestedRelative,
-            );
+            const modulePath = path.resolve(nodeModulesBase, requestedRelative);
             if (
                 !modulePath.startsWith(nodeModulesBase + path.sep) &&
                 modulePath !== nodeModulesBase
@@ -584,7 +583,9 @@ export function createRequestMiddleware(
             } else {
                 const chalkInstance = await loadChalk();
                 logger.error(
-                    chalkInstance.red(`🚩 Error al leer el módulo ${modulePath}`),
+                    chalkInstance.red(
+                        `🚩 Error al leer el módulo ${modulePath}`,
+                    ),
                 );
                 res.statusCode = 404;
                 res.end('// Module not found');
@@ -774,7 +775,11 @@ export async function browserSyncServer(): Promise<any> {
                 ignored: ['node_modules', '.git'],
             },
             middleware: [
-                createRequestMiddleware(relativeHrmPath, projectRoot, AssetsOmit),
+                createRequestMiddleware(
+                    relativeHrmPath,
+                    projectRoot,
+                    AssetsOmit,
+                ),
             ],
         });
 

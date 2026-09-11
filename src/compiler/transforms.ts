@@ -386,425 +386,105 @@ async function replaceAliasImportsAst(
     return resultCode;
 }
 
-export async function replaceAliasImportStatic(
-    file: string,
-    code: string,
-): Promise<string> {
-    if (!env.PATH_ALIAS || !env.PATH_DIST) {
-        return code;
-    }
-    const pathAlias = getParsedPathAlias();
-    let resultCode = code;
+/**
+ * Recolecta, recursivamente, las posiciones {start, end} de todos los
+ * literales de string "reales" del AST (Literal con value string, y
+ * TemplateLiteral totalmente estático sin interpolación). Excluye
+ * deliberadamente comentarios (no forman parte del AST) y regex literals
+ * (Literal con .regex en vez de un value string).
+ */
+function collectStringLiteralRanges(
+    node: any,
+    ranges: Array<{ start: number; end: number }>,
+    seen: Set<any> = new Set(),
+): void {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
 
-    // Usar regex para transformar imports estáticos
-    const importRegex =
-        /import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*\s+from\s+)?['"`]([^'"`]+)['"`]/g;
-
-    // Crear un array para procesar transformaciones async
-    const matches = Array.from(resultCode.matchAll(importRegex));
-
-    for (const match of matches) {
-        const [, moduleRequest] = match;
-        if (!moduleRequest) continue; // Skip if moduleRequest is undefined
-        let newPath: string | null = null;
-        let transformed = false; // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
-        if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
-            try {
-                // Usar el sistema optimizado primero
-                const optimizedResult = await getOptimizedModulePath(
-                    moduleRequest,
-                    file,
-                );
-                if (optimizedResult.excluded) {
-                    // Módulo excluido explícitamente: mantener importación original
-                    continue;
-                }
-                if (optimizedResult.path) {
-                    newPath = optimizedResult.path;
-                    transformed = true;
-                } else {
-                    // Fallback al sistema anterior
-                    const modulePath = getModuleSubPath(moduleRequest, file);
-                    if (modulePath === null) {
-                        continue;
-                    }
-                    if (modulePath) {
-                        newPath = modulePath;
-                        transformed = true;
-                    }
-                }
-            } catch (error) {
-                if (env.VERBOSE === 'true')
-                    logger.warn(
-                        `Error resolviendo módulo ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
-                    );
-            }
-        } // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
-        if (!transformed) {
-            // Usar el sistema optimizado de alias
-            const aliasPath = getOptimizedAliasPath(moduleRequest);
-            if (aliasPath) {
-                let newImportPath = aliasPath;
-
-                // Transformar extensiones
-                if (
-                    newImportPath.endsWith('.ts') ||
-                    newImportPath.endsWith('.vue')
-                ) {
-                    newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
-                    newImportPath += '.js';
-                }
-                newPath = newImportPath;
-                transformed = true;
-            } else {
-                // Fallback al sistema anterior
-                for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('*', '');
-                    if (moduleRequest.startsWith(aliasPattern)) {
-                        // Reemplazar el alias con la ruta del target
-                        const relativePath = moduleRequest.replace(
-                            aliasPattern,
-                            '',
-                        );
-                        // Para alias que apuntan a la raíz (como @/* -> /src/*),
-                        // solo usamos PATH_DIST + relativePath
-                        let newImportPath = path.join(
-                            '/',
-                            env.PATH_DIST!,
-                            relativePath,
-                        );
-
-                        // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                        newImportPath = newImportPath
-                            .replace(/\/\.\//g, '/')
-                            .replace(/\\/g, '/');
-
-                        if (
-                            newImportPath.endsWith('.ts') ||
-                            newImportPath.endsWith('.vue')
-                        ) {
-                            newImportPath = newImportPath.replace(
-                                /\.(ts|vue)$/,
-                                '.js',
-                            );
-                        } else if (
-                            !/\.(js|mjs|css|json)$/.test(newImportPath)
-                        ) {
-                            newImportPath += '.js';
-                        }
-
-                        newPath = newImportPath;
-                        transformed = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 3. Si no es alias ni módulo externo, verificar si es ruta relativa que necesita extensión .js
+    if (
+        node.type === 'Literal' &&
+        typeof node.value === 'string' &&
+        typeof node.start === 'number' &&
+        typeof node.end === 'number'
+    ) {
+        ranges.push({ start: node.start, end: node.end });
+    } else if (
+        node.type === 'TemplateLiteral' &&
+        Array.isArray(node.expressions) &&
+        node.expressions.length === 0 &&
+        Array.isArray(node.quasis) &&
+        node.quasis.length === 1
+    ) {
+        const quasi = node.quasis[0];
         if (
-            !transformed &&
-            (moduleRequest.startsWith('./') || moduleRequest.startsWith('../'))
+            typeof quasi?.start === 'number' &&
+            typeof quasi?.end === 'number'
         ) {
-            let relativePath = moduleRequest;
-
-            if (relativePath.endsWith('.ts') || relativePath.endsWith('.vue')) {
-                relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
-                newPath = relativePath;
-                transformed = true;
-            } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
-                newPath = relativePath + '.js';
-                transformed = true;
-            }
-        }
-
-        // 4. Reemplazar solo el path en las comillas, no toda la línea
-        if (transformed && newPath) {
-            // Buscar y reemplazar solo la parte entre comillas
-            const pathRegex = new RegExp(
-                `(['"\`])${moduleRequest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`,
-                'g',
-            );
-            resultCode = resultCode.replace(pathRegex, `$1${newPath}$1`);
-        }
-    }
-    return resultCode;
-}
-
-export async function replaceAliasImportDynamic(
-    code: string,
-    _imports: any,
-    file?: string,
-): Promise<string> {
-    if (!env.PATH_ALIAS || !env.PATH_DIST) {
-        return code;
-    }
-
-    const pathAlias = getParsedPathAlias();
-    const pathDist = env.PATH_DIST;
-    let resultCode = code;
-
-    // Regex para imports dinámicos normales con string (solo comillas simples y dobles)
-    const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-    // Regex para template literals (solo backticks)
-    const templateLiteralRegex = /import\s*\(\s*`([^`]+)`\s*\)/g;
-
-    // Manejar imports dinámicos normales con string
-    const dynamicMatches = Array.from(resultCode.matchAll(dynamicImportRegex));
-
-    for (const match of dynamicMatches) {
-        const [, moduleRequest] = match;
-        if (!moduleRequest) continue; // Skip if moduleRequest is undefined
-
-        let newPath: string | null = null;
-        let transformed = false; // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
-        if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
-            try {
-                // Usar el sistema optimizado primero
-                const optimizedResult = await getOptimizedModulePath(
-                    moduleRequest,
-                    file,
-                );
-                if (optimizedResult.excluded) {
-                    // Módulo excluido explícitamente: mantener importación original
-                    continue;
-                }
-                if (optimizedResult.path) {
-                    newPath = optimizedResult.path;
-                    transformed = true;
-                } else {
-                    // Fallback al sistema anterior
-                    const modulePath = getModuleSubPath(moduleRequest, file);
-                    if (modulePath === null) {
-                        continue;
-                    }
-                    if (modulePath) {
-                        newPath = modulePath;
-                        transformed = true;
-                    }
-                }
-            } catch (error) {
-                if (env.VERBOSE === 'true')
-                    logger.warn(
-                        `Error resolviendo módulo dinámico ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
-                    );
-            }
-        } // 2. Si no es módulo externo/excluido, verificar si es un alias conocido
-        if (!transformed) {
-            // Usar el sistema optimizado de alias
-            const aliasPath = getOptimizedAliasPath(moduleRequest);
-            if (aliasPath) {
-                let newImportPath = aliasPath;
-
-                // Transformar extensiones
-                if (
-                    newImportPath.endsWith('.ts') ||
-                    newImportPath.endsWith('.vue')
-                ) {
-                    newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-                } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
-                    newImportPath += '.js';
-                }
-
-                newPath = newImportPath;
-                transformed = true;
-            } else {
-                // Fallback al sistema anterior
-                for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('*', '');
-                    if (moduleRequest.startsWith(aliasPattern)) {
-                        // Reemplazar el alias con la ruta del target
-                        const relativePath = moduleRequest.replace(
-                            aliasPattern,
-                            '',
-                        );
-                        // Para alias que apuntan a la raíz (como @/* -> /src/*),
-                        // solo usamos PATH_DIST + relativePath
-                        let newImportPath = path.join(
-                            '/',
-                            pathDist,
-                            relativePath,
-                        );
-
-                        // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                        newImportPath = newImportPath
-                            .replace(/\/\.\//g, '/')
-                            .replace(/\\/g, '/');
-
-                        if (
-                            newImportPath.endsWith('.ts') ||
-                            newImportPath.endsWith('.vue')
-                        ) {
-                            newImportPath = newImportPath.replace(
-                                /\.(ts|vue)$/,
-                                '.js',
-                            );
-                        } else if (
-                            !/\.(js|mjs|css|json)$/.test(newImportPath)
-                        ) {
-                            newImportPath += '.js';
-                        }
-
-                        newPath = newImportPath;
-                        transformed = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 3. Si no es alias ni módulo externo, verificar si es ruta relativa que necesita extensión .js
-        if (
-            !transformed &&
-            (moduleRequest.startsWith('./') || moduleRequest.startsWith('../'))
-        ) {
-            let relativePath = moduleRequest;
-
-            if (relativePath.endsWith('.ts') || relativePath.endsWith('.vue')) {
-                relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
-                newPath = relativePath;
-                transformed = true;
-            } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
-                newPath = relativePath + '.js';
-                transformed = true;
-            }
-        }
-
-        // 4. Reemplazar solo el path en las comillas, no toda la expresión
-        if (transformed && newPath) {
-            // Buscar y reemplazar solo la parte entre comillas en import()
-            const pathRegex = new RegExp(
-                `import\\s*\\(\\s*(['"])${moduleRequest.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1\\s*\\)`,
-                'g',
-            );
-            resultCode = resultCode.replace(
-                pathRegex,
-                `import($1${newPath}$1)`,
-            );
+            ranges.push({ start: quasi.start, end: quasi.end });
         }
     }
 
-    // Manejar template literals - versión mejorada
-    resultCode = resultCode.replace(
-        templateLiteralRegex,
-        (match, moduleRequest) => {
-            let transformed = false;
-            let result = match;
-
-            // 1. PRIMERO: Verificar si es un módulo excluido (prioridad máxima)
-            if (!transformed && isExternalModule(moduleRequest, pathAlias)) {
-                try {
-                    const modulePath = getModuleSubPath(moduleRequest, file);
-                    if (modulePath === null) {
-                        // Si getModuleSubPath retorna null, significa que es un módulo excluido
-                        // No transformar y retornar el match original
-                        return match;
-                    }
-                    if (modulePath) {
-                        result = match.replace(moduleRequest, modulePath);
-                        transformed = true;
-                    }
-                } catch (error) {
-                    if (env.VERBOSE === 'true')
-                        logger.warn(
-                            `Error resolviendo módulo template literal ${moduleRequest}: ${error instanceof Error ? error.message : String(error)}`,
-                        );
-                }
+    for (const key in node) {
+        if (key === 'start' || key === 'end' || key === 'range') continue;
+        const value = node[key];
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                collectStringLiteralRanges(item, ranges, seen);
             }
-
-            // 2. Verificar aliases en template literals
-            if (!transformed) {
-                for (const [alias] of Object.entries(pathAlias)) {
-                    const aliasPattern = alias.replace('*', '');
-                    if (moduleRequest.includes(aliasPattern)) {
-                        const relativePath = moduleRequest.replace(
-                            aliasPattern,
-                            '',
-                        );
-                        // Para alias que apuntan a la raíz (como @/* -> /src/*),
-                        // solo usamos PATH_DIST + relativePath
-                        let newModuleRequest = path.join(
-                            '/',
-                            pathDist,
-                            relativePath,
-                        );
-                        // Normalizar la ruta para eliminar ./ extra y barras duplicadas
-                        newModuleRequest = newModuleRequest
-                            .replace(/\/\.\//g, '/')
-                            .replace(/\/+/g, '/')
-                            .replace(/\\/g, '/'); // Normalizar separadores de Windows a Unix
-
-                        // Transformar extensiones .ts y .vue a .js en template literals
-                        newModuleRequest = newModuleRequest
-                            .replace(/\.ts(\b|`|\$)/g, '.js$1')
-                            .replace(/\.vue(\b|`|\$)/g, '.js$1');
-
-                        result = match.replace(moduleRequest, newModuleRequest);
-                        transformed = true;
-                        break;
-                    }
-                }
-            }
-
-            // 3. Si no es alias ni módulo externo, verificar si necesita transformación de extensión para rutas relativas
-            if (!transformed) {
-                // Para template literals que contienen rutas relativas, solo transformar extensiones
-                let newModuleRequest = moduleRequest;
-                if (
-                    moduleRequest.includes('./') ||
-                    moduleRequest.includes('../')
-                ) {
-                    // Transformar extensiones .ts y .vue a .js en template literals relativos
-                    newModuleRequest = moduleRequest
-                        .replace(/\.ts(\b|`)/g, '.js$1')
-                        .replace(/\.vue(\b|`)/g, '.js$1');
-                    if (newModuleRequest !== moduleRequest) {
-                        result = match.replace(moduleRequest, newModuleRequest);
-                    }
-                }
-            }
-
-            return result;
-        },
-    );
-
-    return resultCode;
+        } else if (value && typeof value === 'object') {
+            collectStringLiteralRanges(value, ranges, seen);
+        }
+    }
 }
 
 /**
  * Reemplaza alias en strings del código JavaScript (no solo en imports)
  * Maneja casos como: link.href = 'P@/vendor/sweetalert2/sweetalert2.dark.min.css';
+ *
+ * Solo toca literales de string cuya posición viene confirmada por el AST
+ * (ver collectStringLiteralRanges), en vez de escanear todo el texto con un
+ * regex global: eso evitaba distinguir un string real de contenido dentro de
+ * un comentario o de un regex literal, y podía corromper strings de datos
+ * de usuario que por coincidencia empezaran con el mismo prefijo de alias.
  * @param code - El código JavaScript a transformar
+ * @param ast - AST ya parseado de `code` (mismas posiciones de byte)
  * @returns El código con los alias reemplazados en strings
  */
-async function replaceAliasInStrings(code: string): Promise<string> {
+async function replaceAliasInStrings(code: string, ast: any): Promise<string> {
     if (!env.PATH_ALIAS || !env.PATH_DIST) {
         return code;
     }
 
     const pathAlias = getParsedPathAlias();
     const pathDist = env.PATH_DIST;
-    let resultCode = code; // Regex para encontrar strings que contengan posibles alias
-    // Busca strings entre comillas simples, dobles o backticks que contengan alias
-    const stringRegex = /(['"`])([^'"`]+)(['"`])/g;
 
-    // Crear un array para procesar todas las coincidencias
-    const matches = Array.from(resultCode.matchAll(stringRegex));
-    for (const match of matches) {
-        const [fullMatch, openQuote, stringContent, closeQuote] = match;
+    const stringRanges: Array<{ start: number; end: number }> = [];
+    collectStringLiteralRanges(ast?.program, stringRanges);
+    if (stringRanges.length === 0) return code;
 
-        // Verificar que las comillas de apertura y cierre coincidan
-        if (openQuote !== closeQuote || !stringContent) continue; // Verificar si el string contiene algún alias
-        let transformed = false;
-        let newStringContent = stringContent;
+    // Ordenar alias por longitud (más largos primero) para priorizar alias más específicos
+    const sortedAliases = Object.entries(pathAlias).sort((a, b) => {
+        const aliasA = a[0].replace('/*', '');
+        const aliasB = b[0].replace('/*', '');
+        return aliasB.length - aliasA.length;
+    });
 
-        // Ordenar alias por longitud (más largos primero) para priorizar alias más específicos
-        const sortedAliases = Object.entries(pathAlias).sort((a, b) => {
-            const aliasA = a[0].replace('/*', '');
-            const aliasB = b[0].replace('/*', '');
-            return aliasB.length - aliasA.length;
-        });
+    const replacements: Array<{ start: number; end: number; value: string }> =
+        [];
+
+    for (const { start, end } of stringRanges) {
+        const raw = code.slice(start, end);
+        if (raw.length < 2) continue;
+        const openQuote = raw[0];
+        const closeQuote = raw[raw.length - 1];
+        if (
+            openQuote !== closeQuote ||
+            (openQuote !== '"' && openQuote !== "'" && openQuote !== '`')
+        ) {
+            continue;
+        }
+        const stringContent = raw.slice(1, -1);
+        if (!stringContent) continue;
 
         for (const [alias, target] of sortedAliases) {
             const aliasPattern = alias.replace('/*', '');
@@ -813,84 +493,82 @@ async function replaceAliasInStrings(code: string): Promise<string> {
             const aliasRegex = new RegExp(
                 `^${aliasPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`,
             );
-            if (aliasRegex.test(stringContent)) {
-                // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
-                if (isExternalModule(stringContent, pathAlias)) {
-                    // Para strings que parecen ser módulos externos, verificar si están excluidos
-                    if (EXCLUDED_MODULES.has(stringContent)) {
-                        // Es un módulo excluido, no transformar
-                        continue;
-                    }
-                }
+            if (!aliasRegex.test(stringContent)) continue;
 
-                // Reemplazar el alias con la ruta del target
-                const relativePath = stringContent.replace(aliasPattern, '');
-
-                // Construir la nueva ruta basada en la configuración del target
-                let newPath: string;
-
-                // El target puede ser un array de strings o un string
-                const targetArray = Array.isArray(target) ? target : [target];
-                const targetPath = targetArray[0];
-                if (targetPath.startsWith('/')) {
-                    // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
-                    // Para targets como "/src/*", solo usamos PATH_DIST + relativePath
-                    // sin incluir el directorio del target en la ruta final
-                    newPath = path.join('/', pathDist, relativePath);
-                    if (env.VERBOSE === 'true') {
-                        console.log(
-                            `  ✅ Ruta absoluta: pathDist="${pathDist}", relativePath="${relativePath}", newPath="${newPath}"`,
-                        );
-                    }
-                } else {
-                    // Si es una ruta relativa, verificar si ya apunta al directorio de distribución
-                    const cleanTarget = targetPath
-                        .replace('./', '')
-                        .replace('/*', '');
-                    const normalizedPathDist = pathDist.replace('./', '');
-
-                    if (cleanTarget === normalizedPathDist) {
-                        // Si el target es el mismo que PATH_DIST, no duplicar
-                        newPath = path.join(
-                            '/',
-                            normalizedPathDist,
-                            relativePath,
-                        );
-                    } else {
-                        // Si es diferente, usar PATH_DIST como base
-                        newPath = path.join(
-                            '/',
-                            normalizedPathDist,
-                            cleanTarget,
-                            relativePath,
-                        );
-                    }
-                }
-
-                // Normalizar la ruta para eliminar ./ extra y separadores de Windows
-                newPath = newPath
-                    .replace(/\/\.\//g, '/')
-                    .replace(/\\/g, '/')
-                    .replace(/\/+/g, '/');
-
-                // Para archivos estáticos (CSS, JS, imágenes, etc.), mantener la extensión original
-                // No agregar .js automáticamente como hacemos con imports
-                newStringContent = newPath;
-                transformed = true;
-                break;
+            // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
+            if (
+                isExternalModule(stringContent, pathAlias) &&
+                EXCLUDED_MODULES.has(stringContent)
+            ) {
+                continue;
             }
-        } // Si se transformó, reemplazar en el código
-        if (transformed) {
-            const newFullMatch = `${openQuote}${newStringContent}${closeQuote}`;
-            // Usar una expresión regular más específica para evitar reemplazos accidentales
-            const escapedOriginal = fullMatch.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                '\\$&',
-            );
-            const specificRegex = new RegExp(escapedOriginal, 'g');
 
-            resultCode = resultCode.replace(specificRegex, newFullMatch);
+            // Reemplazar el alias con la ruta del target
+            const relativePath = stringContent.replace(aliasPattern, '');
+
+            // Construir la nueva ruta basada en la configuración del target
+            let newPath: string;
+
+            // El target puede ser un array de strings o un string
+            const targetArray = Array.isArray(target) ? target : [target];
+            const targetPath = targetArray[0];
+            if (targetPath.startsWith('/')) {
+                // Si el target empieza con /, es una ruta absoluta desde la raíz del proyecto
+                // Para targets como "/src/*", solo usamos PATH_DIST + relativePath
+                // sin incluir el directorio del target en la ruta final
+                newPath = path.join('/', pathDist, relativePath);
+                if (env.VERBOSE === 'true') {
+                    console.log(
+                        `  ✅ Ruta absoluta: pathDist="${pathDist}", relativePath="${relativePath}", newPath="${newPath}"`,
+                    );
+                }
+            } else {
+                // Si es una ruta relativa, verificar si ya apunta al directorio de distribución
+                const cleanTarget = targetPath
+                    .replace('./', '')
+                    .replace('/*', '');
+                const normalizedPathDist = pathDist.replace('./', '');
+
+                if (cleanTarget === normalizedPathDist) {
+                    // Si el target es el mismo que PATH_DIST, no duplicar
+                    newPath = path.join('/', normalizedPathDist, relativePath);
+                } else {
+                    // Si es diferente, usar PATH_DIST como base
+                    newPath = path.join(
+                        '/',
+                        normalizedPathDist,
+                        cleanTarget,
+                        relativePath,
+                    );
+                }
+            }
+
+            // Normalizar la ruta para eliminar ./ extra y separadores de Windows
+            newPath = newPath
+                .replace(/\/\.\//g, '/')
+                .replace(/\\/g, '/')
+                .replace(/\/+/g, '/');
+
+            // Para archivos estáticos (CSS, JS, imágenes, etc.), mantener la extensión original
+            // No agregar .js automáticamente como hacemos con imports
+            replacements.push({
+                start,
+                end,
+                value: `${openQuote}${newPath}${closeQuote}`,
+            });
+            break;
         }
+    }
+
+    if (replacements.length === 0) return code;
+
+    replacements.sort((a, b) => b.start - a.start);
+    let resultCode = code;
+    for (const replacement of replacements) {
+        resultCode =
+            resultCode.slice(0, replacement.start) +
+            replacement.value +
+            resultCode.slice(replacement.end);
     }
 
     return resultCode;
@@ -1016,7 +694,11 @@ export async function estandarizaCode(
             throw new Error(firstError?.message || 'Error sin mensaje');
         }
         code = await replaceAliasImportsAst(code, file, ast);
-        code = await replaceAliasInStrings(code);
+        // Re-parsear: replaceAliasImportsAst puede haber cambiado longitudes
+        // de string, así que las posiciones del AST original ya no
+        // coinciden con el código actual (cache hit si el contenido no cambió).
+        const astAfterImports = await parser(file, code);
+        code = await replaceAliasInStrings(code, astAfterImports);
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
 

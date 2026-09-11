@@ -1,68 +1,56 @@
 import { existsSync } from 'node:fs';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-describe('File Watcher - Basic Tests', () => {
-    const testDir = join(process.cwd(), 'temp', 'watch-test');
+import { cleanOutputDir } from '../src/servicios/file-watcher';
+
+// A diferencia de la versión anterior de este archivo (que no importaba nada
+// de src/servicios/file-watcher.ts y solo hacía smoke tests genéricos de
+// fs/path), este test ejercita cleanOutputDir() real. isAdditionalWatchFile,
+// getAction y WatchDebouncer no están exportados de file-watcher.ts, así que
+// no son testeables como unidades sin exportarlos primero — queda pendiente
+// como cobertura nueva (no cabe en este housekeeping de alinear tests).
+describe('file-watcher - cleanOutputDir', () => {
+    const testDir = join(process.cwd(), 'temp', 'file-watcher-test');
 
     beforeEach(async () => {
-        if (!existsSync(testDir)) {
-            await mkdir(testDir, { recursive: true });
+        await mkdir(join(testDir, 'subdir'), { recursive: true });
+        await writeFile(join(testDir, 'file.js'), 'console.log(1);', 'utf-8');
+        await writeFile(
+            join(testDir, 'subdir', 'nested.js'),
+            'console.log(2);',
+            'utf-8',
+        );
+    });
+
+    afterEach(async () => {
+        await rm(testDir, { recursive: true, force: true });
+    });
+
+    it('elimina archivos y subdirectorios dentro del directorio de salida', async () => {
+        await cleanOutputDir(testDir, false);
+
+        expect(existsSync(testDir)).toBe(true); // el directorio en sí se conserva
+        const remaining = await readdir(testDir);
+        expect(remaining).toEqual([]);
+    });
+
+    it('no lanza si el directorio de salida no existe', async () => {
+        const missingDir = join(process.cwd(), 'temp', 'does-not-exist-xyz');
+        await expect(cleanOutputDir(missingDir, true)).resolves.not.toThrow();
+    });
+
+    it('con primerInteraccion=false no pide confirmación aunque env.yes sea "false"', async () => {
+        const originalYes = process.env.yes;
+        process.env.yes = 'false';
+        try {
+            await cleanOutputDir(testDir, false);
+            const remaining = await readdir(testDir);
+            expect(remaining).toEqual([]);
+        } finally {
+            if (originalYes === undefined) delete process.env.yes;
+            else process.env.yes = originalYes;
         }
-    });
-
-    describe('File Operations', () => {
-        it('should create and read test files', async () => {
-            const testFile = join(testDir, 'test.ts');
-            const content = 'const x: number = 42;';
-
-            await writeFile(testFile, content, 'utf-8');
-
-            expect(existsSync(testFile)).toBe(true);
-
-            if (existsSync(testFile)) {
-                await unlink(testFile);
-            }
-        });
-
-        it('should handle different file extensions', () => {
-            const extensions = ['.ts', '.vue', '.js', '.css'];
-
-            extensions.forEach(ext => {
-                expect(ext).toBeDefined();
-                expect(ext.startsWith('.')).toBe(true);
-            });
-        });
-
-        it('should validate file paths', () => {
-            const validPath = join(testDir, 'test.ts');
-            const invalidPath = '../../../etc/passwd';
-
-            expect(validPath).toContain('temp');
-            expect(invalidPath).toContain('..');
-        });
-    });
-
-    describe('File System Safety', () => {
-        it('should identify dangerous path patterns', () => {
-            const dangerousPaths = [
-                '../../../etc/passwd',
-                '..\\..\\..\\windows\\system32',
-                'test; rm -rf /',
-            ];
-
-            dangerousPaths.forEach(path => {
-                expect(path).toBeDefined();
-            });
-        });
-
-        it('should identify special characters', () => {
-            const specialChars = ['\x00', '\n', '\r', '|', ';', '$'];
-
-            specialChars.forEach(char => {
-                expect(char).toBeDefined();
-            });
-        });
     });
 });

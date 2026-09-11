@@ -116,6 +116,48 @@ div { color: red; }
             expect(result.data).toBeNull();
         });
 
+        it('debe propagar errores de compilación de template como error real (no solo loguearlos)', async () => {
+            const vueCode = `
+<template>
+  <div v-if="x">{{ x }</div>
+</template>
+`;
+
+            const mockDescriptor = {
+                template: { content: '<div v-if="x">{{ x }</div>' },
+                script: null,
+                scriptSetup: null,
+                styles: [],
+                customBlocks: [],
+            };
+
+            vueCompiler.parse.mockReturnValue({
+                descriptor: mockDescriptor,
+                errors: [],
+            });
+
+            vueCompiler.compileTemplate.mockReturnValue({
+                code: '',
+                errors: [
+                    {
+                        message:
+                            'Mustache interpolation is missing ending delimiter',
+                    },
+                ],
+            });
+
+            const result = await preCompileVue(
+                vueCode,
+                '/path/to/Component.vue',
+            );
+
+            expect(result.error).toBeInstanceOf(Error);
+            expect((result.error as Error).message).toContain(
+                'Mustache interpolation is missing ending delimiter',
+            );
+            expect(result.data).toBeNull();
+        });
+
         it('debe compilar componente con script setup', async () => {
             const vueCode = `
 <script setup lang="ts">

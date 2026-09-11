@@ -1,141 +1,78 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { getModulePath } from '../src/utils/module-resolver';
 
-describe('Module Resolver - Production Mode Priority', () => {
-    const originalEnv = { ...process.env };
+// A diferencia de la versión anterior de este archivo (que nunca importaba
+// module-resolver.ts y solo filtraba arrays de strings hardcodeados), estos
+// tests ejercitan getModulePath() real contra los paquetes reales instalados
+// en node_modules (vue, vue-router, pinia son dependencias de este proyecto),
+// que es lo que realmente decide qué build (.prod.js/.min.js/dev) se importa
+// según env.isPROD.
+describe('module-resolver - prioridad de build en producción', () => {
+    const originalIsPROD = process.env.isPROD;
+    const originalVerbose = process.env.VERBOSE;
 
     beforeEach(() => {
-        // Restaurar env
-        process.env = { ...originalEnv };
-        process.env.PATH_DIST = 'dist';
+        // Mutar propiedades en vez de reasignar process.env por completo:
+        // module-resolver.ts hace `import { env } from 'node:process'` y
+        // guarda esa referencia una sola vez al cargar el módulo — reasignar
+        // `process.env = {...}` rompería esa referencia y sus cambios de
+        // env nunca llegarían al módulo real.
         process.env.VERBOSE = 'false';
     });
 
     afterEach(() => {
-        process.env = { ...originalEnv };
+        if (originalIsPROD === undefined) delete process.env.isPROD;
+        else process.env.isPROD = originalIsPROD;
+        if (originalVerbose === undefined) delete process.env.VERBOSE;
+        else process.env.VERBOSE = originalVerbose;
     });
 
-    it('should set isPROD environment variable correctly in production mode', () => {
+    it('en producción resuelve vue a su build .esm-browser.prod.js', () => {
         process.env.isPROD = 'true';
-        expect(process.env.isPROD).toBe('true');
+        expect(getModulePath('vue')).toBe(
+            '/node_modules/vue/dist/vue.esm-browser.prod.js',
+        );
     });
 
-    it('should set isPROD environment variable correctly in development mode', () => {
+    it('en desarrollo resuelve vue a su build .esm-browser.js (sin .prod)', () => {
         process.env.isPROD = 'false';
-        expect(process.env.isPROD).toBe('false');
+        const resolved = getModulePath('vue');
+        expect(resolved).toBe('/node_modules/vue/dist/vue.esm-browser.js');
+        expect(resolved).not.toContain('.prod.');
     });
 
-    it('should prioritize production files when isPROD is true', () => {
+    it('en producción resuelve vue-router a su build .prod.js', () => {
         process.env.isPROD = 'true';
-
-        // Lista de archivos simulados
-        const files = [
-            'vue.esm-browser.js',
-            'vue.esm-browser.prod.js',
-            'vue.esm-browser.min.js',
-        ];
-
-        // En producción, debería seleccionar .prod.js primero
-        const prodFiles = files.filter((file: string) =>
-            file.toLowerCase().includes('.prod.'),
+        expect(getModulePath('vue-router')).toBe(
+            '/node_modules/vue-router/dist/vue-router.esm-browser.prod.js',
         );
-        expect(prodFiles.length).toBeGreaterThan(0);
-        expect(prodFiles[0]).toBe('vue.esm-browser.prod.js');
     });
 
-    it('should prioritize development files when isPROD is false', () => {
+    it('en desarrollo resuelve vue-router a su build de desarrollo', () => {
         process.env.isPROD = 'false';
-
-        // Lista de archivos simulados
-        const files = [
-            'vue.esm-browser.js',
-            'vue.esm-browser.prod.js',
-            'vue.esm-browser.min.js',
-        ];
-
-        // En desarrollo, debería seleccionar el archivo sin .prod ni .min
-        const devFiles = files.filter(
-            (file: string) =>
-                !file.toLowerCase().includes('.prod.') &&
-                !file.toLowerCase().includes('.min.'),
+        const resolved = getModulePath('vue-router');
+        expect(resolved).toBe(
+            '/node_modules/vue-router/dist/vue-router.esm-browser.js',
         );
-        expect(devFiles.length).toBeGreaterThan(0);
-        expect(devFiles[0]).toBe('vue.esm-browser.js');
+        expect(resolved).not.toContain('.prod.');
     });
 
-    it('should prefer .prod.js over .min.js in production', () => {
+    it('en producción resuelve pinia a su build .prod.js', () => {
         process.env.isPROD = 'true';
-
-        const files = [
-            'library.esm-browser.js',
-            'library.esm-browser.min.js',
-            'library.esm-browser.prod.js',
-        ];
-
-        // Primero buscar .prod.js
-        const prodFiles = files.filter((file: string) =>
-            file.toLowerCase().includes('.prod.'),
+        expect(getModulePath('pinia')).toBe(
+            '/node_modules/pinia/dist/pinia.esm-browser.prod.js',
         );
-
-        // Luego buscar .min.js
-        const minFiles = files.filter((file: string) =>
-            file.toLowerCase().includes('.min.'),
-        );
-
-        // .prod.js tiene prioridad sobre .min.js
-        expect(prodFiles[0]).toBe('library.esm-browser.prod.js');
-        expect(prodFiles[0]).not.toBe(minFiles[0]);
     });
 
-    it('should use .min.js as fallback when .prod.js is not available in production', () => {
+    it('cambiar isPROD en caliente cambia la resolución sin reiniciar el proceso', () => {
         process.env.isPROD = 'true';
+        const prod = getModulePath('vue');
 
-        const files = [
-            'library.esm-browser.js',
-            'library.esm-browser.min.js',
-            // No hay .prod.js
-        ];
+        process.env.isPROD = 'false';
+        const dev = getModulePath('vue');
 
-        // Primero buscar .prod.js
-        const prodFiles = files.filter((file: string) =>
-            file.toLowerCase().includes('.prod.'),
-        );
-
-        // Si no hay .prod.js, buscar .min.js
-        if (prodFiles.length === 0) {
-            const minFiles = files.filter((file: string) =>
-                file.toLowerCase().includes('.min.'),
-            );
-            expect(minFiles.length).toBeGreaterThan(0);
-            expect(minFiles[0]).toBe('library.esm-browser.min.js');
-        }
-    });
-
-    it('should handle multiple library patterns with production priority', () => {
-        process.env.isPROD = 'true';
-
-        const testCases = [
-            {
-                files: ['vue.esm-browser.js', 'vue.esm-browser.prod.js'],
-                expected: 'vue.esm-browser.prod.js',
-            },
-            {
-                files: [
-                    'vue-router.esm-browser.js',
-                    'vue-router.esm-browser.prod.js',
-                ],
-                expected: 'vue-router.esm-browser.prod.js',
-            },
-            {
-                files: ['pinia.esm-browser.js', 'pinia.esm-browser.prod.js'],
-                expected: 'pinia.esm-browser.prod.js',
-            },
-        ];
-
-        testCases.forEach(({ files, expected }) => {
-            const prodFiles = files.filter((file: string) =>
-                file.toLowerCase().includes('.prod.'),
-            );
-            expect(prodFiles[0]).toBe(expected);
-        });
+        expect(prod).not.toBe(dev);
+        expect(prod).toContain('.prod.js');
+        expect(dev).not.toContain('.prod.');
     });
 });

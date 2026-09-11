@@ -29,6 +29,10 @@ type PendingTask = {
     resolve: (value: any) => void;
     reject: (error: Error) => void;
     timeout: ReturnType<typeof setTimeout>;
+    // Worker al que se despachó la tarea (null mientras espera en cola).
+    // Permite que un error de un worker solo rechace SUS tareas, no las de
+    // workers hermanos que siguen sanos.
+    poolWorker: PoolWorker | null;
 };
 
 type PoolWorker = {
@@ -92,12 +96,13 @@ export class CompileWorkerPool {
 
             worker.on('error', error => {
                 poolWorker.busy = false;
+                const normalized =
+                    error instanceof Error ? error : new Error(String(error));
+                // Rechazar solo las tareas despachadas a ESTE worker, no las
+                // que están corriendo en workers hermanos sanos.
                 for (const [id, pending] of this.pending) {
+                    if (pending.poolWorker !== poolWorker) continue;
                     clearTimeout(pending.timeout);
-                    const normalized =
-                        error instanceof Error
-                            ? error
-                            : new Error(String(error));
                     pending.reject(normalized);
                     this.pending.delete(id);
                 }
@@ -121,10 +126,17 @@ export class CompileWorkerPool {
                 reject(new Error(`Worker timeout: ${type}`));
             }, this.TASK_TIMEOUT);
 
-            this.pending.set(id, { resolve, reject, timeout });
+            const pendingTask: PendingTask = {
+                resolve,
+                reject,
+                timeout,
+                poolWorker: null,
+            };
+            this.pending.set(id, pendingTask);
             const worker = this.getAvailableWorker();
             if (worker) {
                 worker.busy = true;
+                pendingTask.poolWorker = worker;
                 worker.worker.postMessage(message);
                 return;
             }
@@ -142,6 +154,8 @@ export class CompileWorkerPool {
         if (!worker) return;
         const message = this.queue.shift();
         if (!message) return;
+        const pendingTask = this.pending.get(message.id);
+        if (pendingTask) pendingTask.poolWorker = worker;
         worker.busy = true;
         worker.worker.postMessage(message);
     }

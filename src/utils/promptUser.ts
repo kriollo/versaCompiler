@@ -15,6 +15,7 @@ export async function promptUser(
         const timer = setTimeout(() => {
             if (!isResolved) {
                 isResolved = true;
+                process.removeListener('SIGINT', handleSigint);
                 rl.close();
                 reject(
                     new Error('Timeout: No se recibió respuesta del usuario'),
