@@ -78,6 +78,17 @@ function stopCompile() {
     logger.info('VersaCompiler cerrado correctamente');
 }
 
+// En tests, `process.exit()` mataría el proceso del test runner. Igual que
+// file-watcher.ts, en NODE_ENV==='test' lanzamos en vez de salir, así el
+// control de flujo (nada corre después de esta llamada) sigue siendo
+// testeable sin terminar el proceso.
+function exitProcess(code: number): never {
+    if (globalProcess.env.NODE_ENV !== 'test') {
+        globalProcess.exit(code);
+    }
+    throw new Error(`__PROCESS_EXIT_${code}__`);
+}
+
 async function main() {
     try {
         // Load yargs dynamically
@@ -241,11 +252,11 @@ async function main() {
             logger.info('Iniciando la configuración...');
             const { initConfig } = await loadConfigModule();
             await initConfig();
-            globalProcess.exit(0);
+            exitProcess(0);
         }
 
         if (!(await readConfig())) {
-            globalProcess.exit(1);
+            exitProcess(1);
         }
 
         env.isPROD = argv.prod ? 'true' : 'false';
@@ -383,7 +394,7 @@ async function main() {
                 }
             }
 
-            globalProcess.exit(hasErrors ? 1 : 0);
+            exitProcess(hasErrors ? 1 : 0);
         }
         if (argv.file) {
             // Compilar archivo individual
@@ -398,7 +409,7 @@ async function main() {
                 logger.error(
                     chalk.red(`❌ Error: El archivo '${argv.file}' no existe.`),
                 );
-                globalProcess.exit(1);
+                exitProcess(1);
             }
 
             // Compilar el archivo (absolutePathFile está garantizado aquí)
@@ -410,25 +421,25 @@ async function main() {
                         `✅ Archivo compilado exitosamente: ${result.output}`,
                     ),
                 );
-                globalProcess.exit(0);
+                exitProcess(0);
             } else {
                 logger.error(
                     chalk.red(`❌ Error al compilar el archivo: ${argv.file}`),
                 );
-                globalProcess.exit(1);
+                exitProcess(1);
             }
         }
         if (argv.all) {
             const { initCompileAll } = await loadCompilerModule();
             await initCompileAll();
-            globalProcess.exit(0);
+            exitProcess(0);
         }
 
         if (!argv.watch) {
             if (env.ENABLE_LINTER === 'true') {
                 const { runLinter } = await loadCompilerModule();
                 const linterPassed = await runLinter(true);
-                globalProcess.exit(linterPassed ? 0 : 1);
+                exitProcess(linterPassed ? 0 : 1);
             }
         }
         if (env.TAILWIND === 'true') {
@@ -456,11 +467,11 @@ async function main() {
 
             bs = await browserSyncServer();
             if (!bs) {
-                globalProcess.exit(1);
+                exitProcess(1);
             }
             watch = await initChokidar(bs);
             if (!watch) {
-                globalProcess.exit(1);
+                exitProcess(1);
             }
         }
         // ✨ FIX: Cleanup handler para evitar acumulación de listeners
@@ -475,7 +486,7 @@ async function main() {
                 await cleanupWatcher(watch);
             }
             stopCompile();
-            globalProcess.exit(0);
+            exitProcess(0);
         };
 
         const sigintHandler = () => cleanupHandler();
@@ -486,11 +497,11 @@ async function main() {
     } catch (error) {
         logger.error('Error en la aplicación:', error);
         stopCompile();
-        globalProcess.exit(1);
+        exitProcess(1);
     }
 }
 
 main().catch(error => {
     logger.error('Error fatal no controlado en main():', error);
-    globalProcess.exit(1);
+    exitProcess(1);
 });

@@ -3,14 +3,20 @@ import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { cleanOutputDir } from '../src/servicios/file-watcher';
+import {
+    cleanOutputDir,
+    getAction,
+    isAdditionalWatchFile,
+} from '../src/servicios/file-watcher';
 
 // A diferencia de la versión anterior de este archivo (que no importaba nada
 // de src/servicios/file-watcher.ts y solo hacía smoke tests genéricos de
-// fs/path), este test ejercita cleanOutputDir() real. isAdditionalWatchFile,
-// getAction y WatchDebouncer no están exportados de file-watcher.ts, así que
-// no son testeables como unidades sin exportarlos primero — queda pendiente
-// como cobertura nueva (no cabe en este housekeeping de alinear tests).
+// fs/path), este test ejercita cleanOutputDir(), getAction() e
+// isAdditionalWatchFile() reales (las dos últimas se exportaron para esto,
+// eran internas). WatchDebouncer queda fuera: está fuertemente acoplado al
+// pipeline de compilación real (initCompile, getPipelineModuleGraph,
+// emitirCambios, etc.) y testearlo de forma significativa requeriría mockear
+// todo ese pipeline — es un esfuerzo de test aparte, no housekeeping.
 describe('file-watcher - cleanOutputDir', () => {
     const testDir = join(process.cwd(), 'temp', 'file-watcher-test');
 
@@ -52,5 +58,65 @@ describe('file-watcher - cleanOutputDir', () => {
             if (originalYes === undefined) delete process.env.yes;
             else process.env.yes = originalYes;
         }
+    });
+});
+
+describe('file-watcher - getAction', () => {
+    const extensionWatch = [
+        { ext: 'js', action: 'compileFile' },
+        { ext: 'ts', action: 'compileFile' },
+        { ext: 'vue', action: 'compileFile' },
+        { ext: 'css', action: 'reloadCss' },
+    ];
+
+    it('devuelve la acción configurada para la extensión del archivo', () => {
+        expect(getAction('foo.ts', extensionWatch)).toBe('compileFile');
+        expect(getAction('styles/main.css', extensionWatch)).toBe(
+            'reloadCss',
+        );
+    });
+
+    it('devuelve "reloadFull" para una extensión sin acción configurada', () => {
+        expect(getAction('image.png', extensionWatch)).toBe('reloadFull');
+    });
+
+    it('devuelve "reloadFull" para un archivo sin extensión', () => {
+        expect(getAction('Makefile', extensionWatch)).toBe('reloadFull');
+    });
+
+    it('usa la última extensión en archivos con varios puntos', () => {
+        expect(getAction('component.test.ts', extensionWatch)).toBe(
+            'compileFile',
+        );
+    });
+});
+
+describe('file-watcher - isAdditionalWatchFile', () => {
+    it('devuelve false cuando no hay patrones adicionales configurados', () => {
+        expect(isAdditionalWatchFile('templates/foo.twig', [])).toBe(false);
+    });
+
+    it('matchea un glob simple de patrones adicionales', () => {
+        const patterns = ['./app/templates/**/*.twig'];
+        expect(
+            isAdditionalWatchFile(
+                './app/templates/nested/foo.twig',
+                patterns,
+            ),
+        ).toBe(true);
+    });
+
+    it('no matchea un archivo que no cumple ningún patrón', () => {
+        const patterns = ['./app/templates/**/*.twig'];
+        expect(isAdditionalWatchFile('./src/index.ts', patterns)).toBe(
+            false,
+        );
+    });
+
+    it('matchea con múltiples patrones configurados', () => {
+        const patterns = ['./app/templates/**/*.twig', './locales/**/*.json'];
+        expect(
+            isAdditionalWatchFile('./locales/en/common.json', patterns),
+        ).toBe(true);
     });
 });

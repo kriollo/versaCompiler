@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs';
+import fs, { existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     loadTypeScriptConfig,
     preCompileTS,
@@ -389,27 +389,44 @@ describe('TypeScript Config Management', () => {
     });
 
     describe('Config Cache Management', () => {
-        it('should invalidate cache when tsconfig is modified', async () => {
-            const config1 = {
-                compilerOptions: { target: 'ES5' },
-            };
-            await writeFile(tsconfigPath, JSON.stringify(config1), 'utf-8');
+        // loadTypeScriptConfig busca SIEMPRE primero
+        // path.resolve(process.cwd(), 'tsconfig.json') — como este repo
+        // tiene su propio tsconfig.json real en la raíz, el fixture en
+        // testDir/tsconfigPath nunca llega a leerse (por eso la versión
+        // anterior de este test, que solo escribía ahí, no probaba nada
+        // real: firstConfig/secondConfig venían siempre del mismo archivo
+        // real sin cambios). En vez de mutar el tsconfig.json real del
+        // proyecto, estos tests espían fs.statSync para simular un cambio
+        // de mtime y verifican identidad de referencia: mismo mtime → misma
+        // referencia cacheada; mtime distinto → nueva referencia (recarga).
+        it('reutiliza la misma referencia cacheada si el tsconfig no cambió', () => {
+            const config1 = loadTypeScriptConfig(join(testDir, 'a.ts'));
+            const config2 = loadTypeScriptConfig(join(testDir, 'b.ts'));
 
-            const firstConfig = loadTypeScriptConfig(join(testDir, 'test.ts'));
+            expect(config2).toBe(config1);
+        });
 
-            // Esperar un momento para asegurar diferente timestamp
-            await new Promise(resolve => setTimeout(resolve, 100));
+        it('invalida el cache y recarga si el mtime del tsconfig cambió', () => {
+            const rootTsconfig = join(process.cwd(), 'tsconfig.json');
+            const realStat = fs.statSync(rootTsconfig);
 
-            const config2 = {
-                compilerOptions: { target: 'ES2020' },
-            };
-            await writeFile(tsconfigPath, JSON.stringify(config2), 'utf-8');
+            const statSpy = vi.spyOn(fs, 'statSync');
 
-            const secondConfig = loadTypeScriptConfig(join(testDir, 'test.ts'));
+            statSpy.mockReturnValue({
+                ...realStat,
+                mtimeMs: 111,
+            } as fs.Stats);
+            const firstConfig = loadTypeScriptConfig(join(testDir, 'c.ts'));
 
-            // Debería recargar la configuración si el archivo cambió
-            expect(firstConfig).toBeDefined();
-            expect(secondConfig).toBeDefined();
+            statSpy.mockReturnValue({
+                ...realStat,
+                mtimeMs: 222,
+            } as fs.Stats);
+            const secondConfig = loadTypeScriptConfig(join(testDir, 'c.ts'));
+
+            statSpy.mockRestore();
+
+            expect(secondConfig).not.toBe(firstConfig);
         });
     });
 });

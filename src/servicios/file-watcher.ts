@@ -536,7 +536,7 @@ async function deleteFile(filePath: string): Promise<boolean> {
     }
 }
 
-function getAction(
+export function getAction(
     ruta: string,
     extendsionWatch: { ext: string; action: string }[],
 ) {
@@ -552,7 +552,7 @@ function getAction(
 /**
  * Verifica si un archivo pertenece a las rutas adicionales (no compilables)
  */
-function isAdditionalWatchFile(
+export function isAdditionalWatchFile(
     filePath: string,
     additionalPatterns: string[],
 ): boolean {

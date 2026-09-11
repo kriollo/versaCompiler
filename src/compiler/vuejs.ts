@@ -87,7 +87,7 @@ class VueHMRInjectionCache {
 
         if (!ifExistScript) {
             injectedData =
-                `<script setup lang="ts">${varContent}</script>/n` +
+                `<script setup lang="ts">${varContent}</script>\n` +
                 originalData;
         } else {
             injectedData = originalData.replace(

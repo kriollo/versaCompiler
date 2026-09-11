@@ -1,0 +1,77 @@
+name: CI
+
+on:
+    push:
+        branches: ['**']
+    pull_request:
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    test:
+        name: Lint, test & build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            # No hay pnpm-lock.yaml commiteado en este repo (está en
+            # .gitignore), así que no se puede usar --frozen-lockfile.
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Lint (oxlint)
+              run: pnpm lint
+
+            - name: Test
+              run: pnpm test
+
+            # pnpm build compila el propio compilador (tsx src/main.ts --all)
+            # y genera los .d.ts vía tsconfig.declarations.json — esto ya
+            # cubre la verificación de tipos del código que se publica.
+            # NO se corre `tsc --noEmit -p tsconfig.json` como paso aparte:
+            # ese tsconfig (pensado para el editor/examples/) tiene ~86
+            # errores preexistentes en archivos .js sueltos (src/hrm,
+            # examples/) no relacionados con el código que se compila o
+            # publica, y haría fallar el CI en cada corrida sin señalar
+            # nada nuevo.
+            - name: Build
+              run: pnpm build
+
+    e2e:
+        name: E2E (Playwright)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install
+
+            - name: Install Playwright browsers
+              run: pnpm exec playwright install --with-deps
+
+            - name: Run e2e tests
+              run: pnpm e2e
+
+            - name: Upload Playwright report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report
+                  path: playwright-report/
+                  retention-days: 7
