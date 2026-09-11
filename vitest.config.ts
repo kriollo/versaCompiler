@@ -38,13 +38,10 @@ export default defineConfig({
             html: './test-results/index.html',
         },
 
-        // Configuración de threads
+        // Configuración de threads: un solo fork secuencial (necesario para
+        // que el pool de workers de TypeScript no anide worker threads)
         pool: 'forks',
-        poolOptions: {
-            forks: {
-                singleFork: true,
-            },
-        },
+        fileParallelism: false,
 
         // Modo watch
         watch: false,

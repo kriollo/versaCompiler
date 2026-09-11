@@ -3,13 +3,13 @@
  * Prueba: watch deep, watchEffect, computed multi-dependencia, JSON parse/stringify
  */
 import { ref, computed, watch } from 'vue';
-import type {
-    Contact,
-    ContactFormData,
-    ContactStats,
-    ContactCategory,
+import {
+    ContactListSchema,
+    type Contact,
+    type ContactFormData,
+    type ContactStats,
+    type ContactCategory,
 } from './types';
-import { ContactListSchema } from './types';
 
 const LS_KEY = 'e2e-contacts';
 
@@ -26,7 +26,7 @@ function loadFromStorage(): Contact[] {
         );
     } catch (e) {
         if (e instanceof SyntaxError) {
-            throw new Error(`JSON inválido en localStorage: ${e.message}`);
+            throw new Error(`JSON inválido en localStorage: ${e.message}`, { cause: e });
         }
         throw e;
     }

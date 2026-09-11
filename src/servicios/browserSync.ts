@@ -470,6 +470,207 @@ async function loadChalk() {
 // Pre-cargar chalk al cargar el módulo para hot reload más rápido
 loadChalk().catch(() => {});
 
+/**
+ * Middleware de request de BrowserSync: sirve /__versa/*, /node_modules/*,
+ * reescribe imports para HMR re-import, y loguea el resto de requests.
+ * Extraído como función standalone (en vez de un closure anónimo dentro de
+ * `bs.init()`) para poder testear cada rama con req/res simulados.
+ */
+export function createRequestMiddleware(
+    relativeHrmPath: string,
+    projectRoot: string,
+    AssetsOmit: boolean,
+) {
+    return async function (req: any, res: any, next: any) {
+        //para evitar el error de CORS
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', '*');
+        res.setHeader('Access-Control-Allow-Headers', '*');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Max-Age', '3600');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        //para redigir a la ubicación correcta
+        if (req.url === '/__versa/initHRM.js') {
+            // ✨ OPTIMIZADO: Usar cache para archivos HRM
+            const vueLoaderPath = path.join(relativeHrmPath, '/initHRM.js');
+
+            const cachedFile = await fileCache.getOrReadFile(vueLoaderPath);
+            if (cachedFile) {
+                res.setHeader('Content-Type', cachedFile.contentType);
+                res.setHeader('ETag', cachedFile.etag);
+
+                res.end(cachedFile.content);
+            } else {
+                const chalkInstance = await loadChalk();
+                logger.error(
+                    chalkInstance.red(
+                        `🚩 :Error al leer el archivo ${vueLoaderPath}`,
+                    ),
+                );
+                res.statusCode = 404;
+                res.end('// vueLoader.js not found');
+            }
+            return;
+        }
+
+        // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
+        if (req.url.startsWith('/__versa/')) {
+            // ✨ SEGURIDAD: Prevenir path traversal normalizando y verificando el directorio
+            const requestedRelative = req.url
+                .replace('/__versa/', '')
+                .split('?')[0]; // strip query string
+            const resolvedFilePath = path.resolve(
+                relativeHrmPath,
+                requestedRelative,
+            );
+            const allowedBase = path.resolve(relativeHrmPath);
+            if (
+                !resolvedFilePath.startsWith(allowedBase + path.sep) &&
+                resolvedFilePath !== allowedBase
+            ) {
+                res.statusCode = 403;
+                res.end('// Forbidden');
+                return;
+            }
+            const filePath = resolvedFilePath;
+
+            const cachedFile = await fileCache.getOrReadFile(filePath);
+            if (cachedFile) {
+                res.setHeader('Content-Type', cachedFile.contentType);
+                res.setHeader('ETag', cachedFile.etag);
+
+                res.end(cachedFile.content);
+            } else {
+                const chalkInstance = await loadChalk();
+                logger.error(
+                    chalkInstance.red(`🚩 :Error al leer el archivo ${filePath}`),
+                );
+                res.statusCode = 404;
+                res.end('// Not found');
+            }
+            return;
+        }
+
+        // Si la URL comienza con /node_modules/, sirve los archivos de node_modules
+        if (req.url.startsWith('/node_modules/')) {
+            // ✨ SEGURIDAD: Prevenir path traversal verificando que el path resuelto
+            // permanece dentro de node_modules del proyecto
+            const requestedRelative = req.url
+                .replace('/node_modules/', '')
+                .split('?')[0]; // strip query string
+            const nodeModulesBase = path.resolve(projectRoot, 'node_modules');
+            const modulePath = path.resolve(
+                nodeModulesBase,
+                requestedRelative,
+            );
+            if (
+                !modulePath.startsWith(nodeModulesBase + path.sep) &&
+                modulePath !== nodeModulesBase
+            ) {
+                res.statusCode = 403;
+                res.end('// Forbidden');
+                return;
+            }
+
+            const cachedFile = await fileCache.getOrReadFile(modulePath);
+            if (cachedFile) {
+                res.setHeader('Content-Type', cachedFile.contentType);
+                res.setHeader('ETag', cachedFile.etag);
+
+                res.end(cachedFile.content);
+            } else {
+                const chalkInstance = await loadChalk();
+                logger.error(
+                    chalkInstance.red(`🚩 Error al leer el módulo ${modulePath}`),
+                );
+                res.statusCode = 404;
+                res.end('// Module not found');
+            }
+            return;
+        }
+
+        // ── HMR re-import: reescribir imports para que el browser no use caché ──
+        // Cuando el cliente hace import('/public/js/foo.js?t=123'), el browser crea
+        // un nuevo module record para esa URL. Al evaluar el módulo, sus static imports
+        // (ej: import { x } from '/public/js/bar.js') SIN timestamp reusan el módulo
+        // cacheado del registry → se ve el código viejo.
+        // Solución: interceptar estas requests y reescribir los imports del archivo
+        // para que también lleven ?t= en los módulos recientemente modificados.
+        const isHMRReimport =
+            req.method === 'GET' &&
+            req.url.includes('?t=') &&
+            /\.js\?/.test(req.url) &&
+            !req.url.startsWith('/__versa/') &&
+            !req.url.startsWith('/node_modules/');
+
+        if (isHMRReimport) {
+            const urlPath = req.url.split('?')[0] as string;
+            // ✨ SEGURIDAD: Prevenir path traversal verificando que el path resuelto
+            // permanece dentro del directorio del proyecto
+            const projectBase = path.resolve(projectRoot);
+            const filePath = path.resolve(projectBase, `.${urlPath}`);
+            if (
+                !filePath.startsWith(projectBase + path.sep) &&
+                filePath !== projectBase
+            ) {
+                res.statusCode = 403;
+                res.end('// Forbidden');
+                return;
+            }
+            try {
+                const rawContent = await fs.readFile(filePath, 'utf-8');
+                const rewritten = rewriteImportsForHMR(rawContent);
+                res.setHeader(
+                    'Content-Type',
+                    'application/javascript; charset=utf-8',
+                );
+                res.setHeader(
+                    'Cache-Control',
+                    'no-cache, no-store, must-revalidate',
+                );
+                res.end(rewritten);
+                return;
+            } catch {
+                // Archivo no encontrado, seguir al handler estático
+            }
+        }
+        // ──────────────────────────────────────────────────────────────────────────
+
+        // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
+        const isAssets = req.url.match(
+            /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
+        );
+
+        if (req.method === 'GET') {
+            const chalkInstance = await loadChalk();
+            // omitir archivos estáticos sólo si AssetsOmit es true
+            if (isAssets && !AssetsOmit) {
+                logger.info(chalkInstance.white(`GET: ${req.url}`));
+            } else if (!isAssets) {
+                logger.info(chalkInstance.cyan(`GET: ${req.url}`));
+            }
+        } else if (req.method === 'POST') {
+            const chalkInstance = await loadChalk();
+            logger.info(chalkInstance.blue(`POST: ${req.url}`));
+        } else if (req.method === 'PUT') {
+            const chalkInstance = await loadChalk();
+            logger.info(chalkInstance.yellow(`PUT: ${req.url}`));
+        } else if (req.method === 'DELETE') {
+            const chalkInstance = await loadChalk();
+            logger.info(chalkInstance.red(`DELETE: ${req.url}`));
+        } else {
+            const chalkInstance = await loadChalk();
+            logger.info(chalkInstance.gray(`${req.method}: ${req.url}`));
+        }
+
+        // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
+        next();
+    };
+}
+
 export async function browserSyncServer(): Promise<any> {
     try {
         let bs: any = null;
@@ -573,244 +774,7 @@ export async function browserSyncServer(): Promise<any> {
                 ignored: ['node_modules', '.git'],
             },
             middleware: [
-                async function (req: any, res: any, next: any) {
-                    //para evitar el error de CORS
-                    res.setHeader('Access-Control-Allow-Origin', '*');
-                    res.setHeader('Access-Control-Allow-Methods', '*');
-                    res.setHeader('Access-Control-Allow-Headers', '*');
-                    res.setHeader('Access-Control-Allow-Credentials', 'true');
-                    res.setHeader('Access-Control-Max-Age', '3600');
-                    res.setHeader(
-                        'Cache-Control',
-                        'no-cache, no-store, must-revalidate',
-                    );
-                    res.setHeader('Pragma', 'no-cache');
-                    res.setHeader('Expires', '0');
-
-                    //para redigir a la ubicación correcta
-                    if (req.url === '/__versa/initHRM.js') {
-                        // ✨ OPTIMIZADO: Usar cache para archivos HRM
-                        const vueLoaderPath = path.join(
-                            relativeHrmPath,
-                            '/initHRM.js',
-                        );
-
-                        const cachedFile =
-                            await fileCache.getOrReadFile(vueLoaderPath);
-                        if (cachedFile) {
-                            res.setHeader(
-                                'Content-Type',
-                                cachedFile.contentType,
-                            );
-                            res.setHeader('ETag', cachedFile.etag);
-
-                            // if (
-                            //     process.env.VERBOSE === 'true' &&
-                            //     cachedFile.cached
-                            // ) {
-                            //     logger.info(
-                            //         `🚀 File cache hit para ${vueLoaderPath}`,
-                            //     );
-                            // }
-
-                            res.end(cachedFile.content);
-                        } else {
-                            const chalkInstance = await loadChalk();
-                            logger.error(
-                                chalkInstance.red(
-                                    `🚩 :Error al leer el archivo ${vueLoaderPath}`,
-                                ),
-                            );
-                            res.statusCode = 404;
-                            res.end('// vueLoader.js not found');
-                        }
-                        return;
-                    }
-
-                    // Si la URL comienza con /__versa/hrm/, sirve los archivos de dist/hrm
-                    if (req.url.startsWith('/__versa/')) {
-                        // ✨ SEGURIDAD: Prevenir path traversal normalizando y verificando el directorio
-                        const requestedRelative = req.url
-                            .replace('/__versa/', '')
-                            .split('?')[0]; // strip query string
-                        const resolvedFilePath = path.resolve(
-                            relativeHrmPath,
-                            requestedRelative,
-                        );
-                        const allowedBase = path.resolve(relativeHrmPath);
-                        if (
-                            !resolvedFilePath.startsWith(
-                                allowedBase + path.sep,
-                            ) &&
-                            resolvedFilePath !== allowedBase
-                        ) {
-                            res.statusCode = 403;
-                            res.end('// Forbidden');
-                            return;
-                        }
-                        const filePath = resolvedFilePath;
-
-                        const cachedFile =
-                            await fileCache.getOrReadFile(filePath);
-                        if (cachedFile) {
-                            res.setHeader(
-                                'Content-Type',
-                                cachedFile.contentType,
-                            );
-                            res.setHeader('ETag', cachedFile.etag);
-
-                            // if (
-                            //     process.env.VERBOSE === 'true' &&
-                            //     cachedFile.cached
-                            // ) {
-                            //     logger.info(
-                            //         `🚀 File cache hit para ${filePath}`,
-                            //     );
-                            // }
-
-                            res.end(cachedFile.content);
-                        } else {
-                            const chalkInstance = await loadChalk();
-                            logger.error(
-                                chalkInstance.red(
-                                    `🚩 :Error al leer el archivo ${filePath}`,
-                                ),
-                            );
-                            res.statusCode = 404;
-                            res.end('// Not found');
-                        }
-                        return;
-                    }
-
-                    // Si la URL comienza con /node_modules/, sirve los archivos de node_modules
-                    if (req.url.startsWith('/node_modules/')) {
-                        // ✨ SEGURIDAD: Prevenir path traversal verificando que el path resuelto
-                        // permanece dentro de node_modules del proyecto
-                        const requestedRelative = req.url
-                            .replace('/node_modules/', '')
-                            .split('?')[0]; // strip query string
-                        const nodeModulesBase = path.resolve(
-                            process.cwd(),
-                            'node_modules',
-                        );
-                        const modulePath = path.resolve(
-                            nodeModulesBase,
-                            requestedRelative,
-                        );
-                        if (
-                            !modulePath.startsWith(
-                                nodeModulesBase + path.sep,
-                            ) &&
-                            modulePath !== nodeModulesBase
-                        ) {
-                            res.statusCode = 403;
-                            res.end('// Forbidden');
-                            return;
-                        }
-
-                        const cachedFile =
-                            await fileCache.getOrReadFile(modulePath);
-                        if (cachedFile) {
-                            res.setHeader(
-                                'Content-Type',
-                                cachedFile.contentType,
-                            );
-                            res.setHeader('ETag', cachedFile.etag);
-
-                            // if (
-                            //     process.env.VERBOSE === 'true' &&
-                            //     cachedFile.cached
-                            // ) {
-                            //     logger.info(
-                            //         `🚀 Module cache hit para ${modulePath}`,
-                            //     );
-                            // }
-
-                            res.end(cachedFile.content);
-                        } else {
-                            const chalkInstance = await loadChalk();
-                            logger.error(
-                                chalkInstance.red(
-                                    `🚩 Error al leer el módulo ${modulePath}`,
-                                ),
-                            );
-                            res.statusCode = 404;
-                            res.end('// Module not found');
-                        }
-                        return;
-                    }
-
-                    // ── HMR re-import: reescribir imports para que el browser no use caché ──
-                    // Cuando el cliente hace import('/public/js/foo.js?t=123'), el browser crea
-                    // un nuevo module record para esa URL. Al evaluar el módulo, sus static imports
-                    // (ej: import { x } from '/public/js/bar.js') SIN timestamp reusan el módulo
-                    // cacheado del registry → se ve el código viejo.
-                    // Solución: interceptar estas requests y reescribir los imports del archivo
-                    // para que también lleven ?t= en los módulos recientemente modificados.
-                    const isHMRReimport =
-                        req.method === 'GET' &&
-                        req.url.includes('?t=') &&
-                        /\.js\?/.test(req.url) &&
-                        !req.url.startsWith('/__versa/') &&
-                        !req.url.startsWith('/node_modules/');
-
-                    if (isHMRReimport) {
-                        const urlPath = req.url.split('?')[0] as string;
-                        const filePath = path.join(process.cwd(), urlPath);
-                        try {
-                            const rawContent = await fs.readFile(
-                                filePath,
-                                'utf-8',
-                            );
-                            const rewritten = rewriteImportsForHMR(rawContent);
-                            res.setHeader(
-                                'Content-Type',
-                                'application/javascript; charset=utf-8',
-                            );
-                            res.setHeader(
-                                'Cache-Control',
-                                'no-cache, no-store, must-revalidate',
-                            );
-                            res.end(rewritten);
-                            return;
-                        } catch {
-                            // Archivo no encontrado, seguir al handler estático
-                        }
-                    }
-                    // ──────────────────────────────────────────────────────────────────────────
-
-                    // detectar si es un archivo estático, puede que contenga un . y alguna extensión o dashUsers.js?v=1746559083866
-                    const isAssets = req.url.match(
-                        /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|json|html|xml|txt|pdf|zip|mp4|mp3|wav|ogg)(\?.*)?$/i,
-                    );
-
-                    if (req.method === 'GET') {
-                        const chalkInstance = await loadChalk();
-                        // omitir archivos estáticos sólo si AssetsOmit es true
-                        if (isAssets && !AssetsOmit) {
-                            logger.info(chalkInstance.white(`GET: ${req.url}`));
-                        } else if (!isAssets) {
-                            logger.info(chalkInstance.cyan(`GET: ${req.url}`));
-                        }
-                    } else if (req.method === 'POST') {
-                        const chalkInstance = await loadChalk();
-                        logger.info(chalkInstance.blue(`POST: ${req.url}`));
-                    } else if (req.method === 'PUT') {
-                        const chalkInstance = await loadChalk();
-                        logger.info(chalkInstance.yellow(`PUT: ${req.url}`));
-                    } else if (req.method === 'DELETE') {
-                        const chalkInstance = await loadChalk();
-                        logger.info(chalkInstance.red(`DELETE: ${req.url}`));
-                    } else {
-                        const chalkInstance = await loadChalk();
-                        logger.info(
-                            chalkInstance.gray(`${req.method}: ${req.url}`),
-                        );
-                    }
-
-                    // Aquí podrías, por ejemplo, escribir estos logs en un archivo o base de datos
-                    next();
-                },
+                createRequestMiddleware(relativeHrmPath, projectRoot, AssetsOmit),
             ],
         });
 

@@ -153,6 +153,54 @@ describe('IntegrityValidator', () => {
 
             expect(result.checks.structure).toBe(true);
         });
+
+        it('acepta regex con "/" dentro de una character class (ej. rutas)', () => {
+            // Bug real: un '/' dentro de [...] no cierra el regex.
+            // Sin el fix, esto se detecta como "corchete desbalanceado".
+            const code =
+                "const ALLOWED_PATH_CHARS = /^[a-zA-Z0-9.\\-_/\\\\:@ ()[\\]]+$/;";
+            const result = integrityValidator.validate(
+                code,
+                code,
+                'test:regex-char-class-slash',
+                { throwOnError: false },
+            );
+
+            expect(result.checks.structure).toBe(true);
+        });
+
+        it('acepta regex con brackets dentro de una interpolación de template', () => {
+            // Bug real: un regex dentro de `${ ... }` no se reconocía como
+            // regex (solo se detectaba fuera de templates), así que sus
+            // corchetes literales (character class) se contaban como código.
+            const code =
+                'const pattern = `${marker.replace(/[.*+?^${}()|[\\]\\\\]/g, String.raw`\\\\$&`)}`;';
+            const result = integrityValidator.validate(
+                code,
+                code,
+                'test:regex-inside-interpolation',
+                { throwOnError: false },
+            );
+
+            expect(result.checks.structure).toBe(true);
+        });
+
+        it('no confunde una división dentro de una interpolación con un regex', () => {
+            // Bug real: el carácter previo a un template (ej. el '(' de una
+            // llamada a función) quedaba "pegado" como contexto al entrar en
+            // una interpolación, haciendo que a/b dentro de `${ }` se
+            // detectara como el inicio de un regex.
+            const code =
+                'logger.info(`Hilos: ${(count / total).toFixed(1)}x CPUs`);';
+            const result = integrityValidator.validate(
+                code,
+                code,
+                'test:division-inside-interpolation',
+                { throwOnError: false },
+            );
+
+            expect(result.checks.structure).toBe(true);
+        });
     });
 
     describe('checkExports', () => {

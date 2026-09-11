@@ -4,8 +4,11 @@
      * Prueba: template refs, v-model en FormField custom, error display, zod validation
      */
     import { ref, watch } from 'vue';
-    import type { Contact, ContactFormData } from '../types';
-    import { ContactFormSchema } from '../types';
+    import {
+        ContactFormSchema,
+        type Contact,
+        type ContactFormData,
+    } from '../types';
     import { useValidation } from '../useValidation';
     import FormField from './FormField.vue';
 

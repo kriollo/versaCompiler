@@ -145,7 +145,6 @@ test.describe('Sección 3 — @vueuse/core (paquete scoped @scope/pkg)', () => {
         // Mover el ratón
         await page.mouse.move(200, 200);
         await page.mouse.move(400, 300);
-        const after = await li.textContent();
         // Las coordenadas deben haber cambiado (en headless pueden ser iguales si no hay window)
         // Solo verificamos que el elemento sigue visible
         await expect(li).toBeVisible();

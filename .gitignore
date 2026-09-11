@@ -8,6 +8,7 @@ dist
 src/compiler/.cache
 examples/dashboard
 test-results/*
+.vitest/*
 temp/*
 testProjects/*
 testProjectsCompiled/*

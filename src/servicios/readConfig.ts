@@ -106,8 +106,14 @@ export function validatePath(pathStr: string): boolean {
         return false;
     }
 
-    // Rechazar rutas absolutas de Windows (válido en cualquier plataforma)
-    if (/^[A-Za-z]:[/\\]/.test(pathStr)) {
+    // Rechazar rutas absolutas de Windows solo cuando NO se ejecuta en
+    // Windows: en ese caso una ruta "C:\..." nunca puede ser el resultado
+    // de resolver contra process.cwd() en este SO, así que es señal de
+    // path traversal. En Windows, path.resolve() del propio CLI genera
+    // rutas con letra de unidad de forma legítima, y la comprobación de
+    // path traversal de abajo (normalize/resolve/relative contra cwd) ya
+    // garantiza que se mantengan dentro del workspace.
+    if (process.platform !== 'win32' && /^[A-Za-z]:[/\\]/.test(pathStr)) {
         logger.error(`Ruta absoluta de Windows no permitida: ${pathStr}`);
         return false;
     }

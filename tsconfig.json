@@ -26,12 +26,10 @@
         "sourceMap": true,
         "inlineSourceMap": false,
         "inlineSources": false,
-        "baseUrl": ".",
-        "ignoreDeprecations": "6.0",
         "paths": {
-            "@/*": ["examples/*"],
-            "P@/*": ["public/*"],
-            "e@/*": ["examples/*"]
+            "@/*": ["./examples/*"],
+            "P@/*": ["./public/*"],
+            "e@/*": ["./examples/*"]
         },
         "typeRoots": [
             "./node_modules/@types",

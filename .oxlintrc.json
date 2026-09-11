@@ -7,6 +7,8 @@
         "dist/**/*",
         "temp/**/*",
         "performance-results/**/*",
+        "test-results/**/*",
+        ".vitest/**/*",
         "examples/js/examples/test-errors.js",
         "tests/**/*"
     ],
@@ -110,7 +112,6 @@
         "import/default": "error",
         "import/named": "error",
         "import/namespace": "error",
-        "import/no-unresolved": "off",
         "no-unused-expressions": "error",
         "no-alert": "warn",
         "no-console": "off",

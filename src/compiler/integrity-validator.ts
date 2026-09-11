@@ -223,6 +223,7 @@ export class IntegrityValidator {
         let inComment = false;
         let inMultilineComment = false;
         let inRegex = false; // Dentro de regex literal /pattern/flags
+        let inRegexCharClass = false; // Dentro de [...] de un regex (el '/' ahí no cierra el regex)
         let stringChar = '';
         let escapeNext = false;
         let prevNonWhitespaceChar = ''; // Para detectar contexto de regex
@@ -244,9 +245,11 @@ export class IntegrityValidator {
             }
 
             // Detectar regex literals (antes de comentarios, porque ambos usan /)
+            // También válido dentro de interpolaciones de template (`${ /re/ }`),
+            // que son código JS normal, no texto literal del template.
             if (
                 !inString &&
-                !inTemplate &&
+                (!inTemplate || inTemplateInterpolation) &&
                 !inComment &&
                 !inMultilineComment &&
                 !inRegex &&
@@ -258,13 +261,15 @@ export class IntegrityValidator {
                 const regexContext = /[=([,;:!&|?+\-{]$/;
                 if (regexContext.test(prevNonWhitespaceChar)) {
                     inRegex = true;
+                    inRegexCharClass = false;
                     i++;
                     continue;
                 }
             }
 
-            // Detectar fin de regex literal
-            if (inRegex && char === '/') {
+            // Detectar fin de regex literal (un '/' dentro de una character
+            // class [...] es literal, no cierra el regex: /[/\\]/ es válido)
+            if (inRegex && char === '/' && !inRegexCharClass) {
                 inRegex = false;
                 // Skip flags como g, i, m, s, u, y
                 let j = i + 1;
@@ -280,8 +285,14 @@ export class IntegrityValidator {
                 continue;
             }
 
-            // Skip contenido dentro de regex
+            // Trackear entrada/salida de character class [...] dentro del regex,
+            // y skip del resto del contenido dentro de regex
             if (inRegex) {
+                if (char === '[' && !inRegexCharClass) {
+                    inRegexCharClass = true;
+                } else if (char === ']' && inRegexCharClass) {
+                    inRegexCharClass = false;
+                }
                 i++;
                 continue;
             }
@@ -372,6 +383,10 @@ export class IntegrityValidator {
             ) {
                 inTemplateInterpolation = true;
                 templateBraceDepth = 0;
+                // Contexto "recién abierto": permite que un regex literal
+                // válido al inicio de la interpolación (ej. `${/re/.test(x)}`)
+                // se detecte, en vez de arrastrar el char previo al template.
+                prevNonWhitespaceChar = '{';
                 i += 2; // Skip ${ completamente
                 continue;
             }
@@ -407,6 +422,20 @@ export class IntegrityValidator {
                 ) {
                     return false;
                 }
+
+                // Track prev non-whitespace char (el contenido de una
+                // interpolación es código JS real: la detección de regex de
+                // arriba también depende de esto dentro de `${ }`)
+                if (
+                    char &&
+                    char !== ' ' &&
+                    char !== '\t' &&
+                    char !== '\n' &&
+                    char !== '\r'
+                ) {
+                    prevNonWhitespaceChar = char;
+                }
+
                 i++;
                 continue;
             }

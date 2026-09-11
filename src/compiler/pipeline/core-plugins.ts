@@ -3,6 +3,7 @@ import { env } from 'node:process';
 
 import { logger } from '../../servicios/logger';
 import { CompileWorkerPool } from '../compile-worker-pool';
+import { integrityValidator } from '../integrity-validator';
 
 import type { Plugin, TransformArgs, TransformResult } from './types';
 
@@ -201,7 +202,38 @@ export function createCorePlugins(): Plugin[] {
                         errors: [withStageError('minification', result.error)],
                     };
                 }
-                return { contents: result.code || '' };
+                const minified = result.code || '';
+
+                // Validación de integridad redundante (minify.ts ya valida
+                // internamente con throwOnError:false) pero crítica cuando el
+                // usuario pide explícitamente --checkIntegrity: hard-fail en
+                // vez de degradar en silencio antes de escribir el archivo final.
+                if (env.CHECK_INTEGRITY === 'true') {
+                    const validation = integrityValidator.validate(
+                        args.contents,
+                        minified,
+                        `compile:${path.basename(args.path)}`,
+                        {
+                            skipSyntaxCheck: true,
+                            verbose: env.VERBOSE === 'true',
+                            throwOnError: true,
+                        },
+                    );
+                    if (!validation.valid) {
+                        return {
+                            errors: [
+                                withStageError(
+                                    'minification',
+                                    new Error(
+                                        `Compilation integrity check failed for ${path.basename(args.path)}: ${validation.errors.join(', ')}`,
+                                    ),
+                                ),
+                            ],
+                        };
+                    }
+                }
+
+                return { contents: minified };
             } catch (error) {
                 return { errors: [withStageError('minification', error)] };
             }
