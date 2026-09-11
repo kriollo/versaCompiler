@@ -5,6 +5,36 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.6.9] - 2026-09-11
+
+### 🔒 Seguridad
+
+- **`browserSync.ts` — path traversal en el branch de HMR re-import**: el middleware del dev server que reescribe imports para HMR (`?t=` en la URL) construía la ruta del archivo a servir sin la comprobación de contención que sí tenían los branches `/__versa/` y `/node_modules/`. Un request con `../` en la URL podía leer archivos arbitrarios del filesystem fuera del proyecto. Fix: misma validación `resolvedPath.startsWith(allowedBase)` que ya usaban los otros dos branches. El middleware se extrajo a una función standalone (`createRequestMiddleware`) para poder testearlo directamente.
+- **`readConfig.ts` — `validatePath` rechazaba rutas absolutas de Windows generadas por el propio CLI**: `validatePath` rechazaba incondicionalmente cualquier ruta con letra de unidad (`C:\...`), incluidas las que el propio `main.ts` genera vía `path.resolve()` en Windows real. Esto rompía `versacompiler` en cualquier proyecto Windows con configuración automática (regresión de 2.6.7). Fix: el rechazo por patrón ahora solo aplica cuando `process.platform !== 'win32'`; en Windows real, la comprobación de traversal existente (normalize/resolve/relative contra cwd) ya valida correctamente que la ruta se mantenga dentro del workspace.
+
+### 🐛 Correcciones
+
+- **`integrity-validator.ts` — falsos positivos de "estructura inválida" en archivos válidos**: el verificador de balance de brackets no reconocía regex literals dentro de interpolaciones de template (`` `${/re/}` ``) ni manejaba correctamente un `/` dentro de una character class de regex (`` /[/\\]/ ``, común en regex de rutas). Esto hacía fallar la compilación con `--checkIntegrity` en archivos fuente completamente válidos. Ambos casos, más un tercero (una división dentro de una interpolación de template heredaba el contexto de regex del código anterior al template), quedan corregidos y cubiertos por tests.
+- **`integrity-validator.ts` — umbral arbitrario de 10 caracteres**: `checkSize` rechazaba salidas minificadas legítimamente cortas (ej. `"export{};"`, 9 caracteres, para un archivo de solo tipos). Ahora solo verifica que el resultado no esté vacío; la validez sintáctica real la cubre el check de sintaxis (oxc-parser).
+- **`vuejs.ts` — errores de compilación de `<template>` solo se logueaban**: un template con errores de sintaxis "compilaba" igual, sin marcar la compilación como fallida. Ahora se propagan como error real.
+- **`transforms.ts` — `replaceAliasInStrings` podía corromper strings ajenos a imports**: la función escaneaba con un regex global todo el texto del archivo en busca de strings que empezaran con un prefijo de alias, sin distinguir un string real de contenido dentro de un comentario o un regex literal. Reescrita para operar solo sobre posiciones de literales de string confirmadas por el AST.
+- **`compile-worker-pool.ts` — un worker que crasheaba tumbaba tareas de workers hermanos sanos**: el handler de `error` rechazaba todas las tareas pendientes del pool completo en vez de solo las del worker que falló.
+- **`pipeline/plugin-driver.ts` — output vacío legítimo tratado como "sin cambios"**: un plugin que producía intencionalmente un string vacío (ej. un `.ts` de solo declaraciones de tipos) veía su resultado descartado en favor del contenido de la etapa anterior.
+- **`utils/promptUser.ts` — listener de `SIGINT` colgado tras timeout**: el branch de timeout no removía el listener registrado, acumulándose en sesiones `--watch` largas con múltiples prompts.
+- **`compile.ts` — `getOutputPath` confundía directorios con nombres similares**: el chequeo de si un archivo pertenece a `PATH_SOURCE` usaba `.includes()` sobre el string completo, así que un directorio hermano como `my-src-app` podía matchear falsamente `src`. Ahora resuelve ambas rutas a absolutas y usa `path.relative()` real.
+- **`main.ts` — errores durante el parseo de argumentos no se manejaban**: el parseo de `yargs` estaba fuera del `try/catch` principal, y `main()` no tenía `.catch()`, así que un fallo ahí terminaba en un stack trace crudo en vez del manejo de errores normal del CLI.
+- Typo `</script>/n` → `</script>\n` en `vuejs.ts` (shim HMR para componentes sin `<script>`).
+
+### 🔧 Mejoras Internas
+
+- **Eliminado código muerto**: `typescript-compiler.ts` y `performance-monitor.ts` (sin ningún caller en `src/`), el cuerpo legacy de `compileJS()` en `compile.ts` (inalcanzable tras el pipeline v2), y `replaceAliasImportStatic`/`replaceAliasImportDynamic` en `transforms.ts` (superadas por la resolución vía AST). El gate de integridad post-minify que solo existía en el código legacy se trasladó al pipeline real.
+- **Salud de la suite de tests**: eliminados `tests/library-detection.test.ts` y `tests/hmr-helper-listener.test.ts` (testeaban una API que no existe en `src/`, con lógica reimplementada localmente en vez de importar el módulo real). `tests/module-resolver-production.test.ts` y `tests/file-watcher.test.ts` reescritos para ejercitar los módulos reales en vez de arrays hardcodeados. Añadida cobertura nueva para `browserSync.ts`, `getOutputPath`, `compile-worker-pool.ts`, `plugin-driver.ts`, `promptUser.ts`, `src/hrm/versaHMR.js`, y el manejo de argumentos inválidos en `main.ts`.
+- **CI**: añadido `.github/workflows/ci.yml` — lint, test y build en cada push/PR, tests end-to-end de Playwright en un job separado.
+- Arreglado un test flaky en `worker-pool-stress.test.ts` (umbral de precisión exacto).
+- Actualizadas dependencias (Vue 3.5.42, Vitest 5, oxlint 1.82, oxc-* 0.149, chalk 6, execa 10, entre otras). `typescript` se mantiene fijado en `^6.x`: la v7 reemplazó por completo la API clásica del compilador (`LanguageService`, `transpileModule`, etc.) que usa el motor de type-checking de VersaCompiler, por una API nueva marcada `unstable` por Microsoft.
+
+---
+
 ## [2.6.7] - 2026-04-01
 
 ### 🐛 Correcciones
