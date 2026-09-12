@@ -5,6 +5,16 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.1] - 2026-09-12
+
+### 🐛 Correcciones
+
+- **`vuejs.ts` — falso positivo de "componente sin import" en componentes recursivos**: un componente que se renderiza a sí mismo en su propio template (patrón recursivo válido vía `defineOptions({ name: '...' })` en `<script setup>`, ej. un árbol de carpetas) disparaba la advertencia nueva de "componente usado en template sin import" introducida en 2.7.0. Vue marca esta auto-referencia con el sufijo `__self` en `ast.components` (se resuelve en runtime contra la propia instancia, no requiere import) y el check no lo contemplaba. Reproducido con un archivo `.vue` real y cubierto con test de regresión.
+- **`typescript-worker-thread.cjs` — OOM real que crasheaba `worker-pool-stress.test.ts` en CI (Node 22)**: el worker serializaba `diag.file.text` (el código fuente completo) dentro de **cada diagnóstico individual** antes de enviarlo por `postMessage`. Un archivo con miles de diagnósticos multiplicaba su propio tamaño miles de veces — confirmado con un heap de +2GB antes del `FATAL ERROR: JavaScript heap out of memory`, que el test runner reportaba como `SIGABRT` genérico. El campo nunca se leía del otro lado (era código muerto); se eliminó sin pérdida de funcionalidad. Reproducido localmente instalando el Node 22.23.2 exacto de CI (no reproducía con Node 25).
+- **`typescript-worker-pool.ts` — mismo guard de re-entrancy que `recycleWorker()` aplicado a `terminate()`**: un recycle concurrente podía dejar `poolWorker.worker` en `null` justo antes de que `terminate()` intentara usarlo.
+
+---
+
 ## [2.7.0] - 2026-09-12
 
 ### ✨ Nuevas Características
