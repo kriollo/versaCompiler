@@ -317,6 +317,58 @@ const x = 1;
             ).toBe(true);
         });
 
+        it('NO debe avisar de un componente recursivo que se referencia a sí mismo (sufijo __self de Vue)', async () => {
+            // Un componente con `defineOptions({ name: 'FolderNode' })` que
+            // se renderiza a sí mismo en su template (árbol recursivo) no
+            // tiene import propio — Vue lo resuelve vía __self en runtime.
+            const vueCode = `
+<script setup lang="ts">
+defineOptions({ name: 'FolderNode' });
+</script>
+<template>
+  <FolderNode v-for="c in []" :key="c" />
+</template>
+`;
+
+            const mockDescriptor = {
+                template: {
+                    content: '<FolderNode v-for="c in []" :key="c" />',
+                    loc: { start: { line: 5, column: 1 } },
+                },
+                script: null,
+                scriptSetup: {
+                    content: "defineOptions({ name: 'FolderNode' });",
+                    loc: { start: { line: 2, column: 1 } },
+                },
+                styles: [],
+                customBlocks: [],
+            };
+
+            vueCompiler.parse.mockReturnValue({
+                descriptor: mockDescriptor,
+                errors: [],
+            });
+            vueCompiler.compileScript.mockReturnValue({
+                content: "export default { name: 'FolderNode' }",
+                bindings: {},
+            });
+            vueCompiler.compileTemplate.mockReturnValue({
+                code: 'function render() {}',
+                errors: [],
+                tips: [],
+                ast: { components: ['FolderNode__self'] },
+            });
+
+            const result = await preCompileVue(
+                vueCode,
+                '/path/to/FolderNode.vue',
+                true,
+            );
+
+            expect(result.error).toBeNull();
+            expect(result.warnings).toBeUndefined();
+        });
+
         it('debe compilar componente con script setup', async () => {
             const vueCode = `
 <script setup lang="ts">

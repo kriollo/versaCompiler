@@ -558,8 +558,14 @@ export const preCompileVue = async (
 
             // Componentes usados en el template que Vue no pudo resolver vía
             // bindingMetadata (candidatos a import olvidado o typo en el tag).
-            const usedComponents: string[] = compiledTemplateResult.ast
-                ?.components ?? [];
+            // Vue marca las referencias recursivas a sí mismo (un componente
+            // que se renderiza a sí mismo en su propio template, vía
+            // defineOptions({ name: '...' })) con el sufijo "__self" en
+            // components — se resuelve en runtime contra la propia instancia
+            // (this.$options.name), no es un import faltante.
+            const usedComponents: string[] = (
+                compiledTemplateResult.ast?.components ?? []
+            ).filter((name: string) => !name.endsWith('__self'));
             const unimported = usedComponents.filter(
                 (name: string) =>
                     /^[A-Z]/.test(name) && !components.includes(name),
