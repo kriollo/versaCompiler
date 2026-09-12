@@ -459,11 +459,16 @@ if (parentPort) {
                               diag.messageText,
                               '\n',
                           ),
+                // No incluir diag.file.text: duplicaría el código fuente
+                // COMPLETO en el mensaje serializado por cada diagnóstico
+                // (postMessage no comparte memoria). Un archivo con miles de
+                // diagnósticos multiplicaba su propio tamaño miles de veces,
+                // causando OOM real (confirmado con heap de +2GB en CI).
+                // getLineAndCharacterOfPosition tampoco sobrevive la
+                // serialización, así que el objeto reconstruido del otro
+                // lado ya era inútil para ese propósito de todas formas.
                 file: diag.file
-                    ? {
-                          fileName: diag.file.fileName,
-                          text: diag.file.text,
-                      }
+                    ? { fileName: diag.file.fileName }
                     : undefined,
                 start: diag.start,
                 length: diag.length,

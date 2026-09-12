@@ -1184,6 +1184,10 @@ export class TypeScriptWorkerPool {
         // 2. Cerrar todos los workers con manejo de errores
         const terminatePromises = this.workers.map(async poolWorker => {
             try {
+                // Un recycle concurrente puede haber dejado poolWorker.worker
+                // en null justo antes de terminate() (misma race que en
+                // recycleWorker).
+                if (!poolWorker.worker) return;
                 await poolWorker.worker.terminate();
             } catch (error: any) {
                 console.warn(
