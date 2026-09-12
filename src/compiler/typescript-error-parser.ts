@@ -10,6 +10,10 @@ export interface CleanTypeScriptError {
     message: string;
     severity: 'error' | 'warning' | 'info';
     help: string;
+    /** Línea 1-indexed ya remapeada al archivo original (solo si se pudo calcular con precisión) */
+    line?: number;
+    /** Columna 1-indexed (solo si se pudo calcular con precisión) */
+    column?: number;
 }
 
 /**
@@ -70,6 +74,8 @@ export function parseTypeScriptErrors(
                 break;
         } // Construir información de ubicación limpia
         let help = `Código TS${diagnostic.code}`;
+        let resolvedLine: number | undefined;
+        let resolvedColumn: number | undefined;
 
         if (diagnostic.start !== undefined) {
             // Intentar usar el sourceFile si está disponible
@@ -88,6 +94,8 @@ export function parseTypeScriptErrors(
                     const adjustedLine = scriptInfo
                         ? lineAndChar.line + scriptInfo.startLine
                         : lineAndChar.line + 1;
+                    resolvedLine = adjustedLine;
+                    resolvedColumn = lineAndChar.character + 1;
                     help += ` | Línea ${adjustedLine}, Columna ${lineAndChar.character + 1}`;
                 } catch {
                     // Fallback: calcular posición leyendo el archivo
@@ -157,6 +165,8 @@ export function parseTypeScriptErrors(
             message: cleanedMessage,
             severity,
             help,
+            line: resolvedLine,
+            column: resolvedColumn,
         };
     });
 }

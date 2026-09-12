@@ -17,7 +17,7 @@ import { parser } from './parser';
 let cachedPathAlias: any = null;
 let lastPathAliasString: string | null = null;
 
-function getParsedPathAlias(): any {
+export function getParsedPathAlias(): any {
     if (!env.PATH_ALIAS) return null;
 
     // Solo parsear si el string cambió

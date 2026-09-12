@@ -22,7 +22,11 @@ import { showTimingForHumans } from '../utils/utils';
 import { BuildPipeline } from './pipeline/build-pipeline';
 import { createCorePlugins } from './pipeline/core-plugins';
 import { ModuleGraph } from './pipeline/module-graph';
-import type { HotUpdateResult, Plugin } from './pipeline/types';
+import type {
+    HotUpdateResult,
+    Plugin,
+    StructuredError,
+} from './pipeline/types';
 import { isHmrExcluded } from './transforms';
 
 // Configurar el getter del ProgressManager para el logger
@@ -595,7 +599,6 @@ class SmartCompilationCache {
     private packageJsonPath = path.join(cwd(), 'package.json');
     private nodeModulesPath = path.join(cwd(), 'node_modules');
     private isWatchingDependencies = false;
-    private _depWatcherFailed = false; // Flag para indicar que el watcher de deps falló
     /**
      * Genera hash SHA-256 del contenido del archivo
      */ async generateContentHash(filePath: string): Promise<string> {
@@ -1087,8 +1090,9 @@ class SmartCompilationCache {
                 '⚠️ No se pudo iniciar vigilancia de dependencias:',
                 error,
             );
-            // Marcar fallo para que el sistema lo tenga en cuenta
-            this._depWatcherFailed = true;
+            // Sin watcher activo, el TTL de DEP_HASH_TTL acota el peor caso
+            // de staleness (unos minutos), así que no hace falta un flag ni
+            // un mecanismo de fallback adicional.
         }
     }
 
@@ -1318,6 +1322,7 @@ async function handleCompilationError(
     stage: string,
     mode: CompilationMode,
     isVerbose: boolean = false,
+    diagnostic?: StructuredError,
 ): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : error;
     // No mostrar stack trace para errores de tipo TypeScript (son errores del usuario, no del compilador)
@@ -1338,6 +1343,12 @@ async function handleCompilationError(
         const chalkLib = await loadChalk();
         const baseName = path.basename(fileName);
         const stageColor = await getStageColor(stage);
+        // Primera línea accionable: si hay un diagnóstico con ubicación,
+        // "file:line:column — message" en vez de una frase genérica que
+        // oculta el mensaje real (que suele venir después de un "\n").
+        const locatedSummary = diagnostic?.loc
+            ? `${baseName}:${diagnostic.loc.line}:${diagnostic.loc.column} — ${diagnostic.message}`
+            : undefined;
 
         if (isVerbose) {
             // Modo verbose: Mostrar error completo con contexto
@@ -1346,7 +1357,7 @@ async function handleCompilationError(
                     `❌ Error en etapa ${stageColor(stage)} - ${baseName}:`,
                 ),
             );
-            logger.error(chalkLib.red(errorMessage));
+            logger.error(chalkLib.red(locatedSummary ?? errorMessage));
             if (errorDetails && (stage === 'typescript' || stage === 'vue')) {
                 // Mostrar stack trace limitado para TypeScript y Vue
                 const stackLines = errorDetails.split('\n').slice(0, 5);
@@ -1357,14 +1368,30 @@ async function handleCompilationError(
                 });
             }
         } else {
-            // Modo normal: Mostrar error simplificado
-            const firstLine = errorMessage.split('\n')[0];
+            // Modo normal: Mostrar error simplificado, pero accionable
+            const firstLine = locatedSummary ?? errorMessage.split('\n')[0];
             logger.error(
                 chalkLib.red(`❌ Error en ${stageColor(stage)}: ${baseName}`),
             );
             logger.error(chalkLib.red(`   ${firstLine}`));
+            if (!locatedSummary) {
+                logger.info(
+                    chalkLib.yellow(
+                        `💡 Usa --verbose para ver detalles completos`,
+                    ),
+                );
+            }
+        }
+
+        // Code frame corto (si el diagnóstico lo trae) visible por defecto,
+        // no solo en --verbose: es la corrección directa a "errores de
+        // interpolación difíciles de ubicar".
+        if (diagnostic?.codeFrame) {
+            logger.error(chalkLib.gray(diagnostic.codeFrame));
+        }
+        if (diagnostic?.suggestion) {
             logger.info(
-                chalkLib.yellow(`💡 Usa --verbose para ver detalles completos`),
+                chalkLib.yellow(`💡 Sugerencia: ${diagnostic.suggestion}`),
             );
         }
     }
@@ -2210,12 +2237,26 @@ async function compileWithPipeline(
 
     if (result.errors.length > 0) {
         for (const message of result.errors) {
+            // Los mensajes de plugin vienen como "stage: mensaje"
+            // (withStageError en core-plugins.ts); recuperar el stage real
+            // en vez de reportar todo bajo el genérico 'pipeline', para que
+            // el resumen por etapas y el code frame funcionen.
+            const colonIdx = message.indexOf(':');
+            const stage =
+                colonIdx > 0 ? message.slice(0, colonIdx) : 'pipeline';
+            // Los diagnósticos de Vue usan sub-stages más finos
+            // ('vue-template', 'vue-parse', ...) que el 'vue' genérico del
+            // mensaje de plugin, de ahí el startsWith en vez de igualdad.
+            const diagnostic = result.diagnostics?.find(
+                d => d.stage.startsWith(stage) && d.severity === 'error',
+            );
             await handleCompilationError(
                 new Error(message),
                 inPath,
-                'pipeline',
+                stage,
                 mode,
                 env.VERBOSE === 'true',
+                diagnostic,
             );
         }
         throw new Error(result.errors[0]);

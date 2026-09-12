@@ -8,7 +8,9 @@ const vueCompiler = vCompiler as any;
 
 import { logger } from '../servicios/logger';
 
+import { defaultErrorReporter } from './error-reporter';
 import { parser } from './parser';
+import type { StructuredError } from './pipeline/types';
 
 // Lazy loading para chalk
 let chalk: any;
@@ -216,6 +218,94 @@ const getComponentsVueMap = async (ast: any): Promise<string[]> => {
 };
 
 /**
+ * Convierte un error/tip crudo de @vue/compiler-sfc en un StructuredError
+ * con ubicación remapeada al archivo .vue original (compensando el bloque
+ * en el que ocurrió y, en dev, el desplazamiento de líneas de la inyección HMR).
+ */
+function toStructuredError(
+    e: unknown,
+    source: string,
+    stage: string,
+    severity: 'error' | 'warning',
+    blockStartLine: number,
+    injectedLineDelta: number,
+): StructuredError {
+    const anyE = e as any;
+    const message =
+        typeof e === 'string' ? e : anyE?.message || String(e);
+    const rawLoc = typeof e === 'string' ? undefined : anyE?.loc;
+
+    let loc: StructuredError['loc'];
+    let codeFrame: string | undefined;
+
+    if (rawLoc?.start) {
+        loc = {
+            line: Math.max(
+                1,
+                blockStartLine - 1 + rawLoc.start.line - injectedLineDelta,
+            ),
+            column: rawLoc.start.column,
+            endLine: rawLoc.end
+                ? Math.max(
+                      1,
+                      blockStartLine -
+                          1 +
+                          rawLoc.end.line -
+                          injectedLineDelta,
+                  )
+                : undefined,
+            endColumn: rawLoc.end?.column,
+        };
+        if (typeof vueCompiler.generateCodeFrame === 'function') {
+            try {
+                codeFrame = vueCompiler.generateCodeFrame(
+                    source,
+                    rawLoc.start.offset,
+                    rawLoc.end?.offset ?? rawLoc.start.offset + 1,
+                );
+            } catch {
+                // best-effort: si falla el generador de frame, seguimos sin él
+            }
+        }
+    } else if (
+        typeof anyE?.line === 'number' &&
+        typeof anyE?.column === 'number'
+    ) {
+        // Errores estilo postcss (compileStyle) que no traen .loc de Vue
+        loc = {
+            line: Math.max(
+                1,
+                blockStartLine - 1 + anyE.line - injectedLineDelta,
+            ),
+            column: anyE.column,
+        };
+    }
+
+    return { stage, message, severity, loc, codeFrame };
+}
+
+function buildVueDiagnostics(
+    errors: unknown[] | undefined,
+    source: string,
+    stage: string,
+    severity: 'error' | 'warning' = 'error',
+    blockStartLine = 1,
+    injectedLineDelta = 0,
+): StructuredError[] {
+    if (!errors?.length) return [];
+    return errors.map(e =>
+        toStructuredError(
+            e,
+            source,
+            stage,
+            severity,
+            blockStartLine,
+            injectedLineDelta,
+        ),
+    );
+}
+
+/**
  * Precompila un componente Vue.
  * @param {string} data - El código del componente Vue.
  * @param {string} source - La fuente del componente Vue.
@@ -233,6 +323,7 @@ export const preCompileVue = async (
         startLine: number;
         content: string;
     };
+    warnings?: StructuredError[];
 }> => {
     try {
         const fileName = path.basename(source).replace('.vue', '');
@@ -246,11 +337,21 @@ export const preCompileVue = async (
             };
         }
 
+        const originalData = data;
         if (!isProd) {
             const { injectedData } =
                 hmrInjectionCache.getOrGenerateHMRInjection(data, fileName);
             data = injectedData;
         }
+        // En dev, la inyección HMR puede añadir líneas antes del contenido
+        // original; se resta este delta para que los diagnósticos apunten a
+        // la línea real del archivo que el usuario edita.
+        const injectedLineDelta =
+            data === originalData
+                ? 0
+                : data.split('\n').length - originalData.split('\n').length;
+
+        const allWarnings: StructuredError[] = [];
 
         const { descriptor, errors } = vueCompiler.parse(data, {
             filename: fileName,
@@ -262,9 +363,19 @@ export const preCompileVue = async (
         });
 
         if (errors.length) {
-            throw new Error(
+            const diagnostics = buildVueDiagnostics(
+                errors,
+                data,
+                'vue-parse',
+                'error',
+                1,
+                injectedLineDelta,
+            );
+            const err = new Error(
                 `Error al analizar el componente Vue ${source}:\n${errors.map((e: any) => e.message).join('\n')}`,
             );
+            (err as any).diagnostics = diagnostics;
+            throw err;
         }
         const id = Math.random().toString(36).slice(2, 12);
         const scopeId = descriptor.styles.some((s: any) => s.scoped)
@@ -313,6 +424,19 @@ export const preCompileVue = async (
                     ? 'ts'
                     : 'js';
             scriptBindings = compiledScriptResult.bindings;
+
+            if (compiledScriptResult.warnings?.length) {
+                allWarnings.push(
+                    ...buildVueDiagnostics(
+                        compiledScriptResult.warnings,
+                        data,
+                        'vue-script',
+                        'warning',
+                        1,
+                        injectedLineDelta,
+                    ),
+                );
+            }
         } else {
             scriptContent = 'export default {};';
             scriptLang = 'js';
@@ -325,11 +449,38 @@ export const preCompileVue = async (
         );
 
         if (ast?.errors.length > 0) {
-            throw new Error(
+            const scriptBlock = descriptor.script || descriptor.scriptSetup;
+            const scriptStartLine = scriptBlock?.loc?.start?.line ?? 1;
+            const diagnostics = ast.errors.map((e: any) => {
+                const detailed = defaultErrorReporter.analyzeParsingError(
+                    e,
+                    scriptContent,
+                    source,
+                );
+                const structured: StructuredError = {
+                    stage: 'vue-script',
+                    message: detailed.message,
+                    severity: 'error',
+                };
+                if (detailed.line) {
+                    structured.loc = {
+                        line: Math.max(
+                            1,
+                            scriptStartLine - 1 + detailed.line,
+                        ),
+                        column: detailed.column ?? 0,
+                    };
+                    structured.codeFrame = detailed.codeContext;
+                }
+                return structured;
+            });
+            const err = new Error(
                 `Error al analizar el script del componente Vue ${source}:\n${ast.errors
                     .map((e: any) => e.message)
                     .join('\n')}`,
             );
+            (err as any).diagnostics = diagnostics;
+            throw err;
         }
         const components = await getComponentsVueMap(ast);
 
@@ -368,17 +519,58 @@ export const preCompileVue = async (
             const compiledTemplateResult = vueCompiler.compileTemplate(
                 templateCompileOptions,
             );
+            const templateStartLine =
+                descriptor.template.loc?.start?.line ?? 1;
 
             if (compiledTemplateResult.errors?.length > 0) {
-                throw new Error(
+                const diagnostics = buildVueDiagnostics(
+                    compiledTemplateResult.errors,
+                    descriptor.template.content,
+                    'vue-template',
+                    'error',
+                    templateStartLine,
+                    injectedLineDelta,
+                );
+                const err = new Error(
                     `Error al compilar la plantilla del componente Vue ${source}:\n${compiledTemplateResult.errors
                         .map((e: any) =>
                             typeof e === 'string' ? e : e.message,
                         )
                         .join('\n')}`,
                 );
+                (err as any).diagnostics = diagnostics;
+                throw err;
             }
             templateCode = compiledTemplateResult.code;
+
+            if (compiledTemplateResult.tips?.length) {
+                allWarnings.push(
+                    ...buildVueDiagnostics(
+                        compiledTemplateResult.tips,
+                        descriptor.template.content,
+                        'vue-template',
+                        'warning',
+                        templateStartLine,
+                        injectedLineDelta,
+                    ),
+                );
+            }
+
+            // Componentes usados en el template que Vue no pudo resolver vía
+            // bindingMetadata (candidatos a import olvidado o typo en el tag).
+            const usedComponents: string[] = compiledTemplateResult.ast
+                ?.components ?? [];
+            const unimported = usedComponents.filter(
+                (name: string) =>
+                    /^[A-Z]/.test(name) && !components.includes(name),
+            );
+            for (const name of unimported) {
+                allWarnings.push({
+                    stage: 'vue-template',
+                    severity: 'warning',
+                    message: `El componente <${name}> se usa en el template pero no se encontró su import en <script>.`,
+                });
+            }
         } else {
             const chalkInstance = await loadChalk();
             logger.warn(
@@ -434,6 +626,28 @@ export const preCompileVue = async (
                 filename: `${fileName}.vue`,
             });
         });
+
+        const styleErrors = compiledStyles.flatMap((result: any, idx: number) => {
+            if (!result.errors?.length) return [];
+            const style = descriptor.styles[idx];
+            return buildVueDiagnostics(
+                result.errors,
+                style?.content ?? '',
+                'vue-style',
+                'error',
+                style?.loc?.start?.line ?? 1,
+                injectedLineDelta,
+            );
+        });
+        if (styleErrors.length) {
+            const err = new Error(
+                `Error al compilar los estilos del componente Vue ${source}:\n${styleErrors
+                    .map(e => e.message)
+                    .join('\n')}`,
+            );
+            (err as any).diagnostics = styleErrors;
+            throw err;
+        }
 
         // data-versa-hmr-component permite a VueHRM.js eliminar style tags
         // de ciclos HMR anteriores para evitar acumulación de estilos duplicados.
@@ -546,6 +760,7 @@ export const preCompileVue = async (
                 startLine: number;
                 content: string;
             };
+            warnings?: StructuredError[];
         } = {
             lang: finalCompiledScript.lang,
             error: null,
@@ -560,6 +775,19 @@ export const preCompileVue = async (
                         .line || 1,
                 content: (descriptor.script || descriptor.scriptSetup)!.content,
             };
+        }
+
+        if (allWarnings.length) {
+            result.warnings = allWarnings;
+            const chalkInstance = await loadChalk();
+            for (const w of allWarnings) {
+                const where = w.loc ? `:${w.loc.line}:${w.loc.column}` : '';
+                logger.warn(
+                    chalkInstance.yellow(
+                        `⚠ ${source}${where} — ${w.message}`,
+                    ),
+                );
+            }
         }
 
         return result;

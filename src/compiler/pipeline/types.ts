@@ -1,3 +1,18 @@
+export interface StructuredError {
+    stage: string;
+    message: string;
+    file?: string;
+    loc?: {
+        line: number;
+        column: number;
+        endLine?: number;
+        endColumn?: number;
+    };
+    codeFrame?: string;
+    severity: 'error' | 'warning';
+    suggestion?: string;
+}
+
 export type ResolveArgs = {
     path: string;
     importer?: string;
@@ -19,6 +34,7 @@ export type LoadResult = {
     loader?: 'js' | 'ts' | 'vue' | 'json' | 'css' | 'text';
     meta?: Record<string, unknown>;
     errors?: string[];
+    diagnostics?: StructuredError[];
 };
 
 export type TransformArgs = {
@@ -33,6 +49,7 @@ export type TransformResult = {
     loader?: 'js' | 'ts' | 'vue' | 'json' | 'css' | 'text';
     meta?: Record<string, unknown>;
     errors?: string[];
+    diagnostics?: StructuredError[];
 };
 
 export type HotUpdateArgs = {

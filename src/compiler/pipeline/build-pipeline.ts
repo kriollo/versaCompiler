@@ -1,7 +1,9 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
+import { cwd } from 'node:process';
 
 import { parser } from '../parser';
+import { getParsedPathAlias } from '../transforms';
 
 import { ModuleGraph } from './module-graph';
 import { PluginDriver } from './plugin-driver';
@@ -9,6 +11,7 @@ import type {
     HotUpdateArgs,
     HotUpdateResult,
     Plugin,
+    StructuredError,
     TransformResult,
 } from './types';
 
@@ -18,6 +21,7 @@ export type PipelineResult = {
     meta?: Record<string, unknown>;
     dependencies: string[];
     errors: string[];
+    diagnostics?: StructuredError[];
 };
 
 function guessLoader(filePath: string) {
@@ -48,15 +52,44 @@ function collectModuleRequests(ast: any): string[] {
     return requests;
 }
 
+// Resuelve un specifier con alias (ej. "@/utils/foo") a su path de origen
+// bajo la raíz del proyecto, usando pathsAlias (env.PATH_ALIAS, cacheado por
+// transforms.ts). Distinto de getOptimizedAliasPath/resolveModuleRequest en
+// transforms.ts, que resuelven hacia el path de OUTPUT (dist) para reescribir
+// imports en el código compilado; aquí necesitamos el archivo FUENTE para el
+// grafo de dependencias (cascade invalidation / HMR).
+function resolveAliasedImport(specifier: string): string | null {
+    const pathAlias = getParsedPathAlias() as Record<
+        string,
+        string[]
+    > | null;
+    if (!pathAlias) return null;
+
+    for (const [alias, targets] of Object.entries(pathAlias)) {
+        const aliasPattern = alias.replace('*', '');
+        if (!specifier.startsWith(aliasPattern)) continue;
+        const target = Array.isArray(targets) ? targets[0] : undefined;
+        if (!target) continue;
+        const relativePath = specifier.slice(aliasPattern.length);
+        return path.resolve(cwd(), target.replace(/^\.[/\\]/, ''), relativePath);
+    }
+    return null;
+}
+
 async function resolveLocalImport(
     importer: string,
     specifier: string,
 ): Promise<string | null> {
-    if (!specifier.startsWith('.') && !specifier.startsWith('/')) return null;
-
-    const base = specifier.startsWith('/')
-        ? path.normalize(specifier)
-        : path.resolve(path.dirname(importer), specifier);
+    let base: string;
+    if (specifier.startsWith('/')) {
+        base = path.normalize(specifier);
+    } else if (specifier.startsWith('.')) {
+        base = path.resolve(path.dirname(importer), specifier);
+    } else {
+        const aliased = resolveAliasedImport(specifier);
+        if (!aliased) return null;
+        base = aliased;
+    }
 
     const ext = path.extname(base);
     if (ext) return base;
@@ -118,6 +151,7 @@ export class BuildPipeline {
                 loader: guessLoader(entryPath),
                 dependencies: [],
                 errors: loadErrors,
+                diagnostics: loaded.diagnostics,
             };
         }
 
@@ -133,6 +167,26 @@ export class BuildPipeline {
         const finalLoader =
             transformResult.loader || loaded.loader || guessLoader(entryPath);
 
+        const diagnostics = (loaded.diagnostics || []).concat(
+            transformResult.diagnostics || [],
+        );
+        const errors = loadErrors.concat(transformErrors);
+
+        // Si ya hay errores de transformación, finalCode puede ser
+        // vacío/inválido: evitar parsear/resolver dependencias sobre código
+        // roto, que solo generaría errores secundarios confusos.
+        if (transformErrors.length > 0) {
+            await this.driver.end(errors);
+            return {
+                code: finalCode,
+                loader: finalLoader,
+                meta: transformResult.meta || loaded.meta,
+                dependencies: [],
+                errors,
+                diagnostics,
+            };
+        }
+
         const ast = await parser(entryPath, finalCode, getAstType(finalLoader));
         const requests = collectModuleRequests(ast);
         const resolvedDeps: string[] = [];
@@ -143,7 +197,6 @@ export class BuildPipeline {
 
         this.graph.updateImports(entryPath, resolvedDeps);
 
-        const errors = loadErrors.concat(transformErrors);
         await this.driver.end(errors);
 
         return {
@@ -152,6 +205,7 @@ export class BuildPipeline {
             meta: transformResult.meta || loaded.meta,
             dependencies: resolvedDeps,
             errors,
+            diagnostics,
         };
     }
 }

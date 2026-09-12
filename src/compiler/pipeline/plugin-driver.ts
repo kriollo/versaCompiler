@@ -8,6 +8,7 @@ import type {
     Plugin,
     ResolveArgs,
     ResolveResult,
+    StructuredError,
     TransformArgs,
     TransformResult,
 } from './types';
@@ -46,6 +47,7 @@ export class PluginDriver {
         let currentLoader = args.loader;
         let currentMeta = args.meta;
         let errors: string[] = [];
+        let diagnostics: StructuredError[] = [];
         for (const plugin of this.plugins) {
             if (!plugin.onTransform) continue;
             const result = await plugin.onTransform({
@@ -55,6 +57,8 @@ export class PluginDriver {
                 meta: currentMeta,
             });
             if (result.errors?.length) errors = errors.concat(result.errors);
+            if (result.diagnostics?.length)
+                diagnostics = diagnostics.concat(result.diagnostics);
             // Distinguir "el plugin no tocó el contenido" (contents ausente)
             // de "el plugin produjo un output legítimamente vacío" (""),
             // ej. un archivo .ts que solo tiene declaraciones de tipos.
@@ -71,6 +75,7 @@ export class PluginDriver {
             loader: currentLoader,
             meta: currentMeta,
             errors: errors.length ? errors : undefined,
+            diagnostics: diagnostics.length ? diagnostics : undefined,
         };
     }
 

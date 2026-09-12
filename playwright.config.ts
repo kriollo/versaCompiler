@@ -28,8 +28,15 @@ export default defineConfig({
         launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] },
     },
 
+    // Matrix reducido a los navegadores más usados y con motor propio, más
+    // un representante móvil para los tests de viewport/overflow: Desktop
+    // Chrome (chromium) y Desktop Firefox cubren los dos motores reales que
+    // se probaban; Pixel 5 cubre el caso de viewport pequeño. Las otras
+    // variantes móviles/tablet ya quitadas (Galaxy S9+, iPhone 12, iPad Pro)
+    // corrían sobre el mismo motor chromium que Desktop Chrome — Safari/
+    // WebKit real ni se llegaba a probar (ver comentario histórico) — solo
+    // sumaban tiempo de CI sin cobertura de motor adicional.
     projects: [
-        // ── Desktop ──────────────────────────────────────────────────────────
         {
             name: 'Desktop Chrome',
             use: { ...devices['Desktop Chrome'] },
@@ -38,29 +45,9 @@ export default defineConfig({
             name: 'Desktop Firefox',
             use: { ...devices['Desktop Firefox'] },
         },
-        // ── Mobile ───────────────────────────────────────────────────────────
         {
             name: 'Mobile Chrome (Pixel 5)',
             use: { ...devices['Pixel 5'] },
-        },
-        {
-            name: 'Mobile Chrome (Galaxy S9+)',
-            use: { ...devices['Galaxy S9+'] },
-        },
-        {
-            name: 'Mobile Safari (iPhone 12)',
-            use: {
-                ...devices['iPhone 12'],
-                // WebKit en Linux puede fallar; usamos Chromium emulando iPhone
-                browserName: 'chromium',
-            },
-        },
-        {
-            name: 'Tablet (iPad Pro)',
-            use: {
-                ...devices['iPad Pro 11'],
-                browserName: 'chromium',
-            },
         },
     ],
 });

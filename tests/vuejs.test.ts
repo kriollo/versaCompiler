@@ -20,6 +20,7 @@ vi.mock('vue/compiler-sfc', () => ({
     compileScript: vi.fn(),
     compileTemplate: vi.fn(),
     compileStyle: vi.fn(),
+    generateCodeFrame: vi.fn(),
 }));
 
 vi.mock('../src/compiler/parser', () => ({
@@ -34,9 +35,9 @@ vi.mock('../src/servicios/logger', () => ({
 }));
 
 vi.mock('chalk', () => ({
-    default: vi.fn(() => ({
+    default: {
         yellow: vi.fn(msg => msg),
-    })),
+    },
 }));
 
 // Import after mocks
@@ -156,6 +157,164 @@ div { color: red; }
                 'Mustache interpolation is missing ending delimiter',
             );
             expect(result.data).toBeNull();
+        });
+
+        it('debe adjuntar diagnostics con línea/columna y code frame en errores de template', async () => {
+            const vueCode = `
+<script setup>
+const x = 1;
+</script>
+<template>
+  <div v-if="x">{{ x }</div>
+</template>
+`;
+
+            const mockDescriptor = {
+                template: {
+                    content: '<div v-if="x">{{ x }</div>',
+                    loc: { start: { line: 5, column: 1 } },
+                },
+                script: null,
+                scriptSetup: {
+                    content: 'const x = 1;',
+                    loc: { start: { line: 2, column: 1 } },
+                },
+                styles: [],
+                customBlocks: [],
+            };
+
+            vueCompiler.parse.mockReturnValue({
+                descriptor: mockDescriptor,
+                errors: [],
+            });
+            vueCompiler.compileScript.mockReturnValue({
+                content: 'const x = 1;',
+                bindings: {},
+            });
+            vueCompiler.compileTemplate.mockReturnValue({
+                code: '',
+                errors: [
+                    {
+                        message:
+                            'Mustache interpolation is missing ending delimiter',
+                        loc: {
+                            start: { line: 1, column: 15, offset: 14 },
+                            end: { line: 1, column: 20, offset: 19 },
+                            source: '{{ x }',
+                        },
+                    },
+                ],
+                tips: [],
+            });
+            vueCompiler.generateCodeFrame.mockReturnValue(
+                '1 | <div v-if="x">{{ x }</div>\n  |               ^^^^^',
+            );
+
+            const result = await preCompileVue(
+                vueCode,
+                '/path/to/Component.vue',
+                true, // isProd: sin inyección HMR, para verificar línea remapeada exacta
+            );
+
+            expect(result.error).toBeInstanceOf(Error);
+            const diagnostics = (result.error as any).diagnostics;
+            expect(diagnostics).toBeDefined();
+            expect(diagnostics[0].loc.line).toBe(5); // templateStartLine(5) - 1 + relativeLine(1)
+            expect(diagnostics[0].codeFrame).toContain('^');
+        });
+
+        it('debe exponer los tips de compileTemplate como warnings sin fallar la compilación', async () => {
+            const vueCode = `
+<script setup>
+const x = 1;
+</script>
+<template>
+  <div>{{ y }}</div>
+</template>
+`;
+
+            const mockDescriptor = {
+                template: { content: '<div>{{ y }}</div>', loc: { start: { line: 5, column: 1 } } },
+                script: null,
+                scriptSetup: {
+                    content: 'const x = 1;',
+                    loc: { start: { line: 2, column: 1 } },
+                },
+                styles: [],
+                customBlocks: [],
+            };
+
+            vueCompiler.parse.mockReturnValue({
+                descriptor: mockDescriptor,
+                errors: [],
+            });
+            vueCompiler.compileScript.mockReturnValue({
+                content: 'const x = 1;',
+                bindings: { x: 'setup-const' },
+            });
+            vueCompiler.compileTemplate.mockReturnValue({
+                code: 'function render() {}',
+                errors: [],
+                tips: ['Property "y" was accessed during render but is not defined on instance.'],
+                ast: { components: [] },
+            });
+
+            const result = await preCompileVue(
+                vueCode,
+                '/path/to/Component.vue',
+                true,
+            );
+
+            expect(result.error).toBeNull();
+            expect(result.warnings?.length).toBe(1);
+            expect(result.warnings?.[0].message).toContain('y');
+            expect(result.warnings?.[0].severity).toBe('warning');
+        });
+
+        it('debe avisar de un componente usado en template sin import correspondiente', async () => {
+            const vueCode = `
+<script setup></script>
+<template>
+  <MissingWidget />
+</template>
+`;
+
+            const mockDescriptor = {
+                template: {
+                    content: '<MissingWidget />',
+                    loc: { start: { line: 3, column: 1 } },
+                },
+                script: null,
+                scriptSetup: { content: '', loc: { start: { line: 2, column: 1 } } },
+                styles: [],
+                customBlocks: [],
+            };
+
+            vueCompiler.parse.mockReturnValue({
+                descriptor: mockDescriptor,
+                errors: [],
+            });
+            vueCompiler.compileScript.mockReturnValue({
+                content: 'export default {}',
+                bindings: {},
+            });
+            vueCompiler.compileTemplate.mockReturnValue({
+                code: 'function render() {}',
+                errors: [],
+                tips: [],
+                ast: { components: ['MissingWidget'] },
+            });
+
+            const result = await preCompileVue(
+                vueCode,
+                '/path/to/Component.vue',
+                true,
+            );
+
+            expect(result.error).toBeNull();
+            expect(
+                result.warnings?.some(w => w.message.includes('MissingWidget')),
+            ).toBe(true);
         });
 
         it('debe compilar componente con script setup', async () => {

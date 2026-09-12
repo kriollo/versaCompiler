@@ -5,13 +5,29 @@ import { env } from 'node:process';
 
 import * as typescript from 'typescript';
 
+import type { StructuredError } from './pipeline/types';
 import {
+    CleanTypeScriptError,
     createUnifiedErrorMessage,
     parseTypeScriptErrors,
     ScriptExtractionInfo,
 } from './typescript-error-parser';
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 import { TypeScriptWorkerPool } from './typescript-worker-pool';
+
+function toStructuredErrors(
+    errors: CleanTypeScriptError[],
+): StructuredError[] {
+    return errors.map(e => ({
+        stage: 'typescript',
+        message: e.message,
+        severity: e.severity === 'warning' ? 'warning' : 'error',
+        loc:
+            e.line !== undefined
+                ? { line: e.line, column: e.column ?? 0 }
+                : undefined,
+    }));
+}
 
 interface CompileResult {
     error: Error | null;
@@ -381,16 +397,17 @@ export const preCompileTS = async (
             );
 
             if (criticalErrors.length > 0) {
-                const errorMessage = createUnifiedErrorMessage(
-                    parseTypeScriptErrors(
-                        criticalErrors,
-                        fileName,
-                        data,
-                        scriptInfo,
-                    ),
+                const cleanErrors = parseTypeScriptErrors(
+                    criticalErrors,
+                    fileName,
+                    data,
+                    scriptInfo,
                 );
+                const errorMessage = createUnifiedErrorMessage(cleanErrors);
+                const error = new Error(errorMessage);
+                (error as any).diagnostics = toStructuredErrors(cleanErrors);
                 return {
-                    error: new Error(errorMessage),
+                    error,
                     data: null,
                     lang: 'ts',
                 };
@@ -409,17 +426,18 @@ export const preCompileTS = async (
                 );
 
                 if (typeCheckResult.hasErrors) {
-                    const errorMessage = createUnifiedErrorMessage(
-                        parseTypeScriptErrors(
-                            typeCheckResult.diagnostics,
-                            fileName,
-                            data,
-                            scriptInfo,
-                        ),
+                    const cleanErrors = parseTypeScriptErrors(
+                        typeCheckResult.diagnostics,
+                        fileName,
+                        data,
+                        scriptInfo,
                     );
+                    const errorMessage = createUnifiedErrorMessage(cleanErrors);
                     const error = new Error(errorMessage);
                     // Marcar como error de tipo (no error del compilador)
                     (error as any).isTypeError = true;
+                    (error as any).diagnostics =
+                        toStructuredErrors(cleanErrors);
                     // Limpiar stack trace para no confundir con errores del compilador
                     error.stack = undefined;
                     return {

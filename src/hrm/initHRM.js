@@ -11,7 +11,6 @@
 
 import { hideErrorOverlay, showErrorOverlay } from './errorScreen.js';
 import { obtenerInstanciaVue } from './getInstanciaVue.js';
-
 // oxlint-disable-next-line import/no-unassigned-import -- side-effect: inicializa window.__versaHMR
 import './versaHMR.js';
 import { reloadComponent } from './VueHRM.js';

@@ -5,6 +5,34 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.0] - 2026-09-12
+
+### ✨ Nuevas Características
+
+- **Diagnósticos estructurados con línea/columna y code frame**: los errores de compilación de Vue (`<template>`, `<script>`, `<style>`, parse de SFC) y de type-check de TypeScript ahora conservan ubicación exacta (línea, columna) y un code frame con `^` apuntando al carácter exacto, en vez de colapsar a un mensaje de texto sin ubicación. Antes, un error de interpolación roto en un `<template>` (ej. `{{ foo }` sin cerrar) producía un mensaje genérico ("Error al compilar la plantilla...") sin decir dónde; ahora muestra `archivo:línea:columna` y el fragmento de código exacto, visible por defecto sin necesitar `--verbose`.
+- **Warnings de compilación surfaced**: los `tips` de `compileTemplate` (avisos de Vue sobre identificadores de template no declarados en el script) y los `warnings` de `compileScript`, antes descartados por completo, ahora se loguean con ubicación.
+- **Aviso de componente sin importar**: un tag de componente (`<MiWidget />`) usado en `<template>` sin import correspondiente en `<script>` ahora genera un warning, reutilizando datos que el compilador de Vue ya calcula (sin analizador nuevo).
+- **`pnpm bench`**: script mínimo (`scripts/bench-typescript-worker-pool.ts`) para medir tiempos del pool de type-checking de TypeScript.
+
+### 🐛 Correcciones
+
+- **CI E2E — causa real de que fallaran TODOS los tests de `advanced-app.spec.ts` e `import-modes.spec.ts` en los 6 navegadores**: Pinia 4.0.3 pasó a depender de un paquete nuevo (`nostics`, su sistema de diagnósticos) importado de forma estática, y los import maps de los fixtures HTML de e2e no lo tenían mapeado — la app Vue nunca llegaba a montar. Agregado a `e2e/advanced.html` y `e2e/index.html`.
+- **`e2e/server.mjs` — rutas `.pnpm/<paquete>@<versión>` obsoletas en los import maps**: como el repo no commitea `pnpm-lock.yaml`, cualquier bump de una dependencia no hosteada a la raíz (`zod`, `@vueuse/shared`, `nostics`) rompía su ruta exacta hardcodeada (404). El servidor ahora resuelve automáticamente hacia la versión realmente instalada, sin tener que tocar los HTML en cada bump.
+- **`typescript-worker-pool.ts` — race de doble-reciclaje de worker**: llamadas concurrentes a `recycleWorker()` sobre el mismo worker (bajo carga, desde `drainQueue`/`typeCheck`) podían crashear el proceso completo (`TypeError` no capturado, escaló a `SIGABRT` bajo CI). Guard de re-entrancy + test de regresión.
+- **`typescript-worker-thread.cjs` — datos obsoletos de archivos de dependencia compartidos**: el host del Language Service devolvía versión `'0'` fija para cualquier archivo fuera del root, así que si un archivo de dependencia cambiaba en disco durante un `watch`, el `DocumentRegistry` de TypeScript podía seguir sirviendo el `SourceFile` cacheado con contenido viejo. Ahora se trackea versión real por `mtime`, lo que de paso permite reutilizar el parseo entre tareas cuando el archivo no cambió.
+- **`build-pipeline.ts` — imports con alias no se agregaban al grafo de dependencias**: `resolveLocalImport` solo resolvía specifiers relativos/absolutos; un import `@/utils/foo` quedaba fuera de `dependencies`/`ModuleGraph`, rompiendo el cascade de invalidación de cache y el tracking de HMR para imports con alias.
+- **`compile.ts` — el `stage` real de un error de pipeline se perdía**: `compileWithPipeline` reportaba todos los errores bajo el stage genérico `'pipeline'` en vez del stage real del plugin que falló (`vue`, `typescript`, etc.), rompiendo el resumen de errores por etapa.
+- **`vuejs.ts` — errores de `compileStyle` no se verificaban**: un `<style>` con error de sintaxis (SCSS/Less/etc.) no hacía fallar la compilación.
+
+### 🔧 Mejoras Internas
+
+- **Código muerto eliminado**: `typescript-worker.ts` (`TypeScriptWorkerManager`), completamente superado por `TypeScriptWorkerPool`, sin ningún caller.
+- **oxlint**: `no-underscore-dangle` deshabilitado (el proyecto usa guión bajo como convención deliberada en cientos de sitios — `_persistentHost`, `__versaHMR`, etc. — la regla solo generaba ruido); `typescript/no-var-requires` excluido para archivos `.cjs` (donde `require()` es correcto); `examples/js/examples/**/*` (ejemplos con imports absolutos deliberados) agregado a `ignorePatterns`. `pnpm lint` y `pnpm lint:eslint` quedan en cero warnings.
+- **CI — matrix de Playwright reducido de 6 a 3 proyectos**: Desktop Chrome, Desktop Firefox y Mobile Chrome (Pixel 5). Los 4 proyectos quitados (Galaxy S9+, iPhone 12, iPad Pro) corrían todos sobre el mismo motor Chromium que Desktop Chrome — sin cobertura de motor adicional, solo tiempo de CI.
+- **Tests nuevos**: `tests/build-pipeline.test.ts` (resolución de alias en el grafo de dependencias), `tests/typescript-worker-thread.test.ts` (cache de versiones por mtime), `tests/typescript-worker-pool-recycle.test.ts` (regresión del doble-reciclaje), más casos de diagnósticos estructurados en `tests/vuejs.test.ts`.
+
+---
+
 ## [2.6.9] - 2026-09-11
 
 ### 🔒 Seguridad

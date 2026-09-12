@@ -32,8 +32,8 @@
     let variableSinTipo;
 
     // 3. Función con return any implícito (debería dar error)
-    const funcionRetornoImplicito = function () {
-        const x = arguments[0];
+    const funcionRetornoImplicito = function (...args) {
+        const x = args[0];
         return x;
     };
 

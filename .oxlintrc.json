@@ -9,7 +9,7 @@
         "performance-results/**/*",
         "test-results/**/*",
         ".vitest/**/*",
-        "examples/js/examples/test-errors.js",
+        "examples/js/examples/**/*",
         "tests/**/*"
     ],
     "env": {
@@ -108,6 +108,7 @@
         "typescript/triple-slash-reference": "warn",
         "typescript/no-unnecessary-type-assertion": "warn",
         "typescript/no-var-requires": "warn",
+        "no-underscore-dangle": "off",
         "import/no-named-default": "error",
         "import/default": "error",
         "import/named": "error",
@@ -122,5 +123,13 @@
         "typescript/no-unsafe-return": "off",
         "typescript/restrict-plus-operands": "off",
         "typescript/restrict-template-expressions": "off"
-    }
+    },
+    "overrides": [
+        {
+            "files": ["**/*.cjs"],
+            "rules": {
+                "typescript/no-var-requires": "off"
+            }
+        }
+    ]
 }

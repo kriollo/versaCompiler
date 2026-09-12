@@ -26,6 +26,54 @@ const MIME = {
     '.ttf': 'font/ttf',
 };
 
+/**
+ * Los import maps de los HTML de e2e fijan rutas exactas dentro de
+ * node_modules/.pnpm/<paquete>@<version>[_peerHash]/... para paquetes que
+ * pnpm no hoistea a la raíz (dependencias transitivas). Como no hay
+ * pnpm-lock.yaml commiteado, cada `pnpm install` puede resolver una versión
+ * distinta y esa ruta exacta queda obsoleta (404). Este fallback busca en
+ * .pnpm/ cualquier carpeta que empiece con el mismo nombre de paquete y
+ * sirve desde ahí, sin necesidad de tocar los HTML cada vez que una
+ * dependencia sube de versión.
+ */
+function resolvePnpmFallback(filePath) {
+    const marker = `${path.sep}.pnpm${path.sep}`;
+    const idx = filePath.indexOf(marker);
+    if (idx === -1) return null;
+
+    const pnpmDir = filePath.slice(0, idx + marker.length);
+    const rest = filePath.slice(idx + marker.length);
+    const sepIdx = rest.indexOf(path.sep);
+    if (sepIdx === -1) return null;
+
+    const requestedEntry = rest.slice(0, sepIdx);
+    const tailParts = rest
+        .slice(sepIdx + 1)
+        .split(path.sep)
+        .filter(Boolean);
+
+    // Nombre del paquete = todo antes del "@" de versión. Los scoped
+    // packages se codifican como "@scope+name" (empiezan con "@"), así que
+    // ese primer "@" no cuenta como separador de versión.
+    const atIdx = requestedEntry.indexOf(
+        '@',
+        requestedEntry.startsWith('@') ? 1 : 0,
+    );
+    if (atIdx === -1) return null;
+    const pkgName = requestedEntry.slice(0, atIdx);
+
+    let entries;
+    try {
+        entries = fs.readdirSync(pnpmDir);
+    } catch {
+        return null;
+    }
+    const match = entries.find(e => e.startsWith(`${pkgName}@`));
+    if (!match) return null;
+
+    return path.join(pnpmDir, match, ...tailParts);
+}
+
 const server = http.createServer((req, res) => {
     // Ignorar query strings
     let urlPath = (req.url ?? '/').split('?')[0];
@@ -52,7 +100,14 @@ const server = http.createServer((req, res) => {
     }
 
     try {
-        const content = fs.readFileSync(filePath);
+        let content;
+        try {
+            content = fs.readFileSync(filePath);
+        } catch (err) {
+            const fallbackPath = resolvePnpmFallback(filePath);
+            if (!fallbackPath) throw err;
+            content = fs.readFileSync(fallbackPath);
+        }
         const ext = path.extname(filePath);
         res.writeHead(200, {
             'Content-Type': MIME[ext] ?? 'application/octet-stream',

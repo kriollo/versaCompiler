@@ -223,6 +223,7 @@ test.describe('VersaModuleRegistry — API del registry', () => {
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             let received: unknown = null;
             reg.accept('/test/notify.js', mod => {
                 received = mod;
@@ -363,6 +364,7 @@ test.describe('VersaModuleRegistry — API del registry', () => {
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             let received: unknown = null;
             // Registrar sin query string
             reg.accept('/test/qstr.js', mod => {
@@ -588,6 +590,7 @@ test.describe('HRMHelper — Hot Module Replacement de módulos JS/TS', () => {
             page,
             '**/hmr-default-exp.js*',
             // Módulo con export default (clase/función)
+            // oxlint-disable-next-line no-template-curly-in-string -- string literal a propósito: es código fuente servido como módulo fake, no una interpolación olvidada
             'export default function greet(name) { return `Hello, ${name}!`; }',
         );
 
@@ -751,6 +754,7 @@ test.describe('VersaHMR — Múltiples observers y escenarios avanzados', () => 
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             const received: number[] = [];
             reg.accept('/multi-obs.js', () => received.push(1));
             reg.accept('/multi-obs.js', () => received.push(2));
@@ -774,6 +778,7 @@ test.describe('VersaHMR — Múltiples observers y escenarios avanzados', () => 
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             const received: number[] = [];
             const unsub = reg.accept('/multi-unsub.js', () => received.push(1));
             reg.accept('/multi-unsub.js', () => received.push(2));
@@ -1142,6 +1147,7 @@ test.describe('VersaHMR — import.meta.hot compatible API', () => {
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             let called = false;
             reg._onDispose('/test/dispose.js', () => {
                 called = true;
@@ -1169,6 +1175,7 @@ test.describe('VersaHMR — import.meta.hot compatible API', () => {
                 }
             ).__versaHMR;
             reg._getHotData('/test/disposedata.js').state = 'active';
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             let receivedData: unknown = null;
             reg._onDispose('/test/disposedata.js', data => {
                 receivedData = data;
@@ -1191,6 +1198,7 @@ test.describe('VersaHMR — import.meta.hot compatible API', () => {
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             const calls: number[] = [];
             reg._onDispose('/test/multi-dispose.js', () => calls.push(1));
             reg._onDispose('/test/multi-dispose.js', () => calls.push(2));
@@ -1235,6 +1243,7 @@ test.describe('VersaHMR — import.meta.hot compatible API', () => {
                     };
                 }
             ).__versaHMR;
+            // oxlint-disable-next-line no-shadow -- captura el retorno de page.evaluate(); sin overlap real de scope (closure serializada, se ejecuta en el navegador)
             const order: string[] = [];
             reg._onDispose('/test/order.js', () => order.push('dispose'));
             reg.accept('/test/order.js', () => order.push('observer'));

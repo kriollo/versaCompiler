@@ -22,13 +22,53 @@ try {
 /**
  * Language Service Host para validación de tipos en el worker
  */
+// Límite de entradas en el cache de versiones de dependencias (por host).
+// Acota memoria; no participa en getScriptFileNames() así que nunca se
+// vuelve una raíz espuria del Program.
+const MAX_DEP_CACHE = 300;
+
 class WorkerTypeScriptLanguageServiceHost {
     constructor(compilerOptions) {
         this.files = new Map();
+        // Versión "sintética" por archivo de dependencia (no root), basada
+        // en mtime real. Antes se devolvía '0' fijo para cualquier archivo
+        // fuera de this.files: si el archivo cambiaba en disco durante un
+        // watch, el DocumentRegistry de TS seguía sirviendo el SourceFile
+        // cacheado de la versión '0' anterior (dato obsoleto). Con mtime,
+        // un cambio real dispara un bump de versión real y TS reparsea; si
+        // no cambió, mantiene la misma versión y TS reutiliza el SourceFile
+        // ya parseado en vez de reparsearlo en cada tarea.
+        this.depVersions = new Map();
         // Crear opciones ultra-limpias para evitar problemas de serialización
         this.compilerOptions =
             this.createUltraCleanCompilerOptions(compilerOptions);
-    } /**
+    }
+
+    getDepVersion(fileName) {
+        let mtimeMs;
+        try {
+            mtimeMs = fs.statSync(fileName).mtimeMs;
+        } catch {
+            return '0';
+        }
+        const existing = this.depVersions.get(fileName);
+        if (existing && existing.mtimeMs === mtimeMs) {
+            // Reordenar para LRU: reinsertar mueve la clave al final del Map.
+            this.depVersions.delete(fileName);
+            this.depVersions.set(fileName, existing);
+            return String(existing.version);
+        }
+        const version = existing ? existing.version + 1 : 1;
+        this.depVersions.delete(fileName);
+        this.depVersions.set(fileName, { version, mtimeMs });
+        if (this.depVersions.size > MAX_DEP_CACHE) {
+            const oldestKey = this.depVersions.keys().next().value;
+            if (oldestKey !== undefined) this.depVersions.delete(oldestKey);
+        }
+        return String(version);
+    }
+
+    /**
      * Crea opciones del compilador que respetan la configuración del tsconfig.json
      */
     createUltraCleanCompilerOptions(options) {
@@ -98,7 +138,8 @@ class WorkerTypeScriptLanguageServiceHost {
 
     getScriptVersion(fileName) {
         const file = this.files.get(fileName);
-        return file ? file.version.toString() : '0';
+        if (file) return file.version.toString();
+        return this.getDepVersion(fileName);
     }
 
     getScriptSnapshot(fileName) {
@@ -480,3 +521,7 @@ if (parentPort) {
         message: 'TypeScript worker iniciado correctamente',
     });
 }
+
+// Exports solo para pruebas unitarias (require() directo fuera de un worker
+// thread real); no afecta el comportamiento del worker en producción.
+module.exports = { WorkerTypeScriptLanguageServiceHost };

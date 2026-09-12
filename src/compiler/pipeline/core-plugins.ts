@@ -5,7 +5,12 @@ import { logger } from '../../servicios/logger';
 import { CompileWorkerPool } from '../compile-worker-pool';
 import { integrityValidator } from '../integrity-validator';
 
-import type { Plugin, TransformArgs, TransformResult } from './types';
+import type {
+    Plugin,
+    StructuredError,
+    TransformArgs,
+    TransformResult,
+} from './types';
 
 let preCompileVue: any;
 let preCompileTS: any;
@@ -75,6 +80,12 @@ function withStageError(stage: string, error: unknown): string {
     return `${stage}: ${message}`;
 }
 
+function extractDiagnostics(error: unknown): StructuredError[] | undefined {
+    const diagnostics =
+        error instanceof Error ? (error as any).diagnostics : undefined;
+    return Array.isArray(diagnostics) ? diagnostics : undefined;
+}
+
 export function createCorePlugins(): Plugin[] {
     const loadPlugin: Plugin = {
         name: 'core-load',
@@ -115,6 +126,7 @@ export function createCorePlugins(): Plugin[] {
                 if (result?.error) {
                     return {
                         errors: [withStageError('vue', result.error)],
+                        diagnostics: extractDiagnostics(result.error),
                     };
                 }
                 return {
@@ -124,9 +136,13 @@ export function createCorePlugins(): Plugin[] {
                         vueScriptInfo: result.scriptInfo,
                         vueScriptLang: result.lang,
                     },
+                    diagnostics: result.warnings,
                 };
             } catch (error) {
-                return { errors: [withStageError('vue', error)] };
+                return {
+                    errors: [withStageError('vue', error)],
+                    diagnostics: extractDiagnostics(error),
+                };
             }
         },
     };
@@ -151,6 +167,7 @@ export function createCorePlugins(): Plugin[] {
                 if (result?.error) {
                     return {
                         errors: [withStageError('typescript', result.error)],
+                        diagnostics: extractDiagnostics(result.error),
                     };
                 }
                 return {
@@ -158,7 +175,10 @@ export function createCorePlugins(): Plugin[] {
                     loader: 'js',
                 };
             } catch (error) {
-                return { errors: [withStageError('typescript', error)] };
+                return {
+                    errors: [withStageError('typescript', error)],
+                    diagnostics: extractDiagnostics(error),
+                };
             }
         },
     };

@@ -707,6 +707,13 @@ export class TypeScriptWorkerPool {
      * ✨ FIX MEMORIA: Limpieza agresiva de todas las referencias
      */
     private async recycleWorker(poolWorker: PoolWorker): Promise<void> {
+        // Múltiples llamadas concurrentes pueden disparar el reciclaje del
+        // mismo poolWorker (ver call sites en drainQueue/typeCheck bajo
+        // carga). Sin este guard, la segunda llamada encuentra
+        // poolWorker.worker ya en null (puesto por la primera, más abajo) y
+        // revienta en `worker.removeAllListeners(...)`.
+        if (!poolWorker.worker) return;
+
         try {
             console.log(
                 `[WorkerPool] Reciclando worker ${poolWorker.id} después de ${poolWorker.taskCounter} tareas`,
