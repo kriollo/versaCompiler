@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.2] - 2026-09-25
+
+### 🐛 Correcciones
+
+- **`browserSync.ts` — `ghostMode` de BrowserSync sincronizaba scroll/clicks/forms entre pestañas**: al no setearse explícitamente, BrowserSync usaba su valor por defecto (`ghostMode: true`), replicando scroll, clicks y envíos de formulario de una pestaña hacia todas las demás pestañas y dispositivos conectados al mismo dev server. Cada pestaña debe navegar de forma independiente durante el desarrollo; fix de una línea (`ghostMode: false` en `bs.init()`), cubierto con test que verifica el flag recibido por BrowserSync.
+
+---
+
 ## [2.7.1] - 2026-09-12
 
 ### 🐛 Correcciones
