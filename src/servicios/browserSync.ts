@@ -738,6 +738,7 @@ export async function browserSyncServer(): Promise<any> {
             files: [`${env.PATH_DIST}/**/*.css`], // Observa cambios en archivos CSS
             injectChanges: true, // Inyecta CSS sin recargar la página
             open: false, // No abre automáticamente el navegador
+            ghostMode: false, // Desactiva sincronización de scroll/clicks/forms entre pestañas
             port, // Puerto aleatorio para BrowserSync
             ui: {
                 port: uiPort, // Puerto aleatorio para la interfaz de usuario
