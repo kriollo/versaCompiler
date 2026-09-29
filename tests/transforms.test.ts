@@ -267,11 +267,23 @@ describe('estandarizaCode - replaceAliasInStrings solo toca literales reales (AS
     });
 });
 
-describe('estandarizaCode - resolución de alias en re-exports', () => {
+// Re-exports con `from` (`export { x } from '...'`, `export * from '...'`): el parser (oxc) no los
+// incluye en `module.staticImports` sino en `module.staticExports[].entries[].moduleRequest`, así que
+// replaceAliasImportsAst no los resolvía y el literal caía en replaceAliasInStrings, que es para
+// assets: no agrega `.js` y, con un target relativo distinto de PATH_DIST (config Vite-style
+// `resolve.alias: { '@': 'src' }`), antepone el target → `/dist/src/js/colorMath` → 404 en el navegador.
+describe('estandarizaCode - resolución de alias en re-exports (export ... from)', () => {
     const originalEnv = { ...process.env };
 
     beforeEach(() => {
+        process.env.PATH_ALIAS = originalEnv.PATH_ALIAS;
+        process.env.PATH_DIST = originalEnv.PATH_DIST;
+        process.env.VERBOSE = originalEnv.VERBOSE;
+
         resetModuleResolutionOptimizer();
+
+        // Lo que produce readConfig para `resolve.alias: { '@': 'src', 'P@': 'public' }`
+        // (normaliza la clave a '@/*' y quita el '/*' de los valores).
         process.env.PATH_ALIAS = JSON.stringify({
             '@/*': ['src'],
             'P@/*': ['public'],
@@ -282,48 +294,89 @@ describe('estandarizaCode - resolución de alias en re-exports', () => {
 
     afterEach(() => {
         resetModuleResolutionOptimizer();
-        process.env = { ...originalEnv };
+        process.env.PATH_ALIAS = originalEnv.PATH_ALIAS;
+        process.env.PATH_DIST = originalEnv.PATH_DIST;
+        process.env.VERBOSE = originalEnv.VERBOSE;
     });
 
-    it('resuelve re-export con alias igual que un import estático', async () => {
-        const result = await estandarizaCode(
-            `export { readableTextOn } from '@/js/colorMath';`,
-            'test.js',
+    it('control: un import estático con el mismo alias se resuelve a /dist/... con .js', async () => {
+        const code = `import { composite } from '@/js/colorMath';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.error).toBeNull();
+        expect(result.code).toBe(
+            `import { composite } from '/dist/js/colorMath.js';`,
         );
+    });
+
+    it('resuelve `export { x } from` con alias igual que un import (caso real que dejaba la app en blanco)', async () => {
+        const code = `export { readableTextOn } from '@/js/colorMath';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.error).toBeNull();
         expect(result.code).toBe(
             `export { readableTextOn } from '/dist/js/colorMath.js';`,
         );
     });
 
-    it('resuelve export * y export * as con alias', async () => {
-        const result = await estandarizaCode(
-            `export * from '@/js/utils';\nexport * as utils from '@/js/utils';`,
-            'test.js',
-        );
+    it('resuelve `export * from` con alias', async () => {
+        const code = `export * from '@/js/utils';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(`export * from '/dist/js/utils.js';`);
+    });
+
+    it('resuelve `export * as ns from` con alias', async () => {
+        const code = `export * as utils from '@/js/utils';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(`export * as utils from '/dist/js/utils.js';`);
+    });
+
+    it('resuelve `export { default } from` de un .vue a .js', async () => {
+        const code = `export { default } from '@/components/Foo.vue';`;
+        const result = await estandarizaCode(code, 'test.js');
         expect(result.code).toBe(
-            `export * from '/dist/js/utils.js';\nexport * as utils from '/dist/js/utils.js';`,
+            `export { default } from '/dist/components/Foo.js';`,
         );
     });
 
-    it('normaliza .vue y rutas relativas en re-exports', async () => {
-        const result = await estandarizaCode(
-            `export { default } from '@/components/Foo.vue';\nexport { a, b } from './local';`,
-            'test.js',
-        );
-        expect(result.code).toBe(
-            `export { default } from '/dist/components/Foo.js';\nexport { a, b } from './local.js';`,
-        );
+    it('resuelve un re-export relativo agregando .js (varios especificadores, un solo reemplazo)', async () => {
+        const code = `export { a, b as c } from './local';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(`export { a, b as c } from './local.js';`);
     });
 
-    it('resuelve paquetes externos y conserva exports locales y strings de assets', async () => {
-        const result = await estandarizaCode(
-            `export { ref } from 'vue';\nexport const value = 1;\nlink.href = 'P@/vendor/app.css';`,
+    it('resuelve un re-export de un módulo externo igual que su import', async () => {
+        const imported = await estandarizaCode(
+            `import { ref } from 'vue';`,
             'test.js',
         );
-        expect(result.code).toContain('/node_modules/vue/');
-        expect(result.code).toContain('export const value = 1;');
-        expect(result.code).toContain(
-            `link.href = '/dist/public/vendor/app.css';`,
+        const reexported = await estandarizaCode(
+            `export { ref } from 'vue';`,
+            'test.js',
         );
+        const importPath = /from '([^']+)'/.exec(imported.code)?.[1];
+        expect(importPath).toContain('/node_modules/vue/');
+        expect(reexported.code).toBe(`export { ref } from '${importPath}';`);
+    });
+
+    it('resuelve import y re-export del mismo módulo en el mismo archivo', async () => {
+        const code = `import { composite, readableTextOn } from '@/js/colorMath';
+export { readableTextOn };
+export { toneRamp } from '@/js/colorMath';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code)
+            .toBe(`import { composite, readableTextOn } from '/dist/js/colorMath.js';
+export { readableTextOn };
+export { toneRamp } from '/dist/js/colorMath.js';`);
+    });
+
+    it('no toca exports locales (sin `from`)', async () => {
+        const code = `const x = 1;\nexport { x };\nexport const y = 2;\nexport default x;`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(code);
+    });
+
+    it('regresión: un string de asset con alias sigue resolviéndose sin agregar .js', async () => {
+        const code = `link.href = 'P@/vendor/app.css';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(`link.href = '/dist/public/vendor/app.css';`);
     });
 });

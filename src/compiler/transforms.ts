@@ -309,6 +309,16 @@ interface ModuleRequestLiteral {
     end: number;
 }
 
+/**
+ * Especificadores de módulo estáticos del archivo: los de los `import` y también los de los
+ * re-exports con `from` (`export { x } from '…'`, `export * from '…'`, `export * as ns from '…'`).
+ * oxc-parser no incluye los re-exports en `module.staticImports`: están en
+ * `module.staticExports[].entries[].moduleRequest` (los exports locales tienen `moduleRequest: null`).
+ * Sin ellos, un re-export con alias caía en replaceAliasInStrings —pensado para strings de assets,
+ * que no agrega `.js`— y quedaba como `/dist/src/js/foo` (404); uno relativo o de un paquete externo
+ * quedaba sin resolver. Se deduplica por posición: `export { a, b } from 'x'` trae una entrada por
+ * especificador, todas con el mismo `moduleRequest`.
+ */
 function collectStaticModuleRequests(ast: any): ModuleRequestLiteral[] {
     const requests = new Map<number, ModuleRequestLiteral>();
     const add = (request: any) => {
