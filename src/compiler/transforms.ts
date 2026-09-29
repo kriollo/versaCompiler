@@ -303,6 +303,32 @@ function resolveAliasTemplateLiteral(
     return null;
 }
 
+interface ModuleRequestLiteral {
+    value: string;
+    start: number;
+    end: number;
+}
+
+function collectStaticModuleRequests(ast: any): ModuleRequestLiteral[] {
+    const requests = new Map<number, ModuleRequestLiteral>();
+    const add = (request: any) => {
+        const { value, start, end } = request ?? {};
+        if (typeof value !== 'string') return;
+        if (typeof start !== 'number' || typeof end !== 'number') return;
+        requests.set(start, { value, start, end });
+    };
+
+    for (const item of ast?.module?.staticImports || []) {
+        add(item?.moduleRequest);
+    }
+    for (const item of ast?.module?.staticExports || []) {
+        for (const entry of item?.entries || []) {
+            add(entry?.moduleRequest);
+        }
+    }
+    return [...requests.values()];
+}
+
 async function replaceAliasImportsAst(
     code: string,
     file: string,
@@ -317,14 +343,11 @@ async function replaceAliasImportsAst(
 
     const replacements: Array<{ start: number; end: number; value: string }> =
         [];
-    const staticImports = ast?.module?.staticImports || [];
-    for (const item of staticImports) {
-        const moduleRequest = item?.moduleRequest?.value;
-        const start = item?.moduleRequest?.start;
-        const end = item?.moduleRequest?.end;
-        if (typeof moduleRequest !== 'string') continue;
-        if (typeof start !== 'number' || typeof end !== 'number') continue;
-
+    for (const {
+        value: moduleRequest,
+        start,
+        end,
+    } of collectStaticModuleRequests(ast)) {
         const newPath = await resolveModuleRequest(
             moduleRequest,
             file,

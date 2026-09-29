@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.3] - 2026-09-29
+
+### 🐛 Correcciones
+
+- **`transforms.ts` — re-exports con `from` no resolvían alias, rutas relativas ni paquetes externos**: oxc-parser expone estos especificadores en `module.staticExports`, no en `module.staticImports`. Ahora los re-exports usan la misma resolución AST que los imports, incluyendo alias, extensiones `.ts`/`.vue` y módulos externos.
+
+---
+
 ## [2.7.2] - 2026-09-25
 
 ### 🐛 Correcciones

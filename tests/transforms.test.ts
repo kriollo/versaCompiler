@@ -266,3 +266,64 @@ describe('estandarizaCode - replaceAliasInStrings solo toca literales reales (AS
         );
     });
 });
+
+describe('estandarizaCode - resolución de alias en re-exports', () => {
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+        resetModuleResolutionOptimizer();
+        process.env.PATH_ALIAS = JSON.stringify({
+            '@/*': ['src'],
+            'P@/*': ['public'],
+        });
+        process.env.PATH_DIST = 'dist';
+        process.env.VERBOSE = 'false';
+    });
+
+    afterEach(() => {
+        resetModuleResolutionOptimizer();
+        process.env = { ...originalEnv };
+    });
+
+    it('resuelve re-export con alias igual que un import estático', async () => {
+        const result = await estandarizaCode(
+            `export { readableTextOn } from '@/js/colorMath';`,
+            'test.js',
+        );
+        expect(result.code).toBe(
+            `export { readableTextOn } from '/dist/js/colorMath.js';`,
+        );
+    });
+
+    it('resuelve export * y export * as con alias', async () => {
+        const result = await estandarizaCode(
+            `export * from '@/js/utils';\nexport * as utils from '@/js/utils';`,
+            'test.js',
+        );
+        expect(result.code).toBe(
+            `export * from '/dist/js/utils.js';\nexport * as utils from '/dist/js/utils.js';`,
+        );
+    });
+
+    it('normaliza .vue y rutas relativas en re-exports', async () => {
+        const result = await estandarizaCode(
+            `export { default } from '@/components/Foo.vue';\nexport { a, b } from './local';`,
+            'test.js',
+        );
+        expect(result.code).toBe(
+            `export { default } from '/dist/components/Foo.js';\nexport { a, b } from './local.js';`,
+        );
+    });
+
+    it('resuelve paquetes externos y conserva exports locales y strings de assets', async () => {
+        const result = await estandarizaCode(
+            `export { ref } from 'vue';\nexport const value = 1;\nlink.href = 'P@/vendor/app.css';`,
+            'test.js',
+        );
+        expect(result.code).toContain('/node_modules/vue/');
+        expect(result.code).toContain('export const value = 1;');
+        expect(result.code).toContain(
+            `link.href = '/dist/public/vendor/app.css';`,
+        );
+    });
+});
