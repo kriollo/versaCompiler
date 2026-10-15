@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import {
     glob,
     mkdir,
@@ -990,6 +991,16 @@ class SmartCompilationCache {
     }
 
     /**
+     * Archivos cuya salida se generó con otra configuración (p. ej. con --prod, si ahora es dev).
+     */
+    filesWithOtherConfig(): string[] {
+        const current = this.generateConfigHash();
+        return [...this.cache.entries()]
+            .filter(([, entry]) => entry.configHash !== current)
+            .map(([filePath]) => filePath);
+    }
+
+    /**
      * Guarda el cache a disco
      */
     async save(cacheFile: string, cacheDir: string): Promise<void> {
@@ -1263,6 +1274,25 @@ async function loadCache() {
 
 async function saveCache() {
     await smartCache.save(CACHE_FILE, CACHE_DIR);
+}
+
+/**
+ * Al iniciar el watch, recompila en el modo actual lo que quedó compilado en el otro. El watch solo
+ * compila lo que cambia: tras un `--prod`, el archivo editado importaría vue.esm-browser.js y el resto
+ * vue.esm-browser.prod.js, y la página cargaría dos copias de Vue (v-model y provide/inject fallan).
+ */
+export async function recompileOtherModeOutputs(): Promise<number> {
+    await loadCache();
+    const files = smartCache
+        .filesWithOtherConfig()
+        .filter(filePath => existsSync(filePath));
+    for (const filePath of files) {
+        await initCompile(filePath, false, 'watch');
+    }
+    if (files.length > 0) {
+        await saveCache();
+    }
+    return files.length;
 }
 
 // 🎯 Funciones del Sistema Unificado de Manejo de Errores

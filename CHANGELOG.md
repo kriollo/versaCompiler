@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### 🐛 Correcciones
+
+- **`main.ts` / `compile.ts` — el watch después de `--prod` mezclaba dos builds de Vue**: el watch solo compila lo que cambia (`ignoreInitial`). Tras un `--all --prod`, el archivo editado importaba `vue.esm-browser.js` y el resto `vue.esm-browser.prod.js`: la página cargaba dos copias de Vue y `v-model` o `provide/inject` fallaban sin un error claro. Al iniciar, el watch recompila en el modo actual los archivos que la caché registra con otra configuración (en versaTodo: 87 archivos, y las 179 referencias quedan en el mismo build).
+
+---
+
 ## [2.7.3] - 2026-09-29
 
 ### 🐛 Correcciones
