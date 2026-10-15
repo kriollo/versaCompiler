@@ -469,6 +469,16 @@ async function main() {
             if (!bs) {
                 exitProcess(1);
             }
+            // Lo compilado con --prod se recompila en dev: dos builds de Vue mezclados rompen la página
+            const { recompileOtherModeOutputs } = await loadCompilerModule();
+            const recompiled = await recompileOtherModeOutputs();
+            if (recompiled > 0) {
+                logger.info(
+                    chalk.yellow(
+                        `♻️  ${recompiled} archivo(s) compilados en otro modo se recompilaron`,
+                    ),
+                );
+            }
             watch = await initChokidar(bs);
             if (!watch) {
                 exitProcess(1);
