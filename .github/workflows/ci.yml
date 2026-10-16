@@ -14,16 +14,18 @@ jobs:
         name: Lint, test & build
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
             # Sin cache: pnpm — ese cache de actions/setup-node necesita un
             # pnpm-lock.yaml commiteado para generar la clave, y este repo
             # no lo commitea (está en .gitignore).
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22
+                  # Sin pnpm-lock.yaml commiteado no hay clave de caché (ver arriba)
+                  package-manager-cache: false
 
             # No hay pnpm-lock.yaml commiteado en este repo (está en
             # .gitignore), así que no se puede usar --frozen-lockfile.
@@ -47,16 +49,18 @@ jobs:
         name: E2E (Playwright)
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
             # Sin cache: pnpm — ese cache de actions/setup-node necesita un
             # pnpm-lock.yaml commiteado para generar la clave, y este repo
             # no lo commitea (está en .gitignore).
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22
+                  # Sin pnpm-lock.yaml commiteado no hay clave de caché (ver arriba)
+                  package-manager-cache: false
 
             - name: Install dependencies
               run: pnpm install
@@ -69,7 +73,7 @@ jobs:
 
             - name: Upload Playwright report
               if: always()
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: playwright-report
                   path: playwright-report/
