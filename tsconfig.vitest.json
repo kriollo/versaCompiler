@@ -1,7 +1,9 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "types": ["vitest/globals", "node"]
+        "types": ["node"]
     },
-    "include": ["tests/**/*.ts", "tests/**/*.tsx"]
+    "include": ["tests/**/*.ts", "tests/**/*.tsx", "src/types/**/*.d.ts"],
+    // tsconfig.json excluye tests/; aquí son justamente lo que se revisa
+    "exclude": ["./public/**/*", "coverage/**/*"]
 }

@@ -43,7 +43,7 @@ import { obtenerInstanciaVue } from './getInstanciaVue.js';
 
 /**
  * @typedef {Object} VueApp
- * @property {ComponentInstance} _instance - Instancia principal de la aplicación
+ * @property {ComponentInstance} [_instance] - Instancia principal de la aplicación
  */
 
 /**
@@ -71,7 +71,7 @@ function findNodeByInstance(tree, instance) {
 }
 /**
  * Obtiene el camino desde un nodo hasta la raíz
- * @param {TreeNode} node - Nodo inicial
+ * @param {TreeNode|null} node - Nodo inicial
  * @returns {TreeNode[]} Camino desde el nodo hasta la raíz
  */
 function getPathToRoot(node) {
@@ -206,14 +206,16 @@ function tryForceUpdate(instance) {
             instance.update();
         }
         // buscar una variable en el componente que se llame versaComponentKey y sumarle 1
-        if (instance.ctx?._.setupState?.versaComponentKey !== undefined) {
-            instance.ctx._.setupState.versaComponentKey++;
+        const setupState = instance.ctx?._?.setupState;
+        if (setupState?.versaComponentKey !== undefined) {
+            setupState.versaComponentKey++;
         }
         return true;
     }
     if (typeof instance.update === 'function') {
-        if (instance.ctx?._.setupState?.versaComponentKey !== undefined) {
-            instance.ctx._.setupState.versaComponentKey++;
+        const setupState = instance.ctx?._?.setupState;
+        if (setupState?.versaComponentKey !== undefined) {
+            setupState.versaComponentKey++;
         }
         instance.update();
         return true;
@@ -329,6 +331,9 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
     // Fallback: recorrer hacia el padre si el nodo propio no es accesible.
     for (let i = 1; i < path.length; i++) {
         const parent = path[i];
+        if (!parent) {
+            continue;
+        }
 
         if (parent.isRoot || parent.name === 'KeepAlive') {
             window.location.reload();
@@ -370,7 +375,7 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
 
 /**
  * Recarga un componente Vue con Hot Module Replacement
- * @param {VueApp} App - Aplicación Vue principal
+ * @param {VueApp|null} App - Aplicación Vue principal (si falta, se busca en la página)
  * @param {ComponentInfo} Component - Información del componente a recargar
  * @returns {Promise<boolean>} Promise que resuelve a true si la recarga fue exitosa
  */
@@ -417,7 +422,13 @@ export async function reloadComponent(App, Component) {
             return false;
         }
 
-        const componentTree = buildComponentTree(App._instance);
+        const rootInstance = App?._instance;
+        if (!rootInstance) {
+            console.error('❌ La aplicación Vue no expone su instancia raíz');
+            return false;
+        }
+
+        const componentTree = buildComponentTree(rootInstance);
         if (!componentTree) {
             console.error('❌ No se pudo construir el árbol de componentes');
             return false;

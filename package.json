@@ -50,6 +50,7 @@
         "file": "tsx src/main.ts ",
         "build": "tsx src/main.ts --all --cc --co -y && pnpm build:types",
         "build:types": "tsc -p tsconfig.declarations.json",
+        "typecheck": "tsc --noEmit -p tsconfig.typecheck.json && tsc --noEmit -p tsconfig.vitest.json",
         "prepublishOnly": "pnpm build",
         "compileDev": "tsx src/main.ts --all --ci --cc -y -t --linter --verbose",
         "vlint": "tsx src/main.ts --all --cc --co -y --linter",

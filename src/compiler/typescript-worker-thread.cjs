@@ -317,7 +317,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             } catch (error) {
                 console.error(
                     '[Worker] Error obteniendo diagnósticos sintácticos:',
-                    error.message,
+                    error instanceof Error ? error.message : String(error),
                 );
             }
 
@@ -327,7 +327,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             } catch (error) {
                 console.error(
                     '[Worker] Error obteniendo diagnósticos semánticos:',
-                    error.message,
+                    error instanceof Error ? error.message : String(error),
                 );
             }
 
@@ -422,7 +422,8 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
 
 // Escuchar mensajes del proceso principal
 if (parentPort) {
-    parentPort.on('message', message => {
+    const port = parentPort;
+    port.on('message', message => {
         try {
             // console.log('[Worker] Mensaje recibido:', {
             //     id: message.id,
@@ -435,7 +436,7 @@ if (parentPort) {
 
             // Validar que el mensaje tiene la estructura correcta
             if (!id || !fileName || typeof content !== 'string') {
-                parentPort.postMessage({
+                port.postMessage({
                     id: id || 'unknown',
                     success: false,
                     error: 'Mensaje del worker inválido',
@@ -467,9 +468,7 @@ if (parentPort) {
                 // getLineAndCharacterOfPosition tampoco sobrevive la
                 // serialización, así que el objeto reconstruido del otro
                 // lado ya era inútil para ese propósito de todas formas.
-                file: diag.file
-                    ? { fileName: diag.file.fileName }
-                    : undefined,
+                file: diag.file ? { fileName: diag.file.fileName } : undefined,
                 start: diag.start,
                 length: diag.length,
             }));
@@ -482,7 +481,7 @@ if (parentPort) {
             //     hasErrors: result.hasErrors,
             // });
 
-            parentPort.postMessage({
+            port.postMessage({
                 id,
                 success: true,
                 diagnostics: serializableDiagnostics,
@@ -490,7 +489,7 @@ if (parentPort) {
             });
         } catch (error) {
             // Enviar error al proceso principal
-            parentPort.postMessage({
+            port.postMessage({
                 id: message?.id || 'unknown',
                 success: false,
                 error:

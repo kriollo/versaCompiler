@@ -6,13 +6,7 @@ import {
     cleanExpiredVueHMRCache,
 } from '../src/compiler/vuejs';
 
-// Declaraciones de tipos para los globals de Vitest
-declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => void | Promise<void>) => void;
-declare const beforeEach: (fn: () => void) => void;
-declare const afterEach: (fn: () => void) => void;
-declare const expect: any;
-declare const vi: any;
+import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest';
 
 // Mocks
 vi.mock('vue/compiler-sfc', () => ({
@@ -234,7 +228,10 @@ const x = 1;
 `;
 
             const mockDescriptor = {
-                template: { content: '<div>{{ y }}</div>', loc: { start: { line: 5, column: 1 } } },
+                template: {
+                    content: '<div>{{ y }}</div>',
+                    loc: { start: { line: 5, column: 1 } },
+                },
                 script: null,
                 scriptSetup: {
                     content: 'const x = 1;',
@@ -255,7 +252,9 @@ const x = 1;
             vueCompiler.compileTemplate.mockReturnValue({
                 code: 'function render() {}',
                 errors: [],
-                tips: ['Property "y" was accessed during render but is not defined on instance.'],
+                tips: [
+                    'Property "y" was accessed during render but is not defined on instance.',
+                ],
                 ast: { components: [] },
             });
 
@@ -267,8 +266,8 @@ const x = 1;
 
             expect(result.error).toBeNull();
             expect(result.warnings?.length).toBe(1);
-            expect(result.warnings?.[0].message).toContain('y');
-            expect(result.warnings?.[0].severity).toBe('warning');
+            expect(result.warnings?.[0]?.message).toContain('y');
+            expect(result.warnings?.[0]?.severity).toBe('warning');
         });
 
         it('debe avisar de un componente usado en template sin import correspondiente', async () => {
@@ -285,7 +284,10 @@ const x = 1;
                     loc: { start: { line: 3, column: 1 } },
                 },
                 script: null,
-                scriptSetup: { content: '', loc: { start: { line: 2, column: 1 } } },
+                scriptSetup: {
+                    content: '',
+                    loc: { start: { line: 2, column: 1 } },
+                },
                 styles: [],
                 customBlocks: [],
             };
@@ -407,7 +409,7 @@ const message = ref('Hello');
                 errors: [],
             });
 
-            parser.mockResolvedValue({
+            vi.mocked(parser).mockResolvedValue({
                 module: { staticImports: [] },
                 errors: [],
             });

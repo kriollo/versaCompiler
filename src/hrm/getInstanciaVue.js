@@ -13,6 +13,7 @@
  * @property {Object} [$store] - Store de Vuex/Pinia
  * @property {Array} [$children] - Componentes hijos (Vue 2)
  * @property {Object} [$data] - Datos del componente (Vue 2)
+ * @property {any} [_instance] - Instancia raíz del componente (Vue 3)
  */
 
 /**
@@ -196,6 +197,7 @@ function waitForVue(selector = '#app', timeout = 5000) {
 function getVueInstanceInfo(instance) {
     if (!instance) return null;
 
+    /** @type {VueInstanceInfo} */
     const info = {
         version: null,
         type: null,

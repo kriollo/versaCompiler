@@ -8,23 +8,7 @@ import {
     parser,
 } from '../src/compiler/parser';
 
-// Declaraciones de tipos para los globals de Vitest
-declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => void | Promise<void>) => void;
-declare const expect: (value: unknown) => {
-    toBe: (expected: unknown) => void;
-    toEqual: (expected: unknown) => void;
-    toBeNull: () => void;
-    toBeDefined: () => void;
-    toBeInstanceOf: (constructor: any) => void;
-    toBeTruthy: () => void;
-    toBeFalsy: () => void;
-    toContain: (substring: string) => void;
-    toHaveProperty: (property: string) => void;
-    toHaveLength: (length: number) => void;
-};
-declare const beforeEach: (fn: () => void) => void;
-declare const afterEach: (fn: () => void) => void;
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('Parser - Funciones de parsing y cache', () => {
     describe('getCodeFile', () => {

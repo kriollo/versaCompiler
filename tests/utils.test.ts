@@ -1,13 +1,7 @@
 import { showTimingForHumans } from '../src/utils/utils';
 import { getProxyInfo } from '../src/utils/proxyValidator';
 
-// Declaraciones de tipos para los globals de Vitest
-declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => void | Promise<void>) => void;
-declare const expect: (value: unknown) => {
-    toBe: (expected: unknown) => void;
-    toEqual: (expected: unknown) => void;
-};
+import { describe, it, expect } from 'vitest';
 
 describe('Utils - Funciones de utilidad', () => {
     describe('showTimingForHumans', () => {

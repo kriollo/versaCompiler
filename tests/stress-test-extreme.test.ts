@@ -66,7 +66,7 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
 
     it('should handle massive concurrent compilations without crashing', async () => {
         const FILE_COUNT = 200;
-        const filesToCompile = [];
+        const filesToCompile: { path: string; content?: string }[] = [];
 
         // Configurar mock de readFile ANTES de crear las promesas
         mockedReadFile.mockImplementation(async (path: string) => {
@@ -102,12 +102,14 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
     it('should correctly report errors for a batch of files with some invalid ones', async () => {
         const FILE_COUNT = 100;
         const ERROR_COUNT = 10;
-        const filesToCompile = [];
+        const filesToCompile: { path: string; content?: string }[] = [];
 
         // La implementación del mock debe hacerse UNA VEZ, antes de que se ejecuten las compilaciones.
         mockedReadFile.mockImplementation(async (path: string) => {
             if (path.includes('file-batch')) {
-                const index = parseInt(path.split('-').pop()!.split('.')[0]);
+                const index = parseInt(
+                    path.split('-').pop()!.split('.')[0] ?? '',
+                );
                 const withError = index < ERROR_COUNT;
                 return generateLargeFileContent(10, withError);
             }
@@ -144,12 +146,14 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
 
     it('should stress test worker pool with varied file sizes and measure compilation speed', async () => {
         const FILE_COUNT = 300;
-        const filesToCompile = [];
+        const filesToCompile: { path: string; content?: string }[] = [];
 
         // Crear archivos de diferentes tamaños para estresar el worker pool
         mockedReadFile.mockImplementation(async (path: string) => {
             if (path.includes('worker-stress')) {
-                const index = parseInt(path.split('-').pop()!.split('.')[0]);
+                const index = parseInt(
+                    path.split('-').pop()!.split('.')[0] ?? '',
+                );
                 // Variar tamaños: pequeños (5KB), medianos (50KB), grandes (150KB)
                 let size = 5;
                 if (index % 3 === 1) size = 50;
@@ -222,7 +226,11 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
             },
         ];
 
-        const results = [];
+        const results: {
+            scenario: string;
+            result: Awaited<ReturnType<typeof compileFile>>;
+            expectedPatterns: string[];
+        }[] = [];
 
         for (const scenario of errorScenarios) {
             mockedReadFile.mockResolvedValue(scenario.content);
@@ -320,7 +328,9 @@ describe('Stress Test Extreme - Concurrency, Memory and Error Handling', () => {
 
         mockedReadFile.mockImplementation(async (path: string) => {
             if (path.includes('mixed-workload')) {
-                const index = parseInt(path.split('-').pop()!.split('.')[0]);
+                const index = parseInt(
+                    path.split('-').pop()!.split('.')[0] ?? '',
+                );
 
                 // 10% de archivos con errores
                 const hasError = index % 10 === 0;

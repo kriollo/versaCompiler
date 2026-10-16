@@ -116,7 +116,7 @@ async function detectHMRStrategy(filePath, content = null) {
 /**
  * Envía un error del cliente al servidor para debugging
  * @param {string} type - Tipo de error (hmr, reload, vue, etc)
- * @param {Error|string} error - El error a reportar
+ * @param {unknown} error - El error a reportar (Error, texto o lo que se haya lanzado)
  * @param {Object} [context] - Contexto adicional del error
  */
 function reportErrorToServer(type, error, context = {}) {
@@ -140,9 +140,9 @@ function reportErrorToServer(type, error, context = {}) {
             url: window.location.href,
             context,
             error: {
-                message: error?.message || String(error),
-                stack: error?.stack || '',
-                name: error?.name || 'Error',
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? (error.stack ?? '') : '',
+                name: error instanceof Error ? error.name : 'Error',
             },
         };
 
@@ -385,7 +385,7 @@ async function initSocket(retries = 0) {
                 });
                 showErrorOverlay(
                     'Error en HMR de Vue',
-                    error.message || String(error),
+                    error instanceof Error ? error.message : String(error),
                 );
             }
         });

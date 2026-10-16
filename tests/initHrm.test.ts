@@ -314,7 +314,7 @@ describe('InitHRM - handleLibraryHotReload', () => {
             mockDynamicImport,
         );
 
-        const importCall = mockDynamicImport.mock.calls[0][0];
+        const importCall = mockDynamicImport.mock.calls[0]![0];
         expect(importCall).toMatch(/\/lib\/test\.js\?t=\d+/);
     });
 

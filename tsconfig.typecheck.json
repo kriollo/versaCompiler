@@ -1,0 +1,9 @@
+{
+    // Chequeo de tipos del código del compilador (lo que corre el CI).
+    // Sin examples/: sus errores son a propósito, para probar que el compilador los informa bien.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "./node_modules/.cache/.tsbuildinfo-typecheck"
+    },
+    "include": ["src/**/*", "src/types/**/*.d.ts", "versacompile.config.ts"]
+}

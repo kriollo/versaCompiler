@@ -61,13 +61,14 @@ describe('VueHRM - Hot Module Replacement', () => {
         });
 
         it('debe devolver null para instancia inválida', () => {
-            const tree = buildComponentTree(null);
+            // Entradas inválidas a propósito: la función las recibe del navegador sin garantías
+            const tree = buildComponentTree(null as any);
             expect(tree).toBeNull();
 
-            const tree2 = buildComponentTree({});
+            const tree2 = buildComponentTree({} as any);
             expect(tree2).toBeNull();
 
-            const tree3 = buildComponentTree({ type: null });
+            const tree3 = buildComponentTree({ type: null } as any);
             expect(tree3).toBeNull();
         });
 
@@ -82,7 +83,7 @@ describe('VueHRM - Hot Module Replacement', () => {
 
             const tree = buildComponentTree(mockComponentInstance);
 
-            expect(tree.name).toBe('Anonymous');
+            expect(tree?.name).toBe('Anonymous');
         });
 
         it('debe manejar componentes con __name', () => {
@@ -98,7 +99,7 @@ describe('VueHRM - Hot Module Replacement', () => {
 
             const tree = buildComponentTree(mockComponentInstance);
 
-            expect(tree.name).toBe('MyComponent');
+            expect(tree?.name).toBe('MyComponent');
         });
 
         it('debe manejar componentes Suspense', () => {
@@ -117,7 +118,7 @@ describe('VueHRM - Hot Module Replacement', () => {
 
             const tree = buildComponentTree(mockComponentInstance);
 
-            expect(tree.children[0].name).toBe('Suspense');
+            expect(tree?.children[0]?.name).toBe('Suspense');
         });
 
         it('debe manejar componentes con __name', () => {

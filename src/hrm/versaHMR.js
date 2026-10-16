@@ -51,7 +51,7 @@ class VersaModuleRegistry {
             const url = new URL(moduleId, window.location.origin);
             return url.pathname;
         } catch {
-            return moduleId.split('?')[0];
+            return moduleId.split('?')[0] ?? moduleId;
         }
     }
 
@@ -66,15 +66,11 @@ class VersaModuleRegistry {
     accept(moduleId, updateCallback) {
         const id = this._normalizeId(moduleId);
 
-        if (!this._registry.has(id)) {
-            this._registry.set(id, {
-                module: null,
-                callbacks: new Set(),
-                version: 0,
-            });
+        let entry = this._registry.get(id);
+        if (!entry) {
+            entry = { module: null, callbacks: new Set(), version: 0 };
+            this._registry.set(id, entry);
         }
-
-        const entry = this._registry.get(id);
         entry.callbacks.add(updateCallback);
 
         console.log(`[VersaHMR] Registrado observer para: ${id}`);
@@ -151,10 +147,12 @@ class VersaModuleRegistry {
         const importedId = this._normalizeId(imported);
         const importerId = this._normalizeId(importer);
 
-        if (!this._importers.has(importedId)) {
-            this._importers.set(importedId, new Set());
+        let importers = this._importers.get(importedId);
+        if (!importers) {
+            importers = new Set();
+            this._importers.set(importedId, importers);
         }
-        this._importers.get(importedId).add(importerId);
+        importers.add(importerId);
     }
 
     /**
@@ -177,10 +175,12 @@ class VersaModuleRegistry {
      */
     _onDispose(moduleId, cb) {
         const id = this._normalizeId(moduleId);
-        if (!this._disposeCallbacks.has(id)) {
-            this._disposeCallbacks.set(id, new Set());
+        let callbacks = this._disposeCallbacks.get(id);
+        if (!callbacks) {
+            callbacks = new Set();
+            this._disposeCallbacks.set(id, callbacks);
         }
-        this._disposeCallbacks.get(id).add(cb);
+        callbacks.add(cb);
     }
 
     /**

@@ -36,15 +36,10 @@ jobs:
             - name: Test
               run: pnpm test
 
-            # pnpm build compila el propio compilador (tsx src/main.ts --all)
-            # y genera los .d.ts vía tsconfig.declarations.json — esto ya
-            # cubre la verificación de tipos del código que se publica.
-            # NO se corre `tsc --noEmit -p tsconfig.json` como paso aparte:
-            # ese tsconfig (pensado para el editor/examples/) tiene ~86
-            # errores preexistentes en archivos .js sueltos (src/hrm,
-            # examples/) no relacionados con el código que se compila o
-            # publica, y haría fallar el CI en cada corrida sin señalar
-            # nada nuevo.
+            # Tipos de src/ y tests/ (sin examples/: sus errores son a propósito)
+            - name: Typecheck
+              run: pnpm typecheck
+
             - name: Build
               run: pnpm build
 

@@ -265,7 +265,7 @@ describe('Hot Reload Memory Leak Tests', () => {
             }
         }
 
-        const finalListeners = listenerCounts[listenerCounts.length - 1];
+        const finalListeners = listenerCounts[listenerCounts.length - 1]!;
         const listenerGrowth = finalListeners - initialListeners;
 
         console.log(`\n📊 Análisis de listeners:`);

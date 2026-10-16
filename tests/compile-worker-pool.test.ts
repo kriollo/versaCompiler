@@ -45,8 +45,8 @@ describe('CompileWorkerPool - aislamiento de errores por worker', () => {
         expect(workerA!.postMessage).toHaveBeenCalledTimes(1);
         expect(workerB!.postMessage).toHaveBeenCalledTimes(1);
 
-        const idA = workerA!.postMessage.mock.calls[0][0].id;
-        const idB = workerB!.postMessage.mock.calls[0][0].id;
+        const idA = workerA!.postMessage.mock.calls[0]![0].id;
+        const idB = workerB!.postMessage.mock.calls[0]![0].id;
 
         // Worker A crashea: solo debe rechazar la tarea A.
         workerA!.emit('error', new Error('worker A crashed'));
