@@ -5,6 +5,19 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### 🐛 Correcciones
+
+- **`main.ts` — `versacompiler --version` mostraba la versión del proyecto**: sin `.version()` explícito, yargs busca el `package.json` subiendo desde su propia carpeta hasta el último `node_modules`, y en un proyecto instalado llega al `package.json` del proyecto (en versaTodo respondía 3.3.3). Ahora se le pasa la versión del paquete. Verificado instalando el paquete empaquetado en un proyecto con versión 9.9.9.
+
+### 📦 Dependencias
+
+- Actualizadas a la última versión: oxc-parser/transform/minify 0.154, Vue 3.5.44, yargs 18.2, execa 10.1, enhanced-resolve 5.26, vitest 5.0.4, Playwright 1.64, ESLint 10.12, eslint-plugin-unicorn 78, @vueuse/core 15, oxlint 1.88, entre otras.
+- Se mantienen TypeScript 6 (la 7, en Go, no trae la API de JavaScript que usa el chequeo de tipos) y `@types/node` 22.
+
+---
+
 ## [2.7.4] - 2026-10-15
 
 ### 🐛 Correcciones
