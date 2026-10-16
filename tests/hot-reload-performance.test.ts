@@ -212,8 +212,8 @@ describe('Hot Reload Performance Tests', () => {
         console.log(`   📊 Variación: ${(maxTotal - minTotal).toFixed(2)}ms`);
 
         // Detectar degradación (el último ciclo no debe ser mucho más lento que el primero)
-        const firstCycle = allMetrics[0].total;
-        const lastCycle = allMetrics[iterations - 1].total;
+        const firstCycle = allMetrics[0]!.total;
+        const lastCycle = allMetrics[iterations - 1]!.total;
         const degradation = ((lastCycle - firstCycle) / firstCycle) * 100;
 
         console.log(`   🔍 Degradación: ${degradation.toFixed(2)}%`);

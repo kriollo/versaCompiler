@@ -1,4 +1,12 @@
-const { parentPort } = require('node:worker_threads');
+const { parentPort: workerPort } = require('node:worker_threads');
+
+// Este archivo solo corre como worker thread: sin puerto no hay a quién responder
+if (!workerPort) {
+    throw new Error(
+        'compile-worker-thread.cjs debe ejecutarse como worker thread',
+    );
+}
+const parentPort = workerPort;
 
 let preCompileVue;
 let preCompileTS;

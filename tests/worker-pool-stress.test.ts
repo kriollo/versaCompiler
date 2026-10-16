@@ -15,7 +15,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
 
     it('should handle 1000 concurrent type checking tasks without failures', async () => {
         const TASK_COUNT = 1000;
-        const tasks = [];
+        const tasks: Promise<any>[] = [];
 
         const validCode = `
             const x: number = 42;
@@ -78,7 +78,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
 
     it('should detect type errors correctly under heavy load', async () => {
         const TASK_COUNT = 500;
-        const tasks = [];
+        const tasks: Promise<any>[] = [];
 
         // 50% código válido, 50% con errores
         const codes = [
@@ -112,7 +112,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
         const startTime = performance.now();
 
         for (let i = 0; i < TASK_COUNT; i++) {
-            const codeObj = codes[i % codes.length];
+            const codeObj = codes[i % codes.length]!;
             const fileName = `type-check-${i}.ts`;
             tasks.push(
                 workerPool
@@ -166,7 +166,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
 
     it('should maintain performance with mixed complexity tasks', async () => {
         const TASK_COUNT = 300;
-        const tasks = [];
+        const tasks: Promise<any>[] = [];
 
         const complexities = [
             {
@@ -217,7 +217,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
         const taskTimings: { complexity: string; time: number }[] = [];
 
         for (let i = 0; i < TASK_COUNT; i++) {
-            const complexity = complexities[i % complexities.length];
+            const complexity = complexities[i % complexities.length]!;
             const fileName = `mixed-${complexity.name}-${i}.ts`;
             const taskStart = performance.now();
 
@@ -301,7 +301,7 @@ describe('TypeScript Worker Pool - Direct Stress Tests', () => {
 
     it('should recover from worker failures gracefully', async () => {
         const TASK_COUNT = 100;
-        const tasks = [];
+        const tasks: Promise<any>[] = [];
 
         // Código que puede causar problemas al worker
         const problematicCode = `

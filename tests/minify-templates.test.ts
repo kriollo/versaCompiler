@@ -6,19 +6,7 @@ import {
     removeTemporaryTags,
 } from '../src/compiler/minifyTemplate';
 
-// Declaraciones de tipos para los globals de Vitest
-declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => void) => void;
-declare const expect: (value: unknown) => {
-    toBe: (expected: unknown) => void;
-    toBeNull: () => void;
-    toContain: (substring: string) => void;
-    toBeLessThan: (expected: number) => void;
-    toMatch: (pattern: RegExp) => void;
-    not: {
-        toContain: (substring: string) => void;
-    };
-};
+import { describe, it, expect } from 'vitest';
 
 describe('minifyTemplate - Sistema de detección automática', () => {
     describe('detectContentType', () => {

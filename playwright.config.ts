@@ -4,7 +4,9 @@ export default defineConfig({
     testDir: './e2e',
     globalSetup: './e2e/global-setup.ts',
     fullyParallel: true,
-    workers: 4,
+    // Los runners de GitHub tienen 2 núcleos: con 4 workers Firefox se queda sin CPU y las
+    // transiciones (modal, accordion) superan el plazo de toBeVisible
+    workers: process.env.CI ? 2 : 4,
     retries: 1,
     timeout: 30_000,
     reporter: [

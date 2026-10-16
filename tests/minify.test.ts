@@ -5,18 +5,7 @@ import {
     clearMinificationCache,
 } from '../src/compiler/minify';
 
-// Declaraciones de tipos para los globals de Vitest
-declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => void | Promise<void>) => void;
-declare const expect: (value: unknown) => {
-    toBe: (expected: unknown) => void;
-    toEqual: (expected: unknown) => void;
-    toBeNull: () => void;
-    toBeDefined: () => void;
-    toBeLessThan: (expected: number) => void;
-    toBeGreaterThan: (expected: number) => void;
-};
-declare const beforeEach: (fn: () => void) => void;
+import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('Minify - Funciones de minificación', () => {
     beforeEach(() => {

@@ -14,16 +14,18 @@ jobs:
         name: Lint, test & build
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
             # Sin cache: pnpm — ese cache de actions/setup-node necesita un
             # pnpm-lock.yaml commiteado para generar la clave, y este repo
             # no lo commitea (está en .gitignore).
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22
+                  # Sin pnpm-lock.yaml commiteado no hay clave de caché (ver arriba)
+                  package-manager-cache: false
 
             # No hay pnpm-lock.yaml commiteado en este repo (está en
             # .gitignore), así que no se puede usar --frozen-lockfile.
@@ -36,15 +38,10 @@ jobs:
             - name: Test
               run: pnpm test
 
-            # pnpm build compila el propio compilador (tsx src/main.ts --all)
-            # y genera los .d.ts vía tsconfig.declarations.json — esto ya
-            # cubre la verificación de tipos del código que se publica.
-            # NO se corre `tsc --noEmit -p tsconfig.json` como paso aparte:
-            # ese tsconfig (pensado para el editor/examples/) tiene ~86
-            # errores preexistentes en archivos .js sueltos (src/hrm,
-            # examples/) no relacionados con el código que se compila o
-            # publica, y haría fallar el CI en cada corrida sin señalar
-            # nada nuevo.
+            # Tipos de src/ y tests/ (sin examples/: sus errores son a propósito)
+            - name: Typecheck
+              run: pnpm typecheck
+
             - name: Build
               run: pnpm build
 
@@ -52,16 +49,18 @@ jobs:
         name: E2E (Playwright)
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
             # Sin cache: pnpm — ese cache de actions/setup-node necesita un
             # pnpm-lock.yaml commiteado para generar la clave, y este repo
             # no lo commitea (está en .gitignore).
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22
+                  # Sin pnpm-lock.yaml commiteado no hay clave de caché (ver arriba)
+                  package-manager-cache: false
 
             - name: Install dependencies
               run: pnpm install
@@ -74,7 +73,7 @@ jobs:
 
             - name: Upload Playwright report
               if: always()
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: playwright-report
                   path: playwright-report/

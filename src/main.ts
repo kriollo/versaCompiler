@@ -30,12 +30,12 @@ async function loadChalk() {
     return chalk;
 }
 
-// Función para obtener la versión del package.json
+// La versión del paquete versacompiler (no la del proyecto que se compila)
 async function getPackageVersion(): Promise<string> {
     try {
         const fs = await import('node:fs/promises');
         const packageJsonPath = path.resolve(
-            env.PATH_PROY || path.dirname(fileURLToPath(import.meta.url)),
+            path.dirname(fileURLToPath(import.meta.url)),
             '..',
             'package.json',
         );
@@ -95,7 +95,9 @@ async function main() {
         const { yargs: yargsInstance, hideBin: hideBinFn } = await loadYargs();
         const chalkInstance = await loadChalk();
 
+        // Sin .version(), yargs busca el package.json desde el directorio actual: el del proyecto
         let yargInstance = yargsInstance(hideBinFn(globalProcess.argv))
+            .version(await getPackageVersion())
             .scriptName('versa')
             .usage(
                 chalkInstance.blue('VersaCompiler') +
