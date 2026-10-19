@@ -5,6 +5,16 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.6] - 2026-10-19
+
+### 🐛 Correcciones
+
+- **Un string `'@'` se convertía en la ruta del alias** (`src/compiler/transforms.ts`). Con el alias `'@/*'`, cualquier literal igual al prefijo (`'@'`) pasaba a ser la ruta del alias (`'/public'`).
+  - En anima, `handle.replaceAll('@', '')` quedaba como `replaceAll('/public', '')`, y el `@` del usuario de Instagram llegaba tal cual al servidor.
+  - Lo mismo pasaba con `"P@"`, y en los imports dinámicos con template literal (`` import(`@${x}`) ``).
+  - Ahora un alias con comodín (`@/*`) solo toma lo que empieza con `@/`. Un alias exacto toma el valor completo o `alias/…`.
+  - Pruebas nuevas en `tests/transforms.test.ts`.
+
 ## [2.7.5] - 2026-10-15
 
 ### 🐛 Correcciones
