@@ -380,3 +380,47 @@ export { toneRamp } from '/dist/js/colorMath.js';`);
         expect(result.code).toBe(`link.href = '/dist/public/vendor/app.css';`);
     });
 });
+
+describe('estandarizaCode - un alias con comodín solo toma strings que empiezan con "alias/"', () => {
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+        resetModuleResolutionOptimizer();
+        process.env.PATH_ALIAS = JSON.stringify({ '@/*': ['/src/*'], 'P@/*': ['/public/*'] });
+        process.env.PATH_DIST = 'dist';
+        process.env.VERBOSE = 'false';
+    });
+
+    afterEach(() => {
+        resetModuleResolutionOptimizer();
+        process.env.PATH_ALIAS = originalEnv.PATH_ALIAS;
+        process.env.PATH_DIST = originalEnv.PATH_DIST;
+        process.env.VERBOSE = originalEnv.VERBOSE;
+    });
+
+    it('no toca el texto "@" (antes pasaba a ser la ruta del alias)', async () => {
+        const code = `const limpio = handle.replaceAll('@', '').trim();`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(code);
+    });
+
+    it('no toca textos que empiezan con el alias sin "/" (un @usuario, "P@")', async () => {
+        const code = `const a = '@usuario'; const b = "P@"; const c = '@';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(code);
+    });
+
+    it('no toca un template literal como `@${usuario}`', async () => {
+        const code = 'const mencion = `@${usuario}`;';
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toBe(code);
+    });
+
+    it('sigue resolviendo "@/..." en strings y en imports dinámicos con template literal', async () => {
+        const code = "const img = '@/img/logo.png'; const m = import(`@/mods/${nombre}.js`); const t = import(`@${x}`);";
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toContain("const img = '/dist/img/logo.png';");
+        expect(result.code).toContain('import(`/dist/mods/${nombre}.js`)');
+        expect(result.code).toContain('import(`@${x}`)');
+    });
+});

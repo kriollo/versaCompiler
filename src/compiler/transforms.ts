@@ -248,6 +248,22 @@ function extractLiteralValue(
     return { quote, value: raw.slice(1, -1) };
 }
 
+/**
+ * Si `value` usa el alias, la parte que sigue al prefijo (con su `/` inicial); si no, null.
+ *
+ * Un alias con comodín (`@/*`) solo toma lo que empieza con `@/`: el texto `'@'`, un `'@usuario'` o
+ * un paquete con scope no son rutas. Un alias exacto (`@utils`) toma el valor completo o `@utils/…`.
+ */
+function matchAlias(value: string, alias: string): string | null {
+    if (alias.endsWith('/*')) {
+        const prefix = alias.slice(0, -1); // '@/*' → '@/'
+        return value.startsWith(prefix) ? value.slice(prefix.length - 1) : null;
+    }
+    const exact = alias.replace('*', '');
+    if (value === exact) return '';
+    return value.startsWith(`${exact}/`) ? value.slice(exact.length) : null;
+}
+
 function resolveAliasTemplateLiteral(
     raw: string,
     pathAlias: Record<string, any>,
@@ -266,10 +282,8 @@ function resolveAliasTemplateLiteral(
     });
 
     for (const [alias, target] of sortedAliases) {
-        const aliasPattern = alias.replace('/*', '');
-        if (!prefix.startsWith(aliasPattern)) continue;
-
-        const relativePath = prefix.replace(aliasPattern, '');
+        const relativePath = matchAlias(prefix, alias);
+        if (relativePath === null) continue;
         const targetArray = Array.isArray(target) ? target : [target];
         const targetPath = targetArray[0];
         if (!targetPath) continue;
@@ -520,13 +534,9 @@ async function replaceAliasInStrings(code: string, ast: any): Promise<string> {
         if (!stringContent) continue;
 
         for (const [alias, target] of sortedAliases) {
-            const aliasPattern = alias.replace('/*', '');
-
-            // Verificar coincidencia exacta del alias seguido de '/' o al final del string
-            const aliasRegex = new RegExp(
-                `^${aliasPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`,
-            );
-            if (!aliasRegex.test(stringContent)) continue;
+            // `@/*` solo toma "@/…": el texto '@' o un '@usuario' no son rutas
+            const relativePath = matchAlias(stringContent, alias);
+            if (relativePath === null) continue;
 
             // IMPORTANTE: Verificar si es un módulo excluido antes de transformar
             if (
@@ -535,9 +545,6 @@ async function replaceAliasInStrings(code: string, ast: any): Promise<string> {
             ) {
                 continue;
             }
-
-            // Reemplazar el alias con la ruta del target
-            const relativePath = stringContent.replace(aliasPattern, '');
 
             // Construir la nueva ruta basada en la configuración del target
             let newPath: string;
