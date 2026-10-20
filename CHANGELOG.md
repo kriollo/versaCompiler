@@ -5,6 +5,16 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.7] - 2026-10-20
+
+### 🐛 Correcciones
+
+- **Un `>` en un atributo del elemento raíz rompía el componente** (`src/compiler/vuejs.ts`). En desarrollo se inyecta `:key="versaComponentKey"` en el elemento raíz del `<template>`, y la etiqueta se cortaba en el primer `>`, aunque estuviera entre comillas.
+  - `<p v-if="total > 0">` como raíz quedaba partido: el resto de la expresión pasaba a ser un nombre de atributo, con el error «Attribute name cannot contain U+0022…» y «Unexpected JSX expression».
+  - Ahora los valores entre comillas (dobles o simples) se saltan enteros. También funciona con `<`, `>=`, `v-show`, `:class` y etiquetas que se cierran solas.
+  - La regex nueva sigue siendo lineal: 200 000 atributos se procesan en unos 3 ms.
+  - Pruebas nuevas en `tests/vue-root-attrs.test.ts`, con el compilador de Vue real.
+
 ## [2.7.6] - 2026-10-19
 
 ### 🐛 Correcciones
