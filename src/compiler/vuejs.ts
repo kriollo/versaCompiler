@@ -106,10 +106,12 @@ class VueHMRInjectionCache {
             const templateEnd =
                 templateTagMatch.index + templateTagMatch[0].length;
             const afterTemplate = injectedData.slice(templateEnd);
-            // Buscar el primer tag de elemento (ignora espacios/comentarios) justo después del <template>
-            const firstChildMatch = /^(\s*)(<(\w+)([^>]*?)(\/?>))/.exec(
-                afterTemplate,
-            );
+            // Buscar el primer tag de elemento (ignora espacios/comentarios) justo después del <template>.
+            // Los valores entre comillas se saltan enteros: un `>` en v-if="total > 0" no cierra la etiqueta
+            const firstChildMatch =
+                /^(\s*)(<(\w+)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?>))/.exec(
+                    afterTemplate,
+                );
             if (firstChildMatch) {
                 const [
                     ,
