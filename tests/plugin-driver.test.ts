@@ -55,3 +55,91 @@ describe('PluginDriver.transform', () => {
         expect(result.contents).toBe('');
     });
 });
+
+describe('PluginDriver.transform: fail-fast', () => {
+    const llamadas: string[] = [];
+    const etapa = (
+        nombre: string,
+        resultado: Awaited<ReturnType<NonNullable<Plugin['onTransform']>>>,
+    ): Plugin => ({
+        name: nombre,
+        onTransform: async () => {
+            llamadas.push(nombre);
+            return resultado;
+        },
+    });
+
+    it('una etapa con errores corta la cadena: las siguientes no corren y queda el último contenido bueno', async () => {
+        llamadas.length = 0;
+        const driver = new PluginDriver([
+            etapa('a', { contents: 'paso-a' }),
+            etapa('b', {
+                errors: ['b: falló'],
+                diagnostics: [
+                    {
+                        stage: 'b',
+                        message: 'falló',
+                        severity: 'error',
+                    } as never,
+                ],
+            }),
+            etapa('c', { contents: 'no-debe-correr' }),
+        ]);
+
+        const result = await driver.transform({
+            path: 'x.ts',
+            contents: 'origen',
+            loader: 'ts',
+        });
+
+        expect(llamadas).toEqual(['a', 'b']);
+        expect(result.contents).toBe('paso-a');
+        expect(result.errors).toEqual(['b: falló']);
+        expect(result.diagnostics).toHaveLength(1);
+    });
+
+    it('una etapa con solo diagnostics (avisos, sin errors) no corta la cadena', async () => {
+        llamadas.length = 0;
+        const driver = new PluginDriver([
+            etapa('a', {
+                contents: 'a',
+                diagnostics: [
+                    {
+                        stage: 'a',
+                        message: 'aviso',
+                        severity: 'warning',
+                    } as never,
+                ],
+            }),
+            etapa('b', { contents: 'b' }),
+        ]);
+
+        const result = await driver.transform({
+            path: 'x.js',
+            contents: 'origen',
+            loader: 'js',
+        });
+
+        expect(llamadas).toEqual(['a', 'b']);
+        expect(result.contents).toBe('b');
+        expect(result.errors).toBeUndefined();
+        expect(result.diagnostics).toHaveLength(1);
+    });
+
+    it('errors vacío ([]) no cuenta como error', async () => {
+        llamadas.length = 0;
+        const driver = new PluginDriver([
+            etapa('a', { contents: 'a', errors: [] }),
+            etapa('b', { contents: 'b' }),
+        ]);
+
+        const result = await driver.transform({
+            path: 'x.js',
+            contents: 'origen',
+            loader: 'js',
+        });
+
+        expect(llamadas).toEqual(['a', 'b']);
+        expect(result.errors).toBeUndefined();
+    });
+});

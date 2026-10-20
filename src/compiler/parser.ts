@@ -240,6 +240,9 @@ class ParserASTCache {
             sourceType: 'module',
             showSemanticErrors: true,
             astType,
+            // astType solo cambia la forma del AST: el lenguaje sale de la extensión. Un .vue con TS
+            // (loader 'ts') se leería como JS y fallaría con la sintaxis de TypeScript
+            ...(astType === 'ts' ? { lang: 'ts' as const } : {}),
         });
 
         // Cachear resultado si es válido

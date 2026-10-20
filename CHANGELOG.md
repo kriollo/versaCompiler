@@ -21,6 +21,11 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Defensa extra: `estandarizaCode` recibe el loader del paso anterior y parsea con `ts` cuando el contenido aún es TypeScript, tanto al parsear el AST como tras reemplazar los imports con alias.
   - Versión del fix ejercitado contra el proyecto real: `compileDev` vuelve a indicar solo el TS2339; el modal compila limpio una vez corregido el tipo.
   - Pruebas nuevas en `tests/pipeline-fail-fast.test.ts`, con el pipeline core real (vue → ts → transforms): SFC válido con `import type` inline y genérico anidado, y SFC con TS2339 sin error espurio.
+  - **La defensa extra no funcionaba en los `.vue`** (`src/compiler/parser.ts`): en `parseSync` de oxc, `astType` solo cambia la forma del AST, y el lenguaje se deduce de la extensión. Un `.vue` con `loader: 'ts'` se seguía leyendo como JS. Ahora, cuando se pide `astType: 'ts'`, también se pasa `lang: 'ts'`.
+  - Más pruebas:
+    - `tests/plugin-driver.test.ts`: la cadena se corta al primer error y conserva el último contenido bueno; una etapa que solo emite `diagnostics` o devuelve `errors: []` no corta la cadena.
+    - `tests/estandariza-loader.test.ts`: un `.vue` con TS y `loader: 'ts'`.
+    - `tests/pipeline-fail-fast.test.ts`: un `.ts` suelto con TS2339 reporta solo el error real, y uno válido con `import type`, `satisfies` y `as const` compila.
 
 ## [2.7.7] - 2026-10-20
 
