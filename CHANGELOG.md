@@ -5,6 +5,23 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.8] - 2026-10-20
+
+### 🐛 Correcciones
+
+- **Un error de TypeScript producía un error espurio de parseo en standardization** (`src/compiler/pipeline/plugin-driver.ts`, `src/compiler/pipeline/core-plugins.ts`, `src/compiler/transforms.ts`). Un reporte real de modalArticulo.vue en VersaABA mostraba esto:
+  
+  ```
+  ❌ Error en compilación de modalArticulo.vue: typescript: Property 'stocks' does not exist on type 'VersaFetchResponse'.
+  standardization: Expected `,` or `}` but found `Identifier`
+  ```
+  
+  El error real era un TS2339 con `typeCheck` activo (`-t`). El stage `core-ts` devolvía el error y no actualizaba `contents`, pero `PluginDriver.transform` seguía encadenando y el siguiente stage recibía el **TS crudo** del stage vue; el parser de oxc en modo JS se caía con el `type Ref` inline del import de vue — un error de parseo engañoso que entierra el error de tipos. Variaciones del mismo problema: cualquier stage previo con error dejaba TS sin transpilar para el siguiente.
+  - Ahora `PluginDriver.transform` corta la cadena al primer stage que reporta errores (fail-fast): se conservan los errores reales y las etapas posteriores no corren sobre código roto.
+  - Defensa extra: `estandarizaCode` recibe el loader del paso anterior y parsea con `ts` cuando el contenido aún es TypeScript, tanto al parsear el AST como tras reemplazar los imports con alias.
+  - Versión del fix ejercitado contra el proyecto real: `compileDev` vuelve a indicar solo el TS2339; el modal compila limpio una vez corregido el tipo.
+  - Pruebas nuevas en `tests/pipeline-fail-fast.test.ts`, con el pipeline core real (vue → ts → transforms): SFC válido con `import type` inline y genérico anidado, y SFC con TS2339 sin error espurio.
+
 ## [2.7.7] - 2026-10-20
 
 ### 🐛 Correcciones

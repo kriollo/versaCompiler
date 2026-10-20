@@ -187,8 +187,14 @@ export function createCorePlugins(): Plugin[] {
         name: 'core-transforms',
         async onTransform(args: TransformArgs): Promise<TransformResult> {
             try {
+                // Le pasa el loader actual: si TS crudo llegó aquí (stage anterior
+                // con errores), oxc lo parsea como TS y no explota con sintaxis TS.
                 const transform = await loadTransforms();
-                const result = await transform(args.contents, args.path);
+                const result = await transform(
+                    args.contents,
+                    args.path,
+                    args.loader,
+                );
                 if (result?.error) {
                     return {
                         errors: [
