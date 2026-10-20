@@ -69,6 +69,14 @@ export class PluginDriver {
                     ...(currentMeta || {}),
                     ...result.meta,
                 };
+            // Fail-fast: un stage con errores generalmente deja el contenido
+            // SIN transformar (ej. core-ts con error de tipos devuelve el TS
+            // crudo del stage vue). Encadenar a etapas posteriores produce
+            // errores espúrios de parseo que entierran el error real.
+            // Bug VersaABA/2026: "standardization: Expected `,` or `}` but
+            // found `Identifier`" por parsear `type Ref` de un import inline
+            // cuando el error real era un TS2339 del stage typescript.
+            if (result.errors?.length) break;
         }
         return {
             contents: current,

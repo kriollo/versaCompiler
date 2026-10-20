@@ -705,10 +705,15 @@ export function isHmrExcluded(outPath: string): boolean {
 export async function estandarizaCode(
     code: string,
     file: string,
+    loader?: string,
 ): Promise<{ code: string; error: string | null }> {
     const originalCode = code; // Guardar código original para validación
     try {
-        const ast = await parser(file, code);
+        // Si el contenido aún es TypeScript (loader 'ts'), parsearlo como TS:
+        // el parser en modo JS se cae con sintaxis TS legítima (ej. el modificador
+        // `type X` inline en un import) y reporta un error de parseo engañoso.
+        const astType = loader === 'ts' ? 'ts' : 'js';
+        const ast = await parser(file, code, astType);
         if (ast && ast.errors && ast.errors.length > 0) {
             // Debug: mostrar la estructura del error para entender mejor qué información tenemos
             if (env.VERBOSE === 'true') {
@@ -737,7 +742,7 @@ export async function estandarizaCode(
         // Re-parsear: replaceAliasImportsAst puede haber cambiado longitudes
         // de string, así que las posiciones del AST original ya no
         // coinciden con el código actual (cache hit si el contenido no cambió).
-        const astAfterImports = await parser(file, code);
+        const astAfterImports = await parser(file, code, astType);
         code = await replaceAliasInStrings(code, astAfterImports);
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
