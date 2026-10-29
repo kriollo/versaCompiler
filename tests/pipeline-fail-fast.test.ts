@@ -147,4 +147,60 @@ describe('Pipeline: fail-fast cuando un stage de transform falla', () => {
         );
         expect(parseoEspurio).toEqual([]);
     });
+
+    it('un .ts suelto con error de tipos reporta solo el error de TypeScript', async () => {
+        const archivo = path.join(dir, 'servicio.ts');
+        writeFileSync(
+            archivo,
+            `import { type Ref, ref } from 'vue';
+            interface Ficha { id: number }
+            const ficha: Ficha = { id: 1 };
+            const r: Ref<number> = ref(ficha.inexistente);
+            export default r;
+            `,
+            'utf-8',
+        );
+
+        const result = await new BuildPipeline(createCorePlugins()).compileFile(
+            archivo,
+        );
+        const errores = result.errors.map(e => String(e));
+
+        expect(
+            errores.some(
+                e => e.startsWith('typescript:') && e.includes('TS2339'),
+            ),
+            JSON.stringify(errores),
+        ).toBe(true);
+        expect(
+            errores.filter(
+                e =>
+                    e.startsWith('standardization:') ||
+                    e.startsWith('minification:'),
+            ),
+        ).toEqual([]);
+    });
+
+    it('un .ts válido con import type, satisfies y as const compila sin errores', async () => {
+        const archivo = path.join(dir, 'tipos.ts');
+        writeFileSync(
+            archivo,
+            `import type { Ref } from 'vue';
+            import { ref, type ComputedRef } from 'vue';
+            const ESTADOS = ['a', 'b'] as const;
+            const config = { modo: 'x' } satisfies Record<string, string>;
+            export const estado: Ref<(typeof ESTADOS)[number]> = ref('a');
+            export type C = ComputedRef<number>;
+            export default config;
+            `,
+            'utf-8',
+        );
+
+        const result = await new BuildPipeline(createCorePlugins()).compileFile(
+            archivo,
+        );
+
+        expect(result.errors).toEqual([]);
+        expect(result.code).not.toMatch(/satisfies|as const|import type/);
+    });
 });

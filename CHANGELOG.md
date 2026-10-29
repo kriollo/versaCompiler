@@ -5,6 +5,17 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.7.9] - 2026-10-29
+
+### 🐛 Correcciones
+
+- **La defensa de la 2.7.8 contra TS crudo en la estandarización no cubría los `.vue`** (`src/compiler/parser.ts`).
+  - En `parseSync` de oxc, `astType` solo cambia la forma del AST, y el lenguaje se deduce de la extensión. Un `.vue` con `loader: 'ts'` se seguía leyendo como JS. Ahora, cuando se pide `astType: 'ts'`, también se pasa `lang: 'ts'`.
+  - Más pruebas:
+    - `tests/plugin-driver.test.ts`: la cadena se corta al primer error y conserva el último contenido bueno; una etapa que solo emite `diagnostics` o devuelve `errors: []` no corta la cadena.
+    - `tests/estandariza-loader.test.ts`: un `.vue` con TS y `loader: 'ts'`.
+    - `tests/pipeline-fail-fast.test.ts`: un `.ts` suelto con TS2339 reporta solo el error real, y uno válido con `import type`, `satisfies` y `as const` compila.
+
 ## [2.7.8] - 2026-10-20
 
 ### 🐛 Correcciones
