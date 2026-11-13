@@ -87,7 +87,8 @@ export type typeConfig = {
  */
 const MAX_PATH_LENGTH = 260; // Windows MAX_PATH limit
 const MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config size
-const ALLOWED_PATH_CHARS = /^[a-zA-Z0-9.\-_/\\:@ ()[\]]+$/;
+// Letras y dígitos Unicode: rutas como `proyecto-ñ/` o `código/` son legítimas
+const ALLOWED_PATH_CHARS = /^[\p{L}\p{N}.\-_/\\:@ ()[\]+~#,]+$/u;
 const DANGEROUS_PATTERNS = [
     /\.\./, // Path traversal
     /[;&|`$]/, // Command injection characters

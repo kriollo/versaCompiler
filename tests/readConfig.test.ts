@@ -99,6 +99,11 @@ describe('Security - Path Validation', () => {
             expect(validatePath('folder/subfolder/file.ts')).toBe(true);
         });
 
+        it('should accept non-ASCII letters (ñ, accents)', () => {
+            expect(validatePath('proyecto-ñ/src')).toBe(true);
+            expect(validatePath('código/versacompile.config.ts')).toBe(true);
+        });
+
         it('should accept paths with spaces and common special chars', () => {
             expect(validatePath('my folder/file name.ts')).toBe(true);
             expect(validatePath('folder-name/file_name.ts')).toBe(true);
