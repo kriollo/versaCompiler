@@ -72,7 +72,6 @@ let preCompileVue: any;
 let pipelineInstance: BuildPipeline | null = null;
 
 // 🚀 Importar optimizador de transformaciones
-let TransformOptimizer: any;
 
 // 🚀 Importar optimizador de resolución de módulos
 let ModuleResolutionOptimizer: any;
@@ -90,10 +89,6 @@ class OptimizedModuleManager {
     private preloadQueue: Set<string> = new Set(); // Cola de precarga
     private backgroundLoader: Promise<void> | null = null; // Cargador en background
     private preloadLock: Promise<void> | null = null; // Lock para evitar precargas concurrentes
-
-    // ✨ FIX #4: Límites estrictos de memoria para el pool
-    private readonly MAX_POOL_MEMORY = 100 * 1024 * 1024; // 100MB límite total
-    private readonly MAX_POOL_SIZE = 15; // Máximo 15 módulos en pool
 
     // Módulos críticos que siempre se precargan
     private readonly HOT_MODULES = ['chalk', 'parser'];
@@ -299,8 +294,6 @@ class OptimizedModuleManager {
                 return this.loadTailwind();
             case 'linter':
                 return this.loadLinter();
-            case 'transform-optimizer':
-                return this.loadTransformOptimizer();
             case 'module-resolution-optimizer':
                 return this.loadModuleResolutionOptimizer();
             default:
@@ -372,15 +365,6 @@ class OptimizedModuleManager {
         }
         return { ESLint, OxLint };
     }
-    private async loadTransformOptimizer(): Promise<any> {
-        if (!TransformOptimizer) {
-            const transformModule = await import('./transform-optimizer');
-            TransformOptimizer =
-                transformModule.TransformOptimizer.getInstance();
-        }
-        return TransformOptimizer;
-    }
-
     private async loadModuleResolutionOptimizer(): Promise<any> {
         if (!ModuleResolutionOptimizer) {
             const resolutionModule =
@@ -415,89 +399,6 @@ class OptimizedModuleManager {
         };
     }
 
-    /**
-     * ✨ FIX #4: Estima el tamaño en memoria de un módulo
-     */
-    private estimateModuleSize(moduleName: string): number {
-        // Estimaciones basadas en tipos de módulo
-        const sizeMap: Record<string, number> = {
-            'transform-optimizer': 5 * 1024 * 1024, // 5MB
-            typescript: 10 * 1024 * 1024, // 10MB
-            vue: 8 * 1024 * 1024, // 8MB
-            'module-resolution-optimizer': 3 * 1024 * 1024, // 3MB
-            transforms: 2 * 1024 * 1024, // 2MB
-            minify: 2 * 1024 * 1024, // 2MB
-            linter: 1 * 1024 * 1024, // 1MB
-            parser: 500 * 1024, // 500KB
-            chalk: 100 * 1024, // 100KB
-            default: 500 * 1024, // 500KB por defecto
-        };
-
-        return sizeMap[moduleName] ?? (sizeMap.default as number);
-    }
-
-    /**
-     * ✨ FIX #4: Obtiene el uso total de memoria del pool
-     */
-    private getPoolMemoryUsage(): number {
-        let totalSize = 0;
-        for (const moduleName of this.modulePool.keys()) {
-            totalSize += this.estimateModuleSize(moduleName);
-        }
-        return totalSize;
-    }
-
-    /**
-     * ✨ FIX #4: Limpia módulos no utilizados con control de memoria LRU
-     */
-    cleanupUnusedModules(): void {
-        const currentMemory = this.getPoolMemoryUsage();
-        const currentSize = this.modulePool.size;
-
-        // Limpiar si excedemos límites de memoria o tamaño
-        if (
-            currentMemory > this.MAX_POOL_MEMORY ||
-            currentSize > this.MAX_POOL_SIZE
-        ) {
-            // LRU: Ordenar por menos usado
-            const sortedModules = Array.from(this.usageStats.entries()).sort(
-                (a, b) => a[1] - b[1],
-            ); // Ascendente por uso
-
-            // Eliminar módulos hasta estar por debajo del 70% del límite
-            const targetMemory = this.MAX_POOL_MEMORY * 0.7;
-            const targetSize = this.MAX_POOL_SIZE * 0.7;
-            const criticalPressure = currentMemory > this.MAX_POOL_MEMORY * 0.9;
-
-            for (const [moduleName] of sortedModules) {
-                const newMemory = this.getPoolMemoryUsage();
-                const newSize = this.modulePool.size;
-
-                if (newMemory <= targetMemory && newSize <= targetSize) {
-                    break;
-                }
-
-                // HOT_MODULES solo se desalojan si la presión de memoria es crítica (>90%)
-                if (
-                    this.HOT_MODULES.includes(moduleName) &&
-                    !criticalPressure
-                ) {
-                    continue;
-                }
-
-                this.modulePool.delete(moduleName);
-                this.loadedModules.delete(moduleName);
-                this.usageStats.delete(moduleName);
-            }
-
-            if (env.VERBOSE === 'true') {
-                console.log(
-                    `[ModuleManager] Limpieza: ${currentSize} → ${this.modulePool.size} módulos, ` +
-                        `${Math.round(currentMemory / 1024 / 1024)}MB → ${Math.round(this.getPoolMemoryUsage() / 1024 / 1024)}MB`,
-                );
-            }
-        }
-    }
 
     /**
      * Resetea el estado del manager (útil para tests)
@@ -2069,65 +1970,6 @@ export function getOutputPath(ruta: string) {
     return outputPath.replace(/\.(vue|ts)$/, '.js');
 }
 
-// Optimización para modo watch: debouncing y cache de archivos
-class WatchModeOptimizer {
-    private static instance: WatchModeOptimizer;
-    private fileSystemCache: Map<string, { mtime: number }> = new Map();
-    private debounceTimers: Map<string, ReturnType<typeof setTimeout>> =
-        new Map();
-    private readonly DEBOUNCE_DELAY = 100; // 100ms debounce
-
-    static getInstance(): WatchModeOptimizer {
-        if (!WatchModeOptimizer.instance) {
-            WatchModeOptimizer.instance = new WatchModeOptimizer();
-        }
-        return WatchModeOptimizer.instance;
-    }
-
-    async compileForWatch(
-        filePath: string,
-        compileFn: (file: string) => Promise<any>,
-    ): Promise<any> {
-        return new Promise(resolve => {
-            const existingTimer = this.debounceTimers.get(filePath);
-            if (existingTimer) {
-                clearTimeout(existingTimer);
-            }
-            const timer = setTimeout(async () => {
-                this.debounceTimers.delete(filePath);
-                try {
-                    const stats = await stat(filePath);
-                    const cached = this.fileSystemCache.get(filePath);
-                    if (cached && cached.mtime >= stats.mtimeMs) {
-                        resolve({ success: true, cached: true });
-                        return;
-                    } // Configurar worker pool para modo watch
-                    const { TypeScriptWorkerPool } =
-                        (await import('./typescript-worker-pool')) as {
-                            TypeScriptWorkerPool: any;
-                        };
-                    const workerPool = TypeScriptWorkerPool.getInstance();
-                    workerPool.setMode('watch');
-                    const result = await compileFn(filePath);
-                    this.fileSystemCache.set(filePath, {
-                        mtime: stats.mtimeMs,
-                    });
-                    resolve(result);
-                } catch (error) {
-                    resolve({ success: false, error });
-                }
-            }, this.DEBOUNCE_DELAY);
-            this.debounceTimers.set(filePath, timer);
-        });
-    }
-
-    cleanup(): void {
-        this.debounceTimers.forEach(timer => clearTimeout(timer));
-        this.debounceTimers.clear();
-        this.fileSystemCache.clear();
-    }
-}
-
 function getBuildPipeline(): BuildPipeline {
     if (!pipelineInstance) {
         const basePlugins = createCorePlugins();
@@ -3276,9 +3118,6 @@ export async function initCompileAll() {
         progressManager.updateProgress('💾 Guardando cache...');
         await saveCache();
 
-        // ✨ FIX #4: Limpiar módulos no usados después de compilación masiva
-        progressManager.updateProgress('🧹 Limpiando módulos no usados...');
-        moduleManager.cleanupUnusedModules();
 
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime); // Finalizar progreso
@@ -3354,4 +3193,3 @@ export async function compileFile(filePath: string) {
     );
 }
 
-export { WatchModeOptimizer };

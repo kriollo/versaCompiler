@@ -42,11 +42,6 @@ interface WorkerResponse {
     error?: string;
     message?: string;
     type?: string; // ✨ ISSUE #4: Para manejo de mensajes especiales
-    memoryUsage?: {
-        heapUsed: number;
-        heapTotal: number;
-        rss: number;
-    };
 }
 
 /**
@@ -81,9 +76,6 @@ interface PoolWorker {
     busy: boolean;
     pendingTasks: Map<string, PendingTask>;
     taskCounter: number;
-    // ✨ ISSUE #4: Controles de memoria y performance
-    memoryUsage: number;
-    lastMemoryCheck: number;
     tasksProcessed: number;
     creationTime: number;
     lastActivityTime: number;
@@ -103,11 +95,6 @@ export class TypeScriptWorkerPool {
     private readonly TASK_TIMEOUT = 60000; // 60 segundos por tarea - workers son secuenciales, necesitan tiempo
     private readonly WORKER_INIT_TIMEOUT = 10000; // 10 segundos para inicializar
     private readonly MAX_TASKS_PER_WORKER = 200; // ✨ OPTIMIZADO: Aumentado de 50 a 200 para reducir overhead de reciclaje
-    private readonly WORKER_MEMORY_CHECK_INTERVAL = 500; // ✨ OPTIMIZADO: Verificar cada 500 tareas (reducir overhead)
-
-    // ✨ FIX #1: Referencias a timers para limpieza adecuada
-    private memoryCheckInterval: ReturnType<typeof setInterval> | null = null;
-    private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
     // Cola de tareas para cuando todos los workers están ocupados
     private taskQueue: QueuedTask[] = [];
@@ -130,196 +117,6 @@ export class TypeScriptWorkerPool {
             process.env.PATH_PROY || path.join(process.cwd(), 'src'),
             'compiler',
             'typescript-worker-thread.cjs',
-        );
-
-        // ✨ ISSUE #4: Configurar monitoreo de memoria automático        this.startMemoryMonitoring();
-    }
-
-    // ✨ ISSUE #4: Métodos de control de memoria y timeouts
-
-    /**
-     * Inicia el monitoreo automático de memoria de workers
-     * ✨ FIX #1: Ahora almacena referencias a los intervalos para limpieza posterior
-     */
-    private startMemoryMonitoring(): void {
-        // Limpiar intervalos previos si existen
-        this.stopMemoryMonitoring();
-
-        // Monitoreo cada 15 segundos (más frecuente)
-        this.memoryCheckInterval = setInterval(() => {
-            this.checkWorkersMemory();
-        }, 15000);
-
-        // Limpieza de workers inactivos cada 2 minutos (más frecuente)
-        this.cleanupInterval = setInterval(() => {
-            this.cleanupInactiveWorkers();
-        }, 120000);
-    }
-
-    /**
-     * ✨ FIX #1: Detiene el monitoreo automático de memoria
-     */
-    private stopMemoryMonitoring(): void {
-        if (this.memoryCheckInterval) {
-            clearInterval(this.memoryCheckInterval);
-            this.memoryCheckInterval = null;
-        }
-        if (this.cleanupInterval) {
-            clearInterval(this.cleanupInterval);
-            this.cleanupInterval = null;
-        }
-    }
-
-    /**
-     * Verifica el uso de memoria de todos los workers con medición real
-     */
-    private async checkWorkersMemory(): Promise<void> {
-        const now = Date.now();
-
-        for (const poolWorker of this.workers) {
-            // Actualizar tiempo de última verificación
-            poolWorker.lastMemoryCheck = now;
-
-            try {
-                // ✨ ISSUE #4: Obtener memoria real del worker
-                const memoryInfo = await this.getWorkerMemoryUsage(poolWorker);
-                poolWorker.memoryUsage = memoryInfo.heapUsed;
-
-                // Verificar límites de memoria y reciclaje automático.
-                // Solo reciclar workers INACTIVOS para evitar rechazar tareas en vuelo.
-                // Los workers con tareas pendientes se reciclan vía drainQueue cuando quedan libres.
-                const isIdle =
-                    !poolWorker.busy && poolWorker.pendingTasks.size === 0;
-                if (isIdle && this.shouldRecycleWorker(poolWorker)) {
-                    const reason = this.getRecycleReason(poolWorker);
-                    console.warn(
-                        `[WorkerPool] Worker ${poolWorker.id} requiere reciclaje: ${reason}`,
-                    );
-                    await this.recycleWorker(poolWorker);
-                }
-            } catch (error: any) {
-                console.warn(
-                    `[WorkerPool] Error verificando memoria del worker ${poolWorker.id}:`,
-                    error,
-                );
-            }
-        }
-    }
-
-    /**
-     * Obtiene el uso real de memoria de un worker
-     */
-    private async getWorkerMemoryUsage(
-        poolWorker: PoolWorker,
-    ): Promise<{ heapUsed: number; heapTotal: number; rss: number }> {
-        return new Promise(resolve => {
-            const timeout = setTimeout(() => {
-                // Fallback con estimación si no hay respuesta
-                resolve({
-                    heapUsed: poolWorker.tasksProcessed * 2048, // 2KB por tarea
-                    heapTotal: poolWorker.tasksProcessed * 3072, // 3KB total estimado
-                    rss: poolWorker.tasksProcessed * 4096, // 4KB RSS estimado
-                });
-            }, 1000);
-
-            // Solicitar memoria real del worker
-            const memoryRequestId = `memory-${poolWorker.id}-${Date.now()}`;
-
-            const handler = (response: any) => {
-                if (
-                    response.id === memoryRequestId &&
-                    response.type === 'memory-usage'
-                ) {
-                    clearTimeout(timeout);
-                    poolWorker.worker.off('message', handler);
-                    resolve({
-                        heapUsed:
-                            response.memoryUsage?.heapUsed ||
-                            poolWorker.tasksProcessed * 2048,
-                        heapTotal:
-                            response.memoryUsage?.heapTotal ||
-                            poolWorker.tasksProcessed * 3072,
-                        rss:
-                            response.memoryUsage?.rss ||
-                            poolWorker.tasksProcessed * 4096,
-                    });
-                }
-            };
-
-            poolWorker.worker.on('message', handler);
-            poolWorker.worker.postMessage({
-                type: 'get-memory-usage',
-                id: memoryRequestId,
-            });
-        });
-    }
-
-    /**
-     * Obtiene la razón por la cual un worker debe ser reciclado
-     * ✨ OPTIMIZACIÓN #11: Límites aumentados para reducir overhead de reciclaje
-     */
-    private getRecycleReason(poolWorker: PoolWorker): string {
-        const now = Date.now();
-        const MEMORY_LIMIT = 100 * 1024 * 1024; // ✨ 100MB (aumentado de 50MB)
-        const TIME_LIMIT = 30 * 60 * 1000; // 30 minutos
-        const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
-
-        const reasons: string[] = [];
-
-        if (poolWorker.memoryUsage > MEMORY_LIMIT) {
-            reasons.push(
-                `memoria excede ${Math.round(MEMORY_LIMIT / 1024 / 1024)}MB (actual: ${Math.round(poolWorker.memoryUsage / 1024 / 1024)}MB)`,
-            );
-        }
-
-        if (now - poolWorker.creationTime > TIME_LIMIT) {
-            reasons.push(
-                `tiempo de vida excede ${Math.round(TIME_LIMIT / 60000)} minutos`,
-            );
-        }
-
-        if (poolWorker.tasksProcessed >= TASK_LIMIT) {
-            reasons.push(
-                `tareas procesadas exceden ${TASK_LIMIT} (actual: ${poolWorker.tasksProcessed})`,
-            );
-        }
-
-        return reasons.join(', ');
-    } /**
-     * Limpia workers que han estado inactivos por mucho tiempo
-     */
-    private async cleanupInactiveWorkers(): Promise<void> {
-        const now = Date.now();
-        const INACTIVE_TIMEOUT = 5 * 60 * 1000; // 5 minutos (reducido)
-
-        for (const poolWorker of this.workers) {
-            const timeSinceLastActivity = now - poolWorker.lastActivityTime;
-
-            if (
-                timeSinceLastActivity > INACTIVE_TIMEOUT &&
-                !poolWorker.busy &&
-                poolWorker.pendingTasks.size === 0
-            ) {
-                console.info(
-                    `[WorkerPool] Worker ${poolWorker.id} inactivo por ${Math.round(timeSinceLastActivity / 60000)} minutos, reciclando...`,
-                );
-                await this.recycleWorker(poolWorker);
-            }
-        }
-    } /**
-     * Verifica si un worker debe ser reciclado por límites de memoria/tiempo
-     * ✨ OPTIMIZACIÓN #11: Límites aumentados para reducir overhead de reciclaje
-     */
-    private shouldRecycleWorker(poolWorker: PoolWorker): boolean {
-        const now = Date.now();
-        const MEMORY_LIMIT = 100 * 1024 * 1024; // ✨ 100MB (aumentado de 30MB)
-        const TIME_LIMIT = 30 * 60 * 1000; // ✨ 30 minutos (aumentado de 15 min)
-        const TASK_LIMIT = this.MAX_TASKS_PER_WORKER;
-
-        return (
-            poolWorker.memoryUsage > MEMORY_LIMIT ||
-            now - poolWorker.creationTime > TIME_LIMIT ||
-            poolWorker.tasksProcessed >= TASK_LIMIT
         );
     }
 
@@ -436,9 +233,6 @@ export class TypeScriptWorkerPool {
                     busy: false,
                     pendingTasks: new Map(),
                     taskCounter: 0,
-                    // ✨ ISSUE #4: Inicializar controles de memoria
-                    memoryUsage: 0,
-                    lastMemoryCheck: Date.now(),
                     tasksProcessed: 0,
                     creationTime: Date.now(),
                     lastActivityTime: Date.now(),
@@ -752,7 +546,6 @@ export class TypeScriptWorkerPool {
             poolWorker.busy = false;
             poolWorker.taskCounter = 0;
             poolWorker.tasksProcessed = 0;
-            poolWorker.memoryUsage = 0;
 
             // 4. ✨ FIX MEMORIA: Terminar con timeout agresivo
             const terminatePromise = workerToTerminate.terminate();
@@ -1132,9 +925,6 @@ export class TypeScriptWorkerPool {
     async terminate(): Promise<void> {
         console.log('[WorkerPool] Cerrando pool de workers...');
 
-        // 0. ✨ FIX #1: Detener monitoreo de memoria primero
-        this.stopMemoryMonitoring();
-
         // 0b. Rechazar todas las tareas en cola
         for (const queued of this.taskQueue) {
             queued.reject(new Error('Worker pool cerrado'));
@@ -1225,190 +1015,5 @@ export class TypeScriptWorkerPool {
             failedTasks: this.failedTasks,
             successRate,
         };
-    }
-
-    // ✨ ISSUE #4: Métodos de categorización de errores de TypeScript
-
-    /**
-     * Categoriza y mejora los errores de TypeScript para mejor debugging
-     */
-    private categorizeTypeScriptErrors(
-        result: TypeCheckResult,
-        fileName: string,
-    ): TypeCheckResult {
-        if (!result.hasErrors || !result.diagnostics?.length) {
-            return result;
-        }
-
-        const categorizedDiagnostics = result.diagnostics.map(diagnostic => {
-            // Añadir metadatos útiles para debugging
-            const enhanced = {
-                ...diagnostic,
-                _category: this.getErrorCategory(diagnostic),
-                _severity: this.getErrorSeverity(diagnostic),
-                _fileName: fileName,
-                _timestamp: Date.now(),
-            };
-
-            return enhanced;
-        });
-
-        return {
-            ...result,
-            diagnostics: categorizedDiagnostics,
-            // Añadir estadísticas de errores
-            _errorStats: this.calculateErrorStats(categorizedDiagnostics),
-        } as any;
-    } /**
-     * Determina la categoría de un error de TypeScript
-     */
-    private getErrorCategory(diagnostic: any): string {
-        const code = diagnostic.code;
-
-        // Categorización basada en códigos de error comunes
-        if ([2304, 2339, 2346].includes(code)) {
-            return 'MISSING_DECLARATION'; // No puede encontrar nombre/propiedad
-        } else if ([2322, 2322, 2345].includes(code)) {
-            return 'TYPE_MISMATCH'; // Error de tipos
-        } else if ([2307, 2317].includes(code)) {
-            return 'MODULE_RESOLUTION'; // Error de resolución de módulos
-        } else if ([2552, 2551].includes(code)) {
-            return 'PROPERTY_ACCESS'; // Error de acceso a propiedades
-        } else if (code >= 1000 && code < 2000) {
-            return 'SYNTAX_ERROR'; // Errores de sintaxis
-        } else if (code >= 2000 && code < 3000) {
-            return 'SEMANTIC_ERROR'; // Errores semánticos
-        } else if (code >= 4000) {
-            return 'CONFIG_ERROR'; // Errores de configuración
-        }
-
-        return 'OTHER';
-    }
-
-    /**
-     * Determina la severidad de un error de TypeScript
-     */
-    private getErrorSeverity(diagnostic: any): 'ERROR' | 'WARNING' | 'INFO' {
-        const category = diagnostic.category;
-
-        switch (category) {
-            case 1:
-                return 'ERROR'; // typescript.DiagnosticCategory.Error
-            case 2:
-                return 'WARNING'; // typescript.DiagnosticCategory.Warning
-            case 3:
-                return 'INFO'; // typescript.DiagnosticCategory.Message
-            default:
-                return 'ERROR';
-        }
-    }
-
-    /**
-     * Calcula estadísticas de errores para análisis
-     */
-    private calculateErrorStats(diagnostics: any[]): object {
-        const stats = {
-            totalErrors: diagnostics.length,
-            errorsByCategory: {} as Record<string, number>,
-            errorsBySeverity: {} as Record<string, number>,
-            mostCommonError: null as any,
-        };
-
-        // Contar por categoría y severidad
-        diagnostics.forEach(diag => {
-            const category = diag._category || 'OTHER';
-            const severity = diag._severity || 'ERROR';
-
-            stats.errorsByCategory[category] =
-                (stats.errorsByCategory[category] || 0) + 1;
-            stats.errorsBySeverity[severity] =
-                (stats.errorsBySeverity[severity] || 0) + 1;
-        }); // Encontrar el error más común
-        const errorCounts = {} as Record<string, number>;
-        diagnostics.forEach(diag => {
-            const code = String(diag.code);
-            errorCounts[code] = (errorCounts[code] || 0) + 1;
-        });
-        const errorCountKeys = Object.keys(errorCounts);
-        if (errorCountKeys.length > 0) {
-            const mostCommonCode = errorCountKeys.reduce((a, b) =>
-                (errorCounts[a] || 0) > (errorCounts[b] || 0) ? a : b,
-            );
-
-            stats.mostCommonError = {
-                code: mostCommonCode,
-                count: errorCounts[mostCommonCode],
-                message: diagnostics.find(
-                    d => String(d.code) === mostCommonCode,
-                )?.messageText,
-            };
-        }
-
-        return stats;
-    }
-
-    /**
-     * Crea un error categorizado con información de contexto
-     */
-    private createCategorizedError(
-        errorMessage: string,
-        fileName: string,
-        response: WorkerResponse,
-    ): Error {
-        const error = new Error(errorMessage) as any;
-
-        // Añadir metadatos del error
-        error.fileName = fileName;
-        error.timestamp = Date.now();
-        error.workerResponse = response;
-        error.category = this.categorizeGenericError(errorMessage);
-        error.isRecoverable = this.isRecoverableError(errorMessage);
-
-        return error;
-    }
-
-    /**
-     * Categoriza errores genéricos del worker
-     */
-    private categorizeGenericError(errorMessage: string): string {
-        if (
-            errorMessage.includes('timeout') ||
-            errorMessage.includes('Timeout')
-        ) {
-            return 'TIMEOUT';
-        } else if (
-            errorMessage.includes('memory') ||
-            errorMessage.includes('Memory')
-        ) {
-            return 'MEMORY';
-        } else if (
-            errorMessage.includes('Worker') &&
-            errorMessage.includes('exited')
-        ) {
-            return 'WORKER_CRASH';
-        } else if (
-            errorMessage.includes('initialization') ||
-            errorMessage.includes('init')
-        ) {
-            return 'INITIALIZATION';
-        }
-
-        return 'UNKNOWN';
-    }
-
-    /**
-     * Determina si un error es recuperable
-     */
-    private isRecoverableError(errorMessage: string): boolean {
-        const recoverablePatterns = [
-            'timeout',
-            'Worker being recycled',
-            'Worker pool cerrado',
-            'temporary',
-        ];
-
-        return recoverablePatterns.some(pattern =>
-            errorMessage.toLowerCase().includes(pattern.toLowerCase()),
-        );
     }
 }
