@@ -6,6 +6,8 @@
 #   pnpm release --dry-run    # simula todo, no publica nada
 #   pnpm release --otp 123456 # pasa el código 2FA directamente
 #
+# Si no hay sesión de npm, el script ofrece hacer `npm login` (navegador) y sigue.
+#
 # Flujo normal de una versión nueva:
 #   1. Subir "version" en package.json y añadir la entrada en CHANGELOG.md
 #   2. git commit -am "chore: versaCompiler X.Y.Z"
@@ -22,7 +24,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true ;;
         --otp) OTP="${2:?--otp necesita el código}"; shift ;;
         --otp=*) OTP="${1#--otp=}" ;;
-        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,/^set -euo/{/^set -euo/d;p}' "$0"; exit 0 ;;
         *) echo "Opción desconocida: $1" >&2; exit 1 ;;
     esac
     shift
@@ -66,7 +68,13 @@ green "git OK (master, limpio, tag $TAG publicado)"
 # --- npm -------------------------------------------------------------------
 step "Comprobando npm"
 if ! NPM_USER=$(npm whoami 2>/dev/null); then
-    fail "No hay sesión en npm. Ejecuta: npm login   (abre el navegador para autenticar)"
+    printf '\033[33m! No hay sesión en npm.\033[0m\n'
+    read -r -p "¿Iniciar sesión ahora? Se abrirá el navegador para autenticar [S/n] " answer
+    [[ "$answer" =~ ^[nN]$ ]] && fail "Sin sesión no se puede publicar. Inicia sesión con: npm login"
+    # --auth-type=web: npm muestra una URL, autenticas en el navegador (con 2FA)
+    # y la sesión queda guardada en ~/.npmrc para las próximas veces
+    npm login --auth-type=web || fail "npm login falló."
+    NPM_USER=$(npm whoami 2>/dev/null) || fail "Sigue sin haber sesión tras npm login."
 fi
 green "Sesión npm: $NPM_USER"
 if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
