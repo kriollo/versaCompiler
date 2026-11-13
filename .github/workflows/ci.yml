@@ -11,8 +11,13 @@ concurrency:
 
 jobs:
     test:
-        name: Lint, test & build
-        runs-on: ubuntu-latest
+        name: Lint, test & build (${{ matrix.os }}, node ${{ matrix.node }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+                node: [22, 24]
         steps:
             - uses: actions/checkout@v7
 
@@ -23,7 +28,7 @@ jobs:
             # no lo commitea (está en .gitignore).
             - uses: actions/setup-node@v7
               with:
-                  node-version: 22
+                  node-version: ${{ matrix.node }}
                   # Sin pnpm-lock.yaml commiteado no hay clave de caché (ver arriba)
                   package-manager-cache: false
 
@@ -31,6 +36,10 @@ jobs:
             # .gitignore), así que no se puede usar --frozen-lockfile.
             - name: Install dependencies
               run: pnpm install
+
+            - name: Audit production dependencies
+              if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+              run: pnpm audit --prod
 
             - name: Lint (oxlint)
               run: pnpm lint
@@ -44,6 +53,11 @@ jobs:
 
             - name: Build
               run: pnpm build
+
+            - name: Smoke test CLI
+              run: |
+                  node dist/main.js --version
+                  node dist/main.js --help
 
     e2e:
         name: E2E (Playwright)
