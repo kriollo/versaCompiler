@@ -64,4 +64,35 @@ describe('CompileWorkerPool - aislamiento de errores por worker', () => {
         await expect(taskB).resolves.toEqual({ compiled: true });
         void idA; // solo usado para claridad/documentación del escenario
     });
+
+    it('un timeout termina el worker colgado y su reemplazo atiende la cola', async () => {
+        vi.useFakeTimers();
+        try {
+            process.env.COMPILE_MAX_WORKERS = '1';
+            const { CompileWorkerPool } =
+                await import('../src/compiler/compile-worker-pool');
+            const pool = CompileWorkerPool.getInstance();
+            const [hung] = createdWorkers;
+
+            const slow = pool.runTask('vue', { fileName: 'a.vue', source: '' });
+            const slowRejected = expect(slow).rejects.toThrow('Worker timeout');
+            vi.advanceTimersByTime(1);
+            const queued = pool.runTask('ts', { fileName: 'b.ts', source: '' });
+
+            // Solo vence la primera: la segunda se encoló 1 ms después
+            vi.advanceTimersByTime(59999);
+            await slowRejected;
+            expect(hung!.terminate).toHaveBeenCalledTimes(1);
+
+            hung!.emit('exit', 1);
+            const replacement = createdWorkers[1]!;
+            expect(replacement.postMessage).toHaveBeenCalledTimes(1);
+
+            const { id } = replacement.postMessage.mock.calls[0]![0];
+            replacement.emit('message', { id, success: true, data: 'ok' });
+            await expect(queued).resolves.toBe('ok');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

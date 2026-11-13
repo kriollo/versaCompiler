@@ -38,6 +38,7 @@ type PendingTask = {
 type PoolWorker = {
     worker: Worker;
     busy: boolean;
+    dead: boolean;
 };
 
 export class CompileWorkerPool {
@@ -73,44 +74,63 @@ export class CompileWorkerPool {
 
     private initWorkers(): void {
         for (let i = 0; i < this.poolSize; i++) {
-            const worker = new Worker(this.workerPath, {
-                env: process.env,
-            });
-            const poolWorker: PoolWorker = { worker, busy: false };
-
-            worker.on('message', (response: WorkerResponse) => {
-                const pending = this.pending.get(response.id);
-                if (!pending) return;
-                clearTimeout(pending.timeout);
-                this.pending.delete(response.id);
-                poolWorker.busy = false;
-                if (!response.success) {
-                    pending.reject(
-                        new Error(response.error || 'Worker task failed'),
-                    );
-                } else {
-                    pending.resolve(response.data);
-                }
-                this.drainQueue();
-            });
-
-            worker.on('error', error => {
-                poolWorker.busy = false;
-                const normalized =
-                    error instanceof Error ? error : new Error(String(error));
-                // Rechazar solo las tareas despachadas a ESTE worker, no las
-                // que están corriendo en workers hermanos sanos.
-                for (const [id, pending] of this.pending) {
-                    if (pending.poolWorker !== poolWorker) continue;
-                    clearTimeout(pending.timeout);
-                    pending.reject(normalized);
-                    this.pending.delete(id);
-                }
-                this.drainQueue();
-            });
-
-            this.workers.push(poolWorker);
+            this.workers.push(this.spawnWorker());
         }
+    }
+
+    private spawnWorker(): PoolWorker {
+        const worker = new Worker(this.workerPath, {
+            env: process.env,
+        });
+        const poolWorker: PoolWorker = { worker, busy: false, dead: false };
+
+        worker.on('message', (response: WorkerResponse) => {
+            const pending = this.pending.get(response.id);
+            if (!pending) return;
+            clearTimeout(pending.timeout);
+            this.pending.delete(response.id);
+            poolWorker.busy = false;
+            if (!response.success) {
+                pending.reject(new Error(response.error || 'Worker task failed'));
+            } else {
+                pending.resolve(response.data);
+            }
+            this.drainQueue();
+        });
+
+        worker.on('error', error => {
+            this.replaceWorker(
+                poolWorker,
+                error instanceof Error ? error : new Error(String(error)),
+            );
+        });
+        // Un crash/OOM (o el terminate() de un timeout) emite 'exit' sin 'error'
+        worker.on('exit', code => {
+            this.replaceWorker(
+                poolWorker,
+                new Error(`Worker terminó inesperadamente (code ${code})`),
+            );
+        });
+
+        return poolWorker;
+    }
+
+    /**
+     * Rechaza solo las tareas despachadas a ESTE worker (no las de workers
+     * hermanos sanos) y lo sustituye por uno nuevo para no perder el slot.
+     */
+    private replaceWorker(poolWorker: PoolWorker, error: Error): void {
+        if (poolWorker.dead) return;
+        poolWorker.dead = true;
+        for (const [id, pending] of this.pending) {
+            if (pending.poolWorker !== poolWorker) continue;
+            clearTimeout(pending.timeout);
+            pending.reject(error);
+            this.pending.delete(id);
+        }
+        const index = this.workers.indexOf(poolWorker);
+        if (index !== -1) this.workers[index] = this.spawnWorker();
+        this.drainQueue();
     }
 
     async runTask(
@@ -123,7 +143,12 @@ export class CompileWorkerPool {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.pending.delete(id);
+                this.queue = this.queue.filter(queued => queued.id !== id);
                 reject(new Error(`Worker timeout: ${type}`));
+                // El worker sigue colgado en la tarea: reemplazarlo vía 'exit'
+                if (pendingTask.poolWorker) {
+                    void pendingTask.poolWorker.worker.terminate();
+                }
             }, this.TASK_TIMEOUT);
 
             const pendingTask: PendingTask = {
@@ -145,7 +170,7 @@ export class CompileWorkerPool {
     }
 
     private getAvailableWorker(): PoolWorker | null {
-        return this.workers.find(worker => !worker.busy) || null;
+        return this.workers.find(worker => !worker.busy && !worker.dead) || null;
     }
 
     private drainQueue(): void {
