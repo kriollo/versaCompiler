@@ -55,6 +55,7 @@
         "build:types": "tsc -p tsconfig.declarations.json",
         "typecheck": "tsc --noEmit -p tsconfig.typecheck.json && tsc --noEmit -p tsconfig.vitest.json",
         "prepublishOnly": "pnpm build",
+        "release": "bash scripts/publish.sh",
         "compileDev": "tsx src/main.ts --all --ci --cc -y -t --linter --verbose",
         "vlint": "tsx src/main.ts --all --cc --co -y --linter",
         "vtlint": "tsx src/main.ts --all --cc --co -y -t --verbose",
