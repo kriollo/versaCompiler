@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 // thread real) solo instancia las clases, no arranca el listener de
 // parentPort (queda en null fuera de un worker).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { WorkerTypeScriptLanguageServiceHost } = require('../src/compiler/typescript-worker-thread.cjs');
+const {
+    WorkerTypeScriptLanguageServiceHost,
+} = require('../src/compiler/typescript-worker-thread.cjs');
 
 describe('WorkerTypeScriptLanguageServiceHost - cache de versiones de dependencias', () => {
     let dir: string;

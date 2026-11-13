@@ -23,15 +23,14 @@
             version: 0,
             expandPath: [],
         }),
-
         emit = defineEmits<{
             select: [folder: DMSFolder];
             refresh: [];
             deleteFolder: [folder: DMSFolder];
         }>(),
-
         // Normalizar expandPath para garantizar que siempre sea un arreglo (evita warnings de TS sobre 'posiblemente undefined')
-        safeExpandPath = computed<number[]>(() => props.expandPath ?? []),        { folders: childFolders, fetchFolders } = useFolders(),
+        safeExpandPath = computed<number[]>(() => props.expandPath ?? []),
+        { folders: childFolders, fetchFolders } = useFolders(),
         isOpen = ref(false),
         childrenLoaded = ref(false),
         localChildren = ref<DMSFolder[]>([]);
@@ -61,7 +60,10 @@
     );
 
     const childExpandPath = computed<number[]>(() =>
-        safeExpandPath.value.length > 0 && safeExpandPath.value[0] === props.folder.id ? safeExpandPath.value.slice(1) : [],
+        safeExpandPath.value.length > 0 &&
+        safeExpandPath.value[0] === props.folder.id
+            ? safeExpandPath.value.slice(1)
+            : [],
     );
 
     watch(
@@ -93,25 +95,41 @@
                     ? 'bg-brand text-white'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700',
             ]">
-            <button class="w-4 h-4 flex-shrink-0 flex items-center justify-center" @click.stop="toggle">
+            <button
+                class="w-4 h-4 flex-shrink-0 flex items-center justify-center"
+                @click.stop="toggle">
                 <svg
-                    :class="['w-3 h-3 transition-transform', isOpen ? 'rotate-90' : '']"
+                    :class="[
+                        'w-3 h-3 transition-transform',
+                        isOpen ? 'rotate-90' : '',
+                    ]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24">
-                    <path d="m9 18 6-6-6-6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                    <path
+                        d="m9 18 6-6-6-6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2" />
                 </svg>
             </button>
 
             <svg
                 class="w-4 h-4 flex-shrink-0"
-                :class="activeFolderId === folder.id ? 'text-white' : 'text-yellow-400'"
+                :class="
+                    activeFolderId === folder.id
+                        ? 'text-white'
+                        : 'text-yellow-400'
+                "
                 fill="currentColor"
                 viewBox="0 0 24 24">
-                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                <path
+                    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
             </svg>
 
-            <span class="flex-1 truncate" @click="selectFolder">{{ folder.name }}</span>
+            <span class="flex-1 truncate" @click="selectFolder">
+                {{ folder.name }}
+            </span>
 
             <button
                 class="w-5 h-5 flex-shrink-0 items-center justify-center rounded hidden group-hover:flex"
@@ -122,7 +140,11 @@
                 "
                 title="Eliminar carpeta"
                 @click.stop="deleteFolder">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    class="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
                     <path
                         d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
                         stroke-linecap="round"
@@ -132,7 +154,9 @@
             </button>
         </div>
 
-        <div v-if="isOpen && localChildren.length > 0" class="ml-2 border-l border-gray-200 dark:border-gray-700">
+        <div
+            v-if="isOpen && localChildren.length > 0"
+            class="ml-2 border-l border-gray-200 dark:border-gray-700">
             <FolderNode
                 v-for="child in localChildren"
                 :key="child.id"

@@ -1,4 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 
 // versaHMR.js lee `window` en el top-level del módulo (crea el singleton
 // window.__versaHMR si no existe), así que window debe existir ANTES de
@@ -55,10 +63,9 @@ describe('VersaHMR - registro de módulos', () => {
         const callback = vi.fn();
         versaHMR.accept('/public/utils/math.js', callback);
 
-        const ok = versaHMR.notifyUpdate(
-            '/public/utils/math.js?t=123456',
-            { fresh: true },
-        );
+        const ok = versaHMR.notifyUpdate('/public/utils/math.js?t=123456', {
+            fresh: true,
+        });
 
         expect(ok).toBe(true);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -71,9 +78,7 @@ describe('VersaHMR - registro de módulos', () => {
         unsubscribe();
 
         expect(versaHMR.hasObservers('/public/utils/math.js')).toBe(false);
-        expect(versaHMR.notifyUpdate('/public/utils/math.js', {})).toBe(
-            false,
-        );
+        expect(versaHMR.notifyUpdate('/public/utils/math.js', {})).toBe(false);
         expect(callback).not.toHaveBeenCalled();
     });
 

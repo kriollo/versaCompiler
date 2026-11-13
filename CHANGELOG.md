@@ -10,48 +10,48 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### 🐛 Correcciones
 
 - **La defensa de la 2.7.8 contra TS crudo en la estandarización no cubría los `.vue`** (`src/compiler/parser.ts`).
-  - En `parseSync` de oxc, `astType` solo cambia la forma del AST, y el lenguaje se deduce de la extensión. Un `.vue` con `loader: 'ts'` se seguía leyendo como JS. Ahora, cuando se pide `astType: 'ts'`, también se pasa `lang: 'ts'`.
-  - Más pruebas:
-    - `tests/plugin-driver.test.ts`: la cadena se corta al primer error y conserva el último contenido bueno; una etapa que solo emite `diagnostics` o devuelve `errors: []` no corta la cadena.
-    - `tests/estandariza-loader.test.ts`: un `.vue` con TS y `loader: 'ts'`.
-    - `tests/pipeline-fail-fast.test.ts`: un `.ts` suelto con TS2339 reporta solo el error real, y uno válido con `import type`, `satisfies` y `as const` compila.
+    - En `parseSync` de oxc, `astType` solo cambia la forma del AST, y el lenguaje se deduce de la extensión. Un `.vue` con `loader: 'ts'` se seguía leyendo como JS. Ahora, cuando se pide `astType: 'ts'`, también se pasa `lang: 'ts'`.
+    - Más pruebas:
+        - `tests/plugin-driver.test.ts`: la cadena se corta al primer error y conserva el último contenido bueno; una etapa que solo emite `diagnostics` o devuelve `errors: []` no corta la cadena.
+        - `tests/estandariza-loader.test.ts`: un `.vue` con TS y `loader: 'ts'`.
+        - `tests/pipeline-fail-fast.test.ts`: un `.ts` suelto con TS2339 reporta solo el error real, y uno válido con `import type`, `satisfies` y `as const` compila.
 
 ## [2.7.8] - 2026-10-20
 
 ### 🐛 Correcciones
 
 - **Un error de TypeScript producía un error espurio de parseo en standardization** (`src/compiler/pipeline/plugin-driver.ts`, `src/compiler/pipeline/core-plugins.ts`, `src/compiler/transforms.ts`). Un reporte real de modalArticulo.vue en VersaABA mostraba esto:
-  
-  ```
-  ❌ Error en compilación de modalArticulo.vue: typescript: Property 'stocks' does not exist on type 'VersaFetchResponse'.
-  standardization: Expected `,` or `}` but found `Identifier`
-  ```
-  
-  El error real era un TS2339 con `typeCheck` activo (`-t`). El stage `core-ts` devolvía el error y no actualizaba `contents`, pero `PluginDriver.transform` seguía encadenando y el siguiente stage recibía el **TS crudo** del stage vue; el parser de oxc en modo JS se caía con el `type Ref` inline del import de vue — un error de parseo engañoso que entierra el error de tipos. Variaciones del mismo problema: cualquier stage previo con error dejaba TS sin transpilar para el siguiente.
-  - Ahora `PluginDriver.transform` corta la cadena al primer stage que reporta errores (fail-fast): se conservan los errores reales y las etapas posteriores no corren sobre código roto.
-  - Defensa extra: `estandarizaCode` recibe el loader del paso anterior y parsea con `ts` cuando el contenido aún es TypeScript, tanto al parsear el AST como tras reemplazar los imports con alias.
-  - Versión del fix ejercitado contra el proyecto real: `compileDev` vuelve a indicar solo el TS2339; el modal compila limpio una vez corregido el tipo.
-  - Pruebas nuevas en `tests/pipeline-fail-fast.test.ts`, con el pipeline core real (vue → ts → transforms): SFC válido con `import type` inline y genérico anidado, y SFC con TS2339 sin error espurio.
+
+    ```
+    ❌ Error en compilación de modalArticulo.vue: typescript: Property 'stocks' does not exist on type 'VersaFetchResponse'.
+    standardization: Expected `,` or `}` but found `Identifier`
+    ```
+
+    El error real era un TS2339 con `typeCheck` activo (`-t`). El stage `core-ts` devolvía el error y no actualizaba `contents`, pero `PluginDriver.transform` seguía encadenando y el siguiente stage recibía el **TS crudo** del stage vue; el parser de oxc en modo JS se caía con el `type Ref` inline del import de vue — un error de parseo engañoso que entierra el error de tipos. Variaciones del mismo problema: cualquier stage previo con error dejaba TS sin transpilar para el siguiente.
+    - Ahora `PluginDriver.transform` corta la cadena al primer stage que reporta errores (fail-fast): se conservan los errores reales y las etapas posteriores no corren sobre código roto.
+    - Defensa extra: `estandarizaCode` recibe el loader del paso anterior y parsea con `ts` cuando el contenido aún es TypeScript, tanto al parsear el AST como tras reemplazar los imports con alias.
+    - Versión del fix ejercitado contra el proyecto real: `compileDev` vuelve a indicar solo el TS2339; el modal compila limpio una vez corregido el tipo.
+    - Pruebas nuevas en `tests/pipeline-fail-fast.test.ts`, con el pipeline core real (vue → ts → transforms): SFC válido con `import type` inline y genérico anidado, y SFC con TS2339 sin error espurio.
 
 ## [2.7.7] - 2026-10-20
 
 ### 🐛 Correcciones
 
 - **Un `>` en un atributo del elemento raíz rompía el componente** (`src/compiler/vuejs.ts`). En desarrollo se inyecta `:key="versaComponentKey"` en el elemento raíz del `<template>`, y la etiqueta se cortaba en el primer `>`, aunque estuviera entre comillas.
-  - `<p v-if="total > 0">` como raíz quedaba partido: el resto de la expresión pasaba a ser un nombre de atributo, con el error «Attribute name cannot contain U+0022…» y «Unexpected JSX expression».
-  - Ahora los valores entre comillas (dobles o simples) se saltan enteros. También funciona con `<`, `>=`, `v-show`, `:class` y etiquetas que se cierran solas.
-  - La regex nueva sigue siendo lineal: 200 000 atributos se procesan en unos 3 ms.
-  - Pruebas nuevas en `tests/vue-root-attrs.test.ts`, con el compilador de Vue real.
+    - `<p v-if="total > 0">` como raíz quedaba partido: el resto de la expresión pasaba a ser un nombre de atributo, con el error «Attribute name cannot contain U+0022…» y «Unexpected JSX expression».
+    - Ahora los valores entre comillas (dobles o simples) se saltan enteros. También funciona con `<`, `>=`, `v-show`, `:class` y etiquetas que se cierran solas.
+    - La regex nueva sigue siendo lineal: 200 000 atributos se procesan en unos 3 ms.
+    - Pruebas nuevas en `tests/vue-root-attrs.test.ts`, con el compilador de Vue real.
 
 ## [2.7.6] - 2026-10-19
 
 ### 🐛 Correcciones
 
 - **Un string `'@'` se convertía en la ruta del alias** (`src/compiler/transforms.ts`). Con el alias `'@/*'`, cualquier literal igual al prefijo (`'@'`) pasaba a ser la ruta del alias (`'/public'`).
-  - En anima, `handle.replaceAll('@', '')` quedaba como `replaceAll('/public', '')`, y el `@` del usuario de Instagram llegaba tal cual al servidor.
-  - Lo mismo pasaba con `"P@"`, y en los imports dinámicos con template literal (`` import(`@${x}`) ``).
-  - Ahora un alias con comodín (`@/*`) solo toma lo que empieza con `@/`. Un alias exacto toma el valor completo o `alias/…`.
-  - Pruebas nuevas en `tests/transforms.test.ts`.
+    - En anima, `handle.replaceAll('@', '')` quedaba como `replaceAll('/public', '')`, y el `@` del usuario de Instagram llegaba tal cual al servidor.
+    - Lo mismo pasaba con `"P@"`, y en los imports dinámicos con template literal (``import(`@${x}`)``).
+    - Ahora un alias con comodín (`@/*`) solo toma lo que empieza con `@/`. Un alias exacto toma el valor completo o `alias/…`.
+    - Pruebas nuevas en `tests/transforms.test.ts`.
 
 ## [2.7.5] - 2026-10-15
 
@@ -63,10 +63,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 - `pnpm typecheck` (nuevo, también en el CI) revisa `src/` y `tests/` sin errores. Antes había 79 errores que el CI no miraba. `examples/` queda fuera a propósito: sus errores sirven para probar que el compilador los informa.
 - Corregidos en `src/`:
-  - los tipos de lo que Vue, BrowserSync y el HMR agregan a `window` y al DOM (`src/types/hmr-globals.d.ts`);
-  - los workers sin `parentPort`;
-  - los errores de tipo `unknown`;
-  - el HMR de Vue cuando la aplicación no expone su instancia raíz, que antes llegaba a `buildComponentTree(undefined)`.
+    - los tipos de lo que Vue, BrowserSync y el HMR agregan a `window` y al DOM (`src/types/hmr-globals.d.ts`);
+    - los workers sin `parentPort`;
+    - los errores de tipo `unknown`;
+    - el HMR de Vue cuando la aplicación no expone su instancia raíz, que antes llegaba a `buildComponentTree(undefined)`.
 - `tsconfig.vitest.json` no revisaba ninguna prueba: heredaba el `exclude` de `tests/`. Las pruebas importan `describe`/`expect` de `vitest` en vez de declararlos a mano.
 - E2E: 2 workers en el CI, donde Firefox fallaba por falta de CPU en las transiciones.
 
@@ -148,7 +148,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### 🐛 Correcciones
 
-- **`integrity-validator.ts` — falsos positivos de "estructura inválida" en archivos válidos**: el verificador de balance de brackets no reconocía regex literals dentro de interpolaciones de template (`` `${/re/}` ``) ni manejaba correctamente un `/` dentro de una character class de regex (`` /[/\\]/ ``, común en regex de rutas). Esto hacía fallar la compilación con `--checkIntegrity` en archivos fuente completamente válidos. Ambos casos, más un tercero (una división dentro de una interpolación de template heredaba el contexto de regex del código anterior al template), quedan corregidos y cubiertos por tests.
+- **`integrity-validator.ts` — falsos positivos de "estructura inválida" en archivos válidos**: el verificador de balance de brackets no reconocía regex literals dentro de interpolaciones de template (`` `${/re/}` ``) ni manejaba correctamente un `/` dentro de una character class de regex (`/[/\\]/`, común en regex de rutas). Esto hacía fallar la compilación con `--checkIntegrity` en archivos fuente completamente válidos. Ambos casos, más un tercero (una división dentro de una interpolación de template heredaba el contexto de regex del código anterior al template), quedan corregidos y cubiertos por tests.
 - **`integrity-validator.ts` — umbral arbitrario de 10 caracteres**: `checkSize` rechazaba salidas minificadas legítimamente cortas (ej. `"export{};"`, 9 caracteres, para un archivo de solo tipos). Ahora solo verifica que el resultado no esté vacío; la validez sintáctica real la cubre el check de sintaxis (oxc-parser).
 - **`vuejs.ts` — errores de compilación de `<template>` solo se logueaban**: un template con errores de sintaxis "compilaba" igual, sin marcar la compilación como fallida. Ahora se propagan como error real.
 - **`transforms.ts` — `replaceAliasInStrings` podía corromper strings ajenos a imports**: la función escaneaba con un regex global todo el texto del archivo en busca de strings que empezaran con un prefijo de alias, sin distinguir un string real de contenido dentro de un comentario o un regex literal. Reescrita para operar solo sobre posiciones de literales de string confirmadas por el AST.
@@ -193,8 +193,8 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### ✨ Nuevas Características
 
 - **`hmrExclude` en configuración**: nueva opción `hmrExclude?: string[]` en `versacompile.config.ts` para excluir archivos específicos de la inyección del shim HMR manteniendo el hot reload activo en el resto. Útil cuando un archivo compilado se carga con `<script src="...">` (sin `type="module"`) y produce `SyntaxError: Cannot use 'import.meta' outside a module`.
-  - Acepta nombres de archivo exactos (`'early-init.js'`), sufijos de ruta (`'js/early-init.js'`) o globs simples (`'*.legacy.js'`).
-  - `hmr: false` sigue disponible para deshabilitar el shim globalmente.
+    - Acepta nombres de archivo exactos (`'early-init.js'`), sufijos de ruta (`'js/early-init.js'`) o globs simples (`'*.legacy.js'`).
+    - `hmr: false` sigue disponible para deshabilitar el shim globalmente.
 
 ---
 

@@ -19,5 +19,10 @@
     "useTabs": false,
     "vueIndentScriptAndStyle": true,
     "sortPackageJson": false,
-    "ignorePatterns": []
+    "ignorePatterns": [
+        ".agents/**",
+        "playwright-report/**",
+        "skills-lock.json",
+        "pnpm-workspace.yaml"
+    ]
 }

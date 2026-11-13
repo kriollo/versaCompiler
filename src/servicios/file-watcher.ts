@@ -392,7 +392,9 @@ class WatchDebouncer {
                         accion = 'reloadFull';
                     } else {
                         const graph = getPipelineModuleGraph();
-                        const node = graph?.getNode(path.resolve(change.filePath));
+                        const node = graph?.getNode(
+                            path.resolve(change.filePath),
+                        );
                         const importers = node
                             ? Array.from(node.importers)
                             : [];
@@ -632,7 +634,9 @@ export async function initChokidar(bs: any) {
         // archivos con extensión no vigilada (nunca directorios, ni nombres con
         // varios puntos como `user.service.ts`).
         const watchedExt = new Set(
-            extendsionWatch.filter(item => item !== undefined).map(item => item!.ext),
+            extendsionWatch
+                .filter(item => item !== undefined)
+                .map(item => item!.ext),
         );
 
         fileWatch = fileWatch.map(item => item.replace(/\/\*\*\//g, '/'));

@@ -30,9 +30,8 @@ describe('Security - Path Validation', () => {
                         await vi.importActual<typeof process>('node:process');
                     return { ...actual, platform: 'win32' };
                 });
-                const { validatePath: validatePathWin32 } = await import(
-                    '../src/servicios/readConfig'
-                );
+                const { validatePath: validatePathWin32 } =
+                    await import('../src/servicios/readConfig');
 
                 // Escenario real del bug arreglado: main.ts hace
                 // path.resolve(cwd, 'versacompile.config.ts'), que en
@@ -108,7 +107,9 @@ describe('Security - Path Validation', () => {
             expect(validateCommand('eslint')).toBe(true);
             expect(validateCommand('oxlint')).toBe(true);
             expect(validateCommand('./node_modules/.bin/eslint')).toBe(true);
-            expect(validateCommand('../../node_modules/.bin/oxlint')).toBe(true);
+            expect(validateCommand('../../node_modules/.bin/oxlint')).toBe(
+                true,
+            );
             expect(validateCommand('/usr/local/bin/oxlint')).toBe(true);
         });
 

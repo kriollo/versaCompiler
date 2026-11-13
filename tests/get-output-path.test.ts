@@ -34,12 +34,7 @@ describe('getOutputPath', () => {
         // substring puro, así que "my-src-app" (que contiene "src") se
         // trataba como si estuviera dentro de PATH_SOURCE, produciendo una
         // ruta de salida en el subdirectorio equivocado.
-        const ruta = join(
-            process.cwd(),
-            'my-src-app',
-            'other',
-            'Foo.vue',
-        );
+        const ruta = join(process.cwd(), 'my-src-app', 'other', 'Foo.vue');
         // Al no estar realmente bajo PATH_SOURCE, cae al fallback de solo
         // basename (mismo comportamiento que un archivo fuera del proyecto).
         expect(getOutputPath(ruta)).toBe('dist/Foo.js');

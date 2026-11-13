@@ -59,10 +59,7 @@ function collectModuleRequests(ast: any): string[] {
 // imports en el código compilado; aquí necesitamos el archivo FUENTE para el
 // grafo de dependencias (cascade invalidation / HMR).
 function resolveAliasedImport(specifier: string): string | null {
-    const pathAlias = getParsedPathAlias() as Record<
-        string,
-        string[]
-    > | null;
+    const pathAlias = getParsedPathAlias() as Record<string, string[]> | null;
     if (!pathAlias) return null;
 
     for (const [alias, targets] of Object.entries(pathAlias)) {
@@ -71,7 +68,11 @@ function resolveAliasedImport(specifier: string): string | null {
         const target = Array.isArray(targets) ? targets[0] : undefined;
         if (!target) continue;
         const relativePath = specifier.slice(aliasPattern.length);
-        return path.resolve(cwd(), target.replace(/^\.[/\\]/, ''), relativePath);
+        return path.resolve(
+            cwd(),
+            target.replace(/^\.[/\\]/, ''),
+            relativePath,
+        );
     }
     return null;
 }

@@ -15,9 +15,7 @@ import {
 import { validateTypesWithLanguageService } from './typescript-sync-validator';
 import { TypeScriptWorkerPool } from './typescript-worker-pool';
 
-function toStructuredErrors(
-    errors: CleanTypeScriptError[],
-): StructuredError[] {
+function toStructuredErrors(errors: CleanTypeScriptError[]): StructuredError[] {
     return errors.map(e => ({
         stage: 'typescript',
         message: e.message,

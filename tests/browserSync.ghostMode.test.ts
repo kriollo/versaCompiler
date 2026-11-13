@@ -32,9 +32,8 @@ describe('browserSyncServer ghostMode', () => {
     });
 
     it('inicializa BrowserSync con ghostMode deshabilitado', async () => {
-        const { browserSyncServer } = await import(
-            '../src/servicios/browserSync'
-        );
+        const { browserSyncServer } =
+            await import('../src/servicios/browserSync');
         await browserSyncServer();
 
         expect(initMock).toHaveBeenCalledTimes(1);

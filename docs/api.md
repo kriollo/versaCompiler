@@ -117,11 +117,13 @@ interface VersaConfig {
     tsconfig?: string;
 
     /** Configuración de TailwindCSS (false para deshabilitar) */
-    tailwindConfig?: {
-        bin: string;
-        input: string;
-        output: string;
-    } | false;
+    tailwindConfig?:
+        | {
+              bin: string;
+              input: string;
+              output: string;
+          }
+        | false;
 
     /** Array de configuraciones de linters (false para deshabilitar) */
     linter?: LinterConfig[] | false;
@@ -154,10 +156,10 @@ interface VersaConfig {
 ```typescript
 interface LinterConfig {
     name: 'eslint' | 'oxlint'; // Nombre del linter
-    bin: string;               // Ruta al binario
-    configFile: string;        // Archivo de configuración del linter
-    fix?: boolean;             // Auto-fix errores
-    paths?: string[];          // Rutas a analizar
+    bin: string; // Ruta al binario
+    configFile: string; // Archivo de configuración del linter
+    fix?: boolean; // Auto-fix errores
+    paths?: string[]; // Rutas a analizar
 }
 ```
 
@@ -165,8 +167,8 @@ interface LinterConfig {
 
 ```typescript
 interface BundlerConfig {
-    name: string;       // Nombre del bundle
-    fileInput: string;  // Archivo de entrada
+    name: string; // Nombre del bundle
+    fileInput: string; // Archivo de entrada
     fileOutput: string; // Archivo de salida
 }
 ```

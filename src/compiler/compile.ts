@@ -399,7 +399,6 @@ class OptimizedModuleManager {
         };
     }
 
-
     /**
      * Resetea el estado del manager (útil para tests)
      */
@@ -3118,7 +3117,6 @@ export async function initCompileAll() {
         progressManager.updateProgress('💾 Guardando cache...');
         await saveCache();
 
-
         const endTime = Date.now();
         const elapsedTime = showTimingForHumans(endTime - startTime); // Finalizar progreso
         progressManager.endProgress();
@@ -3192,4 +3190,3 @@ export async function compileFile(filePath: string) {
         `compilación de ${path.basename(filePath)}`,
     );
 }
-

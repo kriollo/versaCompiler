@@ -29,7 +29,9 @@ describe('TypeScriptWorkerPool - recycleWorker re-entrancy', () => {
         // rechaza la promesa), así que la regresión real a detectar es que
         // se loguee el TypeError de removeAllListeners sobre `null` — no
         // solo que Promise.all resuelva.
-        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const errorSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
 
         // Regresión: sin el guard `if (!poolWorker.worker) return;`, la
         // segunda llamada concurrente encuentra poolWorker.worker ya en

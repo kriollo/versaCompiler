@@ -594,8 +594,7 @@ export class TypeScriptWorkerPool {
         // Cada worker procesa en serie: apilarle tareas no acelera nada y
         // retrasa el escalado. Sin worker libre, la tarea va a la cola.
         return (
-            this.workers.find(w => !w.busy && w.pendingTasks.size === 0) ??
-            null
+            this.workers.find(w => !w.busy && w.pendingTasks.size === 0) ?? null
         );
     }
 

@@ -346,6 +346,7 @@ versacompiler --watch
 ### Excluir archivos del shim HMR:
 
 Si un archivo compilado se carga con `<script src="...">` (sin `type="module"`), el shim HMR produce:
+
 ```
 SyntaxError: Cannot use 'import.meta' outside a module
 ```

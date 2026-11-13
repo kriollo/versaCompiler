@@ -5,17 +5,17 @@
 1. [Archivo de Configuración](#-archivo-de-configuración)
 2. [Helper `defineConfig`](#-helper-defineconfig)
 3. [Referencia de Opciones](#-referencia-de-opciones)
-   - [root](#root-requerido)
-   - [build](#build-requerido)
-   - [resolve](#resolve-requerido)
-   - [server](#server-opcional)
-   - [watch](#watch-opcional)
-   - [tsconfig](#tsconfig-opcional)
-   - [tailwindConfig](#tailwindconfig-opcional)
-   - [linter](#linter-opcional)
-   - [typeCheckOptions](#typecheckoptions-opcional)
-   - [hmr](#hmr-opcional)
-   - [hmrExclude](#hmrexclude-opcional)
+    - [root](#root-requerido)
+    - [build](#build-requerido)
+    - [resolve](#resolve-requerido)
+    - [server](#server-opcional)
+    - [watch](#watch-opcional)
+    - [tsconfig](#tsconfig-opcional)
+    - [tailwindConfig](#tailwindconfig-opcional)
+    - [linter](#linter-opcional)
+    - [typeCheckOptions](#typecheckoptions-opcional)
+    - [hmr](#hmr-opcional)
+    - [hmrExclude](#hmrexclude-opcional)
 4. [Ejemplo Completo](#-ejemplo-completo)
 5. [Comandos CLI](#-comandos-cli)
 6. [Troubleshooting](#-troubleshooting)
@@ -114,11 +114,11 @@ build: {
 
 Cada entrada acepta:
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
-| `name` | `string` | Identificador del bundle |
-| `fileInput` | `string` | Archivo de entrada (relativo al proyecto) |
-| `fileOutput` | `string` | Archivo de salida |
+| Campo        | Tipo     | Descripción                               |
+| ------------ | -------- | ----------------------------------------- |
+| `name`       | `string` | Identificador del bundle                  |
+| `fileInput`  | `string` | Archivo de entrada (relativo al proyecto) |
+| `fileOutput` | `string` | Archivo de salida                         |
 
 ---
 
@@ -166,10 +166,10 @@ server: {
 },
 ```
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
-| `proxyUrl` | `string` | URL del backend a proxear. Vacío (`''`) para modo standalone |
-| `assetsOmit` | `boolean` | Si `true`, los assets estáticos no pasan por el proxy |
+| Campo              | Tipo       | Descripción                                                                 |
+| ------------------ | ---------- | --------------------------------------------------------------------------- |
+| `proxyUrl`         | `string`   | URL del backend a proxear. Vacío (`''`) para modo standalone                |
+| `assetsOmit`       | `boolean`  | Si `true`, los assets estáticos no pasan por el proxy                       |
 | `watch.additional` | `string[]` | Globs adicionales vigilados en modo `--watch` que disparan recarga completa |
 
 ---
@@ -210,11 +210,11 @@ tailwindConfig: {
 tailwindConfig: false,
 ```
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
-| `bin` | `string` | Ruta al binario de TailwindCSS |
-| `input` | `string` | Archivo CSS con directivas `@tailwind` |
-| `output` | `string` | Archivo CSS compilado de salida |
+| Campo    | Tipo     | Descripción                            |
+| -------- | -------- | -------------------------------------- |
+| `bin`    | `string` | Ruta al binario de TailwindCSS         |
+| `input`  | `string` | Archivo CSS con directivas `@tailwind` |
+| `output` | `string` | Archivo CSS compilado de salida        |
 
 ---
 
@@ -243,13 +243,13 @@ linter: [
 
 #### Campos comunes
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
-| `name` | `'eslint' \| 'oxlint'` | Identificador del linter |
-| `bin` | `string` | Ruta al ejecutable |
-| `configFile` | `string` | Archivo de configuración del linter |
-| `fix` | `boolean` | Si `true`, auto-corrige errores detectados |
-| `paths` | `string[]` | Rutas a analizar (ej: `['src/']`) |
+| Campo        | Tipo                   | Descripción                                |
+| ------------ | ---------------------- | ------------------------------------------ |
+| `name`       | `'eslint' \| 'oxlint'` | Identificador del linter                   |
+| `bin`        | `string`               | Ruta al ejecutable                         |
+| `configFile` | `string`               | Archivo de configuración del linter        |
+| `fix`        | `boolean`              | Si `true`, auto-corrige errores detectados |
+| `paths`      | `string[]`             | Rutas a analizar (ej: `['src/']`)          |
 
 ---
 
@@ -263,8 +263,8 @@ typeCheckOptions: {
 },
 ```
 
-| Campo | Tipo | Descripción |
-| --- | --- | --- |
+| Campo        | Tipo     | Descripción                                                         |
+| ------------ | -------- | ------------------------------------------------------------------- |
 | `maxWorkers` | `number` | Límite de workers paralelos. Por defecto depende del número de CPUs |
 
 ---
@@ -314,11 +314,11 @@ Añadir ese archivo a `hmrExclude` evita la inyección del shim solo en él.
 
 #### Patrones aceptados
 
-| Tipo | Ejemplo | Coincide con |
-| --- | --- | --- |
-| Nombre exacto | `'early-init.js'` | Cualquier archivo cuyo nombre sea exactamente ese |
-| Sufijo de ruta | `'js/early-init.js'` | Archivos cuya ruta termina con ese sufijo |
-| Glob simple (`*`) | `'*.legacy.js'` | Archivos que coinciden con el patrón |
+| Tipo              | Ejemplo              | Coincide con                                      |
+| ----------------- | -------------------- | ------------------------------------------------- |
+| Nombre exacto     | `'early-init.js'`    | Cualquier archivo cuyo nombre sea exactamente ese |
+| Sufijo de ruta    | `'js/early-init.js'` | Archivos cuya ruta termina con ese sufijo         |
+| Glob simple (`*`) | `'*.legacy.js'`      | Archivos que coinciden con el patrón              |
 
 #### Log de confirmación
 
@@ -398,23 +398,23 @@ export default defineConfig({
 
 ## 🖥️ Comandos CLI
 
-| Comando | Alias | Descripción |
-| --- | --- | --- |
-| `--init` | | Inicializar configuración del proyecto |
-| `--watch` | `-w` | Modo observación con HMR y auto-recompilación |
-| `--all` | | Compilar todos los archivos del proyecto |
-| `--file <archivo>` | `-f` | Compilar un archivo específico |
-| `[archivos...]` | | Compilar múltiples archivos específicos |
-| `--prod` | `-p` | Modo producción con minificación |
-| `--verbose` | `-v` | Mostrar información detallada de compilación |
-| `--cleanOutput` | `-co` | Limpiar directorio de salida antes de compilar |
-| `--cleanCache` | `-cc` | Limpiar caché de compilación |
-| `--yes` | `-y` | Confirmar automáticamente todas las acciones |
-| `--typeCheck` | `-t` | Habilitar verificación de tipos TypeScript |
-| `--checkIntegrity` | `-ci` | Validar integridad del código compilado |
-| `--tailwind` | | Habilitar compilación TailwindCSS |
-| `--linter` | | Ejecutar análisis de código |
-| `--help` | `-h` | Mostrar ayuda y opciones disponibles |
+| Comando            | Alias | Descripción                                    |
+| ------------------ | ----- | ---------------------------------------------- |
+| `--init`           |       | Inicializar configuración del proyecto         |
+| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
+| `--all`            |       | Compilar todos los archivos del proyecto       |
+| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
+| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
+| `--prod`           | `-p`  | Modo producción con minificación               |
+| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
+| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
+| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
+| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
+| `--typeCheck`      | `-t`  | Habilitar verificación de tipos TypeScript     |
+| `--checkIntegrity` | `-ci` | Validar integridad del código compilado        |
+| `--tailwind`       |       | Habilitar compilación TailwindCSS              |
+| `--linter`         |       | Ejecutar análisis de código                    |
+| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
 
 ### Ejemplos de uso avanzado
 
@@ -468,6 +468,7 @@ export default defineConfig({
 ```
 
 Al arrancar en `--watch` deberías ver en consola:
+
 ```
 [HMR] Exclusiones activas: ['early-init.js']
 ```

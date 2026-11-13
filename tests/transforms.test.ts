@@ -386,7 +386,10 @@ describe('estandarizaCode - un alias con comodín solo toma strings que empiezan
 
     beforeEach(() => {
         resetModuleResolutionOptimizer();
-        process.env.PATH_ALIAS = JSON.stringify({ '@/*': ['/src/*'], 'P@/*': ['/public/*'] });
+        process.env.PATH_ALIAS = JSON.stringify({
+            '@/*': ['/src/*'],
+            'P@/*': ['/public/*'],
+        });
         process.env.PATH_DIST = 'dist';
         process.env.VERBOSE = 'false';
     });
@@ -417,7 +420,8 @@ describe('estandarizaCode - un alias con comodín solo toma strings que empiezan
     });
 
     it('sigue resolviendo "@/..." en strings y en imports dinámicos con template literal', async () => {
-        const code = "const img = '@/img/logo.png'; const m = import(`@/mods/${nombre}.js`); const t = import(`@${x}`);";
+        const code =
+            "const img = '@/img/logo.png'; const m = import(`@/mods/${nombre}.js`); const t = import(`@${x}`);";
         const result = await estandarizaCode(code, 'test.js');
         expect(result.code).toContain("const img = '/dist/img/logo.png';");
         expect(result.code).toContain('import(`/dist/mods/${nombre}.js`)');

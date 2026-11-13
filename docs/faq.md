@@ -124,8 +124,8 @@ export default defineConfig({
     build: { outDir: './dist' },
     resolve: { alias: { '@': 'src' } },
     hmrExclude: [
-        'early-init.js',   // nombre exacto
-        '*.legacy.js',     // glob simple
+        'early-init.js', // nombre exacto
+        '*.legacy.js', // glob simple
     ],
 });
 ```

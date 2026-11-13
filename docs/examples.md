@@ -138,10 +138,13 @@ export default defineConfig({
     ],
 });
 ```
+
         },
     ],
+
 };
-```
+
+````
 
 **Pipeline de CI/CD con validación:**
 
@@ -157,7 +160,7 @@ versacompiler --all --prod --checkIntegrity --yes
 
 # 4. (Opcional) Verificar estadísticas de validación
 # Implementar script personalizado para leer logs
-```
+````
 
 **Ejemplo de output con validación:**
 
@@ -252,8 +255,8 @@ export default defineConfig({
     },
     // Excluir solo archivos puntuales del shim HMR
     hmrExclude: [
-        'early-init.js',     // se carga con <script src="..."> sin type=module
-        '*.legacy.js',       // archivos legacy que no soportan import.meta
+        'early-init.js', // se carga con <script src="..."> sin type=module
+        '*.legacy.js', // archivos legacy que no soportan import.meta
     ],
 });
 ```
@@ -277,7 +280,7 @@ export default defineConfig({
         alias: { '@': 'src' },
     },
     tsconfig: './tsconfig.json',
-    hmr: false,   // deshabilita el shim HMR en todos los archivos
+    hmr: false, // deshabilita el shim HMR en todos los archivos
     linter: [
         {
             name: 'oxlint',

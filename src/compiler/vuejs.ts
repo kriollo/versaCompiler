@@ -233,8 +233,7 @@ function toStructuredError(
     injectedLineDelta: number,
 ): StructuredError {
     const anyE = e as any;
-    const message =
-        typeof e === 'string' ? e : anyE?.message || String(e);
+    const message = typeof e === 'string' ? e : anyE?.message || String(e);
     const rawLoc = typeof e === 'string' ? undefined : anyE?.loc;
 
     let loc: StructuredError['loc'];
@@ -250,10 +249,7 @@ function toStructuredError(
             endLine: rawLoc.end
                 ? Math.max(
                       1,
-                      blockStartLine -
-                          1 +
-                          rawLoc.end.line -
-                          injectedLineDelta,
+                      blockStartLine - 1 + rawLoc.end.line - injectedLineDelta,
                   )
                 : undefined,
             endColumn: rawLoc.end?.column,
@@ -466,10 +462,7 @@ export const preCompileVue = async (
                 };
                 if (detailed.line) {
                     structured.loc = {
-                        line: Math.max(
-                            1,
-                            scriptStartLine - 1 + detailed.line,
-                        ),
+                        line: Math.max(1, scriptStartLine - 1 + detailed.line),
                         column: detailed.column ?? 0,
                     };
                     structured.codeFrame = detailed.codeContext;
@@ -521,8 +514,7 @@ export const preCompileVue = async (
             const compiledTemplateResult = vueCompiler.compileTemplate(
                 templateCompileOptions,
             );
-            const templateStartLine =
-                descriptor.template.loc?.start?.line ?? 1;
+            const templateStartLine = descriptor.template.loc?.start?.line ?? 1;
 
             if (compiledTemplateResult.errors?.length > 0) {
                 const diagnostics = buildVueDiagnostics(
@@ -635,18 +627,20 @@ export const preCompileVue = async (
             });
         });
 
-        const styleErrors = compiledStyles.flatMap((result: any, idx: number) => {
-            if (!result.errors?.length) return [];
-            const style = descriptor.styles[idx];
-            return buildVueDiagnostics(
-                result.errors,
-                style?.content ?? '',
-                'vue-style',
-                'error',
-                style?.loc?.start?.line ?? 1,
-                injectedLineDelta,
-            );
-        });
+        const styleErrors = compiledStyles.flatMap(
+            (result: any, idx: number) => {
+                if (!result.errors?.length) return [];
+                const style = descriptor.styles[idx];
+                return buildVueDiagnostics(
+                    result.errors,
+                    style?.content ?? '',
+                    'vue-style',
+                    'error',
+                    style?.loc?.start?.line ?? 1,
+                    injectedLineDelta,
+                );
+            },
+        );
         if (styleErrors.length) {
             const err = new Error(
                 `Error al compilar los estilos del componente Vue ${source}:\n${styleErrors
@@ -791,9 +785,7 @@ export const preCompileVue = async (
             for (const w of allWarnings) {
                 const where = w.loc ? `:${w.loc.line}:${w.loc.column}` : '';
                 logger.warn(
-                    chalkInstance.yellow(
-                        `⚠ ${source}${where} — ${w.message}`,
-                    ),
+                    chalkInstance.yellow(`⚠ ${source}${where} — ${w.message}`),
                 );
             }
         }

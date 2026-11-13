@@ -71,9 +71,7 @@ describe('file-watcher - getAction', () => {
 
     it('devuelve la acción configurada para la extensión del archivo', () => {
         expect(getAction('foo.ts', extensionWatch)).toBe('compileFile');
-        expect(getAction('styles/main.css', extensionWatch)).toBe(
-            'reloadCss',
-        );
+        expect(getAction('styles/main.css', extensionWatch)).toBe('reloadCss');
     });
 
     it('devuelve "reloadFull" para una extensión sin acción configurada', () => {
@@ -99,18 +97,13 @@ describe('file-watcher - isAdditionalWatchFile', () => {
     it('matchea un glob simple de patrones adicionales', () => {
         const patterns = ['./app/templates/**/*.twig'];
         expect(
-            isAdditionalWatchFile(
-                './app/templates/nested/foo.twig',
-                patterns,
-            ),
+            isAdditionalWatchFile('./app/templates/nested/foo.twig', patterns),
         ).toBe(true);
     });
 
     it('no matchea un archivo que no cumple ningún patrón', () => {
         const patterns = ['./app/templates/**/*.twig'];
-        expect(isAdditionalWatchFile('./src/index.ts', patterns)).toBe(
-            false,
-        );
+        expect(isAdditionalWatchFile('./src/index.ts', patterns)).toBe(false);
     });
 
     it('matchea con múltiples patrones configurados', () => {

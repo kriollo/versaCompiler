@@ -91,7 +91,9 @@ export class CompileWorkerPool {
             this.pending.delete(response.id);
             poolWorker.busy = false;
             if (!response.success) {
-                pending.reject(new Error(response.error || 'Worker task failed'));
+                pending.reject(
+                    new Error(response.error || 'Worker task failed'),
+                );
             } else {
                 pending.resolve(response.data);
             }
@@ -170,7 +172,9 @@ export class CompileWorkerPool {
     }
 
     private getAvailableWorker(): PoolWorker | null {
-        return this.workers.find(worker => !worker.busy && !worker.dead) || null;
+        return (
+            this.workers.find(worker => !worker.busy && !worker.dead) || null
+        );
     }
 
     private drainQueue(): void {

@@ -97,9 +97,9 @@ describe('BuildPipeline - resolución de dependencias con alias', () => {
             const result = await pipeline.compileFile(entryFile);
 
             expect(result.dependencies).toEqual([depFile, depFile]);
-            expect(
-                pipeline.getModuleGraph().invalidate(depFile),
-            ).toContain(entryFile);
+            expect(pipeline.getModuleGraph().invalidate(depFile)).toContain(
+                entryFile,
+            );
         } finally {
             if (original.dist === undefined) delete env.PATH_DIST;
             else env.PATH_DIST = original.dist;

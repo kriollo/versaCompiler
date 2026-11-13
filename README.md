@@ -256,30 +256,32 @@ export default defineConfig({
 Lista de patrones para excluir archivos **de salida** específicos de la inyección del shim HMR, sin afectar al resto.
 
 Esto es útil cuando un archivo compilado se carga con `<script src="...">` en lugar de `<script type="module" src="...">`, lo que causaría el error:
+
 ```
 SyntaxError: Cannot use 'import.meta' outside a module
 ```
 
 **Patrones aceptados:**
 
-| Patrón | Ejemplo | Coincide con |
-| --- | --- | --- |
-| Nombre exacto | `'early-init.js'` | Cualquier archivo con ese nombre |
-| Sufijo de ruta | `'js/early-init.js'` | Ruta que termina con ese sufijo |
-| Glob simple (`*`) | `'*.legacy.js'` | Archivos que coincidan con el patrón |
+| Patrón            | Ejemplo              | Coincide con                         |
+| ----------------- | -------------------- | ------------------------------------ |
+| Nombre exacto     | `'early-init.js'`    | Cualquier archivo con ese nombre     |
+| Sufijo de ruta    | `'js/early-init.js'` | Ruta que termina con ese sufijo      |
+| Glob simple (`*`) | `'*.legacy.js'`      | Archivos que coincidan con el patrón |
 
 ```typescript
 export default defineConfig({
     // ...
     hmrExclude: [
-        'early-init.js',      // nombre exacto
+        'early-init.js', // nombre exacto
         'vendor/polyfills.js', // sufijo de ruta
-        '*.legacy.js',         // glob simple
+        '*.legacy.js', // glob simple
     ],
 });
 ```
 
 Al iniciar en modo `--watch`, si `hmrExclude` tiene entradas, VersaCompiler mostrará:
+
 ```
 [HMR] Exclusiones activas: ['early-init.js', '*.legacy.js']
 ```
