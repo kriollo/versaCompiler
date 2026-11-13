@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { cwd } from 'node:process';
+import { cwd, env } from 'node:process';
 
 import { parser } from '../parser';
 import { getParsedPathAlias } from '../transforms';
@@ -76,13 +76,36 @@ function resolveAliasedImport(specifier: string): string | null {
     return null;
 }
 
+// El grafo se construye sobre el código YA transformado, donde los imports
+// apuntan al output (`./b.js`, `/dist/lib/b.js`). Hay que llevarlos de vuelta
+// al archivo fuente para que las claves coincidan con las del watcher.
+function distToSource(specifier: string): string {
+    if (!env.PATH_DIST || !env.PATH_SOURCE) return path.normalize(specifier);
+    const distPrefix = `/${env.PATH_DIST.replace(/^\.[/\\]/, '').replace(/[/\\]$/, '')}/`;
+    if (!specifier.startsWith(distPrefix)) return path.normalize(specifier);
+    return path.resolve(
+        cwd(),
+        env.PATH_SOURCE,
+        specifier.slice(distPrefix.length),
+    );
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+    try {
+        await stat(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 async function resolveLocalImport(
     importer: string,
     specifier: string,
 ): Promise<string | null> {
     let base: string;
     if (specifier.startsWith('/')) {
-        base = path.normalize(specifier);
+        base = distToSource(specifier);
     } else if (specifier.startsWith('.')) {
         base = path.resolve(path.dirname(importer), specifier);
     } else {
@@ -92,7 +115,12 @@ async function resolveLocalImport(
     }
 
     const ext = path.extname(base);
-    if (ext) return base;
+    if (ext && ext !== '.js') return base;
+    if (ext === '.js') {
+        if (await fileExists(base)) return base;
+        // `./b.js` reescrito por transforms: el fuente es b.ts / b.vue / ...
+        base = base.slice(0, -ext.length);
+    }
 
     const candidates = [
         `${base}.ts`,
@@ -107,12 +135,7 @@ async function resolveLocalImport(
     ];
 
     for (const candidate of candidates) {
-        try {
-            await stat(candidate);
-            return candidate;
-        } catch {
-            continue;
-        }
+        if (await fileExists(candidate)) return candidate;
     }
 
     return base;

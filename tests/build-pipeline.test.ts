@@ -77,4 +77,34 @@ describe('BuildPipeline - resolución de dependencias con alias', () => {
         expect(result.errors).toEqual([]);
         expect(result.dependencies).toEqual([]);
     });
+
+    it('lleva los imports ya reescritos al output (./foo.js, /dist/foo.js) al archivo fuente .ts', async () => {
+        const srcDir = path.join(dir, 'src');
+        mkdirSync(srcDir);
+        const depFile = path.join(srcDir, 'foo.ts');
+        writeFileSync(depFile, 'export const foo = 1;\n');
+        const entryFile = path.join(srcDir, 'entry.ts');
+        writeFileSync(
+            entryFile,
+            "import { foo } from './foo.js';\nimport { foo as bar } from '/dist/foo.js';\nexport { foo, bar };\n",
+        );
+
+        const original = { dist: env.PATH_DIST, source: env.PATH_SOURCE };
+        env.PATH_DIST = './dist';
+        env.PATH_SOURCE = srcDir;
+        try {
+            const pipeline = new BuildPipeline(createPassthroughPlugins());
+            const result = await pipeline.compileFile(entryFile);
+
+            expect(result.dependencies).toEqual([depFile, depFile]);
+            expect(
+                pipeline.getModuleGraph().invalidate(depFile),
+            ).toContain(entryFile);
+        } finally {
+            if (original.dist === undefined) delete env.PATH_DIST;
+            else env.PATH_DIST = original.dist;
+            if (original.source === undefined) delete env.PATH_SOURCE;
+            else env.PATH_SOURCE = original.source;
+        }
+    });
 });

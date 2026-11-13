@@ -285,11 +285,17 @@ class WatchDebouncer {
 
             const expandedChanges = new Map<string, PendingChange>();
 
+            // Claves absolutas, igual que las del ModuleGraph
+            // (chokidar entrega rutas relativas tipo `./src/b.ts`)
             for (const change of batch) {
-                expandedChanges.set(change.filePath, change);
+                expandedChanges.set(path.resolve(change.filePath), change);
+            }
 
+            for (const change of batch) {
                 if (graph) {
-                    const invalidated = graph.invalidate(change.filePath);
+                    const invalidated = graph.invalidate(
+                        path.resolve(change.filePath),
+                    );
                     for (const invalidatedPath of invalidated) {
                         if (expandedChanges.has(invalidatedPath)) continue;
                         // Usar la acción correcta según la extensión del archivo invalidado
@@ -386,7 +392,7 @@ class WatchDebouncer {
                         accion = 'reloadFull';
                     } else {
                         const graph = getPipelineModuleGraph();
-                        const node = graph?.getNode(change.filePath);
+                        const node = graph?.getNode(path.resolve(change.filePath));
                         const importers = node
                             ? Array.from(node.importers)
                             : [];
