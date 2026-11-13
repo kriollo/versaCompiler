@@ -1,4 +1,3 @@
-import { normalize, relative, resolve } from 'node:path';
 import * as process from 'node:process';
 import { env } from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -83,54 +82,23 @@ export type typeConfig = {
 };
 
 /**
- * Utilidades de seguridad para validar configuraciones
+ * Validación de rutas y comandos del config.
+ *
+ * El config es código del propio usuario (se carga con import()) y los
+ * linters se lanzan con execa sin shell, así que esto no es una frontera de
+ * seguridad: solo atrapa valores corruptos. `..`, rutas absolutas y binarios
+ * del PATH (`eslint`, `/usr/local/bin/oxlint`) son legítimos (monorepos, etc.).
  */
-const MAX_PATH_LENGTH = 260; // Windows MAX_PATH limit
 const MAX_CONFIG_SIZE = 1024 * 1024; // 1MB max config size
-// Letras y dígitos Unicode: rutas como `proyecto-ñ/` o `código/` son legítimas
+// Letras y dígitos Unicode: rutas como `proyecto-ñ/` o `código/` son legítimas.
+// Excluye metacaracteres de shell (; & | ` $), comillas y caracteres de control.
 const ALLOWED_PATH_CHARS = /^[\p{L}\p{N}.\-_/\\:@ ()[\]+~#,]+$/u;
-const DANGEROUS_PATTERNS = [
-    /\.\./, // Path traversal
-    /[;&|`$]/, // Command injection characters
-    /\$\(/, // Command substitution
-    /`.*`/, // Backtick execution
-    /\|\s*[a-zA-Z]/, // Pipe to commands
-];
 
 export function validatePath(pathStr: string): boolean {
     if (!pathStr || typeof pathStr !== 'string') {
         return false;
     }
 
-    if (pathStr.length > MAX_PATH_LENGTH) {
-        logger.warn(`Ruta demasiado larga: ${pathStr.length} caracteres`);
-        return false;
-    }
-
-    // Rechazar rutas absolutas de Windows solo cuando NO se ejecuta en
-    // Windows: en ese caso una ruta "C:\..." nunca puede ser el resultado
-    // de resolver contra process.cwd() en este SO, así que es señal de
-    // path traversal. En Windows, path.resolve() del propio CLI genera
-    // rutas con letra de unidad de forma legítima, y la comprobación de
-    // path traversal de abajo (normalize/resolve/relative contra cwd) ya
-    // garantiza que se mantengan dentro del workspace.
-    if (process.platform !== 'win32' && /^[A-Za-z]:[/\\]/.test(pathStr)) {
-        logger.error(`Ruta absoluta de Windows no permitida: ${pathStr}`);
-        return false;
-    }
-
-    // Normalizar la ruta para detectar path traversal
-    const normalizedPath = normalize(pathStr);
-    const resolvedPath = resolve(process.cwd(), normalizedPath);
-    const relativePath = relative(process.cwd(), resolvedPath);
-
-    // Verificar si la ruta trata de salir del directorio actual
-    if (relativePath.startsWith('..') || normalizedPath.includes('..')) {
-        logger.error(`Detectado intento de path traversal: ${pathStr}`);
-        return false;
-    }
-
-    // Verificar caracteres permitidos
     if (!ALLOWED_PATH_CHARS.test(pathStr)) {
         logger.error(`Caracteres no permitidos en la ruta: ${pathStr}`);
         return false;
@@ -144,30 +112,8 @@ export function validateCommand(command: string): boolean {
         return false;
     }
 
-    if (command.length > MAX_PATH_LENGTH) {
-        logger.warn(`Comando demasiado largo: ${command.length} caracteres`);
-        return false;
-    }
-
-    // Verificar patrones peligrosos
-    for (const pattern of DANGEROUS_PATTERNS) {
-        if (pattern.test(command)) {
-            logger.error(`Detectado patrón peligroso en comando: ${command}`);
-            return false;
-        }
-    }
-
-    // Solo permitir comandos que terminen en extensiones seguras
-    const allowedExecutables = ['.exe', '.cmd', '.bat', '.sh', '.js', '.ts'];
-    const hasAllowedExtension = allowedExecutables.some(
-        ext =>
-            command.toLowerCase().includes(ext) ||
-            command.startsWith('./node_modules/.bin/') ||
-            command.startsWith('npx '),
-    );
-
-    if (!hasAllowedExtension) {
-        logger.error(`Comando no permitido: ${command}`);
+    if (!ALLOWED_PATH_CHARS.test(command)) {
+        logger.error(`Caracteres no permitidos en el comando: ${command}`);
         return false;
     }
 

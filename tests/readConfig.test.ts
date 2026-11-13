@@ -3,15 +3,11 @@ import { validateCommand, validatePath } from '../src/servicios/readConfig';
 
 describe('Security - Path Validation', () => {
     describe('validatePath', () => {
-        it('should reject path traversal attempts with ../', () => {
-            expect(validatePath('../../../etc/passwd')).toBe(false);
-            expect(validatePath('../../sensitive')).toBe(false);
-            expect(validatePath('../config')).toBe(false);
-        });
-
-        it('should reject absolute paths outside workspace', () => {
-            expect(validatePath('/etc/passwd')).toBe(false);
-            expect(validatePath('C:\\Windows\\System32')).toBe(false);
+        it('accepts ../ and absolute paths (monorepos, outDir fuera del proyecto)', () => {
+            // El config es código del propio usuario: no hay frontera que proteger
+            expect(validatePath('../packages/shared/src')).toBe(true);
+            expect(validatePath('/srv/app/dist')).toBe(true);
+            expect(validatePath('C:\\Users\\dev\\proyecto\\src')).toBe(true);
         });
 
         describe('on win32', () => {
@@ -50,27 +46,6 @@ describe('Security - Path Validation', () => {
                     ),
                 ).toBe(true);
             });
-
-            it('still rejects real path traversal (../) in a Windows path', async () => {
-                vi.resetModules();
-                vi.doMock('node:process', async () => {
-                    const actual =
-                        await vi.importActual<typeof process>('node:process');
-                    return { ...actual, platform: 'win32' };
-                });
-                const { validatePath: validatePathWin32 } = await import(
-                    '../src/servicios/readConfig'
-                );
-
-                // Gating el rechazo por plataforma no debe abrir la puerta a
-                // traversal real: un ".." explícito sigue siendo rechazado
-                // por el chequeo de normalización, independiente del OS.
-                expect(
-                    validatePathWin32(
-                        'C:\\Users\\test\\..\\..\\Windows\\System32',
-                    ),
-                ).toBe(false);
-            });
         });
 
         it('should reject command injection attempts', () => {
@@ -88,9 +63,8 @@ describe('Security - Path Validation', () => {
             expect(validatePath('test\rcarriage')).toBe(false);
         });
 
-        it('should reject excessively long paths (>260 chars)', () => {
-            const longPath = 'a'.repeat(300);
-            expect(validatePath(longPath)).toBe(false);
+        it('accepts long paths (no MAX_PATH limit)', () => {
+            expect(validatePath(`/home/${'a'.repeat(300)}/src`)).toBe(true);
         });
 
         it('should accept valid relative paths', () => {
@@ -130,15 +104,12 @@ describe('Security - Path Validation', () => {
             expect(validateCommand('test\x00command')).toBe(false);
         });
 
-        it('should reject simple commands without validation', () => {
-            // validateCommand rechaza comandos que no pasan validación estricta
-            expect(validateCommand('npm')).toBe(false);
-            expect(validateCommand('node')).toBe(false);
-        });
-
-        it('should reject commands with potentially dangerous content', () => {
-            expect(validateCommand('eslint --fix')).toBe(false);
-            expect(validateCommand('npm install')).toBe(false);
+        it('accepts binaries from PATH, node_modules/.bin and absolute paths', () => {
+            expect(validateCommand('eslint')).toBe(true);
+            expect(validateCommand('oxlint')).toBe(true);
+            expect(validateCommand('./node_modules/.bin/eslint')).toBe(true);
+            expect(validateCommand('../../node_modules/.bin/oxlint')).toBe(true);
+            expect(validateCommand('/usr/local/bin/oxlint')).toBe(true);
         });
 
         it('should reject empty string or undefined', () => {
@@ -169,7 +140,7 @@ describe('Configuration Security Edge Cases', () => {
     });
 
     it('should handle relative path components', () => {
-        expect(validatePath('./folder/../other')).toBe(true); // Puede ser válido si se normaliza
-        expect(validatePath('../../escape')).toBe(false); // Escape fuera del workspace
+        expect(validatePath('./folder/../other')).toBe(true);
+        expect(validatePath('../../sibling')).toBe(true);
     });
 });
