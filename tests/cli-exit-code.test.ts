@@ -1,5 +1,11 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -52,6 +58,17 @@ describe('CLI --all - exit code', () => {
 
     it('sale con 0 cuando todo compila', async () => {
         expect(await compileAll(dir)).toBe(0);
+    });
+
+    it('un .ts con solo tipos compila a un módulo vacío (no es un error)', async () => {
+        writeFileSync(
+            path.join(dir, 'src', 'types.ts'),
+            'export interface User { id: number }\nexport type Id = number;\n',
+        );
+        expect(await compileAll(dir)).toBe(0);
+        expect(
+            readFileSync(path.join(dir, 'dist', 'types.js'), 'utf8'),
+        ).toContain('export {};');
     });
 
     it('sale con 1 cuando un archivo no compila', async () => {

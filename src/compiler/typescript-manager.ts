@@ -364,22 +364,22 @@ export const preCompileTS = async (
                 incremental: false, // No usar incremental en transpileModule
                 diagnostics: false,
                 removeComments: env.isPROD === 'true',
-                // Source map inline solo en dev y para .ts sueltos: en .vue el
-                // script es un fragmento del SFC (offsets incorrectos) y en prod
-                // la minificación lo invalidaría. Nunca un .map externo: no se
-                // escribe y quedaría un sourceMappingURL roto.
+                // Si el tsconfig pide source maps, se emiten siempre inline (un
+                // .map externo no se escribe y dejaría un sourceMappingURL roto).
+                // Solo en dev y para .ts sueltos: en .vue el script es un
+                // fragmento del SFC (offsets incorrectos) y en prod la
+                // minificación lo invalidaría.
                 sourceMap: false,
                 declarationMap: false,
-                ...(env.isPROD !== 'true' && !scriptInfo
+                ...(env.isPROD !== 'true' &&
+                !scriptInfo &&
+                (compilerOptions.sourceMap || compilerOptions.inlineSourceMap)
                     ? { inlineSourceMap: true, inlineSources: true }
                     : { inlineSourceMap: false }),
             },
             fileName,
             reportDiagnostics: env.VERBOSE === 'true', // Solo reportar en verbose
         });
-
-        // const transpileResult = traspileTStoJS(
-        //     fileName,data)
 
         // Verificar errores críticos de sintaxis
         if (transpileResult.diagnostics?.length) {

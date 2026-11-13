@@ -2133,6 +2133,12 @@ async function compileWithPipeline(
         throw new Error(result.errors[0]);
     }
 
+    // Un .ts con solo tipos (interfaces, type) transpila a vacío: es válido.
+    // Se emite un módulo vacío para que un import en runtime no dé 404.
+    if (!result.code?.trim() && /\.(m|c)?ts$/.test(inPath)) {
+        result.code = 'export {};\n';
+    }
+
     if (!result.code || result.code.trim().length === 0) {
         await handleCompilationError(
             new Error('El código compilado está vacío.'),

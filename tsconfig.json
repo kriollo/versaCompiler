@@ -23,7 +23,7 @@
         "target": "es2022",
         "lib": ["es2022", "dom", "dom.iterable"],
         "outDir": "./public/",
-        "sourceMap": true,
+        "sourceMap": false, // el paquete publicado no lleva source maps (ver typescript-manager.ts)
         "inlineSourceMap": false,
         "inlineSources": false,
         "paths": {
