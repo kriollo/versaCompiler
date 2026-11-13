@@ -49,8 +49,15 @@ git fetch --quiet origin master --tags
     fail "master no coincide con origin/master: haz git pull / git push primero."
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null ||
     fail "No existe el tag $TAG. Créalo: git tag -a $TAG -m \"versaCompiler $VERSION\" && git push origin $TAG"
-[[ "$(git rev-list -n1 "$TAG")" == "$(git rev-parse HEAD)" ]] ||
-    fail "El tag $TAG no apunta al commit actual."
+if [[ "$(git rev-list -n1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
+    git merge-base --is-ancestor "$TAG" HEAD ||
+        fail "El tag $TAG no está en la historia de master."
+    # Commits posteriores al tag que no tocan lo publicado (scripts, docs) se toleran
+    if ! git diff --quiet "$TAG" HEAD -- src tsconfig*.json README.md LICENSE; then
+        fail "Hay cambios en src/ después de $TAG. Sube la versión y crea un tag nuevo."
+    fi
+    printf '\033[33m! Hay commits después de %s, pero no tocan src/: se publica igual.\033[0m\n' "$TAG"
+fi
 git ls-remote --exit-code --tags origin "$TAG" >/dev/null ||
     fail "El tag $TAG no está en GitHub: git push origin $TAG"
 grep -q "^## \[$VERSION\]" CHANGELOG.md || fail "CHANGELOG.md no tiene la entrada ## [$VERSION]."
