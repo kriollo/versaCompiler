@@ -407,6 +407,8 @@ export class TypeScriptWorkerPool {
         try {
             const newWorker = await this.createWorker(this.workers.length);
             this.workers.push(newWorker);
+            // El worker nuevo toma trabajo de la cola de inmediato
+            this.drainQueue(newWorker);
         } catch {
             // Silencioso: se usará la cola cuando un worker quede libre
         } finally {
@@ -793,31 +795,15 @@ export class TypeScriptWorkerPool {
     }
 
     /**
-     * Encuentra el worker menos ocupado
+     * Devuelve un worker libre, o null si todos están ocupados
      */
     private findAvailableWorker(): PoolWorker | null {
-        // Buscar worker completamente libre
-        const freeWorker = this.workers.find(
-            w => !w.busy && w.pendingTasks.size === 0,
+        // Cada worker procesa en serie: apilarle tareas no acelera nada y
+        // retrasa el escalado. Sin worker libre, la tarea va a la cola.
+        return (
+            this.workers.find(w => !w.busy && w.pendingTasks.size === 0) ??
+            null
         );
-        if (freeWorker) {
-            return freeWorker;
-        }
-
-        // Si no hay workers libres, buscar el menos ocupado
-        const leastBusyWorker = this.workers.reduce((least, current) => {
-            if (current.pendingTasks.size < least.pendingTasks.size) {
-                return current;
-            }
-            return least;
-        });
-
-        // Solo devolver si no está demasiado ocupado
-        if (leastBusyWorker.pendingTasks.size < 5) {
-            return leastBusyWorker;
-        }
-
-        return null; // Todos los workers están muy ocupados
     }
 
     /**
@@ -923,9 +909,6 @@ export class TypeScriptWorkerPool {
             return { diagnostics: [], hasErrors: false };
         }
 
-        // Escalar el pool si es posible
-        this.ensureWorkerCapacity().catch(() => {});
-
         return new Promise<TypeCheckResult>((resolve, reject) => {
             // Wrapper para reject que garantiza que failedTasks se incrementa exactamente una vez
             // para todas las tareas que pasan por la cola (drainQueue path).
@@ -941,6 +924,8 @@ export class TypeScriptWorkerPool {
                 reject: wrappedReject,
                 queuedAt: Date.now(),
             });
+            // Escalar el pool ahora que la cola tiene la tarea
+            this.ensureWorkerCapacity().catch(() => {});
         });
     }
 
