@@ -2069,7 +2069,33 @@ if (typeof window !== 'undefined' && window.__versaHMR) {
     };
 ${depsAccept}  })();
 }\n`;
-    return shim + code;
+    return shim + shiftInlineSourceMap(code, shim.split('\n').length - 1);
+}
+
+const INLINE_MAP_RE =
+    /\/\/# sourceMappingURL=data:application\/json;base64,([A-Za-z0-9+/=]+)\s*$/;
+
+/**
+ * Desplaza un source map inline `lines` líneas hacia abajo (cada `;` en
+ * `mappings` es una línea generada), para que siga apuntando bien tras
+ * anteponer el shim HMR.
+ */
+export function shiftInlineSourceMap(code: string, lines: number): string {
+    const match = INLINE_MAP_RE.exec(code);
+    if (!match || lines <= 0) return code;
+    try {
+        const map = JSON.parse(
+            Buffer.from(match[1]!, 'base64').toString('utf8'),
+        );
+        map.mappings = ';'.repeat(lines) + map.mappings;
+        const encoded = Buffer.from(JSON.stringify(map)).toString('base64');
+        return code.replace(
+            INLINE_MAP_RE,
+            `//# sourceMappingURL=data:application/json;base64,${encoded}`,
+        );
+    } catch {
+        return code;
+    }
 }
 
 async function compileWithPipeline(
