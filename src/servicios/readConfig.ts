@@ -506,10 +506,13 @@ export function withTimeout<T>(
     timeoutMs: number,
     errorMessage: string,
 ): Promise<T> {
-    const timeoutPromise = new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(errorMessage)), timeoutMs),
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() =>
+        clearTimeout(timer),
     );
-    return Promise.race([promise, timeoutPromise]);
 }
 
 /**

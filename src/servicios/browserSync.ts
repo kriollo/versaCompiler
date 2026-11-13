@@ -182,7 +182,10 @@ class BrowserSyncFileCache {
 
             // Si no debe ser cacheado, leer directamente
             if (!this.shouldCache(filePath)) {
-                const content = await fs.readFile(filePath, 'utf-8');
+                const content = await fs.readFile(
+                    filePath,
+                    this.isBinaryFile(filePath) ? undefined : 'utf-8',
+                );
                 return {
                     content,
                     contentType: this.getContentType(filePath),

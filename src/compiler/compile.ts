@@ -42,17 +42,20 @@ async function withTimeout<T>(
     timeoutMs: number,
     operationName: string,
 ): Promise<T> {
-    const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(
             () =>
                 reject(
                     new Error(`Timeout en ${operationName} (${timeoutMs}ms)`),
                 ),
             timeoutMs,
-        ),
-    );
+        );
+    });
 
-    return Promise.race([promise, timeoutPromise]);
+    return Promise.race([promise, timeoutPromise]).finally(() =>
+        clearTimeout(timer),
+    );
 }
 
 // Heavy dependencies will be loaded dynamically when needed
@@ -598,7 +601,6 @@ class SmartCompilationCache {
     private dependencyGraph = new Map<string, Set<string>>(); // archivo -> dependencias
     private reverseDependencyGraph = new Map<string, Set<string>>(); // dependencia -> archivos que la usan
     private packageJsonPath = path.join(cwd(), 'package.json');
-    private nodeModulesPath = path.join(cwd(), 'node_modules');
     private isWatchingDependencies = false;
     /**
      * Genera hash SHA-256 del contenido del archivo
@@ -1064,34 +1066,6 @@ class SmartCompilationCache {
                 });
 
                 this.fileWatchers.set('package.json', packageWatcher);
-            }
-
-            // Vigilar node_modules (solo cambios en el directorio raíz para performance)
-            if (await this.fileExists(this.nodeModulesPath)) {
-                const nodeModulesWatcher = chokidar.watch(
-                    this.nodeModulesPath,
-                    {
-                        persistent: false,
-                        ignoreInitial: true,
-                        depth: 1, // Solo primer nivel para performance
-                        ignored: /(^|[/\\])\../, // Ignorar archivos ocultos
-                    },
-                );
-                nodeModulesWatcher.on('addDir', (dirPath: string) => {
-                    logger.info(
-                        `📦 Nueva dependencia instalada: ${dirPath.split(/[/\\]/).pop()}`,
-                    );
-                    this.invalidateByDependencyChange();
-                });
-
-                nodeModulesWatcher.on('unlinkDir', (dirPath: string) => {
-                    logger.info(
-                        `📦 Dependencia eliminada: ${dirPath.split(/[/\\]/).pop()}`,
-                    );
-                    this.invalidateByDependencyChange();
-                });
-
-                this.fileWatchers.set('node_modules', nodeModulesWatcher);
             }
 
             this.isWatchingDependencies = true;

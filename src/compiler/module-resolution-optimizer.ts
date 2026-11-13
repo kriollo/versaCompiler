@@ -332,7 +332,7 @@ export class ModuleResolutionOptimizer {
         entryPoint: string,
         packageJson: any,
     ): string {
-        const isProd = env.isProd === 'true';
+        const isProd = env.isPROD === 'true';
         const fileName = entryPoint.toLowerCase();
 
         // Si estamos en desarrollo, evitar archivos .min o .prod

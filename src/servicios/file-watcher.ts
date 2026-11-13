@@ -560,11 +560,13 @@ export function isAdditionalWatchFile(
         return false;
     }
 
-    const normalizedPath = normalizeRuta(filePath);
+    // normalizeRuta antepone `./`; se quita en ambos lados para que
+    // `app/**/*.twig` y `./app/**/*.twig` se comporten igual.
+    const stripDot = (s: string) => s.replace(/\\/g, '/').replace(/^\.\//, '');
+    const normalizedPath = stripDot(normalizeRuta(filePath));
 
     return additionalPatterns.some(pattern => {
-        // Normalizar el patrón también
-        const normalizedPattern = pattern.replace(/\\/g, '/');
+        const normalizedPattern = stripDot(pattern);
         return minimatch(normalizedPath, normalizedPattern);
     });
 }
@@ -620,11 +622,11 @@ export async function initChokidar(bs: any) {
             throw new Error('No se encontraron extensiones para observar');
         }
 
-        const regExtExtension = new RegExp(
-            `\\.(?!${extendsionWatch
-                .filter(item => item !== undefined)
-                .map(item => item!.ext)
-                .join('$|')}$).+$`,
+        // chokidar evalúa `ignored` contra la ruta completa: se ignoran solo
+        // archivos con extensión no vigilada (nunca directorios, ni nombres con
+        // varios puntos como `user.service.ts`).
+        const watchedExt = new Set(
+            extendsionWatch.filter(item => item !== undefined).map(item => item!.ext),
         );
 
         fileWatch = fileWatch.map(item => item.replace(/\/\*\*\//g, '/'));
@@ -641,7 +643,9 @@ export async function initChokidar(bs: any) {
         const watcher = chokidar.watch(DirWatch, {
             persistent: true,
             ignoreInitial: true,
-            ignored: regExtExtension,
+            ignored: (filePath, stats) =>
+                !!stats?.isFile() &&
+                !watchedExt.has(path.extname(filePath).slice(1)),
         });
 
         // ✨ OPTIMIZACIÓN: Pre-cargar módulos críticos al iniciar el watcher

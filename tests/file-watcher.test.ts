@@ -119,4 +119,12 @@ describe('file-watcher - isAdditionalWatchFile', () => {
             isAdditionalWatchFile('./locales/en/common.json', patterns),
         ).toBe(true);
     });
+
+    it('matchea aunque el patrón no lleve el prefijo ./', () => {
+        expect(
+            isAdditionalWatchFile('./app/templates/foo.twig', [
+                'app/templates/**/*.twig',
+            ]),
+        ).toBe(true);
+    });
 });
