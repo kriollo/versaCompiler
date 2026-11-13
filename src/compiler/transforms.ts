@@ -5,6 +5,7 @@ import { logger } from '../servicios/logger';
 import { EXCLUDED_MODULES } from '../utils/excluded-modules';
 import { getModuleSubPath } from '../utils/module-resolver';
 
+import { applyClientEnv } from './client-env';
 import { analyzeAndFormatMultipleErrors } from './error-reporter';
 import { integrityValidator } from './integrity-validator';
 import {
@@ -758,6 +759,7 @@ export async function estandarizaCode(
         code = await replaceAliasInStrings(code, astAfterImports);
         code = await removehtmlOfTemplateString(code);
         code = await removeCodeTagImport(code);
+        code = applyClientEnv(code, file);
 
         if (env.isPROD === 'true') {
             code = await removePreserverComent(code);

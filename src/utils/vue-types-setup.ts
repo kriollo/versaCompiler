@@ -196,6 +196,27 @@ declare global {
         // Agregar propiedades globales si es necesario
         [key: string]: any;
     }
+
+    // import.meta.env: VERSA_* de los archivos .env, más MODE/PROD/DEV
+    interface ImportMetaEnv {
+        readonly MODE: string;
+        readonly PROD: boolean;
+        readonly DEV: boolean;
+        readonly [key: \`VERSA_\${string}\`]: string | undefined;
+    }
+    interface ImportMeta {
+        readonly env: ImportMetaEnv;
+    }
+}
+
+declare module '*.json' {
+    const value: any;
+    export default value;
+}
+
+declare module '*.css' {
+    const href: string;
+    export default href;
 }
 
 // Tipos para archivos de assets

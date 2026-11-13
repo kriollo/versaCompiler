@@ -24,6 +24,8 @@ export {
 export interface BuildOptions {
     /** Minifica y compila para producción (`--prod`). */
     prod?: boolean;
+    /** Modo para `import.meta.env` y `.env.<mode>` (`--mode`). */
+    mode?: string;
     /** Verifica tipos con TypeScript (`-t`). */
     typeCheck?: boolean;
     /** Ejecuta los linters configurados antes de compilar (`--linter`). */
@@ -70,6 +72,8 @@ async function setup(options: BuildOptions): Promise<void> {
         options.configFile ?? 'versacompile.config.ts',
     );
     env.isPROD = options.prod ? 'true' : 'false';
+    if (options.mode) env.MODE = options.mode;
+    else delete env.MODE;
     env.TAILWIND = options.tailwind === false ? 'false' : 'true';
     env.ENABLE_LINTER = options.linter ? 'true' : 'false';
     env.typeCheck = options.typeCheck ? 'true' : 'false';

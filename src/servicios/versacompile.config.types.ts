@@ -52,6 +52,13 @@ export type VersaConfig = {
      */
     hmr?: boolean;
     /**
+     * Reemplazos en tiempo de compilación. Cada valor es una expresión JS:
+     * `{ __APP_VERSION__: JSON.stringify('1.2.0'), __DEBUG__: 'false' }`.
+     * Para variables por entorno usa archivos `.env` con prefijo `VERSA_` y
+     * léelas con `import.meta.env.VERSA_*`.
+     */
+    define?: Record<string, string>;
+    /**
      * Lista de patrones de archivos de **salida** que no recibirán el shim HMR.
      * Útil cuando un archivo compilado se carga con `<script src="...">` en lugar
      * de `<script type="module" src="...">`, evitando el error:

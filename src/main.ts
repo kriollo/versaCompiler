@@ -127,6 +127,11 @@ async function main() {
                 description: 'Modo producción',
             })
             .alias('p', 'prod')
+            .option('mode', {
+                type: 'string',
+                description:
+                    'Modo para import.meta.env y archivos .env.<mode> (por defecto: production con --prod, si no development)',
+            })
             .option('verbose', {
                 type: 'boolean',
                 description: 'Habilitar salida detallada (verbose)',
@@ -195,6 +200,7 @@ async function main() {
             all?: boolean;
             file?: string;
             prod?: boolean;
+            mode?: string;
             verbose?: boolean;
             cleanOutput?: boolean;
             cleanCache?: boolean;
@@ -262,6 +268,7 @@ async function main() {
         }
 
         env.isPROD = argv.prod ? 'true' : 'false';
+        if (argv.mode) env.MODE = argv.mode;
         env.isALL = argv.all ? 'true' : 'false';
         env.TAILWIND =
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);
