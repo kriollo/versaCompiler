@@ -7,7 +7,12 @@
         "emitDeclarationOnly": true,
         "declarationDir": "./dist",
         "rootDir": "./src",
-        "ignoreDeprecations": "6.0"
+        "ignoreDeprecations": "6.0",
+        "types": ["node"]
     },
-    "include": ["src/config.ts", "src/servicios/versacompile.config.types.ts"]
+    "include": [
+        "src/index.ts",
+        "src/config.ts",
+        "src/servicios/versacompile.config.types.ts"
+    ]
 }

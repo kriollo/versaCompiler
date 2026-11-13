@@ -30,16 +30,16 @@
         "README.md"
     ],
     "type": "module",
-    "main": "dist/main.js",
-    "types": "dist/config.d.ts",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/main.js",
-            "types": "./dist/main.d.ts"
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
         },
         "./config": {
-            "import": "./dist/config.js",
-            "types": "./dist/config.d.ts"
+            "types": "./dist/config.d.ts",
+            "import": "./dist/config.js"
         }
     },
     "publishConfig": {
@@ -72,25 +72,16 @@
         "fmt": "oxfmt --write --config .oxfmtrc.json ."
     },
     "dependencies": {
-        "@vue/compiler-dom": "^3.5.45",
-        "@vue/reactivity": "^3.5.45",
-        "@vue/runtime-core": "^3.5.45",
-        "@vue/runtime-dom": "^3.5.45",
         "browser-sync": "^3.0.4",
         "chalk": "6.0.1",
         "chokidar": "^6.0.0",
-        "enhanced-resolve": "^5.26.2",
         "execa": "^10.2.1",
-        "find-root": "^1.1.0",
         "fs-extra": "^11.4.1",
         "get-port": "^7.2.0",
         "minify-literals": "^2.2.0",
         "minimatch": "^11.0.8",
         "oxc-minify": "^0.158.0",
         "oxc-parser": "^0.158.0",
-        "oxc-transform": "^0.158.0",
-        "resolve": "^1.22.14",
-        "tsx": "^4.23.15",
         "typescript": "^6.0.3",
         "vue": "3.5.45",
         "yargs": "^18.2.0"
@@ -100,12 +91,10 @@
         "@playwright/test": "^1.65.0",
         "@tailwindcss/cli": "^4.3.5",
         "@types/browser-sync": "^2.29.1",
-        "@types/find-root": "^1.1.4",
         "@types/fs-extra": "^11.0.4",
         "@types/jest": "^30.0.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.20.5",
-        "@types/resolve": "^1.20.6",
         "@types/yargs": "^17.0.35",
         "@typescript-eslint/eslint-plugin": "^8.72.2",
         "@typescript-eslint/parser": "^8.72.2",
@@ -129,6 +118,7 @@
         "rimraf": "^6.1.4",
         "sweetalert2": "^11.26.25",
         "tailwindcss": "^4.3.5",
+        "tsx": "^4.23.15",
         "vitest": "^5.1.0",
         "vue-eslint-parser": "^10.4.2",
         "vue-router": "^5.5.0",

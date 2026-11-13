@@ -60,8 +60,7 @@ VersaCompiler is a CLI build tool (Node.js/TypeScript ESM) that compiles Vue 3 S
 
 - **`src/compiler/compile.ts`** — Main orchestrator. Contains `OptimizedModuleManager` (lazy module pool), `initCompileAll()`, `compileFile()`, `runLinter()`. All heavy imports are deferred here.
 - **`src/compiler/vuejs.ts`** — Vue SFC compilation using `@vue/compiler-sfc`: script, template, styles (scoped/CSS modules/SCSS), custom blocks.
-- **`src/compiler/transformTStoJS.ts`** — TypeScript→JavaScript transpilation via oxc-transform.
-- **`src/compiler/typescript-compiler.ts`** — Full type checking via TypeScript Language Service Host (spawns worker threads).
+- **`src/compiler/typescript-manager.ts`** — TypeScript→JavaScript transpilation via `typescript.transpileModule` (inline source maps in dev) plus type checking through the worker pool.
 - **`src/compiler/typescript-worker-pool.ts`** / **`typescript-worker.ts`** — Worker thread pool for parallel type validation.
 - **`src/compiler/minify.ts`** — OxcMinify-based minification for `--prod` builds.
 - **`src/compiler/integrity-validator.ts`** — 4-level post-compilation integrity checks (size, exports, syntax via oxc-parser). Has LRU cache.

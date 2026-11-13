@@ -64,6 +64,7 @@ class BrowserSyncFileCache {
             },
             5 * 60 * 1000,
         ); // Cada 5 minutos
+        this.cleanupInterval.unref();
     }
 
     /**

@@ -1007,7 +1007,7 @@ export class ModuleResolutionOptimizer {
                 }
                 this.refreshIndexes();
             }
-        }, this.indexRefreshInterval);
+        }, this.indexRefreshInterval).unref(); // no mantener vivo el proceso (API / --all)
     }
 
     /**
