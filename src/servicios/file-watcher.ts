@@ -14,6 +14,7 @@ import {
     normalizeRuta,
     runPipelineHotUpdate,
 } from '../compiler/compile';
+import { STATIC_ASSET_EXTENSIONS } from '../compiler/static-assets';
 import { promptUser } from '../utils/promptUser';
 
 import { emitirCambios, registerHMRUpdate } from './browserSync';
@@ -596,14 +597,18 @@ export async function initChokidar(bs: any) {
         const watchCJS = `${env.PATH_SOURCE}/**/*.cjs`;
         const watchMJS = `${env.PATH_SOURCE}/**/*.mjs`;
 
-        //TODO: agregar watch para CSS
         const watchAditional = JSON.parse(env.aditionalWatch || '[]');
+        // JSON, CSS e imágenes de src/: se recopian (static-assets.ts) y recargan
+        const watchAssets = STATIC_ASSET_EXTENSIONS.map(
+            ext => `${env.PATH_SOURCE}/**/*.${ext}`,
+        );
         let fileWatch = [
             watchJS,
             watchVue,
             watchTS,
             watchCJS,
             watchMJS,
+            ...watchAssets,
             ...watchAditional,
         ];
 

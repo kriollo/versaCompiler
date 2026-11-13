@@ -174,7 +174,7 @@ async function resolveModuleRequest(
                 newImportPath.endsWith('.vue')
             ) {
                 newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-            } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+            } else if (!/\.(js|mjs|cjs)$/.test(newImportPath)) {
                 newImportPath += '.js';
             }
             newPath = newImportPath;
@@ -204,7 +204,7 @@ async function resolveModuleRequest(
                             /\.(ts|vue)$/,
                             '.js',
                         );
-                    } else if (!/\.(js|mjs|css|json)$/.test(newImportPath)) {
+                    } else if (!/\.(js|mjs|cjs)$/.test(newImportPath)) {
                         newImportPath += '.js';
                     }
                     newPath = newImportPath;
@@ -224,7 +224,7 @@ async function resolveModuleRequest(
             relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
             newPath = relativePath;
             transformed = true;
-        } else if (!/\.(js|mjs|css|json)$/.test(relativePath)) {
+        } else if (!/\.(js|mjs|cjs)$/.test(relativePath)) {
             newPath = relativePath + '.js';
             transformed = true;
         }
@@ -353,6 +353,16 @@ function collectStaticModuleRequests(ast: any): ModuleRequestLiteral[] {
     return [...requests.values()];
 }
 
+/**
+ * `import x from './a.json' with { type: 'json' }` (o `import('./a.css', { with: ... })`)
+ * ya funciona nativo en el navegador: no se reescribe a `.json.js`.
+ */
+function hasImportAttributes(code: string, specifierEnd: number): boolean {
+    return /^\s*(?:(?:with|assert)\s*\{|,\s*\{)/.test(
+        code.slice(specifierEnd, specifierEnd + 64),
+    );
+}
+
 async function replaceAliasImportsAst(
     code: string,
     file: string,
@@ -372,6 +382,7 @@ async function replaceAliasImportsAst(
         start,
         end,
     } of collectStaticModuleRequests(ast)) {
+        if (hasImportAttributes(code, end)) continue;
         const newPath = await resolveModuleRequest(
             moduleRequest,
             file,
@@ -395,6 +406,7 @@ async function replaceAliasImportsAst(
         const end = item?.moduleRequest?.end;
         if (typeof start !== 'number' || typeof end !== 'number') continue;
 
+        if (hasImportAttributes(code, end)) continue;
         const raw = code.slice(start, end);
         const literal = extractLiteralValue(raw);
         if (!literal) {

@@ -2230,6 +2230,14 @@ export async function initCompile(
         const file = normalizeRuta(ruta);
         const outFile = getOutputPath(file);
 
+        // JSON, CSS e imágenes: copia + módulo .js, sin pasar por el pipeline
+        const { isStaticAsset, emitStaticAsset } =
+            await import('./static-assets');
+        if (isStaticAsset(file)) {
+            await emitStaticAsset(file, outFile);
+            return { success: true, output: outFile, action: 'compiled' };
+        }
+
         // 🚀 Verificar cache antes de compilar (especialmente importante en modo watch)
         if (mode === 'watch' || mode === 'individual') {
             if (await shouldSkipFile(file)) {
@@ -2968,6 +2976,9 @@ export async function initCompileAll(): Promise<boolean> {
             `${normalizedGlobPathSource}/**/*.ts`,
             `${normalizedGlobPathSource}/**/*.mjs`,
             `${normalizedGlobPathSource}/**/*.cjs`,
+            ...(await import('./static-assets')).STATIC_ASSET_EXTENSIONS.map(
+                ext => `${normalizedGlobPathSource}/**/*.${ext}`,
+            ),
         ];
 
         logger.info(`📝 Compilando todos los archivos...`);
