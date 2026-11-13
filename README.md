@@ -3,7 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=flat&logo=vuedotjs&logoColor=4FC08D)](https://vuejs.org/)
-[![Version](https://img.shields.io/badge/version-2.7.6-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.7.6)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.8.0)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
 > **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) completo.**
 
@@ -25,13 +26,18 @@
 
 ## ⚡ Instalación
 
+### ✅ Requisitos
+
+- **Node.js 22.22 o superior** (lo exige chokidar 6, usado por el modo `--watch`)
+- **pnpm** como gestor de paquetes
+
 ### 📦 Desde código fuente
 
 ```bash
 git clone https://github.com/kriollo/versaCompiler.git
 cd versaCompiler
-npm install
-npm run build
+pnpm install
+pnpm build
 ```
 
 ### 🔗 Instalación local en tu proyecto
@@ -454,6 +460,7 @@ versacompiler --tailwind --verbose
 ### 📦 Minificación y Optimización
 
 - **OxcMinify**: Minificador de última generación escrito en Rust
+- **Templates HTML/CSS en strings**: minificados con `minify-literals` (html-minifier-next + Lightning CSS)
 - **Tree shaking**: Eliminación inteligente de código no utilizado
 - **Variable mangling**: Renombrado de variables para máxima compresión
 - **Dead code elimination**: Eliminación de código muerto
@@ -787,11 +794,11 @@ MIT © [Jorge Jara H](https://github.com/kriollo)
 ### Dependencias Principales
 
 - **Vue.js**: `vue/compiler-sfc` para compilación de SFC
-- **TypeScript**: Compiler API completa con Language Service Host
+- **TypeScript 6**: Compiler API completa con Language Service Host (TypeScript 7 aún no expone esa API en JS)
 - **OxcMinify**: Minificación ultra-optimizada
 - **OxLint**: Linting ultra-rápido en Rust
 - **ESLint**: Análisis profundo de código
-- **Chokidar**: Observación de archivos
+- **Chokidar 6**: Observación de archivos
 - **BrowserSync**: Servidor de desarrollo con HMR
 - **TailwindCSS**: Compilación de utilidades CSS
 

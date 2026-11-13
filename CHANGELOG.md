@@ -5,6 +5,38 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [2.8.0] - 2026-11-13
+
+### ⚠️ Cambios importantes
+
+- **Requiere Node.js 22.22 o superior** (`engines.node`), por chokidar 6.
+- **`validatePath`/`validateCommand` son más permisivos.** Ahora aceptan `..` (alias de monorepo como `../packages/shared/src`), rutas absolutas, rutas de más de 260 caracteres y binarios del PATH (`bin: 'eslint'`, `/usr/local/bin/oxlint`). Se siguen rechazando caracteres de control y metacaracteres de shell. El config es código del propio usuario y los linters se lanzan sin shell, así que esas validaciones no protegían nada.
+
+### 🔒 Seguridad
+
+- **Se reemplaza `minify-html-literals` por `minify-literals`.** El paquete anterior estaba abandonado desde 2022 y arrastraba `html-minifier <=4.0.0`, con un ReDoS de severidad alta (CVE-2022-37620) y sin parche.
+- **Overrides de `glob` y `minimatch`** para dos avisos moderados en dependencias de desarrollo. `pnpm audit` queda limpio.
+
+### 🐛 Correcciones
+
+- **`--watch` ignoraba archivos o carpetas con un punto en el nombre** (`user.service.ts`, `comp.ui/`), que no se recompilaban (`src/servicios/file-watcher.ts`).
+- **El grafo de módulos nunca conectaba un archivo con sus importers.** Editar un módulo no recompilaba a quien lo importa, y el payload HMR siempre llevaba `importers: []`. El grafo guardaba las rutas de salida (`./b.js`, `/dist/lib/b.js`) en vez de las fuentes, y el watcher lo consultaba con rutas relativas (`src/compiler/pipeline/build-pipeline.ts`).
+- **Rutas con `ñ` o acentos:** el CLI no arrancaba si el proyecto estaba en una carpeta así.
+- **Tailwind nunca se minificaba en `--prod`:** se leía `env.isProd` en vez de `env.isPROD`. El mismo error estaba en `module-resolution-optimizer.ts`.
+- **Pool de TypeScript:** escalaba tarde y el worker nuevo no tomaba tareas de la cola, que podían expirar (30 s) y compilarse sin chequeo de tipos.
+- **Pool de compilación (`WORKER_COMPILE`):** un timeout o un crash dejaba el slot del worker perdido para siempre. Ahora se termina y se reemplaza.
+- **`aditionalWatch`:** los patrones sin `./` no coincidían con nada.
+- **Binarios** (`.pdf`, `.zip`, `.mp4`…) servidos por el middleware se leían como UTF-8 y llegaban corruptos.
+- **`withTimeout`** no limpiaba su `setTimeout`.
+- **ESLint:** `import/no-cycle` abortaba al entrar en `node_modules/lightningcss`. Ahora ignora módulos externos.
+
+### 🧹 Mantenimiento
+
+- **Dependencias actualizadas a sus últimas versiones:** chokidar 6, minimatch 11, oxc 0.158, vitest 5.1, eslint 10.14, eslint-plugin-unicorn 79, Playwright 1.65, entre otras. TypeScript se mantiene en 6.x porque TypeScript 7 (nativo) no expone la API JS de `LanguageService`.
+- **Se elimina el watcher de `node_modules`**, que abría un `fs.watch` por paquete. La invalidación queda cubierta por el watcher de `package.json` y `DEP_HASH_TTL`.
+- **Se eliminan ~1100 líneas de código muerto:** `transform-optimizer.ts`, `WatchModeOptimizer`, el monitoreo de memoria del pool TS (nunca arrancaba) y su categorización de errores sin llamadores.
+- **Formato con oxfmt 0.78.** `.agents/`, `playwright-report/`, `skills-lock.json` y `pnpm-workspace.yaml` quedan fuera del formateo.
+
 ## [2.7.9] - 2026-10-29
 
 ### 🐛 Correcciones
