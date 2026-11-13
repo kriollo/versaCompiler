@@ -92,7 +92,7 @@ describe('minifyTemplate - Sistema de detección automática', () => {
     });
 
     describe('minifyTemplate - Integración completa', () => {
-        it('debe minificar template string CSS sin tag (caso vuejs.ts línea 405)', () => {
+        it('debe minificar template string CSS sin tag (caso vuejs.ts línea 405)', async () => {
             const code = `
                 styleTag.innerHTML = \`
                     body {
@@ -105,7 +105,7 @@ describe('minifyTemplate - Sistema de detección automática', () => {
                 \`;
             `;
 
-            const result = minifyTemplate(code, 'test.js');
+            const result = await minifyTemplate(code, 'test.js');
 
             expect(result.error).toBeNull();
             expect(result.code).not.toContain('__VERSA_TEMP__');
@@ -114,7 +114,7 @@ describe('minifyTemplate - Sistema de detección automática', () => {
             expect(result.code).toContain('margin:10px');
         });
 
-        it('debe manejar template strings con expressions', () => {
+        it('debe manejar template strings con expressions', async () => {
             const code = `
                 const styles = \`
                     body {
@@ -124,7 +124,7 @@ describe('minifyTemplate - Sistema de detección automática', () => {
                 \`;
             `;
 
-            const result = minifyTemplate(code, 'test.js');
+            const result = await minifyTemplate(code, 'test.js');
 
             expect(result.error).toBeNull();
             expect(result.code).not.toContain('__VERSA_TEMP__');
@@ -133,17 +133,17 @@ describe('minifyTemplate - Sistema de detección automática', () => {
             expect(result.code).toMatch(/\$\{spacing\}/);
         });
 
-        it('debe skip archivos de tipos TypeScript', () => {
+        it('debe skip archivos de tipos TypeScript', async () => {
             const code = 'declare module "test" { export type Foo<T> = T; }';
-            const result = minifyTemplate(code, 'vue-types-setup.ts');
+            const result = await minifyTemplate(code, 'vue-types-setup.ts');
 
             expect(result.error).toBeNull();
             expect(result.code).toBe(code);
         });
 
-        it('debe skip archivos sin backticks', () => {
+        it('debe skip archivos sin backticks', async () => {
             const code = 'const x = 42; function test() { return x; }';
-            const result = minifyTemplate(code, 'test.js');
+            const result = await minifyTemplate(code, 'test.js');
 
             expect(result.error).toBeNull();
             expect(result.code).toBe(code);

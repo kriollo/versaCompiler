@@ -2,3 +2,7 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
   unrs-resolver: true
+# Parches de seguridad para dependencias transitivas de desarrollo (pnpm audit)
+overrides:
+  'glob@>=9.0.0 <14.0.2': ^14.0.2
+  'minimatch@>=7.0.0 <11.0.1': ^11.0.1

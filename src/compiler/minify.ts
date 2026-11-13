@@ -371,7 +371,7 @@ export const cleanExpiredMinificationCache = () => {
 /**
  * ✨ Minifica templates HTML/Vue ANTES de minificar JavaScript
  * Esta función combina la minificación de templates con la minificación JS en el orden correcto:
- * 1. Primero minifica templates HTML usando minify-html-literals
+ * 1. Primero minifica templates HTML usando minify-literals
  * 2. Luego minifica el JavaScript resultante usando oxc-minify
  *
  * @param {string} data - El código a minificar (puede contener templates HTML)
@@ -386,7 +386,7 @@ export const minifyWithTemplates = async (
 ) => {
     try {
         // PASO 1: Minificar templates HTML primero
-        const templateResult = minifyTemplate(data, filename);
+        const templateResult = await minifyTemplate(data, filename);
 
         // Si hay error en la minificación de templates, pero tenemos código, continuar
         if (templateResult.error && !templateResult.code) {

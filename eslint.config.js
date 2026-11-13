@@ -74,7 +74,7 @@ export default [
             // Imports - Crítico para un compilador
             'import/no-unresolved': 'off', // Desactivado por configuración compleja de rutas
             'import/no-duplicates': 'error',
-            'import/no-cycle': 'error',
+            'import/no-cycle': ['error', { ignoreExternal: true }],
             'import/order': [
                 'warn',
                 {
@@ -141,7 +141,7 @@ export default [
             // Reglas de importación críticas
             'import/no-unresolved': 'off',
             'import/no-duplicates': 'error',
-            'import/no-cycle': 'error',
+            'import/no-cycle': ['error', { ignoreExternal: true }],
             'import/order': [
                 'warn',
                 {

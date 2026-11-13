@@ -1,4 +1,4 @@
-import { minifyHTMLLiterals } from 'minify-html-literals';
+import { minifyHTMLLiterals } from 'minify-literals';
 
 import { logger } from '../servicios/logger';
 
@@ -23,8 +23,6 @@ const defaultMinifyOptions = {
     removeRedundantAttributes: false, // NO quitar atributos redundantes
 
     // Optimizaciones seguras
-    removeScriptTypeAttributes: true, // Quitar type="text/javascript"
-    removeStyleLinkTypeAttributes: true, // Quitar type="text/css"
     useShortDoctype: true, // Usar <!DOCTYPE html> corto
 };
 
@@ -218,7 +216,7 @@ const minifyCSS = (code: string): string => {
     }
 };
 
-const minifyTemplate = (data: string, fileName: string) => {
+const minifyTemplate = async (data: string, fileName: string) => {
     try {
         // ⚠️ SKIP: Archivos de definiciones de tipos TypeScript
         // Estos archivos NO contienen template strings HTML/CSS para minificar
@@ -246,7 +244,7 @@ const minifyTemplate = (data: string, fileName: string) => {
         // Esto incluye los tags temporales agregados en el paso 1
         code = minifyCSS(code);
 
-        // PASO 3: Minificar templates HTML con minify-html-literals
+        // PASO 3: Minificar templates HTML con minify-literals
         // Esta librería procesa todos los template strings con tags html`` y css``
         // Solo procesar si realmente hay tags html`` o css`` en el código
         let minifiedCode = code;
@@ -257,9 +255,10 @@ const minifyTemplate = (data: string, fileName: string) => {
             code.includes(TEMP_CSS_TAG)
         ) {
             try {
-                const minified = minifyHTMLLiterals(code, {
+                const minified = await minifyHTMLLiterals(code, {
                     fileName,
-                    ...defaultMinifyOptions,
+                    html: defaultMinifyOptions,
+                    sourceMap: false,
                 });
                 if (minified && minified.code) {
                     minifiedCode = minified.code;
