@@ -2897,7 +2897,11 @@ async function compileWithConcurrencyLimit(
     // El progreso ya se termina automáticamente en showProgress() cuando se completa
 }
 
-export async function initCompileAll() {
+/**
+ * Compila todo el proyecto. Devuelve `false` si el linter detuvo el build o
+ * hubo algún error de compilación, para que `--all` salga con código 1.
+ */
+export async function initCompileAll(): Promise<boolean> {
     try {
         // Inicializar el gestor de progreso desde el inicio
         const progressManager = ProgressManager.getInstance();
@@ -2916,9 +2920,8 @@ export async function initCompileAll() {
         progressManager.updateProgress('🔍 Ejecutando linter...');
         const shouldContinue = await runLinter(false); // false = mostrar errores y preguntar si hay errores
         if (!shouldContinue) {
-            // await displayCompilationSummary(env.VERBOSE === 'true');
             progressManager.endProgress();
-            return;
+            return false;
         }
 
         const startTime = Date.now();
@@ -3123,6 +3126,7 @@ export async function initCompileAll() {
 
         // Mostrar resumen de compilación con tiempo total
         await displayCompilationSummary(env.VERBOSE === 'true', elapsedTime);
+        return !compilationErrors.some(e => e.severity === 'error');
     } catch (error) {
         // Asegurar que el progreso termine en caso de error
         const progressManager = ProgressManager.getInstance();
@@ -3145,6 +3149,7 @@ export async function initCompileAll() {
             env.VERBOSE === 'true',
         ); // Mostrar resumen incluso si hay errores generales
         await displayCompilationSummary(env.VERBOSE === 'true');
+        return false;
     }
 }
 

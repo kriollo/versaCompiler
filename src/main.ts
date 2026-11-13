@@ -433,8 +433,8 @@ async function main() {
         }
         if (argv.all) {
             const { initCompileAll } = await loadCompilerModule();
-            await initCompileAll();
-            exitProcess(0);
+            const ok = await initCompileAll();
+            exitProcess(ok ? 0 : 1);
         }
 
         if (!argv.watch) {
