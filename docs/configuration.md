@@ -16,9 +16,13 @@
     - [typeCheckOptions](#typecheckoptions-opcional)
     - [hmr](#hmr-opcional)
     - [hmrExclude](#hmrexclude-opcional)
-4. [Ejemplo Completo](#-ejemplo-completo)
-5. [Comandos CLI](#-comandos-cli)
-6. [Troubleshooting](#-troubleshooting)
+    - [define](#define-opcional)
+    - [vendor](#vendor-opcional)
+    - [plugins](#plugins-opcional)
+4. [Variables de entorno (.env)](#-variables-de-entorno-env)
+5. [Ejemplo Completo](#-ejemplo-completo)
+6. [Comandos CLI](#-comandos-cli)
+7. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -87,13 +91,6 @@ Opciones de salida de la compilación.
 ```typescript
 build: {
     outDir: './dist',   // directorio de salida (requerido)
-    bundlers: [         // bundling post-compilación (opcional)
-        {
-            name: 'appLoader',
-            fileInput: './dist/module/appLoader.js',
-            fileOutput: './dist/module/appLoader.prod.js',
-        },
-    ],
 },
 ```
 
@@ -101,24 +98,7 @@ build: {
 
 Directorio donde se escriben los archivos compilados. Se crea automáticamente si no existe.
 
-#### `build.bundlers`
-
-Array de entradas de bundling ejecutadas después de la compilación principal. Usa `false` para deshabilitar:
-
-```typescript
-build: {
-    outDir: './dist',
-    bundlers: false,   // deshabilitar bundling
-},
-```
-
-Cada entrada acepta:
-
-| Campo        | Tipo     | Descripción                               |
-| ------------ | -------- | ----------------------------------------- |
-| `name`       | `string` | Identificador del bundle                  |
-| `fileInput`  | `string` | Archivo de entrada (relativo al proyecto) |
-| `fileOutput` | `string` | Archivo de salida                         |
+> **Nota:** VersaCompiler compila archivo a archivo y **no hace bundling**. La opción `build.bundlers` existe en el tipo de configuración pero **no está implementada**: no genera ningún bundle, así que no la uses. Si necesitas un bundle, usa un bundler externo (Rollup, esbuild, Vite) sobre `outDir`.
 
 ---
 
@@ -334,6 +314,134 @@ Esto confirma que la config fue leída correctamente. Si no aparece el mensaje, 
 
 ---
 
+### `define` _(opcional)_
+
+Reemplaza identificadores o expresiones por valores en tiempo de compilación, igual que `define` en Vite. Cada valor es una **expresión de JavaScript**, por eso los strings deben ir con `JSON.stringify` o con comillas dentro del string:
+
+```typescript
+define: {
+    __APP_VERSION__: JSON.stringify('1.2.0'),   // → "1.2.0"
+    __DEBUG__: 'false',                          // → false
+    'process.env.NODE_ENV': '"production"',      // claves con punto: soportadas
+},
+```
+
+- El reemplazo se hace sobre el AST: no toca el contenido de strings ni comentarios.
+- Úsalo para constantes de build. Para variables de entorno de la app prefiere [`import.meta.env`](#-variables-de-entorno-env).
+
+**Por defecto:** `{}`
+
+---
+
+### `vendor` _(opcional)_
+
+Controla la salida autocontenida de `--prod`. En producción, los imports de `/node_modules/<ruta>` se reescriben a `/<outDir>/vendor/<ruta>` y los archivos (junto con sus imports relativos) se **copian** a esa carpeta. Así no necesitas desplegar `node_modules`.
+
+```typescript
+vendor: false,   // desactiva la copia de dependencias en --prod
+```
+
+- Es **copia de archivos, no bundling**: funciona con builds ESM para navegador (por ejemplo `vue.esm-browser.prod.js`, pinia, vue-router).
+- Si un archivo vendorizado contiene un import "bare" (ej. `import 'lodash'`), VersaCompiler muestra una advertencia, porque ese import no se puede resolver en el navegador.
+
+**Por defecto:** activado en `--prod`.
+
+---
+
+### `plugins` _(opcional)_
+
+Array de plugins. Un plugin es un objeto con un `name` y los hooks que necesite:
+
+| Hook          | Cuándo se ejecuta                         |
+| ------------- | ----------------------------------------- |
+| `onResolve`   | Al resolver un import                     |
+| `onLoad`      | Al leer el contenido de un archivo        |
+| `onTransform` | Al transformar el contenido de un archivo |
+| `onHotUpdate` | Cuando cambia un archivo en `--watch`     |
+| `onEnd`       | Al terminar la compilación                |
+
+El campo opcional **`enforce`** decide en qué orden corre el plugin dentro de `onTransform`:
+
+- `enforce: 'pre'`: corre **antes** de los plugins core (vue, ts, transforms), así que recibe el fuente original (`.vue`, `.ts`).
+- Sin `enforce`: corre **después**, sobre el JS ya compilado.
+
+```typescript
+import { defineConfig } from 'versacompiler/config';
+import type { Plugin } from 'versacompiler';
+
+const addBuildStamp: Plugin = {
+    name: 'add-build-stamp',
+    onTransform({ loader, contents }) {
+        // Sin enforce: 'pre', aquí el contenido ya es JS compilado
+        if (loader !== 'js') return {};
+        return {
+            contents: `/* built: ${new Date().toISOString()} */\n${contents}`,
+        };
+    },
+};
+
+export default defineConfig({
+    // ...
+    plugins: [addBuildStamp],
+});
+```
+
+Los tipos (`Plugin`, `TransformArgs`, `TransformResult`, `LoadArgs`, `LoadResult`, etc.) se exportan desde `versacompiler`. Un hook devuelve solo lo que cambia: `contents` para reemplazar el código, `errors` para reportar problemas.
+
+**Por defecto:** `[]`
+
+---
+
+## 🔐 Variables de entorno (.env)
+
+VersaCompiler lee archivos `.env` y expone a tu código las variables con prefijo `VERSA_` a través de `import.meta.env`.
+
+### Archivos y prioridad
+
+| Archivo             | Cuándo se lee        |
+| ------------------- | -------------------- |
+| `.env`              | Siempre              |
+| `.env.local`        | Siempre              |
+| `.env.<mode>`       | Según el modo activo |
+| `.env.<mode>.local` | Según el modo activo |
+
+Si una variable aparece en varios archivos, **gana el último** de la lista. Las variables del **entorno del proceso** (por ejemplo `VERSA_API_URL=... pnpm build`) ganan sobre los archivos.
+
+### Modo (`--mode`)
+
+- `--mode <nombre>` (CLI) o `mode` (API) selecciona el archivo `.env.<nombre>`.
+- Sin `--mode`: el modo es `production` con `--prod`, y `development` en el resto de casos.
+
+```bash
+pnpm exec versacompiler --all --prod --mode staging   # lee .env.staging
+```
+
+### Uso en el código
+
+```env
+# .env
+VERSA_API_URL=https://api.example.com
+DB_PASSWORD=no-llega-al-navegador
+```
+
+```typescript
+const api = import.meta.env.VERSA_API_URL;
+
+if (import.meta.env.DEV) {
+    console.log('Modo desarrollo');
+}
+
+console.log(import.meta.env.MODE); // 'production', 'development' o el nombre de --mode
+console.log(import.meta.env.PROD); // boolean
+```
+
+- Solo las variables con prefijo `VERSA_` llegan al navegador. El resto **nunca** se incluye en la salida.
+- Los valores se reemplazan en tiempo de compilación por literales. Por eso `if (import.meta.env.DEV) { ... }` desaparece por completo en `--prod`.
+- `MODE`, `PROD` y `DEV` están siempre disponibles.
+- Los tipos (`ImportMetaEnv`) se generan en `src/types/global.d.ts`.
+
+---
+
 ## 📝 Ejemplo Completo
 
 ```typescript
@@ -343,13 +451,6 @@ export default defineConfig({
     root: './src',
     build: {
         outDir: './dist',
-        bundlers: [
-            {
-                name: 'appLoader',
-                fileInput: './dist/module/appLoader.js',
-                fileOutput: './dist/module/appLoader.prod.js',
-            },
-        ],
     },
     resolve: {
         alias: {
@@ -389,6 +490,11 @@ export default defineConfig({
     typeCheckOptions: {
         maxWorkers: 2,
     },
+    define: {
+        __APP_VERSION__: JSON.stringify('1.2.0'),
+    },
+    vendor: true,
+    plugins: [],
     hmr: true,
     hmrExclude: ['early-init.js', '*.legacy.js'],
 });
@@ -398,44 +504,58 @@ export default defineConfig({
 
 ## 🖥️ Comandos CLI
 
-| Comando            | Alias | Descripción                                    |
-| ------------------ | ----- | ---------------------------------------------- |
-| `--init`           |       | Inicializar configuración del proyecto         |
-| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación  |
-| `--all`            |       | Compilar todos los archivos del proyecto       |
-| `--file <archivo>` | `-f`  | Compilar un archivo específico                 |
-| `[archivos...]`    |       | Compilar múltiples archivos específicos        |
-| `--prod`           | `-p`  | Modo producción con minificación               |
-| `--verbose`        | `-v`  | Mostrar información detallada de compilación   |
-| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar |
-| `--cleanCache`     | `-cc` | Limpiar caché de compilación                   |
-| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones   |
-| `--typeCheck`      | `-t`  | Habilitar verificación de tipos TypeScript     |
-| `--checkIntegrity` | `-ci` | Validar integridad del código compilado        |
-| `--tailwind`       |       | Habilitar compilación TailwindCSS              |
-| `--linter`         |       | Ejecutar análisis de código                    |
-| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles           |
+| Comando            | Alias | Descripción                                                        |
+| ------------------ | ----- | ------------------------------------------------------------------ |
+| `--init`           |       | Inicializar configuración del proyecto                             |
+| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación                      |
+| `--all`            |       | Compilar todos los archivos del proyecto                           |
+| `--file <archivo>` | `-f`  | Compilar un archivo específico                                     |
+| `[archivos...]`    |       | Compilar múltiples archivos específicos                            |
+| `--prod`           | `-p`  | Modo producción con minificación                                   |
+| `--verbose`        | `-v`  | Mostrar información detallada de compilación                       |
+| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar                     |
+| `--cleanCache`     | `-cc` | Limpiar caché de compilación                                       |
+| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones                       |
+| `--typeCheck`      | `-t`  | Habilitar verificación de tipos TypeScript                         |
+| `--checkIntegrity` | `-ci` | Validar integridad del código compilado                            |
+| `--tailwind`       |       | Habilitar compilación TailwindCSS                                  |
+| `--linter`         |       | Ejecutar análisis de código                                        |
+| `--silent`         |       | Solo advertencias y errores (una línea por error)                  |
+| `--mode <nombre>`  |       | Modo para `.env.<nombre>` (ver [.env](#-variables-de-entorno-env)) |
+| `--config <ruta>`  |       | Usar otro archivo de configuración                                 |
+| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles                               |
+
+> **Notas:**
+>
+> - `--all` devuelve código de salida `1` si algún archivo falla o si un linter detiene el build. Antes siempre devolvía `0`, así que en CI ahora se detectan los builds rotos.
+> - La barra de progreso solo aparece en una terminal interactiva. En CI, con salida redirigida o con `NO_COLOR`, los logs son líneas planas.
 
 ### Ejemplos de uso avanzado
 
 ```bash
 # Desarrollo con análisis completo
-versacompiler --watch --verbose --typeCheck
+pnpm exec versacompiler --watch --verbose --typeCheck
 
 # Compilación específica de componente
-versacompiler --file src/components/Dashboard.vue --typeCheck
+pnpm exec versacompiler --file src/components/Dashboard.vue --typeCheck
 
 # Build para producción con limpieza completa
-versacompiler --all --prod --cleanOutput --cleanCache --yes
+pnpm exec versacompiler --all --prod --cleanOutput --cleanCache --yes
 
 # Solo análisis de código
-versacompiler --linter --verbose
+pnpm exec versacompiler --linter --verbose
 
 # Compilación de múltiples archivos
-versacompiler src/main.ts src/App.vue src/router.ts
+pnpm exec versacompiler src/main.ts src/App.vue src/router.ts
+
+# Build de staging con su archivo .env.staging, en silencio
+pnpm exec versacompiler --all --prod --mode staging --silent
+
+# Usar otro archivo de configuración
+pnpm exec versacompiler --all --prod --config ./config/versacompile.prod.ts
 
 # Build con validación de integridad (recomendado para deploy)
-versacompiler --all --prod --checkIntegrity --yes
+pnpm exec versacompiler --all --prod --checkIntegrity --yes
 ```
 
 ---
@@ -585,9 +705,10 @@ VersaCompiler incluye un sistema de validación de integridad que detecta autom�
 El validador verifica que el código compilado/minificado:
 
 - ✅ **No esté vacío** - Previene archivos vacíos por errores de minificación
-- ✅ **Mantenga la estructura** - Verifica paréntesis, llaves y corchetes balanceados
 - ✅ **Preserve exports** - Asegura que los exports no se eliminen por error
 - ✅ **Sea sintácticamente válido** - Detecta errores de sintaxis introducidos por transformaciones
+
+> **Nota:** La verificación de estructura (paréntesis/llaves/corchetes) está suspendida, así que no se ejecuta.
 
 ### Uso del Flag --checkIntegrity / -ci
 
@@ -595,13 +716,13 @@ La validación de integridad es **opcional** y se activa con el flag CLI:
 
 ```bash
 # Compilar con validación de integridad
-versacompiler build --all --prod --checkIntegrity
+pnpm exec versacompiler --all --prod --checkIntegrity
 
 # O usar el shorthand
-versacompiler build --all --prod -ci
+pnpm exec versacompiler --all --prod -ci
 
 # En modo verbose para ver detalles de validación
-versacompiler build --all --prod --checkIntegrity --verbose
+pnpm exec versacompiler --all --prod --checkIntegrity --verbose
 ```
 
 ### ¿Cuándo Usar Validación de Integridad?
@@ -665,7 +786,7 @@ jobs:
             - run: pnpm install
 
             # Build con validación de integridad
-            - run: pnpm versacompiler build --all --prod --checkIntegrity
+            - run: pnpm exec versacompiler --all --prod --checkIntegrity
 
             # Solo hacer deploy si la validación pasa
             - run: pnpm deploy

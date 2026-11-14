@@ -25,8 +25,6 @@
 2. **Instalación de dependencias**
 
     ```bash
-    npm install
-    # o
     pnpm install
     ```
 
@@ -38,8 +36,8 @@
 
 4. **Verificar instalación**
     ```bash
-    npm test
-    npm run build
+    pnpm test
+    pnpm build
     ```
 
 ## 🏗️ Estructura del Proyecto
@@ -171,9 +169,9 @@ Antes de reportar un bug:
 3. **Verificar cambios**
 
     ```bash
-    npm run lint
-    npm test
-    npm run build
+    pnpm lint
+    pnpm test
+    pnpm build
     ```
 
 4. **Commit con mensaje descriptivo**
@@ -357,22 +355,16 @@ describe('Compiler', () => {
 
 ```bash
 # Todos los tests
-npm test
+pnpm test
 
-# Tests específicos
-npm test -- --testNamePattern="Compiler"
+# Un archivo específico
+pnpm exec vitest run tests/<archivo>.test.ts
 
 # Tests en modo watch
-npm run test:watch
+pnpm test:watch
 
 # Coverage
-npm run test:coverage
-
-# Performance tests
-npm run test:performance
-
-# Performance tests con persistencia
-npm run test:performance:persist
+pnpm test:coverage
 ```
 
 ## 📚 Documentación

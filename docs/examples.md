@@ -293,35 +293,11 @@ export default defineConfig({
 });
 ```
 
-### Proyecto con Bundling
+### Dependencias en producción sin `node_modules`
 
-```typescript
-// versacompile.config.ts
-import { defineConfig } from 'versacompiler/config';
+En `--prod`, los imports de `/node_modules/<ruta>` se copian a `<outDir>/vendor/`, así que no hace falta desplegar `node_modules`. Funciona con builds ESM para navegador (por ejemplo `vue.esm-browser.prod.js`). Para desactivarlo: `vendor: false`.
 
-export default defineConfig({
-    root: './src',
-    build: {
-        outDir: './dist',
-        bundlers: [
-            {
-                name: 'appLoader',
-                fileInput: './dist/module/appLoader.js',
-                fileOutput: './dist/module/appLoader.prod.js',
-            },
-            {
-                name: 'components',
-                fileInput: './dist/components/index.js',
-                fileOutput: './dist/components.bundle.js',
-            },
-        ],
-    },
-    resolve: {
-        alias: { '@': 'src' },
-    },
-    tsconfig: './tsconfig.json',
-});
-```
+> **Nota:** VersaCompiler no hace bundling. Si necesitas bundles, usa un bundler externo sobre `outDir`.
 
 ## 📁 Estructuras de Proyecto
 
@@ -430,9 +406,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-      - run: npm install
-      - run: versacompiler --linter --typeCheck
-      - run: versacompiler --all --prod --yes
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install
+      - run: pnpm exec versacompiler --linter --typeCheck
+      - run: pnpm exec versacompiler --all --prod --yes
 ```
 
 ## 🔧 Configuraciones Avanzadas
@@ -579,7 +556,7 @@ module.exports = {
 };
 ```
 
-## 🚀 Scripts NPM Recomendados
+## 🚀 Scripts de package.json Recomendados
 
 ```json
 {
@@ -609,21 +586,21 @@ tsc --init
 
 ```bash
 # Instalar dependencias de linting
-npm install --save-dev eslint oxlint
+pnpm add -D eslint oxlint
 
 # Verificar instalación
-npx eslint --version
-npx oxlint --version
+pnpm exec eslint --version
+pnpm exec oxlint --version
 ```
 
 ### Error: TailwindCSS compilation failed
 
 ```bash
 # Instalar TailwindCSS
-npm install --save-dev tailwindcss
+pnpm add -D tailwindcss
 
 # Inicializar configuración
-npx tailwindcss init
+pnpm exec tailwindcss init
 ```
 
 ### HMR no funciona
@@ -672,8 +649,6 @@ export default {
     },
 };
 ```
-
-Para casos más complejos, consulta la [guía de migración](./migration.md).
 
 ## 🚀 Casos de Uso Avanzados
 
@@ -732,22 +707,10 @@ export default {
             },
         },
     ],
-    bundlers: [
-        {
-            name: 'vendor',
-            fileInput: './dist/vendor/index.js',
-            fileOutput: './dist/vendor.bundle.js',
-        },
-        {
-            name: 'app',
-            fileInput: './dist/main.js',
-            fileOutput: './dist/app.bundle.js',
-        },
-    ],
 };
 ```
 
-**Scripts NPM para Enterprise:**
+**Scripts de package.json para Enterprise:**
 
 ```json
 {
@@ -766,7 +729,7 @@ export default {
 }
 ```
 
-### Micro-frontend con Múltiples Bundlers
+### Micro-frontend (múltiples entradas)
 
 ```typescript
 // versacompile.config.ts para micro-frontends
@@ -782,28 +745,6 @@ export default {
             '@mf2/*': ['src/micro-frontend-2/*'],
         },
     },
-    bundlers: [
-        {
-            name: 'shell',
-            fileInput: './dist/shell/main.js',
-            fileOutput: './dist/bundles/shell.js',
-        },
-        {
-            name: 'micro-frontend-1',
-            fileInput: './dist/micro-frontend-1/index.js',
-            fileOutput: './dist/bundles/mf1.js',
-        },
-        {
-            name: 'micro-frontend-2',
-            fileInput: './dist/micro-frontend-2/index.js',
-            fileOutput: './dist/bundles/mf2.js',
-        },
-        {
-            name: 'shared',
-            fileInput: './dist/shared/index.js',
-            fileOutput: './dist/bundles/shared.js',
-        },
-    ],
     linter: [
         {
             name: 'oxlint',
@@ -1007,23 +948,16 @@ versacompiler --verbose --typeCheck --file any-file.ts
 ### Build para CDN
 
 ```typescript
-export default {
-    compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist/cdn',
-        pathsAlias: {
-            '@/*': ['src/*'],
-        },
-    },
-    bundlers: [
-        {
-            name: 'cdn-bundle',
-            fileInput: './dist/cdn/main.js',
-            fileOutput: './dist/cdn/app.min.js',
-        },
-    ],
-};
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist/cdn' },
+    resolve: { alias: { '@': 'src' } },
+});
 ```
+
+> **Nota:** VersaCompiler no genera bundles. Los archivos se compilan uno a uno en `dist/cdn/`.
 
 ### Build con Validación de Integridad (Deploy Seguro)
 
@@ -1109,8 +1043,9 @@ stages:
 build:
     stage: build
     script:
-        - npm install
-        - npx versacompiler --all --prod --checkIntegrity
+        - corepack enable
+        - pnpm install
+        - pnpm exec versacompiler --all --prod --checkIntegrity
     artifacts:
         paths:
             - dist/
@@ -1120,7 +1055,7 @@ deploy:
     dependencies:
         - build
     script:
-        - npm run deploy
+        - pnpm deploy
     only:
         - main
 ```
@@ -1143,15 +1078,17 @@ El build se detiene inmediatamente y NO se genera output corrupto.
 
 ```dockerfile
 # Dockerfile optimizado con VersaCompiler
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+# Instala todas las dependencias: versacompiler es devDependency y se necesita para compilar
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 # Build con validación de integridad
-RUN npx versacompiler --all --prod --checkIntegrity --cleanOutput --yes
+RUN pnpm exec versacompiler --all --prod --checkIntegrity --cleanOutput --yes
 
 FROM nginx:alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -1172,12 +1109,12 @@ spec:
         spec:
             containers:
                 - name: builder
-                  image: node:18-alpine
+                  image: node:22-alpine
                   command: ['/bin/sh']
-                  args: [
+                  args:
+                      [
                           '-c',
-                          checkIntegrity --
-                          'npm install && npx versacompiler --all --prod --yes',
+                          'corepack enable && pnpm install && pnpm exec versacompiler --all --prod --checkIntegrity --yes',
                       ]
                   volumeMounts:
                       - name: source-code
@@ -1192,5 +1129,4 @@ spec:
 Para más ejemplos específicos de tu caso de uso, consulta:
 
 - [Configuración avanzada](./configuration.md)
-- [Guía de performance](./performance.md)
 - [FAQ](./faq.md)

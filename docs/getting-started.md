@@ -13,6 +13,29 @@
 
 ## 📦 Instalación
 
+### Requisitos
+
+- **Node.js 22.22 o superior**
+- **pnpm**
+- **TypeScript 6** (TypeScript 7 no es compatible)
+
+### Instalación en tu proyecto
+
+```bash
+pnpm add -D versacompiler
+```
+
+Después añade los scripts a tu `package.json`:
+
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --all --prod"
+    }
+}
+```
+
 ### Instalación desde Código Fuente
 
 ```bash
@@ -21,13 +44,10 @@ git clone https://github.com/kriollo/versaCompiler.git
 cd versaCompiler
 
 # Instalar dependencias
-npm install
+pnpm install
 
 # Compilar
-npm run build
-
-# Usar en tu proyecto
-cp -r dist/* tu-proyecto/versacompiler/
+pnpm build
 ```
 
 ## 🎯 Tu Primer Proyecto
@@ -175,7 +195,7 @@ versacompiler --all --verbose
 
 # 🔧 Solo verificar configuración
 versacompiler --help
-# → Ver todas las 14 opciones CLI disponibles
+# → Ver todas las opciones CLI disponibles
 
 # 📦 Información de archivos procesados
 versacompiler src/components/ --verbose
@@ -332,13 +352,14 @@ versacompiler --watch
 - ✅ **TypeScript/JavaScript** - Recarga inteligente de módulos con workers
 - ✅ **CSS/TailwindCSS** - Inyección de estilos sin recarga
 - ✅ **Assets** - Actualización automática de recursos
-- ✅ **CSS Modules/SCSS** - Soporte completo con HMR
+- ✅ **SCSS/Sass, Less, Stylus** - Requieren instalar el preprocesador (`pnpm add -D sass`)
 
 ### Funcionalidades avanzadas de HMR:
 
 - 🔄 **Cache inteligente** - Solo recompila archivos modificados
 - ⚡ **Validación en paralelo** - TypeScript workers independientes
-- 🎨 **Hot reload de estilos** - TailwindCSS y CSS Modules
+- 🎨 **Hot reload de estilos** - TailwindCSS y CSS de componentes Vue
+- 🚨 **Overlay de errores** - Los errores de compilación se muestran en el navegador y desaparecen al corregir el archivo
 - 🧩 **Preservación de estado** - Vue Composition API y Options API
 - 🛡️ **`hmr: false`** - Deshabilita el shim HMR globalmente (para Node.js/librerías)
 - 🎯 **`hmrExclude`** - Excluye archivos específicos del shim HMR
@@ -402,6 +423,23 @@ versacompiler --watch --verbose
 # → Performance de HMR
 ```
 
+## 📥 Imports de JSON, CSS y assets
+
+Desde JS, TS o Vue puedes importar estos tipos de archivo:
+
+```typescript
+import data from './data.json'; // export default: el objeto JSON
+import './style.css'; // inyecta <link rel="stylesheet"> una sola vez
+import logo from './logo.png'; // export default: URL del archivo
+
+console.log(data, logo);
+```
+
+- Extensiones soportadas: `json`, `css`, `png`, `jpg`, `jpeg`, `gif`, `svg`, `webp`, `avif`, `ico`, `bmp`, `woff`, `woff2`, `ttf`, `otf`, `eot`, `mp4`, `webm`, `ogg`, `mp3`, `wav`, `pdf`, `txt`.
+- Los archivos se copian a `outDir` y se genera un módulo `<archivo>.js` junto a cada uno.
+- Los imports con atributos de importación (`with { type: 'json' }` o `type: 'css'`) se dejan nativos y no se reescriben.
+- El CSS de entrada de TailwindCSS se omite.
+
 ## 🚀 Build para Producción
 
 ### Build Básico
@@ -438,13 +476,13 @@ versacompiler --typeCheck --prod
 ### Optimizaciones Automáticas Incluidas:
 
 - ✅ **Minificación** con OxcMinify (más rápido que Terser)
-- ✅ **Tree Shaking** automático
-- ✅ **Dead Code Elimination**
-- ✅ **Optimización de imports**
-- ✅ **Compresión de assets**
-- ✅ **Vue 3.5 optimizations** - Mejores optimizaciones del compiler
-- ✅ **TypeScript decorators** - Soporte completo en producción
-- ✅ **CSS Modules optimization** - Eliminación de CSS no usado
+- ✅ **Dead code** eliminado por el minificador
+- ✅ **Salida autocontenida** - Las dependencias de `node_modules` importadas por URL se copian a `<outDir>/vendor/` (desactivable con `vendor: false`)
+- ✅ **`import.meta.env`** - Las variables `DEV` y `PROD` se reemplazan en compilación
+- ✅ **Vue 3.5** - Compilación de SFC con el compilador oficial
+- ✅ **TypeScript decorators** - Según tu `tsconfig.json`
+
+> **Nota:** VersaCompiler compila archivo a archivo: no hace bundling ni tree shaking. Los source maps no se generan en `--prod`.
 
 ### Builds Específicos
 
@@ -466,7 +504,6 @@ versacompiler --all --typeCheck --linter --prod
 - 📖 [Configuración Avanzada](./configuration.md)
 - 🎯 [Ejemplos y Recetas](./examples.md)
 - 🔧 [API Reference](./api.md)
-- 🚀 [Guía de Migración](./migration.md)
 
 ### Funcionalidades Avanzadas a Explorar
 
@@ -477,8 +514,10 @@ versacompiler --all --typeCheck --linter --prod
 - 🔄 **Cache inteligente** para builds incrementales
 - 🎭 **Vue 3.5 completo** - Composition API, script setup, TypeScript
 - 🎯 **TypeScript decorators** - Soporte experimental completo
-- 📦 **CSS Modules/SCSS** - Preprocesadores integrados
-- ⚡ **HMR avanzado** - Preservación de estado y recarga selectiva
+- 📦 **SCSS/Sass, Less, Stylus** - Preprocesadores (instalación manual)
+- 🔌 **Plugins** - Hooks propios para resolver, cargar y transformar archivos
+- 🔐 **Variables de entorno** - `.env` y `import.meta.env`
+- ⚡ **HMR** - Preservación de estado y recarga selectiva
 
 ### Integración con Herramientas
 

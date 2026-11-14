@@ -6,32 +6,41 @@
 [![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](https://github.com/kriollo/versaCompiler/releases/tag/v2.8.0)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-> **🎯 Compilador rápido y eficiente para Vue.js, TypeScript y JavaScript con Hot Module Replacement (HMR) completo.**
+> **🎯 Compilador rápido para Vue 3, TypeScript y JavaScript con Hot Module Replacement (HMR).**
 
-**VersaCompiler** es una herramienta de compilación diseñada para proyectos Vue 3 con soporte completo para TypeScript, JavaScript y todas las funcionalidades modernas que necesitas para desarrollo web.
+**VersaCompiler** compila tus proyectos Vue 3, TypeScript y JavaScript archivo a archivo, con HMR en desarrollo, linting, TailwindCSS y un build de producción minificado.
 
-## 🌟 Características Principales
+## 🌟 Características
 
-- ⚡ **Compilación ultra-rápida** - Workers paralelos y cache inteligente
-- 🔥 **HMR Completo (como Vite)** - Vue SFCs, librerías JS/TS y propagación en cascada sin recarga de página
-- 🧩 **Soporte completo para Vue 3** - SFC, Composition API, script setup
-- 📝 **TypeScript avanzado** - Language Service, decorators, validación de tipos
-- 🔍 **Sistema de linting dual** - ESLint + OxLint con auto-fix
-- 🎨 **TailwindCSS integrado** - Compilación automática y optimizada
-- 🗜️ **Minificación de última generación** - OxcMinify para builds ultra-optimizados
-- 🛡️ **Validación de integridad** - Sistema de 4 niveles que detecta código corrupto, exports eliminados y errores de sintaxis en builds
-- �📦 **Bundling inteligente** - Agrupación configurable de módulos (EN DESARROLLO)
-- 🛠️ **Compilación por archivo** - Granular control de compilación
-- 🧹 **Gestión de caché avanzada** - Cache automático con invalidación inteligente
+- ⚡ **Compilación rápida** - Workers TypeScript en paralelo y caché
+- 🔥 **HMR en `--watch`** - Actualizaciones sin recargar la página y overlay de errores en el navegador
+- 🧩 **Vue 3** - SFC, Composition API, `<script setup>`, SCSS/Sass, Less y Stylus
+- 📝 **TypeScript** - Language Service, verificación de tipos y decorators según tu `tsconfig.json`
+- 📦 **Imports de assets** - JSON, CSS, imágenes y fuentes se importan directamente desde JS/TS/Vue
+- 🔐 **Variables de entorno** - `import.meta.env` con archivos `.env` y prefijo `VERSA_`
+- 🔌 **Plugins** - Hooks `onResolve`, `onLoad`, `onTransform`, `onHotUpdate` y `onEnd`
+- 🧰 **API programática** - `build()` y `compile()` para usar desde tus scripts
+- 🔍 **Linting dual** - ESLint y OxLint
+- 🎨 **TailwindCSS** integrado
+- 🗜️ **Minificación** con OxcMinify y **salida autocontenida** en `--prod` (sin desplegar `node_modules`)
+- 🛡️ **Validación de integridad** - Detecta código corrupto antes de desplegar
+- 🤖 **Apto para CI** - `--all` devuelve código de salida `1` si algún archivo falla
 
 ## ⚡ Instalación
 
 ### ✅ Requisitos
 
-- **Node.js 22.22 o superior** (lo exige chokidar 6, usado por el modo `--watch`)
+- **Node.js 22.22 o superior**
 - **pnpm** como gestor de paquetes
+- **TypeScript 6** (TypeScript 7 no es compatible: aún no expone la API del LanguageService en JS)
 
-### 📦 Desde código fuente
+### 📦 En tu proyecto
+
+```bash
+pnpm add -D versacompiler
+```
+
+### 🛠️ Desde código fuente
 
 ```bash
 git clone https://github.com/kriollo/versaCompiler.git
@@ -40,99 +49,53 @@ pnpm install
 pnpm build
 ```
 
-### 🔗 Instalación local en tu proyecto
-
-```bash
-# Copiar archivos compilados a tu proyecto
-cp -r dist/* tu-proyecto/versacompiler/
-```
-
 ## 🎯 Quick Start
 
-### 1. Configuración inicial
+```bash
+# 1. Crear el archivo de configuración
+pnpm exec versacompiler --init
+
+# 2. Desarrollo con HMR
+pnpm exec versacompiler --watch
+```
+
+Añade los comandos a tu `package.json` para usarlos con pnpm:
+
+```json
+{
+    "scripts": {
+        "dev": "versacompiler --watch",
+        "build": "versacompiler --all --prod --checkIntegrity"
+    }
+}
+```
 
 ```bash
-# Crear archivo de configuración
-versacompiler --init
+pnpm dev
+pnpm build
 ```
 
-### 2. Estructura de proyecto
+### Comandos principales
 
-```
-mi-proyecto/
-├── src/                    # 📝 Código fuente
-│   ├── components/         # 🧩 Componentes Vue
-│   └── main.ts            # 🚀 Punto de entrada
-├── dist/                  # 📦 Archivos compilados (auto-generado)
-├── versacompile.config.ts # ⚙️ Configuración
-└── package.json
-```
+| Comando                    | Descripción                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `--watch` / `-w`           | Modo desarrollo con HMR y auto-recompilación                                           |
+| `--all`                    | Compila todo el proyecto                                                               |
+| `--file <archivo>` / `-f`  | Compila un archivo específico                                                          |
+| `--prod` / `-p`            | Build de producción (minificado, salida autocontenida)                                 |
+| `--checkIntegrity` / `-ci` | Valida el código generado (recomendado para deploy)                                    |
+| `--mode <nombre>`          | Modo para `.env.<nombre>` (por defecto `production` con `--prod`, si no `development`) |
+| `--silent`                 | Solo advertencias y errores                                                            |
+| `--config <ruta>`          | Usa otro archivo de configuración                                                      |
+| `--linter`                 | Ejecuta los linters configurados                                                       |
+| `--typeCheck` / `-t`       | Verificación de tipos TypeScript                                                       |
+| `--help` / `-h`            | Muestra todas las opciones                                                             |
 
-### 3. Comandos básicos
-
-```bash
-# 🔥 Desarrollo con auto-reload y HMR
-versacompiler --watch
-
-# 🔥 Desarrollo con análisis detallado
-versacompiler --watch --verbose
-
-# 🏗️ Compilar todo el proyecto
-versacompiler --all
-
-# 📄 Compilar archivo específico
-versacompiler --file src/components/MyComponent.vue
-
-# 📝 Compilar múltiples archivos específicos
-versacompiler src/main.ts src/components/App.vue
-
-# 🚀 Build para producción (minificado)
-versacompiler --all --prod
-
-# 🛡️ Build con validación de integridad (recomendado para deploy)
-versacompiler --all --prod --checkIntegrity
-
-# 🧹 Limpiar y recompilar todo
-versacompiler --all --cleanOutput --cleanCache
-
-# 🔍 Solo verificar código (linting)
-versacompiler --linter
-
-# 🎨 Solo compilar TailwindCSS
-versacompiler --tailwind
-
-# ⚡ Compilación rápida con confirmación automática
-versacompiler --all --prod --yes
-
-# 🔬 Verificación de tipos específica
-versacompiler --typeCheck --file src/types.ts
-```
+La lista completa de opciones está en [docs/configuration.md](./docs/configuration.md#-comandos-cli).
 
 ## 📖 Configuración
 
-### 🛠️ Comandos CLI Disponibles
-
-| Comando            | Alias | Descripción                                      |
-| ------------------ | ----- | ------------------------------------------------ |
-| `--init`           |       | Inicializar configuración del proyecto           |
-| `--watch`          | `-w`  | Modo observación con HMR y auto-recompilación    |
-| `--all`            |       | Compilar todos los archivos del proyecto         |
-| `--file <archivo>` | `-f`  | Compilar un archivo específico                   |
-| `[archivos...]`    |       | Compilar múltiples archivos específicos          |
-| `--prod`           | `-p`  | Modo producción con minificación                 |
-| `--verbose`        | `-v`  | Mostrar información detallada de compilación     |
-| `--cleanOutput`    | `-co` | Limpiar directorio de salida antes de compilar   |
-| `--cleanCache`     | `-cc` | Limpiar caché de compilación                     |
-| `--yes`            | `-y`  | Confirmar automáticamente todas las acciones     |
-| `--typeCheck`      | `-t`  | Habilitar/deshabilitar verificación de tipos     |
-| `--checkIntegrity` | `-ci` | Validar integridad del código compilado (deploy) |
-| `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS   |
-| `--linter`         |       | Habilitar/deshabilitar análisis de código        |
-| `--help`           | `-h`  | Mostrar ayuda y opciones disponibles             |
-
-### 🔧 Archivo de configuración
-
-Crea un archivo `versacompile.config.ts` en la raíz de tu proyecto usando `defineConfig` para autocompletado TypeScript:
+Crea `versacompile.config.ts` en la raíz de tu proyecto:
 
 ```typescript
 import { defineConfig } from 'versacompiler/config';
@@ -141,41 +104,15 @@ export default defineConfig({
     root: './src',
     build: {
         outDir: './dist',
-        bundlers: [
-            {
-                name: 'appLoader',
-                fileInput: './public/module/appLoader.js',
-                fileOutput: './public/module/appLoader.prod.js',
-            },
-        ],
     },
     resolve: {
-        alias: {
-            '@': 'src',
-            'P@': 'public',
-        },
-    },
-    server: {
-        proxyUrl: '',
-        assetsOmit: true,
-        watch: {
-            additional: ['./app/templates/**/*.twig'],
-        },
+        alias: { '@': 'src' },
     },
     tsconfig: './tsconfig.json',
-    tailwindConfig: {
-        bin: './node_modules/.bin/tailwindcss',
-        input: './src/css/input.css',
-        output: './public/css/output.css',
+    define: {
+        __APP_VERSION__: JSON.stringify('1.2.0'),
     },
     linter: [
-        {
-            name: 'eslint',
-            bin: './node_modules/.bin/eslint',
-            configFile: './eslint.config.js',
-            fix: false,
-            paths: ['src/'],
-        },
         {
             name: 'oxlint',
             bin: './node_modules/.bin/oxlint',
@@ -184,558 +121,67 @@ export default defineConfig({
             paths: ['src/'],
         },
     ],
-    typeCheckOptions: {
-        maxWorkers: 2,
-    },
-    hmrExclude: ['nohrm.js'],
 });
 ```
 
-### 📝 Opciones de configuración
+Todas las opciones (servidor, TailwindCSS, linters, plugins, `hmr`, `vendor`...) están documentadas en [docs/configuration.md](./docs/configuration.md).
 
-#### `root` _(requerido)_
-
-- Directorio raíz de los archivos fuente (ej: `'./src'`)
-
-#### `build` _(requerido)_
-
-- `outDir`: Directorio de salida de los archivos compilados (ej: `'./dist'`)
-- `bundlers`: Array de entradas de bundling post-compilación (opcional, `false` para deshabilitar)
-    - `name`: Nombre del bundle
-    - `fileInput`: Archivo de entrada
-    - `fileOutput`: Archivo de salida
-
-#### `resolve`
-
-- `alias`: Mapa de alias de imports. La clave es el prefijo del alias y el valor es la ruta que reemplaza (ej: `{ '@': 'src', 'P@': 'public' }`)
-
-#### `server`
-
-- `proxyUrl`: URL del proxy para desarrollo (ej: `'http://localhost:8000'`)
-- `assetsOmit`: Omitir assets estáticos del proxy (`true`/`false`)
-- `watch.additional`: Globs adicionales a vigilar que disparan recarga completa (ej: plantillas Twig, HTML)
-
-#### `tsconfig`
-
-- Ruta al `tsconfig.json` del proyecto (ej: `'./tsconfig.json'`)
-
-#### `tailwindConfig`
-
-- `bin`: Ruta al binario de TailwindCSS
-- `input`: Archivo CSS de entrada con directivas Tailwind
-- `output`: Archivo CSS de salida compilado
-- Usar `false` para deshabilitar completamente
-
-#### `linter`
-
-Array de configuraciones de linters. Usar `false` para deshabilitar todos:
-
-- `name`: Nombre del linter (`'eslint'` o `'oxlint'`)
-- `bin`: Ruta al binario del linter
-- `configFile`: Archivo de configuración del linter
-- `fix`: Auto-fix de errores detectados (`true`/`false`)
-- `paths`: Rutas específicas a analizar (ej: `['src/']`)
-
-#### `typeCheckOptions`
-
-- `maxWorkers`: Máximo número de worker threads para verificación de tipos (por defecto: depende del número de CPUs)
-
-#### `hmr` _(opcional)_
-
-Controla si VersaCompiler inyecta el shim HMR en los archivos `.js` compilados.
-
-- `true` _(por defecto)_: todos los archivos compilados reciben el shim HMR en modo desarrollo
-- `false`: deshabilita la inyección **globalmente** — útil para builds de librería Node.js o cuando ningún archivo debe tener HMR
+## 🧰 API programática
 
 ```typescript
-// Deshabilitar HMR globalmente (ej. librería CLI / Node.js)
-export default defineConfig({
-    // ...
-    hmr: false,
+import { build, compile, defineConfig } from 'versacompiler';
+
+// true = sin errores
+const ok = await build({ prod: true, checkIntegrity: true });
+
+// Compila un único archivo
+const { success, output } = await compile('src/components/App.vue', {
+    prod: false,
 });
 ```
 
-> **Nota**: Para deshabilitar HMR solo en archivos puntuales (mientras el resto sigue con HMR activo), usa `hmrExclude` en su lugar.
-
-#### `hmrExclude` _(opcional)_
-
-Lista de patrones para excluir archivos **de salida** específicos de la inyección del shim HMR, sin afectar al resto.
-
-Esto es útil cuando un archivo compilado se carga con `<script src="...">` en lugar de `<script type="module" src="...">`, lo que causaría el error:
-
-```
-SyntaxError: Cannot use 'import.meta' outside a module
-```
-
-**Patrones aceptados:**
-
-| Patrón            | Ejemplo              | Coincide con                         |
-| ----------------- | -------------------- | ------------------------------------ |
-| Nombre exacto     | `'early-init.js'`    | Cualquier archivo con ese nombre     |
-| Sufijo de ruta    | `'js/early-init.js'` | Ruta que termina con ese sufijo      |
-| Glob simple (`*`) | `'*.legacy.js'`      | Archivos que coincidan con el patrón |
-
-```typescript
-export default defineConfig({
-    // ...
-    hmrExclude: [
-        'early-init.js', // nombre exacto
-        'vendor/polyfills.js', // sufijo de ruta
-        '*.legacy.js', // glob simple
-    ],
-});
-```
-
-Al iniciar en modo `--watch`, si `hmrExclude` tiene entradas, VersaCompiler mostrará:
-
-```
-[HMR] Exclusiones activas: ['early-init.js', '*.legacy.js']
-```
-
-## 🎯 Ejemplos de Uso
-
-### Desarrollo Local
-
-```bash
-# Iniciar servidor de desarrollo con HMR
-versacompiler --watch
-
-# Desarrollo con información detallada
-versacompiler --watch --verbose
-
-# Compilación específica durante desarrollo
-versacompiler --file src/main.ts
-
-# Solo linting durante desarrollo
-versacompiler --linter
-
-# Desarrollo con limpieza de caché
-versacompiler --watch --cleanCache
-```
-
-### Compilación para Producción
-
-```bash
-# Build completo para producción
-versacompiler --all --prod
-
-# Build con limpieza previa
-versacompiler --all --prod --cleanOutput --cleanCache
-
-# Build silencioso para CI/CD
-versacompiler --all --prod --yes
-
-# Build con análisis detallado
-versacompiler --all --prod --verbose
-```
-
-### Flujos de Trabajo Específicos
-
-```bash
-# Compilar solo archivos modificados
-versacompiler file1.vue file2.ts file3.js
-
-# Verificación de tipos específica
-versacompiler --typeCheck --file src/types/api.ts
-
-# Solo TailwindCSS
-versacompiler --tailwind
-
-# Compilación híbrida (linting + compilación)
-versacompiler --all --linter --typeCheck
-```
-
-### Integración CI/CD
-
-```bash
-# Pipeline de CI completo
-versacompiler --linter                    # 1. Verificar código
-versacompiler --typeCheck --all          # 2. Verificar tipos
-versacompiler --all --prod --yes         # 3. Build para producción
-```
-
-## 🧩 Casos de Uso Avanzados
-
-### 🎮 Desarrollo de Componentes Vue
-
-```bash
-# Compilación específica de componente con hot reload
-versacompiler --watch --file src/components/GameBoard.vue
-
-# Desarrollo con validación de tipos estricta
-versacompiler --watch --typeCheck --verbose
-
-# Solo compilar estilos para rapid prototyping
-versacompiler --tailwind --file src/styles/components.css
-```
-
-### 🏢 Proyectos Enterprise
-
-```bash
-# Validación completa antes de commit
-versacompiler --linter --typeCheck --all
-
-# Build optimizado para múltiples entornos
-versacompiler --all --prod --cleanOutput --verbose
-
-# Análisis de bundle para optimización
-versacompiler --all --prod --verbose | grep "Bundle"
-```
-
-### 🧪 Testing y CI/CD
-
-```bash
-# Pre-commit hooks
-versacompiler --linter --typeCheck --cleanCache
-
-# GitHub Actions / CI Pipeline
-versacompiler --all --prod --yes --verbose
-
-# Testing de componentes individuales
-versacompiler --file tests/components/Button.test.ts
-```
-
-### 🎨 Design System Development
-
-```bash
-# Compilación de componentes de design system
-versacompiler --watch src/design-system/components/
-
-# Build de librería de componentes
-versacompiler --all --prod src/design-system/
-
-# Validación de tokens de diseño
-versacompiler --tailwind --verbose
-```
-
-## 🏗️ Funcionalidades
-
-### 🔥 Hot Module Replacement (HMR)
-
-- **Componentes Vue**: Actualizaciones instantáneas preservando estado de componentes
-- **TypeScript/JavaScript**: Recarga inteligente de módulos sin perder contexto
-- **CSS/TailwindCSS**: Inyección de estilos en tiempo real
-- **Key-based updates**: Sistema de keys únicos para identificación de componentes
-- **`hmr: false`**: Deshabilita la inyección del shim HMR globalmente (para builds de librería Node.js)
-- **`hmrExclude`**: Excluye archivos específicos del shim HMR. Acepta nombres exactos, sufijos de ruta y globs simples (`*.legacy.js`)
-
-### 🚀 Sistema de Compilación Avanzado
-
-- **Worker Threads**: Pool de workers TypeScript optimizado para CPU cores
-- **Cache inteligente**: Sistema de cache por archivos con invalidación automática
-- **Compilación incremental**: Solo recompila archivos modificados
-- **Progress tracking**: Métricas en tiempo real con timing detallado
-- **Lazy loading**: Carga de módulos bajo demanda para máxima eficiencia
-
-### 🔍 Sistema de Linting Dual de Nueva Generación
-
-- **ESLint**: Análisis profundo de código JavaScript/TypeScript/Vue
-    - Soporte para múltiples formatos de salida (json, stylish, compact)
-    - Cache inteligente para acelerar análisis repetitivos
-    - Auto-fix avanzado con preservación de formato
-- **OxLint**: Linter ultra-rápido escrito en Rust
-    - Análisis paralelo de archivos
-    - Reglas optimizadas para Vue 3 y TypeScript moderno
-    - Integración con tsconfig.json
-
-### 📝 TypeScript de Última Generación
-
-- **Language Service Host**: Validación de tipos completa y optimizada
-- **Soporte para Decorators**: Experimental decorators y emit decorator metadata
-- **Archivos virtuales**: Soporte para archivos .vue como .vue.ts
-- **Worker-based validation**: Validación de tipos en threads separados
-- **Fallback inteligente**: Modo sincrónico para entornos de testing
-- **Error filtering**: Filtrado inteligente de errores específicos de TypeScript
-
-### 🧩 Soporte Vue 3 de Nivel Profesional
-
-- **Vue 3.5 Support**: Soporte completo para las últimas características
-- **Script Setup**: Compilación optimizada de composition API
-- **CSS Modules**: Soporte completo para CSS modules con hashing
-- **Scoped Styles**: Compilación de estilos scoped con scope IDs únicos
-- **SCSS/Sass**: Preprocesadores CSS integrados
-- **Custom Blocks**: Soporte para bloques personalizados en SFC
-- **Slots avanzados**: Compilación optimizada de slots con fallbacks
-
-### 📦 Minificación y Optimización
-
-- **OxcMinify**: Minificador de última generación escrito en Rust
-- **Templates HTML/CSS en strings**: minificados con `minify-literals` (html-minifier-next + Lightning CSS)
-- **Tree shaking**: Eliminación inteligente de código no utilizado
-- **Variable mangling**: Renombrado de variables para máxima compresión
-- **Dead code elimination**: Eliminación de código muerto
-- **Compresión avanzada**: Algoritmos de compresión optimizados
-- **Source maps**: Generación de source maps en desarrollo
-
-### 🛡️ Sistema de Validación de Integridad (v2.4.0+)
-
-Protección automática contra código corrupto en compilación y minificación con sistema de 4 niveles:
-
-#### ✅ Check 1: Validación de Tamaño (~0.1ms)
-
-- Verifica que el código no esté vacío después de compilación
-- Detecta archivos con menos de 10 caracteres (posible corrupción)
-- Previene archivos completamente vacíos por errores de minificación
-
-#### 🔍 Check 2: Validación de Estructura (~1ms) ⚠️ _Temporalmente suspendido_
-
-- Parser character-by-character para verificar brackets balanceados
-- Detección de strings, template literals, comentarios y regex
-- **Nota**: Actualmente suspendido debido a limitaciones con character classes en regex (`/[()\[\]{}]/`)
-- Los otros 3 checks proporcionan protección suficiente durante la suspensión
-
-#### 📤 Check 3: Validación de Exports (~1ms)
-
-- Detecta exports eliminados incorrectamente durante transformaciones
-- Compara exports del código original vs código procesado
-- Previene bugs críticos en módulos que pierden sus APIs públicas
-
-#### 🔬 Check 4: Validación de Sintaxis (~3ms)
-
-- Validación completa con oxc-parser (parser JavaScript/TypeScript de producción)
-- Detecta errores de sintaxis introducidos durante compilación
-- Garantiza que el código generado es sintácticamente válido
-
-#### 🚀 Características Adicionales
-
-- **Cache LRU**: Hasta 100 entradas cacheadas para optimizar validaciones repetidas (~0.1ms en cache hit)
-- **Performance objetivo**: <5ms por archivo (típicamente 1-3ms total)
-- **Estadísticas detalladas**: Tracking de validaciones, cache hits/misses, duración promedio
-- **Modo verbose**: Logging detallado de cada validación para debugging
-- **Opciones configurables**: `skipSyntaxCheck`, `throwOnError`, `verbose`
-
-#### 📊 Casos de Uso Detectados
-
-```typescript
-// Bug #1: Código vacío después de minificación (Check 1)
-const result = minify(code);
-// → IntegrityValidator detecta: "Tamaño de código inválido (0 chars)"
-
-// Bug #2: Export eliminado por error (Check 3)
-export const API_KEY = '...';
-// → Después de transform: const API_KEY = "...";
-// → IntegrityValidator detecta: "Export 'API_KEY' fue eliminado"
-
-// Bug #3: Sintaxis inválida introducida (Check 4)
-const obj = { key: value };
-// → Después de transform: const obj = { key: value
-// → IntegrityValidator detecta: "SyntaxError: Expected '}'"
-
-// Bug #4: Brackets desbalanceados (Check 2, cuando esté habilitado)
-const arr = [1, 2, 3];
-// → Después de transform: const arr = [1, 2, 3;
-// → IntegrityValidator detectará: "Corchetes desbalanceados"
-```
-
-#### 🎯 Uso Recomendado
-
-```bash
-# Desarrollo: Validación automática integrada
-versacompiler --watch
-# → Validación de integridad en cada compilación
-
-# Producción: Validación explícita antes de deploy
-versacompiler --all --prod --checkIntegrity
-# → 100% de archivos validados antes de deployment
-
-# CI/CD: Validación en pipeline
-versacompiler --all --prod --checkIntegrity --yes
-# → Build fallará si hay código corrupto
-```
-
-#### 📈 Resultados de Validación
-
-- **Validación típica**: 1-3ms por archivo
-- **Cache hit**: <0.1ms (resultado reutilizado)
-- **Overhead total**: <5ms adicional en compilación estándar
-- **Tests**: 32/32 tests pasando con cobertura completa
-- **Tasa de éxito**: 40/40 archivos (100%) con Checks 1, 3 y 4 activos
-
-### 🛠️ Gestión de Archivos y Cache
-
-- **Sistema de cache multinivel**: Cache de configuraciones, compilaciones y validaciones
-- **Invalidación inteligente**: Cache invalidation basado en timestamps y dependencias
-- **Compilación granular**: Compilación por archivo individual o en lotes
-- **Gestión de dependencias**: Tracking automático de dependencias entre archivos
-- **Limpieza automática**: Auto-limpieza de archivos obsoletos
-
-### 🎨 TailwindCSS Integrado
-
-- **Compilación automática**: Watch mode integrado para cambios en CSS
-- **Optimización de producción**: Minificación y purging automático
-- **Content scanning**: Escaneo inteligente de archivos para clases utilizadas
-- **Config personalizada**: Soporte para configuraciones personalizadas de Tailwind
-
-## 🚧 Troubleshooting
-
-### ❌ Problemas Frecuentes
-
-#### 🔍 Error: "Cannot resolve module" o problemas de imports
-
-```bash
-# Verificar configuración de aliases y paths
-versacompiler --verbose --file problemFile.ts
-
-# Limpiar cache TypeScript si persiste
-versacompiler --cleanCache
-
-# Verificar configuración en tsconfig.json
-cat tsconfig.json | grep -A 10 "paths"
-```
-
-#### 🔥 HMR no funciona correctamente
-
-```typescript
-// Verificar configuración en versacompile.config.ts
-import { defineConfig } from 'versacompiler/config';
-
-export default defineConfig({
-    root: './src',
-    build: { outDir: './dist' },
-    resolve: { alias: { '@': 'src' } },
-    server: {
-        proxyUrl: '', // Vacío si no usas proxy backend
-        assetsOmit: true,
-    },
-});
-```
-
-```bash
-# Reiniciar con limpieza de cache
-versacompiler --watch --cleanCache
-```
-
-#### ⚠️ Error: `Cannot use 'import.meta' outside a module` en un archivo JS
-
-Este error ocurre cuando un archivo compilado con el shim HMR se carga sin `type="module"`. Usa `hmrExclude` para excluirlo:
-
-```typescript
-// versacompile.config.ts
-export default defineConfig({
-    // ...
-    hmrExclude: ['early-init.js'],
-});
-```
-
-Si el problema afecta a **todos** los archivos (ej. proyecto Node.js), deshabilita HMR globalmente:
-
-```typescript
-export default defineConfig({
-    // ...
-    hmr: false,
-});
-```
-
-#### 🐌 Compilación o linting muy lento
-
-```bash
-# Usar solo OxLint para máxima velocidad
-versacompiler --linter --verbose
-
-# Verificar si worker threads están activos
-versacompiler --verbose --typeCheck
-
-# Limpiar cache si está corrupto
-versacompiler --cleanCache --cleanOutput
-```
-
-#### 🔴 Errores de TypeScript en archivos Vue
-
-```bash
-# Verificar soporte para decorators en tsconfig.json
-{
-  "compilerOptions": {
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
-  }
-}
-
-# Ejecutar solo verificación de tipos
-versacompiler --typeCheck --file Component.vue
-```
-
-#### ⚠️ Warnings de dependencias o módulos
-
-```bash
-# Verificar si las dependencias están instaladas
-npm install
-
-# Revisar configuración de paths en versacompile.config.ts
-versacompiler --verbose --file problematicFile.ts
-```
-
-#### 🎨 TailwindCSS no se actualiza
-
-```bash
-# Verificar configuración de Tailwind
-versacompiler --tailwind --verbose
-
-# Limpiar cache de TailwindCSS
-rm -rf ./node_modules/.cache/tailwindcss
-versacompiler --tailwind --cleanCache
-```
-
-### 🔧 Configuraciones de Debug
-
-#### Habilitar logging detallado
-
-```bash
-# Máximo nivel de detalle
-versacompiler --verbose --all
-
-# Debug específico por archivo
-versacompiler --verbose --file src/problematicFile.vue
-```
-
-#### Verificar configuración activa
-
-```bash
-# Ver configuración cargada
-versacompiler --verbose --init  # Muestra config actual
-```
-
-#### Performance profiling
-
-```bash
-# Analizar performance de compilación
-versacompiler --verbose --all --prod
-# Revisar timings en la salida
-```
+Detalles y limitaciones en [docs/api.md](./docs/api.md).
 
 ## 📚 Documentación
 
 - 📖 [**Guía de Inicio Rápido**](./docs/getting-started.md)
-- 📋 [**Configuración Avanzada**](./docs/configuration.md)
+- 📋 [**Configuración**](./docs/configuration.md) - Opciones, `.env`, plugins y CLI
 - 🎯 [**Ejemplos y Recetas**](./docs/examples.md)
 - 🔧 [**API Reference**](./docs/api.md)
-- 🔄 [**Guía de Migración**](./docs/migration.md)
 - 🤝 [**Guía de Contribución**](./docs/contributing.md)
 - ❓ [**FAQ - Preguntas Frecuentes**](./docs/faq.md)
+
+## 🚧 Troubleshooting
+
+- **HMR no conecta o no actualiza**: revisa `server.proxyUrl` (vacío si no usas proxy) y ejecuta `pnpm exec versacompiler --watch --cleanCache`.
+- **`Cannot use 'import.meta' outside a module`**: el archivo se carga con `<script>` sin `type="module"`. Añádelo a `hmrExclude`, o usa `hmr: false` si ningún archivo necesita HMR.
+- **`<style lang="scss">` no compila**: instala el preprocesador con `pnpm add -D sass` (o `less` / `stylus`). VersaCompiler no los incluye.
+- **Compilación lenta**: usa `--cleanCache` solo cuando sea necesario y limita los workers con `typeCheckOptions.maxWorkers`.
+
+Más casos en [docs/faq.md](./docs/faq.md).
 
 ## 🧪 Testing
 
 ```bash
 # Ejecutar tests
-npm test
+pnpm test
 
 # Tests con coverage
-npm run test:coverage
+pnpm test:coverage
 
 # Tests en modo watch
-npm run test:watch
+pnpm test:watch
 ```
 
 ## 🤝 Contribuir
 
-¡Las contribuciones son bienvenidas! Ver [CONTRIBUTING.md](./docs/contributing.md) para detalles.
-
-### 🛠️ Desarrollo Local
+¡Las contribuciones son bienvenidas! Ver [docs/contributing.md](./docs/contributing.md) para detalles.
 
 ```bash
 git clone https://github.com/kriollo/versaCompiler.git
 cd versaCompiler
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ## 📄 Licencia
@@ -748,67 +194,6 @@ MIT © [Jorge Jara H](https://github.com/kriollo)
 - **TypeScript Team** - Por el excelente sistema de tipos
 - **Oxc Project** - Por las herramientas de desarrollo ultra-rápidas
 - **Comunidad Open Source** - Por el feedback y contribuciones
-
----
-
-## 🔧 Arquitectura Técnica
-
-### Compilación de Archivos
-
-- **JavaScript (.js)**: Procesamiento, transformaciones y optimización con placement inteligente
-- **TypeScript (.ts)**: Transpilación completa usando TypeScript Compiler API con Language Service
-- **Vue SFC (.vue)**: Compilación completa de Single File Components con:
-    - Script compilation (incluyendo script setup)
-    - Template compilation con optimizaciones
-    - Style compilation (CSS, SCSS, CSS Modules, Scoped)
-    - Custom blocks processing
-
-### Sistema de Workers Avanzado
-
-- **TypeScript Worker Threads**: Validación de tipos en procesos separados
-- **Fallback sincrónico**: Detección automática de entorno de testing
-- **Pool de workers**: Optimizado según CPU cores disponibles
-- **Cache de validación**: Resultados de validación persistentes
-
-### Minificación de Última Generación
-
-- **OxcMinify**: Minificador ultra-rápido en Rust para modo `--prod`
-- **Variable mangling**: Renombrado inteligente de variables
-- **Dead code elimination**: Eliminación de código no utilizado
-- **Modern JavaScript**: Preservación de sintaxis ES2020+
-
-### Sistema de Observación de Archivos
-
-- **Chokidar**: Observación eficiente de cambios en archivos
-- **Debounced compilation**: Evita recompilaciones excesivas
-- **Dependency tracking**: Seguimiento de dependencias entre archivos
-- **Hot Module Replacement**: Actualizaciones sin perder estado
-
-### Cache Multinivel
-
-- **Configuration cache**: Cache de tsconfig.json y configuraciones
-- **Compilation cache**: Resultados de compilación por archivo
-- **TypeScript cache**: Cache del Language Service Host
-- **File system cache**: Cache de lecturas de archivos
-
-### Dependencias Principales
-
-- **Vue.js**: `vue/compiler-sfc` para compilación de SFC
-- **TypeScript 6**: Compiler API completa con Language Service Host (TypeScript 7 aún no expone esa API en JS)
-- **OxcMinify**: Minificación ultra-optimizada
-- **OxLint**: Linting ultra-rápido en Rust
-- **ESLint**: Análisis profundo de código
-- **Chokidar 6**: Observación de archivos
-- **BrowserSync**: Servidor de desarrollo con HMR
-- **TailwindCSS**: Compilación de utilidades CSS
-
-### Optimizaciones de Performance
-
-- **Lazy loading**: Carga de módulos bajo demanda
-- **Module manager**: Gestión inteligente de dependencias pesadas
-- **Compilation batching**: Agrupación de compilaciones
-- **Progressive compilation**: Compilación incremental
-- **Memory management**: Gestión optimizada de memoria en workers
 
 ---
 

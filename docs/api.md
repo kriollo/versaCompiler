@@ -46,13 +46,18 @@ export default defineConfig({
 | `--checkIntegrity` | `-ci` | Validar integridad del código compilado (deploy) |
 | `--tailwind`       |       | Habilitar/deshabilitar compilación TailwindCSS   |
 | `--linter`         |       | Habilitar/deshabilitar análisis de código        |
+| `--silent`         |       | Solo advertencias y errores                      |
+| `--mode <nombre>`  |       | Modo para `.env.<nombre>`                        |
+| `--config <ruta>`  |       | Usar otro archivo de configuración               |
 | `--help`           | `-h`  | Mostrar ayuda y opciones disponibles             |
+
+`--all` devuelve código de salida `1` si algún archivo falla o si un linter detiene el build.
 
 ### Ejemplos de Uso
 
 ```bash
 # Desarrollo con auto-recompilación
-versacompiler --watch
+pnpm exec versacompiler --watch
 
 # Build para producción
 versacompiler --all --prod
@@ -79,6 +84,55 @@ versacompiler --linter
 versacompiler --all --verbose
 ```
 
+## API programática
+
+```typescript
+import { build, compile, defineConfig } from 'versacompiler';
+```
+
+Las funciones configuran el compilador igual que el CLI, a partir de `versacompile.config.ts` en el directorio de trabajo (o de `configFile`).
+
+### `build(options?)`
+
+Compila todo el proyecto (equivale a `--all`). Devuelve `Promise<boolean>`: `true` si no hubo errores.
+
+```typescript
+const ok = await build({ prod: true, checkIntegrity: true });
+if (!ok) process.exit(1);
+```
+
+### `compile(filePath, options?)`
+
+Compila un único archivo (equivale a `--file`). Devuelve `Promise<{ success: boolean; output: string }>`, donde `output` es la ruta del archivo generado (vacía si falló).
+
+```typescript
+const { success, output } = await compile('src/components/App.vue', {
+    typeCheck: true,
+});
+```
+
+### Opciones (`BuildOptions`)
+
+Todas son opcionales:
+
+| Opción           | Equivale a         | Descripción                                                 |
+| ---------------- | ------------------ | ----------------------------------------------------------- |
+| `prod`           | `--prod`           | Minifica y compila para producción                          |
+| `mode`           | `--mode`           | Modo para `import.meta.env` y `.env.<mode>`                 |
+| `typeCheck`      | `--typeCheck`      | Verificación de tipos TypeScript                            |
+| `linter`         | `--linter`         | Ejecuta los linters configurados                            |
+| `tailwind`       | `--tailwind`       | Compila TailwindCSS si está configurado. Por defecto `true` |
+| `checkIntegrity` | `--checkIntegrity` | Valida la integridad del código generado                    |
+| `verbose`        | `--verbose`        | Logs detallados                                             |
+| `silent`         | `--silent`         | Solo advertencias y errores                                 |
+| `configFile`     | `--config`         | Ruta al archivo de configuración                            |
+
+> **Limitación:** las opciones se transmiten por `process.env`, igual que en el CLI. Dos llamadas concurrentes con opciones distintas en el mismo proceso se pisan. Para builds en paralelo, usa procesos separados.
+
+### Tipos de plugin
+
+`Plugin`, `TransformArgs`, `TransformResult`, `LoadArgs`, `LoadResult`, `ResolveArgs`, `ResolveResult`, `HotUpdateArgs`, `HotUpdateResult`, `EndArgs` y `StructuredError` se exportan desde `versacompiler`. Ver el ejemplo de `onTransform` en [configuration.md](./configuration.md#plugins-opcional).
+
 ## Estructura de Configuración
 
 ### VersaConfig (configuración pública)
@@ -91,7 +145,6 @@ interface VersaConfig {
     /** Opciones de salida de la compilación */
     build: {
         outDir: string;
-        bundlers?: BundlerConfig[] | false;
     };
 
     /** Resolución de módulos e imports */
@@ -148,6 +201,21 @@ interface VersaConfig {
      * @default []
      */
     hmrExclude?: string[];
+
+    /**
+     * Reemplazos en tiempo de compilación. Cada valor es una expresión JS.
+     * @example { __APP_VERSION__: JSON.stringify('1.2.0') }
+     */
+    define?: Record<string, string>;
+
+    /**
+     * Salida autocontenida en --prod: copia /node_modules/* a <outDir>/vendor/.
+     * @default true en --prod
+     */
+    vendor?: boolean;
+
+    /** Plugins con hooks onResolve, onLoad, onTransform, onHotUpdate y onEnd */
+    plugins?: Plugin[];
 }
 ```
 
@@ -163,15 +231,7 @@ interface LinterConfig {
 }
 ```
 
-### BundlerConfig
-
-```typescript
-interface BundlerConfig {
-    name: string; // Nombre del bundle
-    fileInput: string; // Archivo de entrada
-    fileOutput: string; // Archivo de salida
-}
-```
+> **Nota:** `build.bundlers` no está implementado (no genera bundles).
 
 ### Helper `defineConfig`
 
@@ -191,6 +251,7 @@ VersaCompiler puede compilar:
 - ✅ **Archivos Vue (.vue)** - Single File Components
 - ✅ **TypeScript (.ts)** - Transpilación a JavaScript
 - ✅ **JavaScript (.js)** - Procesamiento y optimización
+- ✅ **JSON, CSS y assets** importados desde JS/TS/Vue (ver [getting-started.md](./getting-started.md#-imports-de-json-css-y-assets))
 
 ### Características de Desarrollo
 
@@ -202,24 +263,25 @@ VersaCompiler puede compilar:
 
 ### Build y Optimización
 
-- **Minificación**: OxcMinify ultra-rápido para producción
-- **Tree Shaking**: Eliminación de código no utilizado
+- **Minificación**: OxcMinify para producción (elimina código muerto)
+- **Salida autocontenida**: en `--prod`, las dependencias de `node_modules` se copian a `<outDir>/vendor/` (copia, no bundling)
 - **Linting Dual**: ESLint y OxLint con múltiples formatos
-- **TailwindCSS**: Compilación automática con purging
-- **Source Maps**: Generación automática en desarrollo
+- **TailwindCSS**: Compilación automática
+- **Source Maps**: Solo inline y solo para `.ts` en desarrollo, si el `tsconfig.json` tiene `sourceMap` o `inlineSourceMap`. No para `.vue`, no en `--prod` y nunca como archivos `.map` externos
 
 ### Funcionalidades Avanzadas
 
-- **Decorator Support**: Soporte completo para TypeScript decorators
+- **Decorator Support**: Según tu `tsconfig.json`. Con `experimentalDecorators: true` se compilan; con `target: "esnext"` sin `experimentalDecorators`, se emiten tal cual (sintaxis nativa)
 - **Vue 3.5 Support**: Última versión de Vue con todas sus características
-- **CSS Modules**: Soporte nativo para CSS Modules
-- **SCSS/Sass**: Preprocesadores CSS integrados
+- **SCSS/Sass, Less, Stylus**: Preprocesadores que debes instalar tú (`pnpm add -D sass`)
 - **Custom Blocks**: Procesamiento de bloques personalizados en Vue SFC
+- **Plugins**: Hooks propios con `enforce: 'pre'` o post-compilación (ver [configuration.md](./configuration.md#plugins-opcional))
+- **Variables de entorno**: `import.meta.env` con prefijo `VERSA_` (ver [configuration.md](./configuration.md#-variables-de-entorno-env))
 - **Granular Compilation**: Compilación por archivo individual
 
 ## Integración
 
-### Uso en Scripts NPM
+### Uso en Scripts de package.json
 
 ```json
 {
@@ -581,19 +643,21 @@ const regex = /[(abc)]/; // ❌ Detecta ( como bracket real
 
 ```dockerfile
 # Dockerfile
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
 
 COPY . .
 
 # Build usando VersaCompiler
-RUN npx versacompiler --all --prod --yes
+RUN pnpm exec versacompiler --all --prod --yes
 
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
 ```
 
 ## Archivos de Configuración Relacionados
@@ -683,11 +747,11 @@ Este comando mostrará:
 
 VersaCompiler es un proyecto en desarrollo. Características no disponibles:
 
-- ❌ Plugin system extensible
-- ❌ Configuración dinámica avanzada
-- ❌ Hot Module Replacement completo
-- ❌ Source maps avanzados
+- ❌ Bundling (`build.bundlers` no está implementado)
 - ❌ Code splitting automático
+- ❌ Tree shaking
+- ❌ Módulos CSS (`*.module.css`)
+- ❌ Source maps externos (`.map`) y source maps en `.vue` o en `--prod`
 
 Para funcionalidades avanzadas, considera herramientas como Vite, Webpack o Rollup.
 

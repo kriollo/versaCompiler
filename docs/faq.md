@@ -32,7 +32,7 @@ VersaCompiler es una herramienta avanzada de compilación para proyectos Vue.js 
 - ✅ **TypeScript avanzado** con decorators, Language Service, workers
 - ✅ **JavaScript moderno** ES2020+ con minificación inteligente
 - ✅ **TailwindCSS** compilación optimizada con purging
-- ✅ **CSS Modules, SCSS** preprocesadores integrados
+- ✅ **SCSS/Sass, Less, Stylus** (debes instalar el preprocesador: `pnpm add -D sass`)
 - ✅ **Linting dual** ESLint + OxLint con múltiples formatos
 - ✅ **Proyectos enterprise** con configuraciones avanzadas
 
@@ -44,21 +44,28 @@ Sí, es **100% gratuito y open source** bajo licencia MIT.
 
 ### ¿Cómo instalo VersaCompiler?
 
-Actualmente solo está disponible desde código fuente:
+En tu proyecto:
+
+```bash
+pnpm add -D versacompiler
+```
+
+Desde código fuente:
 
 ```bash
 git clone https://github.com/kriollo/versaCompiler.git
 cd versaCompiler
-npm install
-npm run build
+pnpm install
+pnpm build
 ```
 
 ### ¿Necesito Node.js específico?
 
-**Requisitos mínimos:**
+**Requisitos:**
 
-- Node.js >= 16.0.0
-- npm >= 7.0.0
+- Node.js >= 22.22
+- pnpm
+- TypeScript 6 (TypeScript 7 no es compatible: no expone la API del LanguageService en JS)
 
 ### ¿Dónde va el archivo de configuración?
 
@@ -279,7 +286,6 @@ VersaCompiler usa tu `tsconfig.json` existente y lo optimiza automáticamente. P
 VersaCompiler soporta **Vue 3.5 completamente** incluyendo:
 
 - ✅ **Script setup** con Composition API
-- ✅ **CSS Modules** con hashing automático
 - ✅ **Scoped styles** con scope IDs únicos
 - ✅ **SCSS/Sass** preprocesadores
 - ✅ **Custom blocks** en SFC
@@ -313,7 +319,10 @@ export default defineConfig({
 
 ### ¿Puedo usar decorators de TypeScript?
 
-Absolutamente. VersaCompiler tiene soporte completo para decorators:
+Sí. Los decorators siguen la configuración de tu `tsconfig.json`:
+
+- Con `experimentalDecorators: true` se compilan (y `emitDecoratorMetadata` añade metadata).
+- Con `target: "esnext"` y sin `experimentalDecorators`, TypeScript los emite tal cual (sintaxis nativa).
 
 ```typescript
 // tsconfig.json
@@ -460,20 +469,34 @@ Esto compila todos los archivos, minifica el código usando OxcMinify y opcional
 ### ¿Qué optimizaciones incluye?
 
 - **Minificación avanzada** con OxcMinify (Rust)
-- **Tree shaking** eliminación de código no utilizado
 - **Variable mangling** renombrado de variables
-- **Dead code elimination** eliminación de código muerto
-- **Compilación de TailwindCSS** con purging optimizado
+- **Dead code elimination** eliminación de código muerto por el minificador
+- **Salida autocontenida**: los imports de `/node_modules/` se reescriben a `<outDir>/vendor/` y los archivos se copian ahí, así no hace falta desplegar `node_modules` (desactivable con `vendor: false`)
+- **Compilación de TailwindCSS**
 - **Transpilación de TypeScript** a JavaScript moderno
 - **Validación de integridad** (opcional con `--checkIntegrity`)
 
+Lo que **no** hace: tree shaking ni bundling. Compila archivo a archivo.
+
 ### ¿Genera source maps?
 
-Actualmente **no** se generan source maps automáticamente.
+Solo en desarrollo, y de forma limitada:
+
+- Inline source maps para archivos `.ts`.
+- Solo si tu `tsconfig.json` tiene `sourceMap` o `inlineSourceMap`.
+- No se generan para `.vue`, nunca en `--prod`, y no se generan archivos `.map` externos.
 
 ### ¿Soporta code splitting?
 
 **No**, VersaCompiler no tiene code splitting automático. Para esto necesitas herramientas más maduras.
+
+### ¿Cómo leo variables de entorno en el código?
+
+Usa variables con prefijo `VERSA_` en un archivo `.env` y accede a ellas con `import.meta.env.VERSA_*`. Las variables sin ese prefijo no llegan al navegador. Ver [configuration.md](./configuration.md#-variables-de-entorno-env).
+
+### ¿Puedo usar VersaCompiler desde un script de Node?
+
+Sí, con `build()` y `compile()` desde `versacompiler`. Ver [api.md](./api.md#api-programática).
 
 ## 🛠️ Troubleshooting
 
@@ -488,15 +511,15 @@ ls versacompile.config.ts
 ### Error: "Cannot compile TypeScript files"
 
 1. Verifica que `tsconfig.json` existe y es válido
-2. Instala TypeScript: `npm install typescript`
+2. Instala TypeScript 6: `pnpm add -D typescript@6`
 
 ### Error: "Linter binary not found"
 
 Instala las dependencias necesarias:
 
 ```bash
-npm install --save-dev eslint      # Para ESLint
-npm install --save-dev oxlint      # Para OxLint
+pnpm add -D eslint      # Para ESLint
+pnpm add -D oxlint      # Para OxLint
 ```
 
 ### HMR no funciona
@@ -537,7 +560,7 @@ Si el problema afecta a todos los archivos, usa `hmr: false`.
 
 ### ¿Puedo migrar desde Vite?
 
-La migración es posible pero manual. VersaCompiler tiene menos características que Vite.
+La migración es posible pero manual. VersaCompiler tiene menos características que Vite: no hace bundling, code splitting ni tree shaking.
 
 ### ¿Cuándo usar VersaCompiler vs otras herramientas?
 
