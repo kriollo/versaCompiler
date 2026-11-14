@@ -540,8 +540,8 @@ versacompiler --all --typeCheck --linter --prod
 
 1. **Error de módulos** → `versacompiler --verbose`
 2. **HMR no funciona** → Verificar puerto 3000 libre
-3. **Linting lento** → Usar solo `oxlint: true`
-4. **TypeScript lento** → Habilitar `useWorkers: true`
+3. **Linting lento** → Deja solo OxLint en el array `linter`: `{ name: 'oxlint', bin: './node_modules/.bin/oxlint', configFile: './.oxlintrc.json', paths: ['src/'] }`
+4. **TypeScript lento** → Limita los workers con `typeCheckOptions: { maxWorkers: 2 }`
 5. **Cache corrupto** → `versacompiler --cleanCache`
 6. **Tailwind no compila** → Verificar configuración `tailwindConfig`
 

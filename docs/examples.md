@@ -605,9 +605,9 @@ pnpm exec tailwindcss init
 
 ### HMR no funciona
 
-1. Verificar que `proxyConfig.proxyUrl` esté configurado correctamente
+1. Verificar que `server.proxyUrl` esté configurado correctamente
 2. Asegurar que el puerto no esté ocupado
-3. Verificar que los archivos estén en el directorio `sourceRoot`
+3. Verificar que los archivos estén en el directorio `root`
 
 ## 📚 Ejemplos Completos
 
@@ -620,34 +620,28 @@ Puedes encontrar proyectos de ejemplo completos en:
 
 ### Desde Vite
 
-Si vienes de Vite, la configuración es similar pero más simple:
-
 ```typescript
 // De vite.config.js a versacompile.config.ts
-export default {
-    compilerOptions: {
-        sourceRoot: './src', // = root en Vite
-        outDir: './dist', // = build.outDir en Vite
-        pathsAlias: {
-            '@/*': ['src/*'], // = resolve.alias en Vite
-        },
-    },
-};
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src', // carpeta fuente
+    build: { outDir: './dist' }, // = build.outDir en Vite
+    resolve: { alias: { '@': 'src' } }, // = resolve.alias en Vite
+});
 ```
 
 ### Desde Webpack
 
 ```typescript
 // De webpack.config.js a versacompile.config.ts
-export default {
-    compilerOptions: {
-        sourceRoot: './src', // = entry path
-        outDir: './dist', // = output.path
-        pathsAlias: {
-            '@/*': ['src/*'], // = resolve.alias
-        },
-    },
-};
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src', // carpeta fuente (VersaCompiler no usa "entry" ni bundles)
+    build: { outDir: './dist' }, // = output.path
+    resolve: { alias: { '@': 'src' } }, // = resolve.alias
+});
 ```
 
 ## 🚀 Casos de Uso Avanzados
@@ -656,24 +650,29 @@ export default {
 
 ```typescript
 // versacompile.config.ts para proyecto enterprise
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
-        pathsAlias: {
-            '@/*': ['src/*'],
-            '@components/*': ['src/components/*'],
-            '@services/*': ['src/services/*'],
-            '@types/*': ['src/types/*'],
-            '@utils/*': ['src/utils/*'],
-            '@constants/*': ['src/constants/*'],
-            '@api/*': ['src/api/*'],
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: {
+        alias: {
+            '@': 'src',
+            '@components': 'src/components',
+            '@services': 'src/services',
+            '@types': 'src/types',
+            '@utils': 'src/utils',
+            '@constants': 'src/constants',
+            '@api': 'src/api',
         },
     },
-    proxyConfig: {
+    tsconfig: './tsconfig.json',
+    server: {
         proxyUrl: 'https://api.empresa.com',
         assetsOmit: false,
+    },
+    typeCheckOptions: {
+        maxWorkers: 3,
     },
     linter: [
         {
@@ -682,14 +681,6 @@ export default {
             configFile: './eslint.config.js',
             fix: true,
             paths: ['src/'],
-            eslintConfig: {
-                cache: true,
-                maxWarnings: 0, // Cero warnings para enterprise
-                quiet: false,
-                formats: ['json', 'stylish'],
-                deny: ['no-console', 'no-debugger'],
-                ignorePattern: ['*.test.ts', '*.spec.ts'],
-            },
         },
         {
             name: 'oxlint',
@@ -697,18 +688,12 @@ export default {
             configFile: './.oxlintrc.json',
             fix: false,
             paths: ['src/'],
-            oxlintConfig: {
-                tsconfigPath: './tsconfig.json',
-                quiet: true,
-                rules: {
-                    'no-unused-vars': 'error',
-                    'prefer-const': 'error',
-                },
-            },
         },
     ],
-};
+});
 ```
+
+> Las reglas de cada linter (por ejemplo `no-unused-vars` o `maxWarnings`) se definen en su propio archivo (`eslint.config.js`, `.oxlintrc.json`), no en `versacompile.config.ts`.
 
 **Scripts de package.json para Enterprise:**
 
@@ -733,18 +718,20 @@ export default {
 
 ```typescript
 // versacompile.config.ts para micro-frontends
-export default {
-    tsconfig: './tsconfig.json',
-    compilerOptions: {
-        sourceRoot: './src',
-        outDir: './dist',
-        pathsAlias: {
-            '@shared/*': ['src/shared/*'],
-            '@shell/*': ['src/shell/*'],
-            '@mf1/*': ['src/micro-frontend-1/*'],
-            '@mf2/*': ['src/micro-frontend-2/*'],
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: {
+        alias: {
+            '@shared': 'src/shared',
+            '@shell': 'src/shell',
+            '@mf1': 'src/micro-frontend-1',
+            '@mf2': 'src/micro-frontend-2',
         },
     },
+    tsconfig: './tsconfig.json',
     linter: [
         {
             name: 'oxlint',
@@ -752,13 +739,12 @@ export default {
             configFile: './.oxlintrc.json',
             fix: true,
             paths: ['src/shared/', 'src/shell/'],
-            oxlintConfig: {
-                quiet: false,
-            },
         },
     ],
-};
+});
 ```
+
+> Cada micro-frontend se compila como parte del mismo `outDir`. VersaCompiler no genera un bundle por micro-frontend.
 
 ### Desarrollo con Hot Reloading Avanzado
 

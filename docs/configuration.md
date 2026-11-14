@@ -624,15 +624,10 @@ versacompiler --cleanOutput
 
 ```bash
 # Usar solo OxLint para máxima velocidad
-versacompiler --linter --verbose
-
-# Verificar configuración de cache en eslintConfig
-{
-    eslintConfig: {
-        cache: true  // Asegurar que cache está habilitado
-    }
-}
+pnpm exec versacompiler --linter --verbose
 ```
+
+Para usar solo OxLint, deja únicamente ese linter en el array `linter` (ver "Para proyectos grandes" abajo).
 
 #### Problemas de TypeScript
 
@@ -664,20 +659,25 @@ versacompiler --typeCheck --file src/components/Problem.vue
 #### Para proyectos grandes
 
 ```typescript
-export default {
+import { defineConfig } from 'versacompiler/config';
+
+export default defineConfig({
+    root: './src',
+    build: { outDir: './dist' },
+    resolve: { alias: { '@': 'src' } },
     // Optimizaciones para proyectos grandes
     linter: [
         {
             name: 'oxlint', // Usar OxLint para velocidad
             bin: './node_modules/.bin/oxlint',
             configFile: './.oxlintrc.json',
-            eslintConfig: {
-                cache: true, // Cache obligatorio
-                quiet: true, // Solo errores
-            },
+            paths: ['src/'],
         },
     ],
-};
+    typeCheckOptions: {
+        maxWorkers: 2, // Límite de workers de type checking
+    },
+});
 ```
 
 #### Para desarrollo rápido
