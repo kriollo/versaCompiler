@@ -1,3 +1,5 @@
+import type { Plugin } from '../compiler/pipeline/types.js';
+
 export type LinterConfig = {
     name: string;
     bin: string;
@@ -31,7 +33,8 @@ export type VersaConfig = {
     watch?: {
         additional?: string[];
     };
-    plugins?: unknown[];
+    /** Plugins del pipeline (`onLoad`, `onTransform`, `onHotUpdate`...). Ver `Plugin`. */
+    plugins?: Plugin[];
     tsconfig?: string;
     tailwindConfig?:
         | {

@@ -21,6 +21,20 @@ export {
     type VersaConfig,
 } from './servicios/versacompile.config.types.js';
 
+export type {
+    EndArgs,
+    HotUpdateArgs,
+    HotUpdateResult,
+    LoadArgs,
+    LoadResult,
+    Plugin,
+    ResolveArgs,
+    ResolveResult,
+    StructuredError,
+    TransformArgs,
+    TransformResult,
+} from './compiler/pipeline/types.js';
+
 export interface BuildOptions {
     /** Minifica y compila para producción (`--prod`). */
     prod?: boolean;

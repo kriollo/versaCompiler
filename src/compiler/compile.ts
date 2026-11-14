@@ -2002,7 +2002,11 @@ function getBuildPipeline(): BuildPipeline {
         const basePlugins = createCorePlugins();
         const config = getLoadedConfig();
         const userPlugins = normalizeUserPlugins(config?.plugins);
-        pipelineInstance = new BuildPipeline([...basePlugins, ...userPlugins]);
+        pipelineInstance = new BuildPipeline([
+            ...userPlugins.filter(p => p.enforce === 'pre'),
+            ...basePlugins,
+            ...userPlugins.filter(p => p.enforce !== 'pre'),
+        ]);
     }
     return pipelineInstance;
 }

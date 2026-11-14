@@ -68,6 +68,12 @@ export type EndArgs = {
 
 export type Plugin = {
     name: string;
+    /**
+     * `'pre'`: corre antes que los plugins core (vue, ts, transforms), así que
+     * puede preprocesar el fuente original. Por defecto corre después, sobre
+     * el JS ya compilado.
+     */
+    enforce?: 'pre' | 'post';
     onResolve?: (args: ResolveArgs) => Promise<ResolveResult> | ResolveResult;
     onLoad?: (args: LoadArgs) => Promise<LoadResult> | LoadResult;
     onTransform?: (
