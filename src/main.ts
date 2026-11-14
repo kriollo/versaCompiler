@@ -127,6 +127,10 @@ async function main() {
                 description: 'Modo producción',
             })
             .alias('p', 'prod')
+            .option('silent', {
+                type: 'boolean',
+                description: 'Solo muestra advertencias y errores',
+            })
             .option('mode', {
                 type: 'string',
                 description:
@@ -201,6 +205,7 @@ async function main() {
             file?: string;
             prod?: boolean;
             mode?: string;
+            silent?: boolean;
             verbose?: boolean;
             cleanOutput?: boolean;
             cleanCache?: boolean;
@@ -240,6 +245,7 @@ async function main() {
                 },
             )
             .parse()) as CompileArgs;
+        if (argv.silent) env.SILENT = 'true';
         // 🎨 Header moderno y elegante
         const version = await getPackageVersion();
         const headerLine = '━'.repeat(60);

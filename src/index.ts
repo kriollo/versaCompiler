@@ -36,6 +36,8 @@ export interface BuildOptions {
     checkIntegrity?: boolean;
     /** Logs detallados (`--verbose`). */
     verbose?: boolean;
+    /** Solo advertencias y errores (`--silent`). */
+    silent?: boolean;
     /** Ruta al archivo de configuración. Por defecto `<cwd>/versacompile.config.ts`. */
     configFile?: string;
 }
@@ -79,6 +81,7 @@ async function setup(options: BuildOptions): Promise<void> {
     env.typeCheck = options.typeCheck ? 'true' : 'false';
     env.CHECK_INTEGRITY = options.checkIntegrity ? 'true' : 'false';
     env.VERBOSE = options.verbose ? 'true' : 'false';
+    env.SILENT = options.silent ? 'true' : 'false';
     env.yes = 'true'; // sin prompts interactivos
 
     const { readConfig } = (await import(READ_CONFIG)) as {

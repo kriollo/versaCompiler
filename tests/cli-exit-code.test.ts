@@ -19,11 +19,20 @@ const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
 // Ejecuta el CLI real en un proyecto temporal: --all debe salir con 1 si
 // algún archivo falla, para que un CI detecte el build roto.
-async function compileAll(cwd: string): Promise<number> {
+async function compileAll(
+    cwd: string,
+    extraArgs: string[] = [],
+): Promise<number> {
     try {
         await run(
             process.execPath,
-            [tsxCli, path.join(root, 'src', 'main.ts'), '--all', '-y'],
+            [
+                tsxCli,
+                path.join(root, 'src', 'main.ts'),
+                '--all',
+                '-y',
+                ...extraArgs,
+            ],
             {
                 cwd,
                 env: { ...process.env, NODE_ENV: 'production' },
@@ -77,5 +86,37 @@ describe('CLI --all - exit code', () => {
             'export const bad = ;\n',
         );
         expect(await compileAll(dir)).toBe(1);
+    });
+
+    it('--silent no imprime nada si todo compila y una línea por error si falla', async () => {
+        const out = async () => {
+            try {
+                const r = await run(
+                    process.execPath,
+                    [
+                        tsxCli,
+                        path.join(root, 'src', 'main.ts'),
+                        '--all',
+                        '-y',
+                        '--silent',
+                    ],
+                    {
+                        cwd: dir,
+                        env: { ...process.env, NODE_ENV: 'production' },
+                    },
+                );
+                return r.stdout + r.stderr;
+            } catch (error: any) {
+                return error.stdout + error.stderr;
+            }
+        };
+        expect((await out()).trim()).toBe('');
+        writeFileSync(
+            path.join(dir, 'src', 'bad.ts'),
+            'export const bad = ;\n',
+        );
+        const lines = (await out()).trim().split('\n');
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toContain('bad.ts');
     });
 });

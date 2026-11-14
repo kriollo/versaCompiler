@@ -19,6 +19,7 @@ test.describe('--watch: overlay de errores de compilación', () => {
     let watch: ChildProcess;
     let url: string;
 
+    // oxlint-disable-next-line no-empty-pattern -- firma requerida por Playwright para llegar a testInfo
     test.beforeAll(async ({}, testInfo) => {
         // Un solo navegador basta: lo que se prueba es el servidor de --watch
         test.skip(testInfo.project.name !== 'Desktop Chrome');
@@ -61,6 +62,7 @@ test.describe('--watch: overlay de errores de compilación', () => {
             watch.stdout!.on('data', chunk => {
                 out += chunk;
                 // browser-sync colorea la URL: quitar códigos ANSI antes de buscarla
+                // oxlint-disable-next-line no-control-regex -- quitar códigos ANSI es justo la intención
                 const plain = out.replace(/\u001b\[[0-9;]*m/g, '');
                 const match = /Local: (http:\/\/localhost:\d+)/.exec(plain);
                 if (match) {

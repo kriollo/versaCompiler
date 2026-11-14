@@ -39,11 +39,18 @@ class Logger {
         }
     }
 
+    // --silent: solo advertencias y errores
+    private get silent(): boolean {
+        return process.env.SILENT === 'true';
+    }
+
     log(...args: any[]): void {
+        if (this.silent) return;
         this.writeMessage(args.map(arg => String(arg)).join(' '));
     }
 
     info(...args: any[]): void {
+        if (this.silent) return;
         // En modo verbose, mostrar logs inmediatamente
         const isVerbose = process.env.VERBOSE === 'true';
         this.writeMessage(
@@ -62,6 +69,7 @@ class Logger {
     }
 
     debug(...args: any[]): void {
+        if (this.silent) return;
         this.writeMessage(args.map(arg => String(arg)).join(' '));
     }
 

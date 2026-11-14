@@ -1343,6 +1343,16 @@ async function displayCompilationSummary(
     totalTime?: string,
 ): Promise<void> {
     const chalkLib = await loadChalk();
+    // --silent: sin resumen, pero los errores siempre se muestran (una línea c/u)
+    if (env.SILENT === 'true') {
+        for (const e of compilationErrors) {
+            const line = `${e.file} [${e.stage}] ${e.message.split('\n')[0]}`;
+            if (e.severity === 'error')
+                logger.error(chalkLib.red(`❌ ${line}`));
+            else logger.warn(chalkLib.yellow(`⚠ ${line}`));
+        }
+        return;
+    }
     if (compilationErrors.length === 0 && compilationResults.length === 0) {
         logger.info(
             chalkLib.green('✅ No hay errores de compilación para mostrar.'),
@@ -2370,11 +2380,29 @@ class ProgressManager {
         console.error = this.originalConsoleError;
         console.warn = this.originalConsoleWarn;
     }
+    /**
+     * Barra de progreso con colores solo en una terminal interactiva. En CI,
+     * con salida redirigida, NO_COLOR o --silent: líneas planas, sin \r ni ANSI.
+     */
+    private get fancy(): boolean {
+        return (
+            !!process.stdout.isTTY &&
+            env.NO_COLOR === undefined &&
+            env.SILENT !== 'true'
+        );
+    }
+
+    private flushLogs(): void {
+        for (const log of this.logBuffer) process.stdout.write(log + '\n');
+        this.logBuffer = [];
+    }
+
     startProgress(): void {
         this.progressActive = true;
         this.logBuffer = [];
         this.hasProgressLine = false;
         this.interceptConsole();
+        if (!this.fancy) return;
 
         // 🎨 Header moderno de inicio de compilación
         const headerLine = '━'.repeat(48);
@@ -2389,6 +2417,10 @@ class ProgressManager {
 
     updateProgress(progressText: string): void {
         if (!this.progressActive) return;
+        if (!this.fancy) {
+            this.flushLogs();
+            return;
+        }
 
         // Si hay logs pendientes, mostrarlos primero
         if (this.logBuffer.length > 0) {
@@ -2445,7 +2477,9 @@ class ProgressManager {
         }
     }
     endProgress(): void {
-        if (this.progressActive) {
+        if (this.progressActive && !this.fancy) {
+            this.flushLogs();
+        } else if (this.progressActive) {
             if (this.hasProgressLine) {
                 process.stdout.write('\n');
             }
