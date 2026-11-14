@@ -127,6 +127,11 @@ async function main() {
                 description: 'Modo producción',
             })
             .alias('p', 'prod')
+            .option('config', {
+                type: 'string',
+                description:
+                    'Ruta al archivo de configuración (por defecto: versacompile.config.ts)',
+            })
             .option('silent', {
                 type: 'boolean',
                 description: 'Solo muestra advertencias y errores',
@@ -206,6 +211,7 @@ async function main() {
             prod?: boolean;
             mode?: string;
             silent?: boolean;
+            config?: string;
             verbose?: boolean;
             cleanOutput?: boolean;
             cleanCache?: boolean;
@@ -246,6 +252,12 @@ async function main() {
             )
             .parse()) as CompileArgs;
         if (argv.silent) env.SILENT = 'true';
+        if (argv.config) {
+            env.PATH_CONFIG_FILE = path.resolve(
+                globalProcess.cwd(),
+                argv.config,
+            );
+        }
         // 🎨 Header moderno y elegante
         const version = await getPackageVersion();
         const headerLine = '━'.repeat(60);

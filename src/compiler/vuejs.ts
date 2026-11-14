@@ -641,6 +641,8 @@ export const preCompileVue = async (
                 );
             },
         );
+        for (const e of styleErrors)
+            e.message = withPreprocessorHint(e.message);
         if (styleErrors.length) {
             const err = new Error(
                 `Error al compilar los estilos del componente Vue ${source}:\n${styleErrors
@@ -793,9 +795,12 @@ export const preCompileVue = async (
         return result;
     } catch (error) {
         logger.error('Vue compilation error:', error);
+        const normalized =
+            error instanceof Error ? error : new Error(String(error));
+        normalized.message = withPreprocessorHint(normalized.message);
         return {
             lang: null,
-            error: error instanceof Error ? error : new Error(String(error)),
+            error: normalized,
             data: null,
             scriptInfo: undefined,
         };
@@ -803,6 +808,19 @@ export const preCompileVue = async (
 };
 
 // ✨ NUEVA FUNCIÓN: Exportar funcionalidades del cache HMR para uso externo
+/** `<style lang="scss">` sin `sass` instalado: decir cómo arreglarlo. */
+function withPreprocessorHint(message: string): string {
+    // En la misma línea del error: el mensaje de Node sigue con "Require stack"
+    return message.replace(
+        /Cannot find module '(sass|sass-embedded|less|stylus)'/,
+        (match, name: string) => {
+            const pkg = name === 'sass-embedded' ? 'sass' : name;
+            const lang = pkg === 'sass' ? 'scss' : pkg;
+            return `${match} — para <style lang="${lang}"> instala el preprocesador: pnpm add -D ${pkg}`;
+        },
+    );
+}
+
 export const getVueHMRCacheStats = () => {
     return hmrInjectionCache.getStats();
 };
