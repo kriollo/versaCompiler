@@ -5,6 +5,12 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [3.0.1] - 2026-11-14
+
+### 🐛 Correcciones
+
+- **Windows: el type check de los `.vue` no reportaba errores** (`typescript-sync-validator.ts`, `typescript-worker-thread.cjs`). El host del LanguageService guardaba los archivos con barras invertidas (`C:\\...\\Modal.vue.ts`), pero TypeScript consulta las rutas normalizadas a `/`. El archivo virtual no se encontraba y el chequeo devolvía cero errores. Lo detectó la nueva matriz de CI con Windows.
+
 ## [3.0.0] - 2026-11-14
 
 Incluye también todo lo de la 2.8.0, que no se publicó en npm.
