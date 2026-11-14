@@ -280,8 +280,12 @@ let initializationTimeout = null;
  * @returns {Promise<void>} Promise que se resuelve cuando la conexión está configurada
  */
 async function initSocket(retries = 0) {
-    // Evitar inicializaciones concurrentes
-    if (isInitializing && retries > 0) {
+    // Evitar inicializaciones concurrentes: una llamada inicial nueva se salta
+    // si ya hay una cadena de reintentos en curso. Los reintentos (retries > 0)
+    // son de esa misma cadena y deben continuar: antes se bloqueaban a sí
+    // mismos y, si el cliente de BrowserSync no estaba listo en el primer
+    // intento, el HMR no llegaba a conectarse nunca.
+    if (isInitializing && retries === 0) {
         console.log(
             '⏳ Versa HMR: Ya hay una inicialización en curso, saltando...',
         );
@@ -339,6 +343,23 @@ async function initSocket(retries = 0) {
                     );
                 }
             }, retryDelay);
+        });
+
+        // Errores de compilación de --watch: overlay hasta que el archivo vuelva a compilar
+        /** @type {string | null} */
+        let compileErrorFile = null;
+        socket.on('compileError', (/** @type {any} */ data) => {
+            compileErrorFile = data.filePath;
+            showErrorOverlay(
+                `Error de compilación: ${data.message}`,
+                data.codeFrame || '',
+            );
+        });
+        socket.on('compileOk', (/** @type {any} */ data) => {
+            if (compileErrorFile && data.filePath === compileErrorFile) {
+                compileErrorFile = null;
+                hideErrorOverlay();
+            }
         });
 
         // Configurar listener para recarga completa

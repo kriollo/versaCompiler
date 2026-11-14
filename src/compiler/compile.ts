@@ -1220,6 +1220,18 @@ function registerCompilationResult(
 /**
  * Maneja errores según el modo de compilación
  */
+// Último error por archivo, para mostrarlo en el overlay del navegador (--watch)
+const lastErrorByFile = new Map<
+    string,
+    { message: string; codeFrame: string }
+>();
+
+export function getLastCompileError(
+    file: string,
+): { message: string; codeFrame: string } | undefined {
+    return lastErrorByFile.get(path.resolve(file));
+}
+
 async function handleCompilationError(
     error: Error | string,
     fileName: string,
@@ -1243,6 +1255,12 @@ async function handleCompilationError(
         errorDetails,
     );
     registerCompilationResult(stage, 1, 0, [fileName]); // Mostrar error inmediatamente solo en modo individual y watch
+    lastErrorByFile.set(path.resolve(fileName), {
+        message: diagnostic?.loc
+            ? `${path.basename(fileName)}:${diagnostic.loc.line}:${diagnostic.loc.column} — ${diagnostic.message}`
+            : `[${stage}] ${errorMessage}`,
+        codeFrame: diagnostic?.codeFrame ?? '',
+    });
     if (mode === 'individual' || mode === 'watch') {
         const chalkLib = await loadChalk();
         const baseName = path.basename(fileName);

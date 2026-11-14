@@ -13,6 +13,7 @@ import {
     initCompile,
     normalizeRuta,
     runPipelineHotUpdate,
+    getLastCompileError,
 } from '../compiler/compile';
 import { STATIC_ASSET_EXTENSIONS } from '../compiler/static-assets';
 import { promptUser } from '../utils/promptUser';
@@ -379,7 +380,21 @@ class WatchDebouncer {
                 pluginHmrReload = hotUpdate.reload || 'none';
             }
             const result = await initCompile(change.filePath, true, 'watch');
+            // Overlay de errores en el navegador: se muestra al fallar y se
+            // oculta en la siguiente compilación correcta de ese archivo
+            const sockets = this.browserSyncInstance?.sockets;
+            if (!result.success) {
+                const last = getLastCompileError(change.filePath);
+                sockets?.emit('compileError', {
+                    filePath: change.filePath,
+                    message:
+                        last?.message ??
+                        `${change.filePath}: ${result.error ?? 'error de compilación'}`,
+                    codeFrame: last?.codeFrame ?? '',
+                });
+            }
             if (result.success) {
+                sockets?.emit('compileOk', { filePath: change.filePath });
                 // Registrar el output para que el middleware HMR reescriba imports dependientes
                 if (result.output) {
                     registerHMRUpdate(result.output);
