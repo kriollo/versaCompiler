@@ -478,21 +478,18 @@ describe('preCompileTS - sourceRoot sin source map', () => {
                 compilerOptions: { sourceMap: true, sourceRoot: './src/' },
             }),
         );
-        const cwd = vi.spyOn(process, 'cwd').mockReturnValue(dir);
-        const typeCheck = process.env.typeCheck;
-        process.env.typeCheck = 'true';
+        const originalCwd = process.cwd();
+        process.chdir(dir);
         try {
             const code = 'const x: number = 1;';
             const result = await preCompileTS(code, join(dir, 'a.vue'), {
                 startLine: 1,
                 content: code,
             });
-            console.log('DBG', JSON.stringify(result), process.env.isPROD);
             expect(result.error).toBeNull();
             expect(result.data).toContain('const x = 1');
         } finally {
-            cwd.mockRestore();
-            process.env.typeCheck = typeCheck;
+            process.chdir(originalCwd);
         }
     });
 });

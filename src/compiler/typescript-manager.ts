@@ -375,7 +375,12 @@ export const preCompileTS = async (
                 !scriptInfo &&
                 (compilerOptions.sourceMap || compilerOptions.inlineSourceMap)
                     ? { inlineSourceMap: true, inlineSources: true }
-                    : { inlineSourceMap: false }),
+                    : // Sin mapa, TS rechaza sourceRoot/mapRoot del tsconfig (TS5051)
+                      {
+                          inlineSourceMap: false,
+                          sourceRoot: undefined,
+                          mapRoot: undefined,
+                      }),
             },
             fileName,
             // Siempre: son solo errores sintácticos (baratos) y sin ellos un

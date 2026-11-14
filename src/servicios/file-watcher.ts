@@ -95,6 +95,14 @@ interface PendingChange {
     timestamp: number;
     extensionAction: string;
     isAdditionalFile: boolean; // ✨ NUEVO: Indica si es un archivo adicional (no compilable)
+    /**
+     * Importer invalidado por el grafo (no el archivo editado): se recompila
+     * para detectar errores (p. ej. de tipos), pero NO se recarga en el
+     * navegador. Su salida no depende del hijo (compilación 1:1) y recargarlo
+     * re-evaluaría su módulo: un `Symbol()` de provide/inject definido ahí
+     * cambiaría de identidad y los hijos recreados no encontrarían su inject.
+     */
+    cascade?: boolean;
 }
 
 class WatchDebouncer {
@@ -322,6 +330,7 @@ class WatchDebouncer {
                             timestamp: Date.now(),
                             extensionAction: invalidatedAction,
                             isAdditionalFile: false,
+                            cascade: true,
                         });
                     }
                 }
@@ -396,6 +405,7 @@ class WatchDebouncer {
             }
             if (result.success) {
                 sockets?.emit('compileOk', { filePath: change.filePath });
+                if (change.cascade) return;
                 // Registrar el output para que el middleware HMR reescriba imports dependientes
                 if (result.output) {
                     registerHMRUpdate(result.output);
