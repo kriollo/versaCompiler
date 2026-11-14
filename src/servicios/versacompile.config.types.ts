@@ -59,6 +59,13 @@ export type VersaConfig = {
      */
     define?: Record<string, string>;
     /**
+     * En `--prod`, copia a `<outDir>/vendor/` los archivos de `node_modules`
+     * que importa el proyecto y reescribe los imports hacia ahí, para no tener
+     * que desplegar `node_modules`. Con `false` se mantiene `/node_modules/...`.
+     * @default true
+     */
+    vendor?: boolean;
+    /**
      * Lista de patrones de archivos de **salida** que no recibirán el shim HMR.
      * Útil cuando un archivo compilado se carga con `<script src="...">` en lugar
      * de `<script type="module" src="...">`, evitando el error:

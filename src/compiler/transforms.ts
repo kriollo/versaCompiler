@@ -13,6 +13,7 @@ import {
     getOptimizedModulePath,
 } from './module-resolution-optimizer';
 import { parser } from './parser';
+import { copyVendorFile, isVendorEnabled, toVendorUrl } from './vendor';
 
 // ✨ OPTIMIZACIÓN CRÍTICA: Cache de PATH_ALIAS parseado
 let cachedPathAlias: any = null;
@@ -364,6 +365,15 @@ function hasImportAttributes(code: string, specifierEnd: number): boolean {
     );
 }
 
+/** En --prod, `/node_modules/x` → `/<outDir>/vendor/x` (y copia el archivo). */
+async function vendorize(newPath: string): Promise<string> {
+    if (!isVendorEnabled()) return newPath;
+    const vendorUrl = toVendorUrl(newPath);
+    if (!vendorUrl) return newPath;
+    await copyVendorFile(newPath);
+    return vendorUrl;
+}
+
 async function replaceAliasImportsAst(
     code: string,
     file: string,
@@ -384,12 +394,13 @@ async function replaceAliasImportsAst(
         end,
     } of collectStaticModuleRequests(ast)) {
         if (hasImportAttributes(code, end)) continue;
-        const newPath = await resolveModuleRequest(
+        const resolved = await resolveModuleRequest(
             moduleRequest,
             file,
             pathAlias,
         );
-        if (!newPath || newPath === moduleRequest) continue;
+        if (!resolved || resolved === moduleRequest) continue;
+        const newPath = await vendorize(resolved);
 
         const raw = code.slice(start, end);
         const literal = extractLiteralValue(raw);
@@ -418,12 +429,13 @@ async function replaceAliasImportsAst(
             continue;
         }
 
-        const newPath = await resolveModuleRequest(
+        const resolved = await resolveModuleRequest(
             literal.value,
             file,
             pathAlias,
         );
-        if (!newPath || newPath === literal.value) continue;
+        if (!resolved || resolved === literal.value) continue;
+        const newPath = await vendorize(resolved);
 
         replacements.push({
             start,

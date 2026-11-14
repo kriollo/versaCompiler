@@ -4,6 +4,9 @@ export default defineConfig({
     test: {
         // Entorno de pruebas
         environment: 'node',
+        // Los tests con isPROD no deben copiar node_modules a <outDir>/vendor
+        // dentro del repo; los tests de vendor lo activan explícitamente.
+        env: { VENDOR: 'false' },
 
         // Globales (describe, it, expect disponibles sin import)
         globals: true,

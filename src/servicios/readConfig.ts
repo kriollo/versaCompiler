@@ -50,6 +50,7 @@ export type ViteStyleConfig = {
     hmr?: boolean;
     hmrExclude?: string[];
     define?: Record<string, string>;
+    vendor?: boolean;
 };
 
 export type typeConfig = {
@@ -81,6 +82,7 @@ export type typeConfig = {
     hmr?: boolean;
     hmrExclude?: string[];
     define?: Record<string, string>;
+    vendor?: boolean;
 };
 
 /**
@@ -432,6 +434,7 @@ function normalizeConfig(input: any): typeConfig {
         hmr: viteConfig?.hmr,
         hmrExclude: viteConfig?.hmrExclude,
         define: viteConfig?.define,
+        vendor: viteConfig?.vendor,
     };
 }
 
@@ -541,6 +544,7 @@ export async function readConfig(): Promise<boolean> {
         env.HMR = tsConfig?.hmr === false ? 'false' : 'true';
         env.HMR_EXCLUDE = JSON.stringify(tsConfig?.hmrExclude ?? []);
         env.DEFINE = JSON.stringify(tsConfig?.define ?? {});
+        env.VENDOR = tsConfig?.vendor === false ? 'false' : 'true';
         if (tsConfig?.hmrExclude && tsConfig.hmrExclude.length > 0) {
             logger.info(
                 `[HMR] Exclusiones activas: ${JSON.stringify(tsConfig.hmrExclude)}`,
