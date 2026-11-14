@@ -428,13 +428,23 @@ class WatchDebouncer {
 
                         // Determinar estrategia base:
                         // Si el plugin dice 'module' → propagate garantizado
-                        // Si hay importers conocidos → propagate (los consumers actualizarán sus refs)
+                        // Si hay importers conocidos → full-reload, salvo que el módulo
+                        // acepte su reemplazo (import.meta.hot.accept): los importers
+                        // ya ligaron sus bindings (setup no se re-ejecuta) y re-importar
+                        // crea una 2ª instancia del módulo (Symbol() de inject distinto
+                        // → "injection not found")
                         // Si no hay importers → analizar el módulo compilado para detectar si es "simple"
                         let strategy: 'propagate' | 'full-reload';
                         if (pluginHmrReload === 'module') {
                             strategy = 'propagate';
                         } else if (importers.length > 0) {
-                            strategy = 'propagate';
+                            const content = await readFile(
+                                result.output,
+                                'utf8',
+                            ).catch(() => '');
+                            strategy = /import\.meta\.hot\.accept/.test(content)
+                                ? 'propagate'
+                                : 'full-reload';
                         } else {
                             // Sin importers conocidos: analizar el output compilado
                             strategy = await analyzeCompiledModuleStrategy(

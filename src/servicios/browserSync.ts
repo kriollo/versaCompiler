@@ -880,6 +880,11 @@ export async function emitirCambios(
         normalizedPath,
         path.extname(normalizedPath),
     );
+    // Tras una recarga completa el navegador ya carga todo fresco: seguir
+    // reescribiendo a ?t= crearía 2ª instancias de módulos ya cargados
+    if (action === 'reloadFull' || payload.strategy === 'full-reload') {
+        recentHMRTimestamps.clear();
+    }
     bs.sockets.emit(action, {
         action,
         filePath,

@@ -5,6 +5,15 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### 🐛 Correcciones (HMR)
+
+- **Editar un componente recargaba a todos sus ancestros** (`file-watcher.ts`): los importers invalidados por el grafo se recompilan, pero ya no se envían al navegador. Era la causa del `injection "Symbol(...)" not found` y de que la app se montara de nuevo.
+- **Editar un `.ts`/`.js` plano importado por otros módulos ahora recarga la página** (`file-watcher.ts`, `browserSync.ts`), salvo que el módulo declare `import.meta.hot.accept`. Antes el cambio no se veía o dejaba dos instancias del módulo (claves de `provide`/`inject` distintas). Tras una recarga completa se vacía el mapa de reescritura `?t=`.
+- **Un tsconfig con `baseUrl` (TS5101) o `sourceRoot` (TS5051) hacía fallar todos los archivos** (`typescript-manager.ts`): los diagnósticos de opciones del tsconfig ya no se tratan como errores de sintaxis.
+- **`components: {...}` registraba cualquier import de un `.vue`** (`vuejs.ts`), por ejemplo `import { KEY } from './X.vue'`, lo que provocaba un TDZ en los ciclos de imports. Ahora solo registra lo que usa el template.
+
 ## [3.0.1] - 2026-11-14
 
 ### 🐛 Correcciones

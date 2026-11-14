@@ -479,6 +479,8 @@ export const preCompileVue = async (
             throw err;
         }
         const components = await getComponentsVueMap(ast);
+        // Componentes que el template usa (null: no hubo template compilado)
+        let templateComponents: string[] | null = null;
 
         if (scriptBindings) {
             Object.keys(scriptBindings).forEach(key => {
@@ -561,6 +563,7 @@ export const preCompileVue = async (
             const usedComponents: string[] = (
                 compiledTemplateResult.ast?.components ?? []
             ).filter((name: string) => !name.endsWith('__self'));
+            templateComponents = usedComponents;
             const unimported = usedComponents.filter(
                 (name: string) =>
                     /^[A-Z]/.test(name) && !components.includes(name),
@@ -680,6 +683,18 @@ export const preCompileVue = async (
 
         // Verificar si ya existe una propiedad 'components' en el output
         const hasComponentsProperty = /components\s*:\s*\{/.test(output);
+        // Solo los imports de .vue que el template usa: un `import { KEY } from
+        // './X.vue'` no es un componente y, evaluado en el top-level, rompe (TDZ)
+        // cuando X.vue también importa este archivo
+        const pascal = (s: string) =>
+            s
+                .replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
+                .replace(/^\w/, c => c.toUpperCase());
+        const usedSet =
+            templateComponents && new Set(templateComponents.map(pascal));
+        const registered = usedSet
+            ? components.filter(c => usedSet.has(pascal(c)))
+            : components;
 
         const exportComponent = `
                 __file: '${source}',
@@ -689,7 +704,7 @@ export const preCompileVue = async (
                     hasComponentsProperty
                         ? ''
                         : `components: {
-                    ${components.map(comp => `${comp}`).join(',\n                    ')}
+                    ${registered.join(',\n                    ')}
                 },`
                 }
             `;

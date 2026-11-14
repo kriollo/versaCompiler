@@ -392,6 +392,9 @@ export const preCompileTS = async (
         if (transpileResult.diagnostics?.length) {
             const criticalErrors = transpileResult.diagnostics.filter(
                 (diag: typescript.Diagnostic) => {
+                    // Solo errores del archivo: los de opciones del tsconfig
+                    // (TS5051 sourceRoot, TS5101 baseUrl…) no tienen `file`
+                    if (!diag.file) return false;
                     if (diag.category !== typescript.DiagnosticCategory.Error)
                         return false;
 
