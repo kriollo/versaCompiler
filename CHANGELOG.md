@@ -9,7 +9,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### 🐛 Correcciones
 
-- **Windows: el type check de los `.vue` no reportaba errores** (`typescript-sync-validator.ts`, `typescript-worker-thread.cjs`). El host del LanguageService guardaba los archivos con barras invertidas (`C:\\...\\Modal.vue.ts`), pero TypeScript consulta las rutas normalizadas a `/`. El archivo virtual no se encontraba y el chequeo devolvía cero errores. Lo detectó la nueva matriz de CI con Windows.
+- **Windows: el type check de los `.vue` no reportaba errores** (`typescript-sync-validator.ts`, `typescript-worker-thread.cjs`). El host del LanguageService guardaba los archivos con barras invertidas (`C:\...\Modal.vue.ts`), pero TypeScript consulta las rutas normalizadas a `/`. El archivo virtual no se encontraba y el chequeo devolvía cero errores. Lo detectó la nueva matriz de CI con Windows.
 
 ## [3.0.0] - 2026-11-14
 

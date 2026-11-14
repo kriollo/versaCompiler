@@ -467,3 +467,32 @@ describe('TypeScript Compiler - Performance', () => {
         expect(growth).toBeLessThan(50);
     }, 15000);
 });
+
+describe('preCompileTS - sourceRoot sin source map', () => {
+    it('no falla con TS5051 en scripts de .vue cuando el tsconfig tiene sourceRoot', async () => {
+        const dir = join(process.cwd(), 'temp', 'ts-source-root-test');
+        await mkdir(dir, { recursive: true });
+        await writeFile(
+            join(dir, 'tsconfig.json'),
+            JSON.stringify({
+                compilerOptions: { sourceMap: true, sourceRoot: './src/' },
+            }),
+        );
+        const cwd = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+        const typeCheck = process.env.typeCheck;
+        process.env.typeCheck = 'true';
+        try {
+            const code = 'const x: number = 1;';
+            const result = await preCompileTS(code, join(dir, 'a.vue'), {
+                startLine: 1,
+                content: code,
+            });
+            console.log('DBG', JSON.stringify(result), process.env.isPROD);
+            expect(result.error).toBeNull();
+            expect(result.data).toContain('const x = 1');
+        } finally {
+            cwd.mockRestore();
+            process.env.typeCheck = typeCheck;
+        }
+    });
+});
