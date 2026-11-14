@@ -121,6 +121,8 @@ async function resolveLocalImport(
         if (await fileExists(base)) return base;
         // `./b.js` reescrito por transforms: el fuente es b.ts / b.vue / ...
         base = base.slice(0, -ext.length);
+        // `./data.json.js` (módulo de un asset): el fuente es data.json
+        if (path.extname(base) && (await fileExists(base))) return base;
     }
 
     const candidates = [

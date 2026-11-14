@@ -10,17 +10,17 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### ✨ Novedades
 
 - **API programática:** `import { build, compile, defineConfig } from 'versacompiler'`, con tipos publicados (también los de plugins). Antes `types` apuntaba a un archivo inexistente e importar el paquete ejecutaba el CLI.
-- **Importar JSON, CSS e imágenes** desde JS/TS/Vue. Se copian a `outDir` y junto a cada uno se genera un módulo `.js`: el JSON exporta los datos, el CSS inyecta un `<link>` y los assets exportan su URL. Los imports con atributos (`with { type: 'json' }`) se dejan nativos.
+- **Importar JSON, CSS e imágenes** desde JS/TS/Vue. Solo se copian a `outDir` los que algún módulo importa, y junto a cada uno se genera un módulo `.js`: el JSON exporta los datos, el CSS inyecta un `<link>` y los assets exportan su URL. Los imports con atributos (`with { type: 'json' }`) se dejan nativos.
 - **`import.meta.env` y archivos `.env`:** variables `VERSA_*` de `.env`, `.env.local`, `.env.<mode>` y `.env.<mode>.local`, más `MODE`, `PROD` y `DEV`. Se reemplazan por literales, así que `if (import.meta.env.DEV)` desaparece en `--prod`. Las variables sin el prefijo nunca llegan al navegador.
 - **`define` en el config,** también con claves con punto (`process.env.NODE_ENV`). Trabaja sobre el AST, así que no toca strings ni comentarios.
-- **Salida de producción autocontenida:** en `--prod` los imports de `node_modules` se copian a `<outDir>/vendor/` y se reescriben hacia ahí, así que ya no hay que desplegar `node_modules`. Se desactiva con `vendor: false`.
+- **Salida de producción autocontenida:** en `--prod` los imports de `node_modules` se copian a `<outDir>/vendor/` y se reescriben hacia ahí, así que ya no hay que desplegar `node_modules`. Los imports bare dentro de esos archivos (por ejemplo `vue-router` → `vue`) se reescriben a la misma copia, así que hay una sola instancia de Vue y no hace falta un importmap. Se desactiva con `vendor: false`.
 - **Errores de compilación en el overlay del navegador** durante `--watch`. El overlay se oculta cuando el archivo vuelve a compilar.
 - **Source maps inline en desarrollo** para `.ts`, cuando el `tsconfig` pide `sourceMap` o `inlineSourceMap`.
 - **Nuevas opciones del CLI:**
-  - `--silent`: solo advertencias y errores.
-  - `--mode`: elige el archivo `.env.<mode>`.
-  - `--config`: usa otro archivo de configuración.
-  - Fuera de una terminal interactiva, la salida va en líneas planas, sin barra de progreso ni códigos ANSI.
+    - `--silent`: solo advertencias y errores.
+    - `--mode`: elige el archivo `.env.<mode>`.
+    - `--config`: usa otro archivo de configuración.
+    - Fuera de una terminal interactiva, la salida va en líneas planas, sin barra de progreso ni códigos ANSI.
 - **Plugins con `enforce: 'pre'`,** que corren antes que los plugins core y ven el fuente original. `plugins` queda tipado como `Plugin[]`.
 - **Error accionable** cuando falta `sass`, `less` o `stylus` para un `<style lang>`.
 
@@ -28,6 +28,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 - **`--all` sale con código 1** si falla algún archivo o si el linter detiene el build. Antes siempre salía con 0.
 - **El socket HMR podía no conectarse nunca:** si el cliente de BrowserSync no estaba listo en el primer intento, cada reintento se bloqueaba a sí mismo.
+- **Un `.ts` con error de sintaxis** (`export const x = {`) se "reparaba" a `{}` y compilaba con éxito: los diagnósticos de `transpileModule` solo se reportaban en `--verbose`.
 - **Un `.ts` que solo declara tipos** ya no falla con "El código compilado está vacío"; ahora emite `export {}`.
 - **`sourceMap` en el `tsconfig`** dejaba un `//# sourceMappingURL` hacia un `.map` que nunca se escribía.
 - **La API ya no deja el proceso colgado:** había timers sin `unref()` y el pool de workers de TS no se cerraba al terminar.

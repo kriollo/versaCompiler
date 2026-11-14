@@ -129,6 +129,17 @@ function isExternalModule(
     return true;
 }
 
+/**
+ * `./x` → `./x.js`, `./x.css` → `./x.css.js` (módulo del asset). El `.js` va
+ * antes de `?query`/`#hash`: `./x.css?inline` → `./x.css.js?inline`.
+ */
+function addJsExtension(specifier: string): string {
+    const [, base = specifier, suffix = ''] =
+        /^([^?#]*)([?#].*)?$/.exec(specifier) ?? [];
+    if (/\.(js|mjs|cjs)$/.test(base)) return specifier;
+    return `${base}.js${suffix}`;
+}
+
 async function resolveModuleRequest(
     moduleRequest: string,
     file: string | undefined,
@@ -176,8 +187,8 @@ async function resolveModuleRequest(
                 newImportPath.endsWith('.vue')
             ) {
                 newImportPath = newImportPath.replace(/\.(ts|vue)$/, '.js');
-            } else if (!/\.(js|mjs|cjs)$/.test(newImportPath)) {
-                newImportPath += '.js';
+            } else {
+                newImportPath = addJsExtension(newImportPath);
             }
             newPath = newImportPath;
             transformed = true;
@@ -206,8 +217,8 @@ async function resolveModuleRequest(
                             /\.(ts|vue)$/,
                             '.js',
                         );
-                    } else if (!/\.(js|mjs|cjs)$/.test(newImportPath)) {
-                        newImportPath += '.js';
+                    } else {
+                        newImportPath = addJsExtension(newImportPath);
                     }
                     newPath = newImportPath;
                     transformed = true;
@@ -226,8 +237,8 @@ async function resolveModuleRequest(
             relativePath = relativePath.replace(/\.(ts|vue)$/, '.js');
             newPath = relativePath;
             transformed = true;
-        } else if (!/\.(js|mjs|cjs)$/.test(relativePath)) {
-            newPath = relativePath + '.js';
+        } else if (addJsExtension(relativePath) !== relativePath) {
+            newPath = addJsExtension(relativePath);
             transformed = true;
         }
     }
@@ -370,7 +381,10 @@ async function vendorize(newPath: string): Promise<string> {
     if (!isVendorEnabled()) return newPath;
     const vendorUrl = toVendorUrl(newPath);
     if (!vendorUrl) return newPath;
-    await copyVendorFile(newPath);
+    const pathAlias = getParsedPathAlias() ?? {};
+    await copyVendorFile(newPath, (specifier, importer) =>
+        resolveModuleRequest(specifier, importer, pathAlias),
+    );
     return vendorUrl;
 }
 
@@ -394,6 +408,8 @@ async function replaceAliasImportsAst(
         end,
     } of collectStaticModuleRequests(ast)) {
         if (hasImportAttributes(code, end)) continue;
+        // removeCodeTagImport lo elimina después: no resolver ni vendorizar
+        if (moduleRequest === 'code-tag') continue;
         const resolved = await resolveModuleRequest(
             moduleRequest,
             file,

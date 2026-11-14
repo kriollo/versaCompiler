@@ -6,6 +6,7 @@ const { env } = process;
 import * as chokidar from 'chokidar';
 import { minimatch } from 'minimatch';
 
+import { getMode, invalidateClientEnv } from '../compiler/client-env';
 import {
     clearCompilationState,
     getOutputPath,
@@ -669,6 +670,23 @@ export async function initChokidar(bs: any) {
             directories.get(dir)!.push(item);
         });
         const DirWatch = Array.from(directories.keys());
+
+        // .env* (en la raíz, fuera de src/): invalida import.meta.env. Lo ya
+        // compilado se actualiza al volver a guardar cada archivo.
+        const mode = getMode();
+        chokidar
+            .watch(
+                ['.env', '.env.local', `.env.${mode}`, `.env.${mode}.local`],
+                {
+                    ignoreInitial: true,
+                },
+            )
+            .on('all', (_event: string, file: string) => {
+                invalidateClientEnv();
+                logger.warn(
+                    `🔐 ${file} cambió: import.meta.env se actualiza en los archivos que recompiles; reinicia --watch para recompilar todo`,
+                );
+            });
 
         const watcher = chokidar.watch(DirWatch, {
             persistent: true,

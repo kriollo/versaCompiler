@@ -49,7 +49,30 @@ export function loadClientEnv(): Record<string, string | boolean> {
     return { ...clientEnv, MODE: mode, PROD: isProd, DEV: !isProd };
 }
 
-type Replacement = { start: number; end: number; value: string };
+let envSignature: string | null = null;
+
+/**
+ * Firma de todo lo que puede cambiar el código generado por import.meta.env:
+ * modo, archivos .env* y variables VERSA_* del proceso. Va en la clave del
+ * cache de compilación. Se calcula una vez por proceso (ver invalidateClientEnv).
+ */
+export function clientEnvSignature(): string {
+    if (envSignature === null) envSignature = JSON.stringify(loadClientEnv());
+    return envSignature;
+}
+
+/** Llamar cuando cambie un .env (watch) o el modo (API). */
+export function invalidateClientEnv(): void {
+    envSignature = null;
+}
+
+type Replacement = {
+    start: number;
+    end: number;
+    value: string;
+    /** No filtrar por `skip` (shorthand: la Property y su clave tienen el mismo rango) */
+    force?: boolean;
+};
 
 /**
  * Sustituye `import.meta.env.X` por su valor literal y aplica `define` del
@@ -76,8 +99,47 @@ export function applyClientEnv(code: string, file = 'file.js'): string {
     });
     const clientEnv = usesEnv ? loadClientEnv() : {};
     const found: Replacement[] = [];
+    // Posiciones donde un nombre definido NO es un uso: declaraciones, claves,
+    // imports/exports, lados izquierdos de asignación y parámetros. Reemplazar
+    // ahí produciría JS inválido (`const "1.0" = ...`). esbuild hace lo mismo.
+    const skip: Array<[number, number]> = [];
+    const skipNode = (n: any) => n && skip.push([n.start, n.end]);
+    const skipParams = (n: any) => n.params?.forEach(skipNode);
 
     new Visitor({
+        VariableDeclarator: (n: any) => skipNode(n.id),
+        AssignmentExpression: (n: any) => skipNode(n.left),
+        UpdateExpression: (n: any) => skipNode(n.argument),
+        ImportSpecifier: skipNode,
+        ImportDefaultSpecifier: skipNode,
+        ImportNamespaceSpecifier: skipNode,
+        ExportSpecifier: skipNode,
+        FunctionDeclaration: (n: any) => {
+            skipNode(n.id);
+            skipParams(n);
+        },
+        FunctionExpression: (n: any) => {
+            skipNode(n.id);
+            skipParams(n);
+        },
+        ArrowFunctionExpression: skipParams,
+        ClassDeclaration: (n: any) => skipNode(n.id),
+        MethodDefinition: (n: any) => !n.computed && skipNode(n.key),
+        PropertyDefinition: (n: any) => !n.computed && skipNode(n.key),
+        Property(n: any) {
+            if (n.shorthand && n.key?.name in defines) {
+                // { __VERSION__ } → { __VERSION__: "1.0" }
+                found.push({
+                    start: n.start,
+                    end: n.end,
+                    value: `${n.key.name}: ${defines[n.key.name]}`,
+                    force: true,
+                });
+                skipNode(n.key);
+            } else if (!n.computed) {
+                skipNode(n.key);
+            }
+        },
         MemberExpression(node: any) {
             const text = code.slice(node.start, node.end);
             if (text in defines) {
@@ -132,12 +194,20 @@ export function applyClientEnv(code: string, file = 'file.js'): string {
         },
     }).visit(program);
 
-    if (found.length === 0) return code;
+    const inSkip = (r: Replacement) =>
+        skip.some(([a, b]) => r.start >= a && r.end <= b);
+    const usable = found.filter(r => r.force || !inSkip(r));
+    if (usable.length === 0) return code;
     // Exteriores primero; se descartan los anidados (p. ej. el Identifier dentro
     // de un MemberExpression ya reemplazado)
-    found.sort((a, b) => a.start - b.start || b.end - a.end);
+    usable.sort(
+        (a, b) =>
+            a.start - b.start ||
+            b.end - a.end ||
+            Number(!!b.force) - Number(!!a.force),
+    );
     const kept: Replacement[] = [];
-    for (const r of found) {
+    for (const r of usable) {
         const last = kept[kept.length - 1];
         if (last && r.start < last.end) continue;
         kept.push(r);

@@ -20,6 +20,7 @@ import { getLoadedConfig } from '../servicios/readConfig';
 import { promptUser } from '../utils/promptUser';
 import { showTimingForHumans } from '../utils/utils';
 
+import { clientEnvSignature } from './client-env';
 import { BuildPipeline } from './pipeline/build-pipeline';
 import { createCorePlugins } from './pipeline/core-plugins';
 import { ModuleGraph } from './pipeline/module-graph';
@@ -483,6 +484,10 @@ const COMPILATION_ENV_VARS = [
     'tailwindcss',
     'linter',
     'tsconfigFile',
+    'DEFINE',
+    'MODE',
+    'VENDOR',
+    'PATH_DIST',
 ] as const;
 
 class SmartCompilationCache {
@@ -549,9 +554,10 @@ class SmartCompilationCache {
      */
     private generateEnvHash(): string {
         try {
-            const envVars = COMPILATION_ENV_VARS.map(
-                key => `${key}=${env[key] || ''}`,
-            ).join('|');
+            const envVars =
+                COMPILATION_ENV_VARS.map(
+                    key => `${key}=${env[key] || ''}`,
+                ).join('|') + `|clientEnv=${clientEnvSignature()}`;
             return createHash('sha256')
                 .update(envVars)
                 .digest('hex')
@@ -2199,6 +2205,13 @@ async function compileWithPipeline(
         smartCache.registerDependencies(inPath, result.dependencies);
     }
 
+    // JSON, CSS e imágenes se copian solo si algún módulo los importa: un
+    // src/credenciales.json o src/notas.txt sin importar no llega al webroot
+    const { isStaticAsset, emitStaticAsset } = await import('./static-assets');
+    for (const dep of result.dependencies) {
+        if (isStaticAsset(dep)) await emitStaticAsset(dep, getOutputPath(dep));
+    }
+
     registerCompilationSuccess(inPath, 'pipeline');
 
     return {
@@ -2267,7 +2280,8 @@ export async function initCompile(
             await import('./static-assets');
         if (isStaticAsset(file)) {
             await emitStaticAsset(file, outFile);
-            return { success: true, output: outFile, action: 'compiled' };
+            // 'extension': el watcher lo traduce a reloadFull
+            return { success: true, output: outFile, action: 'extension' };
         }
 
         // 🚀 Verificar cache antes de compilar (especialmente importante en modo watch)
@@ -3032,9 +3046,6 @@ export async function initCompileAll(): Promise<boolean> {
             `${normalizedGlobPathSource}/**/*.ts`,
             `${normalizedGlobPathSource}/**/*.mjs`,
             `${normalizedGlobPathSource}/**/*.cjs`,
-            ...(await import('./static-assets')).STATIC_ASSET_EXTENSIONS.map(
-                ext => `${normalizedGlobPathSource}/**/*.${ext}`,
-            ),
         ];
 
         logger.info(`📝 Compilando todos los archivos...`);
@@ -3060,6 +3071,9 @@ export async function initCompileAll(): Promise<boolean> {
                 );
             }
         }
+
+        // Cada --all recopia vendor desde cero (outDir pudo haberse borrado)
+        (await import('./vendor')).resetVendorCache();
 
         // Fase 4: Recopilando archivos
         progressManager.updateProgress('📁 Recopilando archivos...');

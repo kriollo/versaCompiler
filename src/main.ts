@@ -286,7 +286,9 @@ async function main() {
         }
 
         env.isPROD = argv.prod ? 'true' : 'false';
+        // Sin --mode se ignora una variable MODE heredada del shell
         if (argv.mode) env.MODE = argv.mode;
+        else delete env.MODE;
         env.isALL = argv.all ? 'true' : 'false';
         env.TAILWIND =
             argv.tailwind === undefined ? 'true' : String(argv.tailwind);

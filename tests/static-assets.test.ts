@@ -99,4 +99,11 @@ describe('transforms - imports de assets', () => {
         expect(result.code).toContain(`from './data.json' with`);
         expect(result.code).toContain(`import('./x.css', {`);
     });
+
+    it('pone el .js antes de ?query y #hash', async () => {
+        const code = `import a from './x.css?inline';\nimport b from './logo.svg#icon';`;
+        const result = await estandarizaCode(code, 'test.js');
+        expect(result.code).toContain(`from './x.css.js?inline'`);
+        expect(result.code).toContain(`from './logo.svg.js#icon'`);
+    });
 });

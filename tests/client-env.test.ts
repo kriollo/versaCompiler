@@ -68,3 +68,36 @@ describe('applyClientEnv - import.meta.env y define', () => {
         );
     });
 });
+
+describe('applyClientEnv - define no rompe declaraciones ni claves', () => {
+    const saved = process.env.DEFINE;
+    afterEach(() => {
+        if (saved === undefined) delete process.env.DEFINE;
+        else process.env.DEFINE = saved;
+    });
+
+    it('solo reemplaza usos, no declaraciones, claves, imports ni asignaciones', () => {
+        process.env.DEFINE = JSON.stringify({
+            __V__: '"1.2.3"',
+            'process.env.NODE_ENV': '"production"',
+        });
+        const code = [
+            "import { __V__ as v } from './x.js';",
+            "const __V__ = 'local';",
+            'const o = { __V__: 1, __V__, [__V__]: 2 };',
+            'function f(__V__) { return __V__; }',
+            "process.env.NODE_ENV = 'x';",
+            'const n = process.env.NODE_ENV;',
+        ].join('\n');
+        expect(applyClientEnv(code)).toBe(
+            [
+                "import { __V__ as v } from './x.js';",
+                "const __V__ = 'local';",
+                'const o = { __V__: 1, __V__: "1.2.3", ["1.2.3"]: 2 };',
+                'function f(__V__) { return "1.2.3"; }',
+                "process.env.NODE_ENV = 'x';",
+                'const n = "production";',
+            ].join('\n'),
+        );
+    });
+});

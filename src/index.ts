@@ -67,6 +67,7 @@ export interface CompileResult {
 const COMPILER = './compiler/compile.js';
 const READ_CONFIG = './servicios/readConfig.js';
 const TS_POOL = './compiler/typescript-worker-pool.js';
+const CLIENT_ENV = './compiler/client-env.js';
 
 /** Cierra los workers de TypeScript para que el proceso del usuario pueda salir. */
 async function shutdown(): Promise<void> {
@@ -90,6 +91,11 @@ async function setup(options: BuildOptions): Promise<void> {
     env.isPROD = options.prod ? 'true' : 'false';
     if (options.mode) env.MODE = options.mode;
     else delete env.MODE;
+    // .env o modo pueden haber cambiado entre dos llamadas
+    const { invalidateClientEnv } = (await import(CLIENT_ENV)) as {
+        invalidateClientEnv(): void;
+    };
+    invalidateClientEnv();
     env.TAILWIND = options.tailwind === false ? 'false' : 'true';
     env.ENABLE_LINTER = options.linter ? 'true' : 'false';
     env.typeCheck = options.typeCheck ? 'true' : 'false';

@@ -295,7 +295,7 @@ export default defineConfig({
 
 ### Dependencias en producción sin `node_modules`
 
-En `--prod`, los imports de `/node_modules/<ruta>` se copian a `<outDir>/vendor/`, así que no hace falta desplegar `node_modules`. Funciona con builds ESM para navegador (por ejemplo `vue.esm-browser.prod.js`). Para desactivarlo: `vendor: false`.
+En `--prod`, los imports de `/node_modules/<ruta>` se copian a `<outDir>/vendor/`, así que no hace falta desplegar `node_modules`. Funciona con builds ESM para navegador (por ejemplo `vue.esm-browser.prod.js`). Los imports bare dentro de esos archivos (`vue-router` importa `"vue"`) se reescriben a la misma copia de vendor, así que no hace falta un importmap y hay una sola instancia de Vue. Para desactivarlo: `vendor: false`.
 
 > **Nota:** VersaCompiler no hace bundling. Si necesitas bundles, usa un bundler externo sobre `outDir`.
 

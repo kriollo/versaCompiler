@@ -378,7 +378,9 @@ export const preCompileTS = async (
                     : { inlineSourceMap: false }),
             },
             fileName,
-            reportDiagnostics: env.VERBOSE === 'true', // Solo reportar en verbose
+            // Siempre: son solo errores sintácticos (baratos) y sin ellos un
+            // `export const x = {` se "recuperaba" a `{}` y compilaba con éxito
+            reportDiagnostics: true,
         });
 
         // Verificar errores críticos de sintaxis

@@ -436,7 +436,7 @@ console.log(data, logo);
 ```
 
 - Extensiones soportadas: `json`, `css`, `png`, `jpg`, `jpeg`, `gif`, `svg`, `webp`, `avif`, `ico`, `bmp`, `woff`, `woff2`, `ttf`, `otf`, `eot`, `mp4`, `webm`, `ogg`, `mp3`, `wav`, `pdf`, `txt`.
-- Los archivos se copian a `outDir` y se genera un módulo `<archivo>.js` junto a cada uno.
+- Solo se copian a `outDir` los archivos que algún módulo importa (un `src/credenciales.json` sin importar no se publica), y junto a cada uno se genera un módulo `<archivo>.js`.
 - Los imports con atributos de importación (`with { type: 'json' }` o `type: 'css'`) se dejan nativos y no se reescriben.
 - El CSS de entrada de TailwindCSS se omite.
 

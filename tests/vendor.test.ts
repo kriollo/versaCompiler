@@ -2,6 +2,7 @@ import {
     existsSync,
     mkdirSync,
     mkdtempSync,
+    readFileSync,
     rmSync,
     writeFileSync,
 } from 'node:fs';
@@ -74,5 +75,53 @@ describe('vendor - salida de producción sin node_modules', () => {
         for (const f of ['index.js', 'util/a.js', 'b.js', 'c.js']) {
             expect(existsSync(path.join(out, f))).toBe(true);
         }
+    });
+
+    it('vuelve a copiar si outDir se borró entre dos builds', async () => {
+        const pkg = path.join(dir, 'node_modules', 'lib');
+        mkdirSync(pkg, { recursive: true });
+        writeFileSync(path.join(pkg, 'index.js'), 'export const a = 1;\n');
+        const out = path.join(dir, 'dist', 'vendor', 'lib', 'index.js');
+
+        await copyVendorFile('/node_modules/lib/index.js');
+        rmSync(path.join(dir, 'dist'), { recursive: true });
+        await copyVendorFile('/node_modules/lib/index.js');
+        expect(existsSync(out)).toBe(true);
+    });
+
+    it('reescribe los imports bare dentro del archivo copiado hacia vendor', async () => {
+        for (const name of ['router', 'core']) {
+            mkdirSync(path.join(dir, 'node_modules', name), {
+                recursive: true,
+            });
+        }
+        writeFileSync(
+            path.join(dir, 'node_modules', 'router', 'index.js'),
+            "import { ref } from 'core';\nexport { ref };\n",
+        );
+        writeFileSync(
+            path.join(dir, 'node_modules', 'core', 'index.js'),
+            'export const ref = 1;\n',
+        );
+
+        await copyVendorFile('/node_modules/router/index.js', async spec =>
+            spec === 'core' ? '/node_modules/core/index.js' : null,
+        );
+
+        const router = readFileSync(
+            path.join(dir, 'dist', 'vendor', 'router', 'index.js'),
+            'utf8',
+        );
+        expect(router).toContain('from "/dist/vendor/core/index.js"');
+        expect(
+            existsSync(path.join(dir, 'dist', 'vendor', 'core', 'index.js')),
+        ).toBe(true);
+    });
+
+    it('usa / en la URL aunque outDir venga con barras de Windows', () => {
+        process.env.PATH_DIST = '.\\public\\js';
+        expect(toVendorUrl('/node_modules/vue/x.js')).toBe(
+            '/public/js/vendor/vue/x.js',
+        );
     });
 });

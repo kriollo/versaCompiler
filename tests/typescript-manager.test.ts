@@ -152,18 +152,13 @@ greet(42);
             expect(result.error).toBeNull();
         });
 
-        it('[comportamiento actual] no reporta errores de sintaxis fuera de modo verbose (fast path)', async () => {
-            // preCompileTS usa transpileModule con diagnostics:false y
-            // reportDiagnostics: env.VERBOSE === 'true' (optimización de
-            // velocidad) — sin --verbose no detecta este error de sintaxis y
-            // emite una "reparación" best-effort en vez de fallar. La
-            // detección real de este tipo de error ocurre en el paso
-            // separado de --typeCheck (typescript-worker-pool), no aquí.
+        it('reporta errores de sintaxis aunque no sea --verbose', async () => {
+            // Antes reportDiagnostics dependía de VERBOSE: sin él, transpileModule
+            // "reparaba" esto a `const x = {}` y el archivo compilaba con éxito.
             const code = 'const x = {;';
             const result = await preCompileTS(code, 'test.ts');
 
-            expect(result.error).toBeNull();
-            expect(result.data).toContain('const x = {}');
+            expect(result.error).not.toBeNull();
         });
 
         it('should handle very long files', async () => {

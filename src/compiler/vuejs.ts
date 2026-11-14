@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { env } from 'node:process';
 
 import * as vCompiler from 'vue/compiler-sfc';
 
@@ -794,7 +795,10 @@ export const preCompileVue = async (
 
         return result;
     } catch (error) {
-        logger.error('Vue compilation error:', error);
+        // El error llega al resumen/overlay; el detalle completo solo en --verbose
+        if (env.VERBOSE === 'true') {
+            logger.error('Vue compilation error:', error);
+        }
         const normalized =
             error instanceof Error ? error : new Error(String(error));
         normalized.message = withPreprocessorHint(normalized.message);
