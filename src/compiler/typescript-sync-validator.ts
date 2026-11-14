@@ -57,6 +57,13 @@ interface TypeCheckResult {
 /**
  * Language Service Host para validación de tipos eficiente
  */
+/**
+ * TypeScript normaliza las rutas a `/` al consultar el host: con claves
+ * `C:\\...` (Windows) el archivo virtual `.vue.ts` no se encontraba y el
+ * type check de los .vue devolvía cero errores.
+ */
+const toKey = (fileName: string): string => fileName.replace(/\\/g, '/');
+
 class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
     private files: Map<string, { version: number; content: string }> =
         new Map();
@@ -70,8 +77,8 @@ class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
     }
 
     addFile(fileName: string, content: string): void {
-        const existing = this.files.get(fileName);
-        this.files.set(fileName, {
+        const existing = this.files.get(toKey(fileName));
+        this.files.set(toKey(fileName), {
             version: existing ? existing.version + 1 : 1,
             content,
         });
@@ -85,13 +92,13 @@ class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
     }
 
     getScriptVersion(fileName: string): string {
-        const file = this.files.get(fileName);
+        const file = this.files.get(toKey(fileName));
         return file ? file.version.toString() : '0';
     }
     getScriptSnapshot(
         fileName: string,
     ): typescript.IScriptSnapshot | undefined {
-        const file = this.files.get(fileName);
+        const file = this.files.get(toKey(fileName));
         if (file) {
             return typescript.ScriptSnapshot.fromString(file.content);
         } // Intentar leer el archivo del sistema de archivos para dependencias
@@ -115,11 +122,11 @@ class TypeScriptLanguageServiceHost implements typescript.LanguageServiceHost {
     }
 
     fileExists(filePath: string): boolean {
-        return this.files.has(filePath) || fs.existsSync(filePath);
+        return this.files.has(toKey(filePath)) || fs.existsSync(filePath);
     }
 
     readFile(filePath: string): string | undefined {
-        const file = this.files.get(filePath);
+        const file = this.files.get(toKey(filePath));
         if (file) {
             return file.content;
         }

@@ -27,6 +27,13 @@ try {
 // vuelve una raíz espuria del Program.
 const MAX_DEP_CACHE = 300;
 
+/**
+ * TypeScript normaliza las rutas a `/` al consultar el host: con claves
+ * `C:\\...` (Windows) el archivo virtual `.vue.ts` no se encontraba y el
+ * type check de los .vue devolvía cero errores.
+ */
+const toKey = fileName => fileName.replace(/\\/g, '/');
+
 class WorkerTypeScriptLanguageServiceHost {
     constructor(compilerOptions) {
         this.files = new Map();
@@ -121,8 +128,8 @@ class WorkerTypeScriptLanguageServiceHost {
     }
 
     addFile(fileName, content) {
-        const existing = this.files.get(fileName);
-        this.files.set(fileName, {
+        const existing = this.files.get(toKey(fileName));
+        this.files.set(toKey(fileName), {
             version: existing ? existing.version + 1 : 1,
             content,
         });
@@ -137,13 +144,13 @@ class WorkerTypeScriptLanguageServiceHost {
     }
 
     getScriptVersion(fileName) {
-        const file = this.files.get(fileName);
+        const file = this.files.get(toKey(fileName));
         if (file) return file.version.toString();
         return this.getDepVersion(fileName);
     }
 
     getScriptSnapshot(fileName) {
-        const file = this.files.get(fileName);
+        const file = this.files.get(toKey(fileName));
         if (file) {
             return ts.ScriptSnapshot.fromString(file.content);
         }
@@ -170,11 +177,11 @@ class WorkerTypeScriptLanguageServiceHost {
     }
 
     fileExists(filePath) {
-        return this.files.has(filePath) || fs.existsSync(filePath);
+        return this.files.has(toKey(filePath)) || fs.existsSync(filePath);
     }
 
     readFile(filePath) {
-        const file = this.files.get(filePath);
+        const file = this.files.get(toKey(filePath));
         if (file) {
             return file.content;
         }
@@ -285,7 +292,10 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             // Se hace DESPUÉS de addFile para que la versión se incremente correctamente
             // (evita que el LS use resultados cacheados de versiones anteriores).
             for (const key of host.files.keys()) {
-                if (key !== virtualFileName && key !== vueTypesPath) {
+                if (
+                    key !== toKey(virtualFileName) &&
+                    key !== toKey(vueTypesPath)
+                ) {
                     host.files.delete(key);
                 }
             }
@@ -296,7 +306,7 @@ function validateTypesInWorker(fileName, content, compilerOptions) {
             // Eliminar archivos de tareas anteriores para evitar que el programa crezca.
             // Se hace DESPUÉS de addFile para que la versión se incremente correctamente.
             for (const key of host.files.keys()) {
-                if (key !== fileName) {
+                if (key !== toKey(fileName)) {
                     host.files.delete(key);
                 }
             }

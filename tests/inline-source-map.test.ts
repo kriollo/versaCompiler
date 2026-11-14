@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { shiftInlineSourceMap } from '../src/compiler/compile';
 
 const withMap = (mappings: string) =>
-    `const a = 1;\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(
+    // El comentario se arma por partes: si aparece literal en este archivo,
+    // Vitest intenta leerlo como el source map del propio test (falla en Windows)
+    `const a = 1;\n//# ${'sourceMappingURL'}=data:application/json;base64,${Buffer.from(
         JSON.stringify({ version: 3, sources: ['a.ts'], mappings }),
     ).toString('base64')}`;
 

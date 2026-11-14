@@ -56,7 +56,10 @@ describe('static-assets - JSON, CSS e imágenes como módulos', () => {
         const out = await emit('logo.png', Buffer.from([0x89, 0x50]));
         expect(readFileSync(out)).toEqual(Buffer.from([0x89, 0x50]));
         const mod = await import(pathToFileURL(`${out}.js`).href);
-        expect(mod.default).toBe(pathToFileURL(out).href);
+        // Windows: pathToFileURL codifica `~` (RUNNER~1) como %7E y new URL no
+        expect(decodeURIComponent(mod.default)).toBe(
+            decodeURIComponent(pathToFileURL(out).href),
+        );
     });
 
     it('un .css se copia y su módulo exporta la URL (inyecta <link> en el navegador)', async () => {
@@ -66,7 +69,10 @@ describe('static-assets - JSON, CSS e imágenes como módulos', () => {
             "link.rel = 'stylesheet'",
         );
         const mod = await import(pathToFileURL(`${out}.js`).href);
-        expect(mod.default).toBe(pathToFileURL(out).href);
+        // Windows: pathToFileURL codifica `~` (RUNNER~1) como %7E y new URL no
+        expect(decodeURIComponent(mod.default)).toBe(
+            decodeURIComponent(pathToFileURL(out).href),
+        );
     });
 });
 

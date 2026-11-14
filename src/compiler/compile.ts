@@ -2129,7 +2129,7 @@ export function shiftInlineSourceMap(code: string, lines: number): string {
         const encoded = Buffer.from(JSON.stringify(map)).toString('base64');
         return code.replace(
             INLINE_MAP_RE,
-            `//# sourceMappingURL=data:application/json;base64,${encoded}`,
+            `//# ${'sourceMappingURL'}=data:application/json;base64,${encoded}`,
         );
     } catch {
         return code;
