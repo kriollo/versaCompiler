@@ -5,7 +5,18 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
-## [Sin publicar]
+## [3.0.0] - 2026-11-14
+
+Incluye también todo lo de la 2.8.0, que no se publicó en npm.
+
+### ⚠️ Cambios que rompen compatibilidad
+
+- **Requiere Node.js 22.22 o superior.**
+- **`--prod` copia las dependencias a `<outDir>/vendor/`** y reescribe los imports hacia ahí, en lugar de importar desde `/node_modules/`. Para volver al comportamiento anterior: `vendor: false`.
+- **Los imports de `.css`, `.json` e imágenes se reescriben a `<archivo>.js`.** Los que usan atributos (`with { type: 'json' }`) siguen siendo nativos.
+- **`--all` sale con código 1 si hay errores.** Un CI que ignoraba fallos ahora los detecta.
+- **Un `.ts` con error de sintaxis ya no compila.** Antes se "reparaba" en silencio.
+- **`validatePath`/`validateCommand` aceptan `..`, rutas absolutas y binarios del PATH** (cambio de la 2.8.0).
 
 ### ✨ Novedades
 
