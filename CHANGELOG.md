@@ -5,6 +5,12 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### 🐛 Correcciones (HMR)
+
+- **El HMR de `.vue` no funcionaba con varias apps Vue montadas en la página** (`VueHRM.js`, `initHRM.js`). Solo se buscaba el componente en una app: `window.__VUE_APP__`, `#app` o el primer elemento del DOM con `__vue_app__`. Si la página montaba antes otras apps (la barra superior, una campana de notificaciones), el componente editado nunca se encontraba. Ahora `reloadComponent` recorre todas las apps montadas (`[data-v-app]`) y actualiza todas las instancias del componente.
+
 ## [3.0.2] - 2026-11-14
 
 ### 🐛 Correcciones (HMR)

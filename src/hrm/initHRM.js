@@ -392,12 +392,9 @@ async function initSocket(retries = 0) {
             try {
                 hideErrorOverlay();
                 vueInstance = window.__VUE_APP__ || vueInstance;
-                if (vueInstance) {
-                    console.log('🔥 Preparando HMR para Vue...');
-                    await reloadComponent(vueInstance, data);
-                } else {
-                    console.log('🔄 Usando método fallback:', vueInstance);
-                }
+                // reloadComponent recorre además todas las apps montadas en el DOM
+                console.log('🔥 Preparando HMR para Vue...');
+                await reloadComponent(vueInstance, data);
             } catch (error) {
                 console.error('❌ Error en HMR de Vue:', error);
                 reportErrorToServer('vue-hmr', error, {

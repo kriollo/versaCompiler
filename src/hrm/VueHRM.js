@@ -374,6 +374,25 @@ function tryUpdateComponentPath(path, newComponent, componentName, App) {
 }
 
 /**
+ * Devuelve todas las apps Vue 3 montadas en la página. Una página puede montar
+ * varias (la de la página y otras chicas en la barra, un modal, etc.) y el
+ * componente editado puede vivir en cualquiera de ellas.
+ * @param {VueApp|null} App - App conocida (se incluye aunque no esté en el DOM)
+ * @returns {VueApp[]} Apps con instancia raíz, sin repetir
+ */
+function getMountedVueApps(App) {
+    const apps = new Set();
+    if (App?._instance) apps.add(App);
+    if (typeof document !== 'undefined') {
+        // Vue marca cada contenedor montado con data-v-app y __vue_app__
+        for (const el of document.querySelectorAll('[data-v-app]')) {
+            if (el.__vue_app__?._instance) apps.add(el.__vue_app__);
+        }
+    }
+    return [...apps];
+}
+
+/**
  * Recarga un componente Vue con Hot Module Replacement
  * @param {VueApp|null} App - Aplicación Vue principal (si falta, se busca en la página)
  * @param {ComponentInfo} Component - Información del componente a recargar
@@ -383,13 +402,14 @@ export async function reloadComponent(App, Component) {
     try {
         const { normalizedPath: relativePath, nameFile: componentName } =
             Component;
-        if (!App || !App._instance) {
+        let apps = getMountedVueApps(App);
+        if (apps.length === 0) {
             const vueInstance = await obtenerInstanciaVue();
             if (!vueInstance) {
                 console.error('❌ No se pudo obtener la instancia de Vue');
                 return false;
             }
-            App = vueInstance;
+            apps = [vueInstance];
         }
 
         if (!relativePath) {
@@ -422,20 +442,33 @@ export async function reloadComponent(App, Component) {
             return false;
         }
 
-        const rootInstance = App?._instance;
-        if (!rootInstance) {
-            console.error('❌ La aplicación Vue no expone su instancia raíz');
-            return false;
+        // Buscar el componente en TODAS las apps montadas, no solo en la primera
+        /** @type {{node: TreeNode, app: VueApp}[]} */
+        const targets = [];
+        for (const app of apps) {
+            const rootInstance = app?._instance;
+            if (!rootInstance) {
+                console.error(
+                    '❌ La aplicación Vue no expone su instancia raíz',
+                );
+                continue;
+            }
+            const componentTree = buildComponentTree(rootInstance);
+            if (!componentTree) {
+                console.error(
+                    '❌ No se pudo construir el árbol de componentes',
+                );
+                continue;
+            }
+            for (const node of findNodeByInstance(
+                componentTree,
+                componentName,
+            )) {
+                targets.push({ node, app });
+            }
         }
 
-        const componentTree = buildComponentTree(rootInstance);
-        if (!componentTree) {
-            console.error('❌ No se pudo construir el árbol de componentes');
-            return false;
-        }
-
-        const targetNodes = findNodeByInstance(componentTree, componentName);
-        if (!targetNodes) {
+        if (targets.length === 0) {
             console.warn(
                 '⚠️ No se encontró el nodo objetivo para:',
                 componentName,
@@ -445,19 +478,18 @@ export async function reloadComponent(App, Component) {
         }
 
         console.log(
-            `🔍 Se encontraron ${targetNodes.length} instancias del componente ${componentName}`,
+            `🔍 Se encontraron ${targets.length} instancias del componente ${componentName}`,
         );
 
         let successfulUpdates = 0; // Procesar TODAS las instancias encontradas
-        for (let i = 0; i < targetNodes.length; i++) {
-            const node = targetNodes[i];
+        for (const [i, { node, app }] of targets.entries()) {
             if (node) {
                 const path = getPathToRoot(node);
                 const updateResult = await tryUpdateComponentPath(
                     path,
                     module.default,
                     componentName,
-                    App,
+                    app,
                 );
 
                 if (updateResult) {
@@ -472,7 +504,7 @@ export async function reloadComponent(App, Component) {
 
         const hasSuccessfulUpdate = successfulUpdates > 0;
         console.log(
-            `\n📊 Resultado final: ${successfulUpdates}/${targetNodes.length} instancias actualizadas`,
+            `\n📊 Resultado final: ${successfulUpdates}/${targets.length} instancias actualizadas`,
         );
 
         return hasSuccessfulUpdate;
