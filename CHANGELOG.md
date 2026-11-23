@@ -5,6 +5,15 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [3.0.4] - 2026-11-19
+
+### 📦 Dependencias
+
+- **Actualización de dependencias de producción:** Vue pasa a `3.5.46`, y las herramientas de Oxc (`oxc-parser` y `oxc-minify`) pasan a `0.160.0`.
+- **Herramientas de desarrollo actualizadas:** TypeScript ESLint a `8.74.0`, ESLint a `10.15.0`, OxLint/Oxfmt a `1.95.0`/`0.80.0`, `@types/node` a `26.6.6`, `@vueuse/core` a `15.1.0` y Vitest a `5.1.1`.
+- **Herramienta de paquetes:** pnpm pasa a `12.23.0`.
+- **Instalación reproducible:** se amplía la lista de exclusiones de `minimumReleaseAge` para las nuevas versiones de Oxc y sus paquetes relacionados.
+
 ## [3.0.3] - 2026-11-19
 
 ### 🐛 Correcciones (HMR)
